@@ -205,7 +205,7 @@ var NOTE_CLAUDE_EFFORTS = NOTE_CLAUDE_EFFORT_CHOICES.map(
 // lists reuse the reviewed Notes catalogs; "default" leaves the choice to the
 // agent's own configuration.
 var ASSISTANT_AGENTS = ["auto", "claude", "codex"];
-var ASSISTANT_CHARACTERS = ["mascot", "mark"];
+var ASSISTANT_CHARACTERS = ["wiz", "mark"];
 var ASSISTANT_CLAUDE_MODELS = ["default"].concat(NOTE_CLAUDE_MODELS);
 var ASSISTANT_CODEX_MODELS = ["default"].concat(NOTE_CODEX_MODELS);
 
@@ -476,7 +476,7 @@ function defaults() {
         // Off until enabled: the screen button attaches a screenshot only
         // to the question it was pressed for.
         assistantScreenContext: false,
-        assistantCharacter: "mascot",
+        assistantCharacter: "wiz",
         // Where the character was left. Runtime state, persisted so a shell
         // reload or a new session finds it there; -1 is the default corner.
         assistantShown: false,

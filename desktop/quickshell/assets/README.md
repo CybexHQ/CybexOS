@@ -13,6 +13,10 @@ The shell chooses icons by semantic role:
 - Small animated primitives may be drawn in QML when an icon-font shape does
   not animate or align correctly.
 
+`wiz/` holds the assistant character's layers. They are generated: edit
+`Common/WizRig.js` and run `scripts/export-wiz` (docs/assistant.md). Wiz is
+original project artwork under the repository MIT license.
+
 Do not add an identity SVG directly to a view. Add its canonical asset here,
 record its provenance below, register it in `BrandIcons`, and render it through
 `BrandIcon`. Small interactive marks also get a `-white.svg` sibling made by

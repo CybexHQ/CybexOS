@@ -22,7 +22,7 @@ import "Common/AssistantHelpers.js" as AssistantHelpers
 PanelWindow {
     id: root
 
-    readonly property real size: Theme.scaled(64)
+    readonly property real size: Assistant.characterSize
     // The bar's band at the top, kept clear by the default place and the box.
     readonly property real topReserve: Settings.position === "top"
         ? Theme.barHeight + Theme.barTopMargin : 0
@@ -35,6 +35,8 @@ PanelWindow {
     property bool pressing: false
     property real dragX: 0
     property real dragY: 0
+    // Both at once, once per pointer move: Wiz reads its velocity from this.
+    property point dragPoint: Qt.point(0, 0)
     property point pressWindow: Qt.point(0, 0)
     property point pressBubble: Qt.point(0, 0)
     readonly property real bubbleX: dragging ? dragX : resting.x
@@ -157,14 +159,19 @@ PanelWindow {
             y: root.bubbleY
             width: root.size
             height: root.size
+            wiz: Settings.assistantCharacter !== "mark"
             mood: Assistant.mood
-            mascot: Settings.assistantCharacter !== "mark"
+            pose: Assistant.pose
             level: composer.level
+            recording: Assistant.listening
             hovered: characterHover.hovered
             unread: Assistant.unread
             boxAbove: root.dockPlace.above
             scale: dragArea.pressed && !root.dragging ? 0.94 : root.dragging ? 1.06 : 1
-            rotation: root.dragging && !Theme.reducedMotion
+            dragPoint: root.dragPoint
+            grab: Qt.point(root.pressWindow.x - root.pressBubble.x, root.pressWindow.y - root.pressBubble.y)
+            // Wiz swings from where he is held himself; the mark only tilts.
+            rotation: root.dragging && !Theme.reducedMotion && !character.wiz
                 ? AssistantHelpers.clamp((root.dragX - root.pressBubble.x) / 40, -8, 8) : 0
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Cybex OS Assistant")
@@ -248,6 +255,7 @@ PanelWindow {
                 }
                 root.dragX = AssistantHelpers.clamp(root.pressBubble.x + dx, 0, root.width - root.size);
                 root.dragY = AssistantHelpers.clamp(root.pressBubble.y + dy, 0, root.height - root.size);
+                root.dragPoint = Qt.point(root.dragX, root.dragY);
                 root.lastPointer = Qt.point(mouse.x, mouse.y);
             }
             onReleased: {

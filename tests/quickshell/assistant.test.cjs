@@ -103,6 +103,41 @@ test("the character's mood follows the most urgent state", () => {
     assert.ok(A.finished({ status: "stopped" }) && !A.finished(null));
 });
 
+test("Wiz's pose follows the mood and what a running turn is doing", () => {
+    const base = { connected: true };
+    const pose = state => A.characterPose(Object.assign({}, base, state));
+    assert.equal(A.characterPose({}), "asleep");
+    assert.equal(pose({ composing: true }), "listening", "an open box is listened to");
+    assert.equal(pose({ listening: true, busy: true }), "listening");
+    assert.equal(pose({ waiting: true, busy: true, step: "Waiting for your approval" }), "needs-input");
+    // The service's own "Thinking" step (turn.py) is thinking; any tool step is work.
+    assert.equal(pose({ busy: true, step: "Thinking" }), "thinking");
+    assert.equal(pose({ busy: true, step: "" }), "thinking");
+    assert.equal(pose({ busy: true, step: "Running nix flake check" }), "working");
+    assert.equal(pose({ transcribing: true, step: "Editing shell.json" }), "thinking",
+        "transcribing is not a turn at work");
+    assert.equal(pose({ celebrating: true }), "finished");
+    assert.equal(pose({ speaking: true }), "happy");
+    // Being dragged wins over everything, even a turn at work or no service.
+    assert.equal(pose({ dragging: true }), "carried");
+    assert.equal(pose({ dragging: true, busy: true, step: "Reading a file", waiting: true }), "carried");
+    assert.equal(A.characterPose({ dragging: true }), "carried");
+    assert.equal(A.mood(Object.assign({}, base, { dragging: true })), "happy", "the mark keeps its happy ring");
+    assert.equal(pose({ failed: true }), "sorry");
+    assert.equal(pose({}), "idle");
+    const W = load("WizRig.js");
+    for (const state of [{}, base, { ...base, composing: true }, { ...base, waiting: true, busy: true },
+        { ...base, busy: true, step: "Reading a file" }, { ...base, busy: true }, { ...base, celebrating: true },
+        { ...base, speaking: true }, { ...base, failed: true }, { ...base, dragging: true }])
+        assert.ok(W.STATES.includes(A.characterPose(state)), "every pose is one Wiz can show");
+    const shared = read("Common/Assistant.qml");
+    assert.match(shared, /readonly property string mood: AssistantHelpers\.mood\(characterState\)/);
+    assert.match(shared, /readonly property string pose: AssistantHelpers\.characterPose\(characterState\)/);
+    assert.match(shared, /step: root\.turn \? root\.turn\.step \|\| "" : ""/);
+    assert.match(repo("desktop/assistant/cybexos_assistant/turn.py"), /self\.step = "Thinking"/,
+        "the service's thinking step is the one characterPose recognises");
+});
+
 test("readouts: elapsed time, home-relative paths and closure changes", () => {
     assert.equal(A.elapsedLabel(8400), "8 s");
     assert.equal(A.elapsedLabel(65000), "1 min 05 s");

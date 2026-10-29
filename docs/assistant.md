@@ -1,8 +1,8 @@
 # Cybex OS Assistant
 
-The assistant is a round character that floats above every window. Ask it
-about Cybex OS by typing or by holding a key and talking; it answers in a small
-box under itself. It can change desktop preferences, create personal widgets,
+The assistant is Wiz, a small character who floats above every window. Ask
+him about Cybex OS by typing or by holding a key and talking; he answers in a
+small box under himself. It can change desktop preferences, create personal widgets,
 prepare system changes for review, write small programs and answer general
 questions. The work is done by the coding agent the person already uses:
 Claude Code or Codex. Cybex OS never stores their credentials.
@@ -40,8 +40,9 @@ listen or speak unless asked to for one question.
 - **Talk** by holding `Super+I` (or the microphone button) and releasing it to
   send. The words are transcribed locally by Voxtype; no audio leaves the
   computer. `Esc` or the cancel button discards a recording.
-- **While it works** the character shows a spinning arc and a short line about
-  the current step. Clicking the character while it works tucks the box away;
+- **While it works** the character shows what it is doing (see
+  [The character](#the-character)) and the box a short line about the
+  current step. Clicking the character while it works tucks the box away;
   a blue dot appears when the reply is ready.
 - **Replies** stay under the character until closed. Copy, Reply (continue the
   conversation), Speak, Undo (when it changed preferences or files), and
@@ -102,16 +103,61 @@ Settings → Assistant, stored in `~/.config/cybexos/shell.json`:
 | `assistantCodexModel` | `default`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` | `default` |
 | `assistantSpeak` | spoken replies | `false` |
 | `assistantScreenContext` | offer the screen button | `false` |
-| `assistantCharacter` | `mascot`, `mark` | `mascot` |
+| `assistantCharacter` | `wiz`, `mark` | `wiz` |
 | `assistantShown` | the character is on screen | `false` |
 | `assistantScreen`, `assistantX`, `assistantY` | where it was left | primary display, top right |
 
 ### The character
 
-`mascot` uses the Cybex X from the supplied wordmark on a charcoal disc. It
-follows focus gently and responds to voice level; `mark` keeps it still.
-Both use the same logo geometry and a blue activity ring. Amber marks a
-question waiting for an answer. Reduced-motion settings suppress movement.
+`wiz` is Wiz: a small figure in a charcoal cloak under an oversized, slightly
+crooked hat with the red Cybex band. His face stays in shadow and two glowing
+eyes carry the expression. He follows the assistant's turn:
+
+| Pose | When |
+| --- | --- |
+| Listening | the box is open, or you are talking (the hat rises with your voice) |
+| Thinking | a question is being worked on; runes circle the hat |
+| Working | a tool is at work (a command, an edit); a spell glows in front of him |
+| Needs input | a question waits for your answer; he peeks from under the brim and an amber pip pulses |
+| Finished | an answer arrived: happy eyes, a nod and a short sparkle |
+| Carried | you are dragging him (see below) |
+| Happy, sorry, asleep | speaking; a failed reply; the assistant service is not running |
+| Idle | everything else |
+
+Dragging him is a small panic. Picked up, he jumps, his hat pops off, "?!"
+flashes, sweat flies and his feet come out from under the cloak, kicking.
+While you move him he swings from where you hold him, his bottom trailing,
+and follows the pointer's speed and direction: pulled sideways, his hat and
+its tip blow back, his feet trail and his eyes look ahead; lifted, the hat is
+shoved down over his eyes; dropping, it floats off above him while he stares
+up at it. A diagonal drag combines both and stretches him along it. Held
+still, he trembles and sweats. A few quick back-and-forths make him dizzy:
+spiral eyes, his hat askew and stars circling it, for about two seconds after
+he is put down. Dropped, he lands with a thud, eyes squeezed shut and a puff
+of dust, harder the faster he was moving; his hat lands a beat later,
+crooked, and he shakes it straight. The logo only tilts.
+
+A blue pip marks a reply you have not seen, as the menubar dot does. His eyes
+follow the pointer while it rests on him. `mark` is the Cybex X from the
+supplied wordmark on a charcoal disc, kept still, with a blue activity ring;
+amber marks a question waiting for an answer.
+
+Wiz is cheap to keep on screen. He is drawn from still layers
+(`desktop/quickshell/assets/wiz/`), each rendered once at its final size and
+then only moved: no canvas, and no per-frame script except while he is being
+dragged. The overlay covers the whole
+display, so every frame he draws is a frame of the display. Idle, he holds
+still between blinks, glances and a rare wobble of the hat: a few frames a
+second, against sixty for a canvas redrawn every frame. Continuous
+motion is reserved for a running turn, recording and a drag; after a drop he
+is still again within about three seconds. A waiting question
+pulses three times, then once every eight seconds. With reduced motion, the
+power saver profile or an idle session he holds each pose still, and nothing
+runs while he is hidden.
+
+His artwork, poses and timing live in `Common/WizRig.js`. After changing it,
+run `scripts/export-wiz` to rebuild the layers; the tests fail while they are
+out of date.
 
 The menubar, boot splash and documents use the corresponding logo assets
 from [the brand directory](../assets/brand/README.md).

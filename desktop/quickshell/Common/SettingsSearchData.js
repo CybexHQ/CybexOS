@@ -33,7 +33,7 @@ var ROWS = [
     { page: "assistant", pageLabel: "Assistant", group: "Agent", label: "Codex model", key: "assistantCodexModel", terms: "ai assistant openai gpt luna terra sol model" },
     { page: "assistant", pageLabel: "Assistant", group: "Voice and screen", label: "Speak replies", key: "assistantSpeak", terms: "ai assistant voice read aloud speech tts text to speech" },
     { page: "assistant", pageLabel: "Assistant", group: "Voice and screen", label: "Screen context", key: "assistantScreenContext", terms: "ai assistant screenshot screen capture privacy" },
-    { page: "assistant", pageLabel: "Assistant", group: "Character", label: "Look", key: "assistantCharacter", terms: "ai assistant mascot character logo cybex" },
+    { page: "assistant", pageLabel: "Assistant", group: "Character", label: "Look", key: "assistantCharacter", terms: "ai assistant wiz wizard mascot character logo cybex" },
     { page: "notifications", pageLabel: "Notifications", group: "Notification history", label: "Remember notification history", key: "notifHistoryPersist", terms: "persist private retention restart" },
     { page: "notifications", pageLabel: "Notifications", group: "Source snoozes", label: "Source snoozes", key: "", terms: "snooze mute application website unsnooze" },
     { page: "notifications", pageLabel: "Notifications", group: "Grouped popups", label: "Burst limit", key: "notifBurstLimit", terms: "group stack duplicates repeated count" },

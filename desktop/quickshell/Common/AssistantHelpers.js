@@ -23,6 +23,9 @@ var APPROVAL_GLYPHS = { command: "terminal", edit: "edit", apply: "deployed_code
 
 var ACTIVE_STATUSES = ["running", "waiting"];
 var FINISHED_STATUSES = ["completed", "stopped", "failed"];
+// The service's step while the agent thinks or writes; any other step is a
+// tool at work (cybexos_assistant/turn.py).
+var THINKING_STEP = "Thinking";
 
 function clamp(value, low, high) {
     return Math.max(low, Math.min(high, value));
@@ -158,6 +161,32 @@ function mood(state) {
     return "idle";
 }
 
+// Wiz's pose (Assistant/Wiz.qml) for the same state: being dragged comes
+// first, a running turn shows whether a tool is at work, a finished turn's
+// celebration is told apart from other happy moments, and an open box is
+// listened to.
+function characterPose(state) {
+    if (state.dragging)
+        return "carried";
+    var current = mood(state);
+    switch (current) {
+    case "asleep":
+    case "sorry":
+        return current;
+    case "listening":
+    case "attentive":
+        return "listening";
+    case "alert":
+        return "needs-input";
+    case "thinking":
+        return state.busy && state.step && state.step !== THINKING_STEP ? "working" : "thinking";
+    case "happy":
+        return state.celebrating ? "finished" : "happy";
+    default:
+        return "idle";
+    }
+}
+
 // "8 s", "1 min 05 s", "12 min": the worker pill's elapsed time.
 function elapsedLabel(ms) {
     var seconds = Math.max(0, Math.floor((ms || 0) / 1000));
@@ -232,6 +261,7 @@ var exported = {
     active: active,
     finished: finished,
     mood: mood,
+    characterPose: characterPose,
     elapsedLabel: elapsedLabel,
     displayPath: displayPath,
     closureChanges: closureChanges,

@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+// Rebuild Wiz's layers, desktop/quickshell/assets/wiz/<layer>.svg, from the
+// rig in desktop/quickshell/Common/WizRig.js (docs/assistant.md).
+//
+//   scripts/export-wiz           write every layer, removing stale ones
+//   scripts/export-wiz --check   exit 1 when a committed layer differs
+//
+// The shell draws each layer once at its final size and only moves it, so a
+// change to Wiz's artwork is a change to the rig followed by this export.
+"use strict";
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const WizRig = require(path.join(root, "desktop/quickshell/Common/WizRig.js"));
+const outDir = path.join(root, "desktop/quickshell/assets/wiz");
+
+function expected() {
+    const files = {};
+    for (const name of Object.keys(WizRig.LAYERS))
+        files[`${name}.svg`] = WizRig.layerSVG(name);
+    return files;
+}
+
+function present() {
+    return fs.existsSync(outDir) ? fs.readdirSync(outDir).filter(name => name.endsWith(".svg")) : [];
+}
+
+function main(argv) {
+    const files = expected();
+    const stale = present().filter(name => !(name in files));
+    if (argv[0] === "--check") {
+        const changed = Object.keys(files).filter(name => {
+            const file = path.join(outDir, name);
+            return !fs.existsSync(file) || fs.readFileSync(file, "utf8") !== files[name];
+        });
+        for (const name of [...changed, ...stale])
+            console.error(`assets/wiz/${name} is out of date; run scripts/export-wiz`);
+        return changed.length || stale.length ? 1 : 0;
+    }
+    if (argv.length) {
+        console.error("usage: scripts/export-wiz [--check]");
+        return 2;
+    }
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const [name, svg] of Object.entries(files))
+        fs.writeFileSync(path.join(outDir, name), svg);
+    for (const name of stale)
+        fs.unlinkSync(path.join(outDir, name));
+    return 0;
+}
+
+process.exitCode = main(process.argv.slice(2));

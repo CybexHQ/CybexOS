@@ -181,7 +181,7 @@ SettingsPage {
                 label: I18n.tr("Look")
                 settingKey: "assistantCharacter"
                 model: [
-                    { value: "mascot", label: I18n.tr("Mascot") },
+                    { value: "wiz", label: I18n.tr("Wiz") },
                     { value: "mark", label: I18n.tr("Logo only") }
                 ]
             }
@@ -189,7 +189,7 @@ SettingsPage {
                 width: parent.width
                 text: Settings.assistantCharacter === "mark"
                     ? I18n.tr("The Cybex OS logo; the ring around it shows what the assistant is doing.")
-                    : I18n.tr("The Cybex OS logo follows focus and responds to your voice.")
+                    : I18n.tr("Wiz shows what the assistant is doing: listening, thinking, working, or waiting for your answer.")
             }
         }
     }

@@ -286,7 +286,7 @@ class Session:
         path = self.base / "qs.log"
         return path.read_text(errors="replace") if path.exists() else ""
 
-    def drag(self, x, y, dx, dy, dwell=0):
+    def drag(self, x, y, dx, dy, dwell=0, held=None):
         self.pointer.move(x, y)
         # Resting on the character first opens its box, as a person's
         # pointer does on the way to a drag.
@@ -294,6 +294,8 @@ class Session:
         self.pointer.button(True)
         for step in range(1, 21):
             self.pointer.move(x + dx * step / 20, y + dy * step / 20)
+            if step == 10 and held:
+                held()
         self.pointer.button(False)
 
 
@@ -327,6 +329,8 @@ def main():
             session.ipc('ask', 'Keep this first question')
             session.wait(lambda: session.shell_state().get('composing') and session.shell_state().get('hasDraft'),
                          'sign-in onboarding with the saved question')
+            # Wiz listens while the box is open.
+            assert session.shell_state()['pose'] == 'listening', session.shell_state()
             assert session.turn() is None
             session.wait(lambda: not session.shell_state().get('authChecking'), 'the initial sign-in check')
             session.ipc('signIn', 'claude')
@@ -346,7 +350,9 @@ def main():
                 if dwell:
                     session.pointer.move(before['x'] + size / 2, before['y'] + size / 2)
                     session.wait(lambda: session.shell_state().get('composing'), 'the box opened by hovering')
-                session.drag(before['x'] + size / 2, before['y'] + size / 2, dx, dy, dwell)
+                held = []
+                session.drag(before['x'] + size / 2, before['y'] + size / 2, dx, dy, dwell,
+                             lambda: held.append(session.shell_state().get('pose')))
                 try:
                     after = session.wait(lambda: (lambda s: s if abs(s.get('x', -9999) - before['x'] - dx) <= 3
                         and abs(s.get('y', -9999) - before['y'] - dy) <= 3 else None)(session.shell_state()),
@@ -354,6 +360,9 @@ def main():
                 except AssertionError as error:
                     raise AssertionError(f'{before=} wanted {dx=}, {dy=}; actual={session.shell_state()}\n{error}') from error
                 assert after['screen'] == 'HEADLESS-1'
+                # Wiz is carried while held and lands when dropped.
+                assert held == ['carried'], held
+                session.wait(lambda: session.shell_state().get('pose') not in (None, 'carried'), 'Wiz to land')
 
             # A preference edit is allowed without a card and comes back with Undo.
             session.ipc("ask", "Make the menubar transparent")
@@ -371,6 +380,9 @@ def main():
             allowed = session.finished("Clean up these downloads")
             assert allowed["status"] == "completed" and allowed["text"] == "Removed it.", allowed
             assert allowed["approvals"] == [], allowed
+            # A finished turn is celebrated for a moment, then Wiz rests.
+            session.wait(lambda: session.shell_state().get("pose") == "finished", "Wiz's celebration")
+            session.wait(lambda: session.shell_state().get("pose") != "finished", "the end of the celebration")
 
             # Ask first takes effect on the next question without a service restart.
             preferences = json.loads(session.preferences.read_text())
@@ -383,6 +395,7 @@ def main():
             assert waiting["status"] == "waiting" and card["kind"] == "command", waiting
             assert card["command"] == "rm -rf ~/Downloads/old-isos", card
             session.wait(lambda: session.shell_state().get("turn") == "waiting", "the shell to show the card")
+            assert session.shell_state()["pose"] == "needs-input", session.shell_state()
             assert session.call("approval.respond", {"id": card["id"], "decision": "deny"})["result"] == {"ok": True}
             denied = session.finished("Clean up my old downloads")
             assert denied["text"] == "Okay, I left it alone.", denied
@@ -404,7 +417,7 @@ def main():
             output = session.log()
             errors = [line for line in output.splitlines() if QML_ERRORS.search(line)]
             assert not errors, "\n".join(errors)
-            print("Assistant onboarding/draft preservation, repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off and hiding passed")
+            print("Assistant onboarding/draft preservation, repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged) and hiding passed")
         finally:
             session.stop()
 

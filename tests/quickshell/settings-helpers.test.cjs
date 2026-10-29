@@ -971,7 +971,7 @@ test("assistant preferences are validated and runtime placement is bounded", () 
     assert.deepEqual([d.assistantAgent, d.assistantClaudeModel, d.assistantCodexModel,
         d.assistantSpeak, d.assistantScreenContext, d.assistantCharacter, d.assistantShown,
         d.assistantScreen, d.assistantX, d.assistantY],
-        ["auto", "default", "default", false, false, "mascot", false, "", -1, -1]);
+        ["auto", "default", "default", false, false, "wiz", false, "", -1, -1]);
     const merged = H.merge({ v: 30, assistantAgent: "codex", assistantClaudeModel: "sonnet",
         assistantCodexModel: "gpt-5.6-sol", assistantSpeak: true, assistantScreenContext: true,
         assistantCharacter: "mark", assistantShown: true, assistantScreen: "DP-1",
@@ -991,7 +991,9 @@ test("assistant preferences are validated and runtime placement is bounded", () 
         assistantX: -50, assistantY: 1e9 });
     assert.equal(invalid.assistantAgent, "auto");
     assert.equal(invalid.assistantClaudeModel, "default", "each agent takes only its own models");
-    assert.equal(invalid.assistantCharacter, "mascot");
+    assert.equal(invalid.assistantCharacter, "wiz");
+    assert.equal(H.merge({ v: 30, assistantCharacter: "mascot" }).assistantCharacter, "wiz",
+        "the retired animated logo falls back to the default character");
     assert.equal(invalid.assistantScreenContext, false, "screen context needs an explicit true");
     assert.equal(invalid.assistantScreen, "");
     assert.equal(invalid.assistantX, -1);

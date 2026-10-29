@@ -104,8 +104,8 @@ ShellRoot {
                 agent: Assistant.agent, busy: Assistant.busy,
                 agentReady: Assistant.agentReady, setupRequired: Assistant.setupRequired,
                 authChecking: Assistant.authChecking, hasDraft: Assistant.draft.trim() !== "",
-                x: Settings.assistantX, y: Settings.assistantY, size: Theme.scaled(64),
-                turn: Assistant.turn ? Assistant.turn.status : "",
+                x: Settings.assistantX, y: Settings.assistantY, size: Assistant.characterSize,
+                turn: Assistant.turn ? Assistant.turn.status : "", pose: Assistant.pose,
                 composing: Assistant.composing, listening: Assistant.listening});
         }
     }

@@ -66,12 +66,16 @@ Singleton {
     property bool dragging: false
     readonly property bool failed: turn !== null && turn.status === "failed" && replyOpen
 
-    readonly property string mood: AssistantHelpers.mood({
+    readonly property var characterState: ({
         connected: root.connected, listening: root.listening, waiting: root.waiting,
         busy: root.busy, transcribing: root.transcribing, dragging: root.dragging,
         speaking: root.speaking, celebrating: root.celebrating, failed: root.failed,
-        composing: root.composing
+        composing: root.composing, step: root.turn ? root.turn.step || "" : ""
     })
+    readonly property string mood: AssistantHelpers.mood(characterState)
+    readonly property string pose: AssistantHelpers.characterPose(characterState)
+    // Wiz stands on his own and needs the room; the mark is a compact disc.
+    readonly property real characterSize: Theme.scaled(Settings.assistantCharacter === "mark" ? 64 : 88)
 
     // ---- voice ---------------------------------------------------------------
     // Voxtype runs on every installation; Dictation watches its state for us.
