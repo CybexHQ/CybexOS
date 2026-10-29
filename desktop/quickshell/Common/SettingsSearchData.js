@@ -1,0 +1,240 @@
+// The settings search index (turn-3 settings design, the 2026-10 palette):
+// every row the search can jump to, described once. `page` must be a
+// Settings.pages id and `tab` one of its tabs when it has them; `key` a
+// Settings key when the target is a keyed row — the jump highlights that
+// row through Settings.highlightKey, and the palette shows its value — or ""
+// when the entry only navigates to its page. `anchor` names a destination
+// outside the preference schema. An optional `widget` names a widget whose
+// settings dialog holds the row; the jump opens it.
+//
+// ACTIONS are things the palette can do rather than rows it can show: each
+// `action` id is run by SettingsPalette, and `page`/`tab`/`anchor`, when
+// set, are where it goes first.
+//
+// Keep this file free of Qt APIs so settings-search.test.cjs can hold it
+// against SettingsHelpers' schema under Node.
+
+var ROWS = [
+    { page: "home", pageLabel: "Home", group: "Welcome guide", label: "Welcome guide", key: "", terms: "welcome setup tour getting started onboarding" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "Web browser", key: "", anchor: "applications-browser", terms: "default browser firefox brave links web http" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "Terminal", key: "", anchor: "applications-terminal", terms: "default terminal kitty ghostty foot alacritty" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "Text editor", key: "", anchor: "applications-editor", terms: "default editor text nvim code" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "PDF viewer", key: "", anchor: "applications-pdf", terms: "default pdf documents" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "Image viewer", key: "", anchor: "applications-image", terms: "default image photo png jpeg" },
+    { page: "applications", pageLabel: "Applications", group: "Default applications", label: "Video player", key: "", anchor: "applications-video", terms: "default video media mp4" },
+    { page: "applications", pageLabel: "Applications", group: "Software", label: "Open Software", key: "", terms: "install remove packages applications software" },
+    { page: "backup", tab: "storage", pageLabel: "Backup & storage", group: "Disk space", label: "Review cleanup", key: "", terms: "free disk space garbage collection nix store" },
+    { page: "backup", tab: "recovery", pageLabel: "Backup & storage", group: "Retention", label: "Automatic weekly cleanup", key: "", anchor: "storage-automatic", terms: "automatic cleanup retention recovery generations pin" },
+    { page: "workspaces", pageLabel: "Workspaces & dock", group: "Workspaces", label: "Workspace mode", key: "", terms: "shared per-monitor display local numbers hotplug external" },
+    { page: "workspaces", pageLabel: "Workspaces & dock", group: "Workspace layout", label: "Default workspace layout", key: "", terms: "dwindle tiled scrolling floating desktop" },
+    { page: "workspaces", pageLabel: "Workspaces & dock", group: "Floating windows", label: "Floating titlebars", key: "", terms: "decoration close maximize minimize restore dock" },
+    { page: "assistant", pageLabel: "Assistant", group: "Agent", label: "Answered by", key: "assistantAgent", terms: "ai assistant clippy helper claude codex agent chat ask question" },
+    { page: "assistant", pageLabel: "Assistant", group: "Agent", label: "Claude Code model", key: "assistantClaudeModel", terms: "ai assistant fable sonnet opus model" },
+    { page: "assistant", pageLabel: "Assistant", group: "Agent", label: "Codex model", key: "assistantCodexModel", terms: "ai assistant openai gpt luna terra sol model" },
+    { page: "assistant", pageLabel: "Assistant", group: "Voice and screen", label: "Speak replies", key: "assistantSpeak", terms: "ai assistant voice read aloud speech tts text to speech" },
+    { page: "assistant", pageLabel: "Assistant", group: "Voice and screen", label: "Screen context", key: "assistantScreenContext", terms: "ai assistant screenshot screen capture privacy" },
+    { page: "assistant", pageLabel: "Assistant", group: "Character", label: "Look", key: "assistantCharacter", terms: "ai assistant mascot character logo cybex" },
+    { page: "notifications", pageLabel: "Notifications", group: "Notification history", label: "Remember notification history", key: "notifHistoryPersist", terms: "persist private retention restart" },
+    { page: "notifications", pageLabel: "Notifications", group: "Source snoozes", label: "Source snoozes", key: "", terms: "snooze mute application website unsnooze" },
+    { page: "notifications", pageLabel: "Notifications", group: "Grouped popups", label: "Burst limit", key: "notifBurstLimit", terms: "group stack duplicates repeated count" },
+    { page: "keyboard", tab: "layouts", pageLabel: "Keyboard", group: "Keyboard layouts", label: "Keyboard layouts", key: "", terms: "input language variant qwerty azerty dvorak colemak" },
+    { page: "keyboard", tab: "layouts", pageLabel: "Keyboard", group: "Switch layouts", label: "Layout switching", key: "", terms: "keyboard shortcut caps lock alt shift next layout" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Keyboard shortcuts", key: "", terms: "keybindings hotkeys keys bind remap super shortcut sheet" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Change a shortcut", key: "", terms: "edit record rebind remap disable reset keybinding hotkey" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Add shortcut", key: "", anchor: "shortcuts-add", terms: "custom new launch app website url web app command run keybinding" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Keyboard map", key: "", anchor: "shortcuts-map", terms: "free keys super letters digits layout overview" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Reset all shortcuts", key: "", anchor: "shortcuts-reset", terms: "defaults restore keybindings" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "From user.lua", label: "From user.lua", key: "", terms: "personal lua config bindings hypr user" },
+    { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Tap to click", key: "", terms: "touchpad tapping click input" },
+    { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Natural scrolling", key: "", terms: "touchpad reverse scroll direction" },
+    { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Swipe between workspaces", key: "", terms: "touchpad gesture three fingers swipe workspace overview" },
+    { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Pointer sensitivity", key: "", terms: "touchpad mouse speed acceleration" },
+    { page: "region", pageLabel: "Region & language", group: "System timezone", label: "Timezone", key: "", terms: "time zone city country daylight saving clock" },
+    { page: "region", pageLabel: "Region & language", group: "System language", label: "System language", key: "", terms: "locale language region lang regional formats" },
+    // Appearance
+    { page: "network", pageLabel: "Network", group: "Connections", label: "Network connections", key: "", terms: "wifi ethernet saved profile adapter advanced editor" },
+    { page: "network", pageLabel: "Network", group: "Connection", label: "Autoconnect and metered", key: "", terms: "automatic join metered data limit background" },
+    { page: "network", pageLabel: "Network", group: "IPv4 and IPv6", label: "IP addresses and DNS", key: "", terms: "ipv4 ipv6 dns gateway address manual automatic static dhcp" },
+    { page: "network", pageLabel: "Network", group: "VPN", label: "VPN connections", key: "", terms: "vpn openvpn wireguard ovpn conf import tunnel openconnect anyconnect vpnc remove" },
+    { page: "network", pageLabel: "Network", group: "Hotspot", label: "Wi-Fi hotspot", key: "", terms: "hotspot tethering share internet access point qr code password network name" },
+    { page: "sound", pageLabel: "Sound", group: "Output", label: "Output device and volume", key: "", terms: "audio speaker headphones volume mute balance port network airplay" },
+    { page: "sound", pageLabel: "Sound", group: "Input", label: "Input device and volume", key: "", terms: "audio microphone mic level mute" },
+    { page: "sound", pageLabel: "Sound", group: "Hardware profiles", label: "Hardware profiles", key: "", terms: "audio card profile pro audio hifi" },
+    { page: "sound", pageLabel: "Sound", group: "Applications", label: "Application audio", key: "", terms: "audio routing per-app volume mute mixer pavucontrol" },
+    // Displays (Settings -> Displays): monitor rules saved outside shell.json.
+    { page: "displays", pageLabel: "Displays", group: "Arrangement", label: "Display arrangement", key: "", terms: "monitor screen layout position multiple external dock" },
+    { page: "displays", pageLabel: "Displays", group: "Selected display", label: "Resolution and refresh rate", key: "", terms: "monitor mode hz hertz 4k 120 144 60" },
+    { page: "displays", pageLabel: "Displays", group: "Selected display", label: "Display scale", key: "", terms: "monitor hidpi fractional zoom size 125 150 200" },
+    { page: "displays", pageLabel: "Displays", group: "Selected display", label: "Rotation", key: "", terms: "monitor transform portrait landscape orientation flip flipped" },
+    { page: "displays", pageLabel: "Displays", group: "Selected display", label: "Mirror and turn off displays", key: "", terms: "monitor duplicate projector disable enable lid clamshell" },
+    { page: "displays", pageLabel: "Displays", group: "Selected display", label: "Adaptive sync", key: "", terms: "monitor vrr freesync gsync variable refresh" },
+    { page: "accounts", pageLabel: "Online accounts", group: "Online accounts", label: "Add account", key: "", terms: "google calendar login sign in reconnect remove credentials" },
+    { page: "accounts", pageLabel: "Online accounts", group: "Online accounts", label: "Use calendars", key: "", terms: "calendar events account sync" },
+    { page: "appearance", pageLabel: "Appearance", group: "Theme", label: "Theme", key: "theme", terms: "color scheme palette preset save share nord gruvbox catppuccin tokyo night rose pine everforest kanagawa" },
+    // Security (Settings -> Security): system authentication outside shell.json.
+    { page: "security", pageLabel: "Security", group: "SSH Server", label: "Enable SSH Server", key: "", terms: "ssh remote login server openssh access password key" },
+    { page: "security", pageLabel: "Security", group: "Fingerprint", label: "Add fingerprint", key: "", terms: "fingerprint reader fprintd enrol enroll finger biometric remove" },
+    { page: "security", pageLabel: "Security", group: "Fingerprint", label: "Use fingerprint to unlock and authorise", key: "", terms: "fingerprint lock screen sudo polkit password authentication authorize login" },
+    { page: "security", pageLabel: "Security", group: "Security keys", label: "Add security key", key: "", terms: "yubikey fido2 u2f hardware token key lock screen sudo polkit two factor remove" },
+    { page: "appearance", pageLabel: "Appearance", group: "Theme", label: "Mode", key: "themeMode", terms: "dark light theme" },
+    { page: "appearance", pageLabel: "Appearance", group: "Theme", label: "Glass effect", key: "glassEnabled", terms: "blur translucent transparent" },
+    { page: "appearance", pageLabel: "Appearance", group: "Text & size", label: "Interface font", key: "font", terms: "typeface figtree mono typography" },
+    { page: "appearance", pageLabel: "Appearance", group: "Text & size", label: "Base font size", key: "shellFontSize", terms: "typography font size pixels advanced" },
+    { page: "appearance", pageLabel: "Appearance", group: "Text & size", label: "Text size", key: "textScale", terms: "scale large accessibility readability" },
+    { page: "appearance", pageLabel: "Appearance", group: "Text & size", label: "Interface scale", key: "shellScale", terms: "ui zoom size accessibility" },
+    { page: "appearance", pageLabel: "Appearance", group: "Text & size", label: "Density", key: "interfaceDensity", terms: "control spacing compact comfortable touch row height" },
+    { page: "appearance", pageLabel: "Appearance", group: "Colors", label: "Accent source", key: "paletteMode", terms: "wallpaper palette fixed color" },
+    { page: "appearance", pageLabel: "Appearance", group: "Colors", label: "Accent color", key: "accent", terms: "hue swatch preset sky lavender sage sand coral" },
+    { page: "appearance", pageLabel: "Appearance", group: "Panels", label: "Panel border", key: "surfaceBorderMode", terms: "accent subtle custom outline" },
+    { page: "appearance", pageLabel: "Appearance", group: "Panels", label: "Panel border color", key: "surfaceBorderColor", terms: "color hex" },
+    { page: "appearance", pageLabel: "Appearance", group: "Panels", label: "Panel border width", key: "surfaceBorderWidth", terms: "outline" },
+    { page: "appearance", pageLabel: "Appearance", group: "Panels", label: "Panel border opacity", key: "surfaceBorderOpacity", terms: "border transparency" },
+    { page: "appearance", pageLabel: "Appearance", group: "Panels", label: "Panel corners", key: "surfaceCornerRadius", terms: "radius rounding" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Match shell style", key: "", terms: "plugin appearance omarchy inherit" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin interface scale", key: "pluginScale", terms: "ui size font zoom omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin border", key: "pluginBorderMode", terms: "accent subtle custom omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin border color", key: "pluginBorderColor", terms: "color hex omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin border width", key: "pluginBorderWidth", terms: "outline omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin border opacity", key: "pluginBorderOpacity", terms: "transparency omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Omarchy plugins", label: "Plugin corners", key: "pluginRadius", terms: "radius rounding omarchy" },
+    { page: "appearance", pageLabel: "Appearance", group: "Accessibility", label: "High contrast", key: "highContrast", terms: "accessibility opaque borders solid" },
+    { page: "appearance", pageLabel: "Appearance", group: "Accessibility", label: "Reduce motion", key: "reducedMotion", terms: "animation accessibility" },
+
+    // Wallpaper
+    { page: "wallpaper", pageLabel: "Wallpaper", group: "Library", label: "Wallpaper", key: "wall", terms: "desktop image background picture online wallhaven download topic color preview" },
+    { page: "wallpaper", pageLabel: "Wallpaper", group: "Folder", label: "Folder", key: "wallDir", terms: "directory pictures" },
+    { page: "wallpaper", pageLabel: "Wallpaper", group: "Rotation", label: "Rotate", key: "shuffle", terms: "shuffle slideshow interval" },
+
+    // Bar
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Layout", label: "Position", key: "position", terms: "top bottom edge placement" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Layout", label: "Style", key: "barStyle", terms: "hug floating attached edge shape" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Layout", label: "Height", key: "barHeight", terms: "size thickness compact classic default roomy custom preset" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Layout", label: "Edge gap", key: "gap", terms: "margin floating style only" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Layout", label: "Corner radius", key: "barRadius", terms: "rounding floating style only" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Background", label: "Bar background", key: "barColorMode", terms: "menubar color custom black white graphite slate macos hue" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Behavior", label: "Auto-hide", key: "autoHide", terms: "hide idle reveal" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Behavior", label: "Reserve space", key: "exclusive", terms: "exclusive zone tiled windows" },
+    { page: "workspaces", pageLabel: "Workspaces & dock", group: "Dock", label: "Show in all layouts", key: "dock", terms: "dock taskbar pinned running apps launcher bottom floating tiled scrolling" },
+    { page: "workspaces", pageLabel: "Workspaces & dock", group: "Dock", label: "Dock auto-hide", key: "dockAutoHide", terms: "dock hide reveal bottom edge" },
+
+    // Bar widgets and their options
+    { page: "plugins", pageLabel: "Plugins", group: "Add a plugin", label: "Browse plugins", key: "", terms: "plugins.omarchy.org directory marketplace community find discover website" },
+    { page: "plugins", pageLabel: "Plugins", group: "Add a plugin", label: "Source", key: "", terms: "install git url local path add omarchy plugin add command paste trust" },
+    { page: "plugins", pageLabel: "Plugins", group: "Installed", label: "Installed plugins", key: "", terms: "enable disable update preview clone remove omarchy manage" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Widgets", label: "Arrange widgets", key: "", terms: "drag order left center right lane module preview move remove menu notification group grouping status pill separate" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Widgets", label: "Add widgets", key: "", terms: "tray plugin enable disable remove toggle module clock weather notes battery workspaces media" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Indicators", label: "Clock-side actions", key: "", terms: "indicator dictate recording ocr scan text clipboard reminder night light do not disturb dnd stay awake idle inhibit order startup duration" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Notes", label: "AI note titles", key: "", terms: "codex claude model provider effort reasoning generate regenerate privacy" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Weather", label: "Weather location", key: "", widget: "weather", terms: "clock city place search country region coordinates latitude longitude forecast" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Fusebox", label: "Fusebox server", key: "", widget: "fusebox", terms: "ai proxy cliproxy subscriptions accounts management key url faults load requests sessions quota used remaining left meters pace breaker priority clients budgets connected addresses notifications privacy email" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Model Usage", label: "Model Usage", key: "", widget: "modelusage", terms: "ai claude codex kimi quota limits reset percentage providers cliproxy proxy accounts credentials cost tokens t3 refresh warning critical" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Updates", label: "Download updates automatically", key: "", widget: "updates", terms: "background download updates automatic schedule timer nix packages metered power check every interval notify software update finish confirm restart" },
+
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Control Center", label: "Control Center widget", key: "", widget: "control", terms: "cybexos button move drag reorder show hide drawer" },
+
+    // Control Center (also searchable by its former Drawer name)
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Tabs", label: "Tab order", key: "", terms: "drawer reorder overview sound network bluetooth power notifications usage" },
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Overview", label: "Overview contents", key: "", terms: "drawer now playing sliders tiles updates cpu ram temperature system stats top processes end task manager" },
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Behavior", label: "Open on hover", key: "drawerHover", terms: "drawer hover switch glyph menu" },
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Behavior", label: "Width", key: "drawerWidth", terms: "drawer size wide" },
+
+    // Notifications
+    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Do Not Disturb", key: "notifDnd", terms: "dnd silence mute focus" },
+    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Quiet hours", key: "notifQuiet", terms: "night schedule silence" },
+    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Duration", key: "notifDuration", terms: "toast timeout seconds" },
+    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Position", key: "notifPosition", terms: "toast corner top bottom" },
+    { page: "notifications", pageLabel: "Notifications", group: "Style", label: "Density", key: "notifDensity", terms: "compact roomy toast" },
+    { page: "notifications", pageLabel: "Notifications", group: "Style", label: "App icons", key: "notifIcons", terms: "sender icon toast" },
+    { page: "notifications", pageLabel: "Notifications", group: "Style", label: "Timeout progress", key: "notifProgress", terms: "countdown bar toast" },
+    { page: "notifications", pageLabel: "Notifications", group: "Style", label: "Body preview", key: "notifBodyLines", terms: "lines text toast" },
+
+    // Formats, touchpad, night light and power (the old System page)
+    { page: "region", pageLabel: "Region & language", group: "Formats", label: "Clock", key: "clock24", terms: "24 12 hour time format" },
+    { page: "region", pageLabel: "Region & language", group: "Formats", label: "Temperature", key: "unit", terms: "celsius fahrenheit weather unit" },
+    { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Scroll speed", key: "scrollFactor", terms: "touchpad mouse wheel input" },
+    { page: "displays", pageLabel: "Displays", group: "Night light", label: "Night light", key: "nightLight", terms: "blue light hyprsunset" },
+    { page: "displays", pageLabel: "Displays", group: "Night light", label: "Warmth", key: "warmth", terms: "kelvin tint blue light" },
+    { page: "power", pageLabel: "Power", group: "Idle", label: "Lock screen", key: "idleLockMins", terms: "timeline idle timeout auto lock hypridle power" },
+    { page: "power", pageLabel: "Power", group: "Idle", label: "Screen off", key: "idleScreenOffMins", terms: "timeline idle timeout display dpms blank monitor power" },
+    { page: "power", pageLabel: "Power", group: "Idle", label: "Suspend", key: "idleSuspendMins", terms: "timeline idle timeout sleep suspend power" },
+    { page: "power", pageLabel: "Power", group: "Idle", label: "Only on battery", key: "idleSuspendBatteryOnly", terms: "idle suspend sleep battery plugged in ac power" },
+    { page: "power", pageLabel: "Power", group: "Stay awake", label: "Duration", key: "", terms: "idle inhibit caffeine sleep" },
+    { page: "power", pageLabel: "Power", group: "Stay awake", label: "Bar indicator", key: "", terms: "stay awake indicator sign-in widget options" },
+    { page: "notifications", pageLabel: "Notifications", group: "On-screen display", label: "Placement", key: "osd", terms: "osd volume brightness popup overlay" },
+
+    // Backup & recovery: backups belong to the cybexos-backup helper, so the
+    // rows navigate rather than naming shell.json keys.
+    { page: "backup", tab: "backups", pageLabel: "Backup & storage", group: "Backups", label: "Back up personal files", key: "", terms: "backup restic encrypted external drive usb disk ssh sftp server nas home folder copy set up" },
+    { page: "backup", tab: "backups", pageLabel: "Backup & storage", group: "Backups", label: "Automatic backups", key: "", terms: "daily schedule timer reminder battery metered" },
+    { page: "backup", tab: "backups", pageLabel: "Backup & storage", group: "Backups", label: "Restore files", key: "", terms: "restore recover deleted lost file folder snapshot restored" },
+    { page: "backup", tab: "backups", pageLabel: "Backup & storage", group: "Backups", label: "Recovery key", key: "", terms: "backup password keyring encryption key" },
+    { page: "backup", tab: "recovery", pageLabel: "Backup & storage", group: "Recovery points", label: "Recovery points", key: "", anchor: "recoveryPoints", terms: "snapshot restore rollback undo update btrfs boot menu grub recovery" },
+    { page: "backup", tab: "recovery", pageLabel: "Backup & storage", group: "Recovery points", label: "Factory reset", key: "", terms: "factory reset erase wipe new owner sell give away oem" },
+
+    // About
+    { page: "home", pageLabel: "Home", group: "Shell health", label: "Status", key: "", terms: "service deployment journal pid" },
+    { page: "home", pageLabel: "Home", group: "Shell health", label: "Last deploy check", key: "", terms: "deploy check refresh health" },
+    { page: "home", pageLabel: "Home", group: "Settings file", label: "Settings file", key: "", terms: "json open config shell-settings" },
+    { page: "home", pageLabel: "Home", group: "Reset", label: "Reset all settings", key: "", terms: "defaults factory restore" }
+];
+
+var ACTIONS = [
+    { action: "software-update", label: "Open Software Update", crumb: "Software Update", terms: "update upgrade check install new version" },
+    { action: "system-check", label: "Run the system check", crumb: "Home", page: "home", anchor: "home-checks", terms: "doctor health diagnose problems drivers firmware" },
+    { action: "change-password", label: "Change password…", crumb: "Security › Password", page: "security", terms: "passwd login account" },
+    { action: "add-fingerprint", label: "Add a fingerprint…", crumb: "Security › Fingerprint", page: "security", terms: "fprint enrol enroll finger reader unlock" },
+    { action: "add-shortcut", label: "Add a keyboard shortcut…", crumb: "Keyboard › Shortcuts", page: "keyboard", tab: "shortcuts", anchor: "shortcuts-add", terms: "custom new keybinding hotkey launch app website" },
+    { action: "shuffle-wallpaper", label: "Shuffle the wallpaper", crumb: "Wallpaper", terms: "random next background image" },
+    { action: "back-up-now", label: "Back up now", crumb: "Backup & storage › Backups", page: "backup", tab: "backups", terms: "backup restic snapshot copy" },
+    { action: "welcome", label: "Open the welcome guide", crumb: "Home", terms: "tour setup onboarding getting started" },
+    { action: "settings-file", label: "Open the settings file", crumb: "Home", terms: "json config shell.json edit" }
+];
+
+// Case-insensitive substring match over the words a user would type. Results
+// keep index order — the pages' own order — with label hits ranked above
+// hits that only matched hidden search terms.
+function search(query, translate) {
+    var tr = translate || function(text) { return text; };
+    var q = (query || "").trim().toLowerCase();
+    if (q === "")
+        return [];
+    var labelHits = [];
+    var termHits = [];
+    ROWS.forEach(function(row) {
+        var labels = [row.label, row.group, row.pageLabel];
+        // Follow launcher actions: translated labels plus English aliases.
+        var direct = labels.concat(labels.map(function(label) { return tr(label); }))
+            .join(" ").toLowerCase().indexOf(q) !== -1;
+        if (direct)
+            labelHits.push(row);
+        else if (row.terms.toLowerCase().indexOf(q) !== -1)
+            termHits.push(row);
+    });
+    return labelHits.concat(termHits);
+}
+
+// The palette's actions for a query: label hits, then hidden-term hits.
+function searchActions(query, translate) {
+    var tr = translate || function(text) { return text; };
+    var q = (query || "").trim().toLowerCase();
+    if (q === "")
+        return [];
+    var labelHits = [], termHits = [];
+    ACTIONS.forEach(function(entry) {
+        if ((entry.label + " " + tr(entry.label) + " " + entry.crumb).toLowerCase().indexOf(q) !== -1)
+            labelHits.push(entry);
+        else if (entry.terms.toLowerCase().indexOf(q) !== -1)
+            termHits.push(entry);
+    });
+    return labelHits.concat(termHits);
+}
+
+var exported = {
+    ROWS: ROWS,
+    ACTIONS: ACTIONS,
+    search: search,
+    searchActions: searchActions
+};
+
+if (typeof module !== "undefined" && module.exports)
+    module.exports = exported;

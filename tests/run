@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Source/fixture regression checks. Real installation qualification is separate.
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+export PYTHONDONTWRITEBYTECODE=1
+python3 -B -m unittest discover -s tests/nixos -v
+python3 -B tests/nixos/hermes-bridge.py
+python3 -B tests/nixos/hermes-remote-runtime.py
+python3 -B tests/nixos/hermes-webui-auth.py
+python3 -B tests/nixos/default-agent.py
+python3 -B tests/nixos/camera-frame.py
+python3 -B tests/system-settings.py
+python3 -B tests/settings-ownership.py
+# Native subprocess timeout checks need a bounded workload, including on CI.
+node --test --test-concurrency=1 tests/quickshell/*.test.cjs
+python3 -B tests/plugin-packages.py
+python3 -B tests/theme-packs.py
+python3 -B tests/model-usage.py

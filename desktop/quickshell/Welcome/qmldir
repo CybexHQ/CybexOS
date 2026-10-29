@@ -1,0 +1,37 @@
+# The welcome guide: the step screens, the installer-style sheets and the
+# Kiosk controls that draw the installer's design (installer/kiosk/ui).
+ConnectStep ConnectStep.qml
+DesktopPreview DesktopPreview.qml
+FinishStep FinishStep.qml
+HelloStep HelloStep.qml
+KeyboardSheet KeyboardSheet.qml
+singleton Kiosk Kiosk.qml
+KioskButton KioskButton.qml
+KioskCard KioskCard.qml
+KioskChip KioskChip.qml
+KioskField KioskField.qml
+KioskFocusRing KioskFocusRing.qml
+KioskFooter KioskFooter.qml
+KioskIcon KioskIcon.qml
+KioskKeycap KioskKeycap.qml
+KioskKeyMap KioskKeyMap.qml
+KioskKicker KioskKicker.qml
+KioskLink KioskLink.qml
+KioskPickList KioskPickList.qml
+KioskRadio KioskRadio.qml
+KioskSegmented KioskSegmented.qml
+KioskSheet KioskSheet.qml
+KioskStepper KioskStepper.qml
+KioskText KioskText.qml
+KioskToggle KioskToggle.qml
+KioskTopBar KioskTopBar.qml
+LanguageSheet LanguageSheet.qml
+ResumePill ResumePill.qml
+ShortcutChangesSheet ShortcutChangesSheet.qml
+ShortcutsStep ShortcutsStep.qml
+StyleStep StyleStep.qml
+ThemeSheet ThemeSheet.qml
+TimezoneSheet TimezoneSheet.qml
+WallpaperStep WallpaperStep.qml
+WallpaperSwatches WallpaperSwatches.qml
+WelcomeView WelcomeView.qml

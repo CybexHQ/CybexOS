@@ -1,0 +1,153 @@
+#!/bin/bash
+# Copy the text in a selected screen region to the clipboard. A QR code or
+# barcode in the region is decoded instead; otherwise the text is recognised.
+
+set -euo pipefail
+
+ACTION_DIR="${XDG_RUNTIME_DIR:-/tmp}/screen-ocr-${UID}"
+mkdir -p "$ACTION_DIR"
+chmod 0700 "$ACTION_DIR"
+SLURP_PID_FILE="$ACTION_DIR/slurp.pid"
+exec 9>"$ACTION_DIR/action.lock"
+# A second press while a selection is open cancels it. Only the slurp this
+# script started is killed — never another application's (or the screenshot
+# script's) region picker.
+if ! flock -n 9; then
+  pid=$(cat "$SLURP_PID_FILE" 2>/dev/null || true)
+  if [[ $pid =~ ^[0-9]+$ ]] && [ "$(cat "/proc/$pid/comm" 2>/dev/null || true)" = slurp ]; then
+    kill "$pid" 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+FREEZE_PID=""
+SLURP_PID=""
+WORK_DIR=""
+
+notify() {
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name="Screen OCR" "Screen OCR" "$1" 9>&- 2>/dev/null || true
+  fi
+}
+
+# One line of decoded content, shortened and escaped for the notification
+# body, which the shell reads as markup.
+display_text() {
+  local text=${1%%$'\n'*}
+  ((${#text} > 120)) && text="${text:0:117}..."
+  # Quoted replacements: bash 5.2 otherwise reads & as the matched text.
+  text=${text//&/"&amp;"}
+  text=${text//</"&lt;"}
+  printf '%s' "${text//>/"&gt;"}"
+}
+
+# The SSID of a Wi-Fi QR code (WIFI:T:WPA;S:name;P:secret;;). Fields may come
+# in any order, and a backslash escapes ; , : and itself.
+wifi_ssid() {
+  local rest=${1#WIFI:} field="" char escaped=0 index
+  for ((index = 0; index < ${#rest}; index++)); do
+    char=${rest:index:1}
+    if ((escaped)); then
+      field+=$char
+      escaped=0
+    elif [ "$char" = "\\" ]; then
+      escaped=1
+    elif [ "$char" = ';' ]; then
+      if [[ $field == S:* ]]; then
+        printf '%s' "${field#S:}"
+        return
+      fi
+      field=""
+    else
+      field+=$char
+    fi
+  done
+  [[ $field == S:* ]] && printf '%s' "${field#S:}"
+  return 0
+}
+
+# Links are only copied, never opened: a code can point anywhere. The
+# notification names what kind of content it was so the user can tell before
+# pasting it; a Wi-Fi code shows its network, never its password.
+describe_code() {
+  local code=$1 ssid
+  case ${code%%$'\n'*} in
+    [Hh][Tt][Tt][Pp]://*|[Hh][Tt][Tt][Pp][Ss]://*)
+      printf 'Copied link from code: %s' "$(display_text "$code")" ;;
+    WIFI:*)
+      ssid=$(wifi_ssid "${code%%$'\n'*}")
+      if [ -n "$ssid" ]; then
+        printf 'Copied Wi-Fi details for %s' "$(display_text "$ssid")"
+      else
+        printf 'Copied Wi-Fi details from code'
+      fi
+      ;;
+    *) printf 'Copied text from code: %s' "$(display_text "$code")" ;;
+  esac
+}
+
+cleanup_freeze() {
+  if [ -n "$FREEZE_PID" ]; then
+    kill "$FREEZE_PID" 2>/dev/null || true
+    wait "$FREEZE_PID" 2>/dev/null || true
+    FREEZE_PID=""
+  fi
+}
+
+cleanup() {
+  cleanup_freeze
+  rm -f "$SLURP_PID_FILE"
+  if [ -n "$WORK_DIR" ]; then
+    rm -rf "$WORK_DIR"
+  fi
+}
+trap cleanup EXIT
+
+WORK_DIR=$(mktemp -d "$ACTION_DIR/capture.XXXXXX")
+IMAGE="$WORK_DIR/selection.png"
+
+wayfreeze 9>&- &
+FREEZE_PID=$!
+sleep 0.1
+
+slurp 9>&- >"$WORK_DIR/selection" 2>/dev/null &
+SLURP_PID=$!
+printf '%s\n' "$SLURP_PID" > "$SLURP_PID_FILE"
+wait "$SLURP_PID" || true
+rm -f "$SLURP_PID_FILE"
+SELECTION=$(cat "$WORK_DIR/selection")
+if [ -z "$SELECTION" ]; then
+  exit 0
+fi
+
+# Capture while the screen is still frozen, then thaw it before OCR: the
+# recognition pass can take seconds, and the desktop must not stay frozen
+# behind it.
+if ! grim -g "$SELECTION" "$IMAGE" 9>&-; then
+  cleanup_freeze
+  notify "Could not capture the selected region"
+  exit 1
+fi
+cleanup_freeze
+
+# zbarimg exits 0 only when it decoded a symbol; with --raw it prints each
+# symbol's content on its own line. A missing zbar falls back to OCR.
+if CODE=$(zbarimg --quiet --raw "$IMAGE" 9>&- 2>/dev/null) && [ -n "$CODE" ]; then
+  printf "%s" "$CODE" | wl-copy 9>&-
+  notify "$(describe_code "$CODE")"
+  exit 0
+fi
+
+if ! TEXT=$(tesseract "$IMAGE" stdout --oem 1 --psm 6 -l eng --dpi 300 \
+    -c preserve_interword_spaces=1 9>&- 2>/dev/null); then
+  notify "Text recognition failed"
+  exit 1
+fi
+if [ -z "$TEXT" ]; then
+  notify "No text found in the selection"
+  exit 1
+fi
+
+printf "%s" "$TEXT" | wl-copy 9>&-
+
+notify "Copied text from selection to clipboard"

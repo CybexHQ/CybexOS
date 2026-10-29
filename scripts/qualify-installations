@@ -1,0 +1,1323 @@
+#!/usr/bin/env python3
+"""Real, disposable UEFI ISO installation tests; never operates on host disks.
+
+Requires qemu-system-x86_64, OVMF and Python pexpect (nix develop).
+The returned evidence is only for the actual ISO/source identities observed.
+It is not physical hardware or published-channel update qualification.
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+from pathlib import Path
+import shlex
+import shutil
+import socket
+import subprocess
+import tempfile
+import time
+
+import pexpect
+
+PASSWORD = 'Cybexos8!'
+
+
+def check_installed_identity(media, installed, source):
+    """Require the ISO's exact content identity after a bundled test install.
+
+    Development installation locks the bundled directory as a path input. Nix
+    preserves its NAR hash but supplies no Git revision to that flake. Record
+    this metadata distinction rather than rejecting identical source bytes or
+    claiming that the installed flake still carries the medium's Git metadata.
+    """
+    if (not all(media.get(key) for key in ('version', 'revision', 'narHash'))
+            or installed.get('version') != media.get('version')
+            or installed.get('narHash') != media.get('narHash')
+            or source.get('narHash') != media.get('narHash')):
+        raise RuntimeError('Installed product differs from ISO source identity')
+    expected_revision = 'uncommitted' if source.get('type') == 'path' else media.get('revision')
+    if (installed.get('revision') != expected_revision
+            or (source.get('type') != 'path' and source.get('rev') != media.get('revision'))):
+        raise RuntimeError('Installed product has unexpected source revision metadata')
+    return {'result': 'passed', 'isoRelease': media, 'installedRelease': installed,
+            'installedSource': source,
+            'scope': 'same exact source NAR; bundled path inputs have no Git revision metadata'
+                     if source.get('type') == 'path' else 'same exact source revision and NAR'}
+
+
+#: Ungated action IDs other streams rely on (welcome-and-shortcuts.md §1.1).
+REQUIRED_ACTIONS = (
+    'shell.launcher', 'shell.settings', 'shell.shortcuts', 'shell.control-panel',
+    'shell.notifications', 'shell.lock', 'shell.exit', 'apps.terminal', 'apps.browser',
+    'apps.files', 'windows.close', 'windows.overview', 'windows.toggle-floating',
+    *('workspaces.%s.%d' % (kind, n) for kind in ('switch', 'move') for n in range(1, 11)),
+    'webapps.slack', 'webapps.whatsapp', 'webapps.youtube', 'webapps.google-photos', 'webapps.x',
+    'clipboard.history', 'capture.region')
+# A free remap and a website shortcut, applied and reset through the service.
+SHORTCUT_REMAP = 'SUPER + ALT + B'
+SHORTCUT_CUSTOM = {'id': 'custom.qa-docs', 'group': 'Web', 'label': 'QA docs',
+                   'keys': ['SUPER + ALT + D'], 'run': {'type': 'url', 'url': 'https://example.org'}}
+MODIFIER_MASKS = {'SHIFT': 1, 'CTRL': 4, 'ALT': 8, 'SUPER': 64}
+
+
+def bound(binds, description, combo):
+    """Whether `hyprctl binds -j` holds the canonical combination with that description."""
+    *modifiers, key = combo.split(' + ')
+    mask = sum(MODIFIER_MASKS[modifier] for modifier in modifiers)
+    for bind in binds:
+        if bind.get('description') != description or bind.get('submap') or bind.get('modmask') != mask:
+            continue
+        if key.startswith('code:') and bind.get('keycode') == int(key[5:]):
+            return True
+        if not key.startswith('code:') and str(bind.get('key', '')).lower() == key.lower():
+            return True
+    return False
+
+
+def check_shortcut_state(state, binds, required=REQUIRED_ACTIONS):
+    """The resolved state is valid, complete, error-free and live in Hyprland."""
+    assert isinstance(state, dict) and state.get('v') == 1, 'state version'
+    assert state.get('error') is None, 'state error: %r' % state.get('error')
+    rows = {row['id']: row for row in state['actions']}
+    missing = [name for name in required if not rows.get(name, {}).get('keys')]
+    assert not missing, 'actions missing or unbound: %s' % missing
+    unbound = ['%s %s' % (row['id'], key) for row in state['actions'] + state['custom']
+               for key in row['keys'] if not key.split(' + ')[-1].lower().startswith('mouse')
+               and not bound(binds, row['group'] + ': ' + row['label'], key)]
+    assert not unbound, 'state keys absent from hyprctl binds: %s' % unbound[:20]
+    return rows
+
+
+def onboarding_qml_errors(lines):
+    """Split a journal into onboarding QML errors and any other QML errors."""
+    errors = [line for line in lines if re.search(r'TypeError|ReferenceError|Binding loop', line)]
+    onboarding = [line for line in errors if re.search(r'Welcome|Shortcut|Keybind|Wallpaper', line)]
+    return onboarding, [line for line in errors if line not in onboarding]
+
+
+SHORTCUTS_DRIVER = r'''
+import base64, hashlib, json, pwd, re, subprocess, time
+from pathlib import Path
+user = pwd.getpwuid(1000)
+base = ['runuser', '-u', user.pw_name, '--', 'env', 'XDG_RUNTIME_DIR=/run/user/1000',
+        'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
+def out(*args):
+    return subprocess.check_output(base + list(args), text=True, timeout=60).strip()
+# The service runs with the shell's own environment, as the Settings page does.
+pid = out('systemctl', '--user', 'show', 'quickshell.service', '-p', 'MainPID', '--value')
+environ = [part for part in Path('/proc', pid, 'environ').read_bytes().decode().split('\0') if '=' in part]
+shell = ['runuser', '-u', user.pw_name, '--', 'env', '-i', *environ]
+def run(*args, stdin=None):
+    return subprocess.run(shell + list(args), input=stdin, text=True, capture_output=True,
+                          timeout=60, check=True).stdout.strip()
+runtime = dict(part.split('=', 1) for part in environ)
+service = ['python3', '-B', out('cybexos-runtime', 'path', 'quickshell') + '/scripts/system-settings.py', 'keybindings']
+def request(document):
+    reply = json.loads(run(*service, stdin=json.dumps(document) + '\n'))
+    assert reply.get('success') is True, reply
+    return reply
+state_path = Path(runtime['XDG_RUNTIME_DIR'], 'cybexos/keybindings-state.json')
+def live():
+    binds = json.loads(run('hyprctl', '-j', 'binds'))
+    assert isinstance(binds, list) and binds, 'hyprctl binds -j is not a non-empty JSON list'
+    return json.loads(state_path.read_text()), binds
+def nil_error():
+    return run('hyprctl', 'eval', 'assert(__cybexos_keybindings_error == nil, __cybexos_keybindings_error)').lower() == 'ok'
+def settle(predicate):
+    for attempt in range(20):
+        state, binds = live()
+        if predicate(state, binds):
+            return state, binds
+        time.sleep(0.5)
+    return state, binds
+user_lua = Path(user.pw_dir, '.config/cybexos/hypr/user.lua')
+digest = lambda: hashlib.sha256(user_lua.read_bytes()).hexdigest() if user_lua.exists() else 'absent'
+evidence = {'userLuaBefore': digest()}
+state, binds = live()
+rows = check_shortcut_state(state, binds)
+assert nil_error(), '__cybexos_keybindings_error is set'
+evidence['defaults'] = {'actions': len(state['actions']), 'binds': len(binds),
+                        'describedBinds': len([bind for bind in binds if bind.get('description')]),
+                        'requiredActions': len(REQUIRED_ACTIONS), 'stateError': None, 'evalErrorNil': True,
+                        'browser': rows['apps.browser']['keys']}
+snapshot = request({'action': 'snapshot'})
+keymap = snapshot['keymap']
+assert keymap and keymap.get('10') == '1', 'keymap from xkbcli: %d entries, 10=%r' % (len(keymap), keymap.get('10'))
+assert snapshot['preferencesError'] == '' and snapshot['state']['error'] is None, snapshot['preferencesError']
+evidence['keymap'] = {'entries': len(keymap), 'keycode10': keymap['10'],
+                      'layout': [(item.get('layout'), item.get('active_keymap')) for item in
+                                 json.loads(run('hyprctl', '-j', 'devices')).get('keyboards', []) if item.get('main')]}
+browser = rows['apps.browser']
+preferences = {'v': 1, 'actions': {'apps.browser': {'keys': [SHORTCUT_REMAP]}}, 'custom': [SHORTCUT_CUSTOM]}
+applied = request({'action': 'apply', 'version': snapshot['version'], 'preferences': preferences})
+custom_description = SHORTCUT_CUSTOM['group'] + ': ' + SHORTCUT_CUSTOM['label']
+browser_description = browser['group'] + ': ' + browser['label']
+def remapped(state, binds):
+    return (bound(binds, browser_description, SHORTCUT_REMAP)
+            and bound(binds, custom_description, SHORTCUT_CUSTOM['keys'][0]))
+state, binds = settle(remapped)
+assert remapped(state, binds), 'remap or custom shortcut is not bound'
+assert not any(bound(binds, browser_description, key) for key in browser['defaultKeys']), 'default browser key still bound'
+rows = check_shortcut_state(state, binds)
+assert rows['apps.browser']['keys'] == [SHORTCUT_REMAP] and rows['apps.browser']['changed'] is True, rows['apps.browser']
+assert [entry['id'] for entry in state['custom']] == [SHORTCUT_CUSTOM['id']], state['custom']
+assert nil_error(), '__cybexos_keybindings_error after apply'
+again = request({'action': 'snapshot'})
+assert again['version'] == applied['version'] and again['preferences'] == preferences
+assert again['state']['custom'] == state['custom']
+evidence['applied'] = {'browser': rows['apps.browser']['keys'], 'custom': state['custom'],
+                       'diagnostics': state['diagnostics'],
+                       'customBind': [bind for bind in binds if bind.get('description') == custom_description]}
+request({'action': 'apply', 'version': applied['version'], 'preferences': {'v': 1}})
+def restored(state, binds):
+    return (all(bound(binds, browser_description, key) for key in browser['defaultKeys'])
+            and not any(bind.get('description') == custom_description for bind in binds))
+state, binds = settle(restored)
+assert restored(state, binds), 'reset did not restore the default bindings'
+rows = check_shortcut_state(state, binds)
+assert rows['apps.browser']['keys'] == browser['defaultKeys'] and rows['apps.browser']['changed'] is False
+assert state['custom'] == [] and not any(row['changed'] for row in state['actions']), 'changed rows after reset'
+assert nil_error(), '__cybexos_keybindings_error after reset'
+evidence['reset'] = {'browser': rows['apps.browser']['keys'], 'custom': state['custom'], 'changedRows': 0}
+evidence['userLuaAfter'] = digest()
+assert evidence['userLuaAfter'] == evidence['userLuaBefore'], 'user.lua changed'
+print('QA_SHORTCUTS:' + base64.b64encode(json.dumps(evidence).encode()).decode())
+'''
+
+
+def shortcuts_script():
+    """The guest script: these constants and checks, then SHORTCUTS_DRIVER."""
+    import inspect
+    constants = ''.join('%s = %r\n' % (name, globals()[name]) for name in
+                        ('REQUIRED_ACTIONS', 'SHORTCUT_REMAP', 'SHORTCUT_CUSTOM', 'MODIFIER_MASKS'))
+    helpers = ''.join(inspect.getsource(item) + '\n' for item in (bound, check_shortcut_state))
+    return constants + helpers + SHORTCUTS_DRIVER
+
+
+class VM:
+    def __init__(self, directory, disk, iso=None, *, extra_qemu_args=()):
+        self.directory, self.disk, self.iso = directory, disk, iso
+        self.extra_qemu_args = list(extra_qemu_args)
+        self.process = None
+        self.control_directory = None
+        self.command_ready = False
+        # Encrypted installations sign the owner in once the disk unlocks.
+        self.autologin = False
+        self.firmware = Path(os.environ['CYBEXOS_OVMF'])
+        self.vars = directory / 'vars.fd'
+        if not self.vars.exists():
+            shutil.copyfile(self.firmware / 'OVMF_VARS.fd', self.vars)
+
+    def start(self):
+        self.command_ready = False
+        # Unix socket names are limited to 108 bytes even when disks/logs live
+        # in a deeply nested task directory. Keep only the small control socket
+        # in /tmp, and remove it with this VM's process.
+        self.control_directory = tempfile.TemporaryDirectory(prefix='ndvm.', dir='/tmp')
+        self.qmp = Path(self.control_directory.name) / 'qmp.sock'
+        args = ['-no-user-config','-machine','q35','-accel','kvm' if os.access('/dev/kvm',os.R_OK|os.W_OK) else 'tcg,thread=multi',
+                '-cpu','host' if os.access('/dev/kvm',os.R_OK|os.W_OK) else 'max', '-m','12288','-smp','4',
+                '-drive',f'if=pflash,format=raw,readonly=on,file={self.firmware / "OVMF_CODE.fd"}',
+                '-drive',f'if=pflash,format=raw,file={self.vars}',
+                '-drive',f'file={self.disk},if=none,id=systemdisk,format=qcow2','-device','virtio-blk-pci,drive=systemdisk,serial=CYBEXOS-QA-DISK',
+                '-netdev','user,id=net','-device','virtio-net-pci,netdev=net','-device','virtio-vga',
+                # An absolute pointer lets QMP click the installer screen exactly.
+                '-device','qemu-xhci','-device','usb-tablet',
+                '-display','none','-serial','stdio','-no-reboot', '-qmp',f'unix:{self.qmp},server=on,wait=off']
+        if self.iso:
+            args += ['-cdrom',str(self.iso),'-boot','d']
+        args += self.extra_qemu_args
+        self.process = pexpect.spawn('qemu-system-x86_64',args,encoding='utf-8',timeout=600,maxread=65536)
+        self.process.delaybeforesend = 0.05
+        # This private, disposable log contains only public QA credentials.
+        self.log = (self.directory / 'serial.log').open('a')
+        self.process.logfile_read = self.log
+
+    def login(self, live=False, encrypted=False, password=PASSWORD):
+        if encrypted:
+            self.process.expect(r'(?i)(passphrase for|enter passphrase)',timeout=600)
+            self.process.sendline(password)
+        # The installation medium has no live account: its serial console is
+        # a root shell, used here only to observe the installer services.
+        # The medium's autologin banner itself contains "login:".
+        index = 1 if live else 0
+        self.process.expect(r'root@cybexos-installer' if live else r'login:', timeout=600)
+        if index == 0:
+            self.process.sendline('cybexqa')
+            self.process.expect('Password:');self.process.sendline(password)
+        # Fish's terminal capability queries can take seconds on a serial
+        # console; wait for the shell before sending administration commands.
+        time.sleep(4 if live else 2)
+        if not live:
+            self.process.sendline('sudo -i')
+            index = self.process.expect([r'password for cybexqa:',r'root@'],timeout=60)
+            if index == 0:
+                self.process.sendline(password)
+                self.process.expect(r'root@',timeout=60)
+        self.process.sendline('export TERM=dumb; export PS1="CYBEXOS_ROOT> "; stty -echo')
+        self.process.expect('CYBEXOS_ROOT> ',timeout=30)
+        self.command('true')
+
+    def command(self, script, timeout=1800):
+        marker = 'CYBEXOS_QA_' + os.urandom(6).hex()
+        command = 'bash -c ' + shlex.quote('printf "\\n' + marker + '_BEGIN\\n"\n(set -e\n' + script + '\n)\nqa_result=$?\nprintf "\\n'+marker+':%s\\n" "$qa_result"')
+        self.command_ready = False
+        self.process.sendline(command)
+        self.process.expect(r'\r*\n'+marker+r'_BEGIN\r*\n',timeout=timeout)
+        self.process.expect(r'\r*\n'+marker+r':([0-9]+)\r*\n',timeout=timeout)
+        self.command_ready = True
+        body=self.process.before
+        if self.process.match.group(1) != '0':
+            raise RuntimeError('Guest command failed (exit '+self.process.match.group(1)+'): '+script[:160]+'\n'+body[-4000:])
+        return body
+
+    def failure_diagnostics(self):
+        """Read bounded diagnostics only when a completed command left a shell.
+
+        Do not inject another command after a broken serial transport, during
+        login, or into an installer still running. No credential files, full
+        process environments or build logs are collected.
+        """
+        if not self.command_ready or self.process is None or not self.process.isalive():
+            return {'state': 'unavailable', 'reason': 'No authenticated idle serial command transport'}
+        if self.iso:
+            # The installation medium carries no Python or desktop session.
+            script = '''systemctl --failed --no-pager --no-legend || true
+systemctl status --no-pager -n 0 cybexos-installerd.service cybexos-installer-ui.service || true
+journalctl -b --no-pager -u cybexos-installerd.service -u cybexos-installer-ui.service -n 60 || true'''
+            try:
+                return {'state': 'collected', 'medium': self.command(script, timeout=120)[-6000:]}
+            except Exception as error:
+                return {'state': 'failed', 'error': str(error)[-2000:]}
+        script = r'''python3 - <<'QA_DIAGNOSTIC'
+import json, pwd, shutil, subprocess
+from pathlib import Path
+output = {}
+def run(label, args):
+    try:
+        result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=15)
+        output[label] = {'status': result.returncode, 'output': result.stdout[-3000:]}
+        return result.stdout
+    except Exception as error:
+        output[label] = {'error': str(error)}
+        return ''
+run('updaterStatus', ['cybex', 'update', 'status'])
+prefix = ['runuser', '-u', pwd.getpwuid(1000).pw_name, '--', 'env', 'XDG_RUNTIME_DIR=/run/user/1000', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
+run('welcomeIpc', prefix + ['HOME=/home/cybexqa', 'cybexos-runtime', 'ipc', 'welcome', 'status'])
+run('polkitIpc', prefix + ['HOME=/home/cybexqa', 'cybexos-runtime', 'ipc', 'polkit', 'status'])
+environment = run('environment', prefix + ['systemctl', '--user', 'show-environment'])
+output.pop('environment')
+signature = next((line.split('=', 1)[1] for line in environment.splitlines() if line.startswith('HYPRLAND_INSTANCE_SIGNATURE=')), '')
+if signature:
+    run('hyprlandConfigErrors', prefix + ['HYPRLAND_INSTANCE_SIGNATURE=' + signature, 'hyprctl', '-j', 'configerrors'])
+pid = run('quickshellPid', prefix + ['systemctl', '--user', 'show', 'quickshell.service', '-p', 'MainPID', '--value']).strip()
+if pid.isdecimal() and int(pid) > 0:
+    try:
+        path = next((entry.decode(errors='replace')[5:] for entry in Path('/proc', pid, 'environ').read_bytes().split(b'\0') if entry.startswith(b'PATH=')), '')
+        output['quickshellPath'] = path[:3000]
+        output['quickshellHelpers'] = {name: shutil.which(name, path=path) for name in ['cybex', 'quickshell-reminder', 'tailscale']}
+    except OSError as error:
+        output['quickshellPath'] = {'error': str(error)}
+invocation = run('quickshellInvocation', prefix + ['systemctl', '--user', 'show', 'quickshell.service', '-p', 'InvocationID', '--value']).strip()
+if invocation:
+    run('quickshellCurrentWarnings', ['journalctl', '--no-pager', '_SYSTEMD_INVOCATION_ID=' + invocation, '-p', 'warning', '-n', '20'])
+run('failedSystemUnits', ['systemctl', '--failed', '--no-pager', '--no-legend'])
+run('passwordPam', ['cat', '/etc/pam.d/passwd'])
+run('loginPam', ['cat', '/etc/pam.d/sddm'])
+run('keyringState', prefix + ['busctl', '--user', 'get-property', 'org.freedesktop.secrets',
+    '/org/freedesktop/secrets/collection/login', 'org.freedesktop.Secret.Collection', 'Locked'])
+run('keyringJournal', ['journalctl', '--no-pager', '-g', 'gkr-pam|gnome-keyring', '-n', '40'])
+print(json.dumps(output))
+QA_DIAGNOSTIC'''
+        try:
+            return {'state': 'collected', 'checks': json.loads(self.command(script, timeout=120).strip())}
+        except Exception as error:
+            return {'state': 'failed', 'error': str(error)[-2000:]}
+
+    def reboot(self, encrypted, password=PASSWORD):
+        self.process.sendline('systemctl reboot')
+        self.process.expect(pexpect.EOF, timeout=120)
+        self.stop()
+        self.iso = None
+        self.start()
+        self.login(encrypted=encrypted, password=password)
+
+    def login_desktop(self, password=PASSWORD):
+        if self.autologin:
+            self.automatic_desktop()
+            return
+        # SDDM has one normal account; its password field has initial focus.
+        qmp = socket.socket(socket.AF_UNIX)
+        qmp.connect(str(self.qmp))
+        stream=qmp.makefile('rwb',buffering=0)
+        json.loads(stream.readline())
+        def call(execute, arguments=None):
+            stream.write((json.dumps({'execute':execute,'arguments':arguments or {}})+'\n').encode())
+            while True:
+                result=json.loads(stream.readline())
+                if 'error' in result:raise RuntimeError(str(result))
+                if 'return' in result:return result
+        call('qmp_capabilities')
+        for char in password:
+            key={'-':'minus', '!':'shift-1'}.get(char, 'shift-'+char.lower() if char.isupper() else char)
+            call('human-monitor-command',{'command-line':'sendkey '+key})
+            time.sleep(.08)
+        call('human-monitor-command',{'command-line':'sendkey ret'})
+        stream.close();qmp.close()
+        self.command('for n in $(seq 1 90); do cybexos-health desktop-required && exit 0; sleep 2; done; exit 1',timeout=240)
+
+    def automatic_desktop(self):
+        """Require the desktop SDDM started itself, with the login keyring unlocked.
+
+        No greeter accepts input, so no password is typed: keystrokes would
+        reach the running desktop. The disk passphrase cached at unlock reaches
+        GNOME Keyring through pam_systemd_loadkey.
+        """
+        self.command('''for n in $(seq 1 90); do cybexos-health desktop-required && break; sleep 2; done
+cybexos-health desktop-required
+for session in $(loginctl list-sessions --no-legend | awk '$3 == "cybexqa" {print $1}'); do
+  loginctl show-session "$session" -p Service --value
+done | grep -qx sddm-autologin
+test -d /run/cybexos-autologin-used
+test "$(runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \\
+  busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection Locked)" = "b false"''', timeout=240)
+
+    def welcome(self, method):
+        # Reach the installed shell as its session user, just like health and
+        # keyring checks; root's IPC/configuration directory is unrelated.
+        return self.command("runuser -u cybexqa -- env HOME=/home/cybexqa "
+            "XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus "
+            "cybexos-runtime ipc welcome " + method).strip()
+
+    def settings(self, method):
+        return self.command("runuser -u cybexqa -- env HOME=/home/cybexqa "
+            "XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus "
+            "cybexos-runtime ipc settings " + method).strip()
+
+    def hello_services(self, timeout=30):
+        """The Hello step's installer summary comes from the region and input services."""
+        deadline = time.monotonic() + timeout
+        while True:
+            services = json.loads(self.settings('status'))['services']
+            hello = {name: {key: services[name][key] for key in ('loaded', 'failed')} for name in ('region', 'input')}
+            if all(state['loaded'] or state['failed'] for state in hello.values()) or time.monotonic() >= deadline:
+                return hello
+            time.sleep(0.5)
+
+    def welcome_layers(self):
+        """The guide's layer surfaces Hyprland has mapped: the full-screen guide and its resume pill."""
+        layers = json.loads(self.command('runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 -j layers'))
+        names = {layer.get('namespace') for monitor in layers.values()
+                 for level in monitor.get('levels', {}).values() for layer in level}
+        return sorted(names & {'qs-welcome', 'qs-welcome-resume'})
+
+    def wait_welcome_layers(self, expected, timeout=30):
+        """Hyprland's own layer list, not only the shell's report."""
+        deadline = time.monotonic() + timeout
+        while True:
+            names = self.welcome_layers()
+            if names == sorted(expected):
+                return names
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Welcome layers ' + json.dumps(names) + ', expected ' + json.dumps(sorted(expected)))
+            time.sleep(0.25)
+
+    def wait_welcome_state(self, predicate, label, timeout=30):
+        deadline = time.monotonic() + timeout
+        while True:
+            state = json.loads(self.welcome('status'))
+            if predicate(state):
+                return state
+            if time.monotonic() >= deadline:
+                raise RuntimeError(label + ': ' + json.dumps(state))
+            time.sleep(0.25)
+
+    def wait_welcome_unmapped(self):
+        """A dismissed guide must leave the compositor, not only report it."""
+        self.wait_welcome_layers([])
+
+    def check_welcome_closed(self):
+        state = json.loads(self.welcome('status'))
+        assert state['open'] is False and state['status'] == 'dismissed', state
+
+    def python(self, source, timeout=300):
+        """Run a guest Python script sent in base64 chunks, free of shell quoting."""
+        import base64
+        encoded = base64.b64encode(source.encode()).decode()
+        self.command('rm -f /run/qa-script.b64')
+        for start in range(0, len(encoded), 2048):
+            self.command('printf %s ' + encoded[start:start + 2048] + ' >> /run/qa-script.b64')
+        return self.command('base64 -d /run/qa-script.b64 > /run/qa-script.py\npython3 -B /run/qa-script.py', timeout=timeout)
+
+    def keyboard_shortcuts(self, screenshots=None):
+        """The installed Hyprland session's shortcut catalog and the Settings apply path.
+
+        The shipped system-settings `keybindings` service runs as the session
+        user with the shell's own environment and PATH, exactly as Settings
+        calls it, against the real compositor's reload and `hyprctl` output.
+        """
+        import base64
+        body = self.python(shortcuts_script())
+        evidence = json.loads(base64.b64decode(re.search(r'QA_SHORTCUTS:([A-Za-z0-9+/=]+)', body).group(1)))
+        # Settings → Keyboard → Shortcuts through the shell's IPC, as Super+K's
+        # "Edit shortcuts" opens it; the old `shortcuts` id names that tab.
+        self.settings('open shortcuts')
+        deadline = time.monotonic() + 30
+        while True:
+            status = json.loads(self.settings('status'))
+            if status['open'] and status['page'] == 'keyboard' and status.get('tab') == 'shortcuts':
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Settings did not open on the shortcuts page: ' + json.dumps(status))
+            time.sleep(0.5)
+        # The page's claim makes one backend request before its rows draw.
+        time.sleep(4)
+        if screenshots:
+            self.screenshot(screenshots / 'settings-shortcuts.png')
+        evidence['settingsPage'] = {'opened': 'cybexos-runtime ipc settings open shortcuts', 'page': status['page'],
+                                    'tab': status['tab']}
+        self.settings('close')
+        # Only the count and QML error lines cross the serial console.
+        count, *lines = self.command('invocation=$(runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/1000 '
+                                     'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user show '
+                                     'quickshell.service -p InvocationID --value)\ntest -n "$invocation"\n'
+                                     'journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID=$invocation > /run/qa-shell.log\n'
+                                     'wc -l < /run/qa-shell.log\n'
+                                     "grep -E 'TypeError|ReferenceError|Binding loop' /run/qa-shell.log || true",
+                                     timeout=120).strip().splitlines()
+        onboarding, other = onboarding_qml_errors(lines)
+        evidence['journal'] = {'lines': int(count), 'onboardingQmlErrors': onboarding[:20],
+                               'otherQmlErrors': len(other), 'otherQmlErrorSamples': other[:5]}
+        if onboarding:
+            raise RuntimeError('Onboarding QML errors in the current shell journal: ' + json.dumps(onboarding[:20]))
+        evidence['result'] = 'passed'
+        return evidence
+
+    def check_desktop_defaults(self):
+        self.command(r'''python3 - <<'QA_DEFAULTS'
+import json, pathlib, pwd, subprocess
+user = pwd.getpwuid(1000)
+prefix = ['runuser', '-u', user.pw_name, '--', 'env', 'XDG_RUNTIME_DIR=/run/user/1000',
+          'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
+environment = subprocess.check_output(prefix + ['systemctl', '--user', 'show-environment'], text=True)
+assert 'XCURSOR_THEME=Bibata-Modern-Classic' in environment
+assert 'XCURSOR_SIZE=24' in environment
+pid = subprocess.check_output(prefix + ['systemctl', '--user', 'show', 'quickshell.service', '-p', 'MainPID', '--value'], text=True).strip()
+runtime = dict(part.split('=', 1) for part in pathlib.Path('/proc', pid, 'environ').read_text().split('\0') if '=' in part)
+schema_environment = [key + '=' + runtime[key] for key in ('XDG_DATA_DIRS', 'GSETTINGS_SCHEMA_DIR') if key in runtime]
+assert subprocess.check_output(prefix + schema_environment + ['gsettings', 'get', 'org.gnome.desktop.interface', 'cursor-theme'], text=True).strip() == "'Bibata-Modern-Classic'"
+subprocess.run(['systemctl', 'is-active', '--quiet', 'avahi-daemon.service'], check=True)
+subprocess.run(['systemctl', 'is-active', '--quiet', 'firewall.service'], check=True)
+assert '5353' in subprocess.check_output(['iptables-save'], text=True)
+path = pathlib.Path(user.pw_dir, '.config/cybexos/shell.json')
+if path.exists():
+    saved = json.loads(path.read_text())
+    if 'mods' in saved:
+        flags = {entry['id']: entry['on'] for column in saved['mods'].values() for entry in column}
+        assert flags['modelusage'] is True
+        assert all(flags[key] is False for key in ('hermes', 'remote', 't3', 'gh', 'fusebox'))
+print('Bibata desktop/session cursor, local discovery, firewall, and saved widget defaults passed')
+QA_DEFAULTS''', timeout=60)
+
+    def authorize(self, command, *, payload=None, approve=True):
+        """Run the desktop's unprivileged path and answer its real Polkit UI.
+
+        The transient user unit inherits the managed shell's PATH. Its request
+        and exit code contain no authentication response: the public QA fixture
+        is typed into the actual prompt through QMP, never submitted over IPC.
+        """
+        identifier = os.urandom(6).hex()
+        directory = '/run/user/1000/qa-authorization-' + identifier
+        runner = ('import pathlib, subprocess\n'
+                  + 'result = subprocess.run(' + repr(command) + ', input=' + repr(payload)
+                  + ', text=True, capture_output=True)\n'
+                  + 'base = pathlib.Path(' + repr(directory) + ')\n'
+                  + '(base / "stdout").write_text(result.stdout)\n'
+                  + '(base / "stderr").write_text(result.stderr)\n'
+                  + '(base / "code").write_text(str(result.returncode))\n')
+        self.python('''import os, pathlib, pwd, subprocess
+base = pathlib.Path(DIRECTORY)
+base.mkdir(mode=0o700)
+user = pwd.getpwnam('cybexqa')
+os.chown(base, user.pw_uid, user.pw_gid)
+script = base / 'request.py'
+script.write_text(RUNNER)
+os.chown(script, user.pw_uid, user.pw_gid)
+prefix = ['runuser', '-u', 'cybexqa', '--', 'env', 'XDG_RUNTIME_DIR=/run/user/1000',
+          'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
+pid = subprocess.check_output(prefix + ['systemctl', '--user', 'show', 'quickshell.service', '-p', 'MainPID', '--value'], text=True).strip()
+environment = pathlib.Path('/proc', pid, 'environ').read_bytes().split(b'\\0')
+path = next(value[5:].decode() for value in environment if value.startswith(b'PATH='))
+subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--unit=qa-authorization-IDENTIFIER',
+                        '--setenv=PATH=' + path, '/run/current-system/sw/bin/python3', str(script)], check=True)
+'''.replace('DIRECTORY', repr(directory)).replace('RUNNER', repr(runner)).replace('IDENTIFIER', identifier))
+        status_command = ('runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/1000 '
+                          'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus '
+                          'cybexos-runtime ipc polkit status')
+        for attempt in range(90):
+            status = json.loads(self.command(status_command))
+            if status.get('registered') and status.get('active') and status.get('responseRequired'):
+                break
+            if self.command('test -f ' + directory + '/code && cat ' + directory + '/code || true').strip():
+                raise RuntimeError('Authorization request exited before the password prompt: '
+                                   + self.command('cat ' + directory + '/stderr'))
+            time.sleep(0.5)
+        else:
+            raise RuntimeError('Desktop Polkit password prompt did not become ready: ' + json.dumps(status))
+        if approve:
+            self.type_text(PASSWORD)
+            self.press('ret')
+        else:
+            self.press('esc')
+        self.command('for n in $(seq 1 90); do test -f ' + directory + '/code && exit 0; sleep 1; done; exit 1', timeout=120)
+        code = int(self.command('cat ' + directory + '/code').strip())
+        output = self.command('cat ' + directory + '/stdout').strip()
+        if approve and code:
+            raise RuntimeError('Desktop-authorized command failed: ' + output + '\n'
+                               + self.command('cat ' + directory + '/stderr'))
+        self.command('rm -r ' + directory)
+        return code, output
+
+    def authorization(self, evidence):
+        print('Installed desktop: exercising real SSH and updater password prompts', flush=True)
+        script = self.command('cybexos-runtime path quickshell').strip() + '/scripts/system-settings.py'
+        command = ['/run/current-system/sw/bin/python3', '-B', script, 'ssh-server']
+        request = json.dumps({'action': 'set-enabled', 'enabled': True}) + '\n'
+        code, output = self.authorize(command, payload=request, approve=False)
+        cancelled = json.loads(output)
+        assert code == 0 and cancelled.get('success') is False, cancelled
+        assert 'cancelled or denied' in cancelled.get('error', ''), cancelled
+        assert not json.loads(self.command('cybexos-ssh-server status'))['enabled']
+        code, output = self.authorize(command, payload=request)
+        enabled = json.loads(output)
+        assert code == 0 and enabled['enabled'] and enabled['active'], enabled
+        self.authorize(command, payload=json.dumps({'action': 'set-enabled', 'enabled': False}) + '\n')
+        assert not json.loads(self.command('cybexos-ssh-server status'))['enabled']
+        code, output = self.authorize(['/run/current-system/sw/bin/cybex', 'update', 'stage', 'local'])
+        accepted = json.loads(output)
+        assert code == 0 and accepted['accepted'], accepted
+        wait_state(self, ('ready',), timeout=600)
+        candidate = json.loads(self.command('cybex update status'))
+        self.command('cybex update discard ' + candidate['transaction'])
+        wait_state(self, ('idle',), timeout=120)
+        evidence.update(result='passed', sshCancellation=True, sshEnable=True, sshDisable=True,
+                        updateStage=True, passwordPrompts='real Quickshell agent and PAM')
+
+    def password_change(self, encrypted, evidence=None):
+        evidence = {} if evidence is None else evidence
+        evidence.update(result='running', encrypted=encrypted, roundTrips=0)
+        prefix = 'runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus '
+        self.command('timeout 30 ' + prefix + "sh -c 'printf qa-keyring-value | secret-tool store --label=Qualification cybexos qualification'", timeout=45)
+        evidence['keyringStored'] = True
+        for current, new in ((PASSWORD, 'Changed8!'), ('Changed8!', PASSWORD)):
+            request = json.dumps({'current': current, 'new': new})
+            script = 'printf %s ' + shlex.quote(request) + ' | env PKEXEC_UID=1000 cybexos-password-worker'
+            result = json.loads(self.command(script, timeout=360).strip())
+            if result.get('success') is not True:
+                raise RuntimeError('Installed password worker: ' + json.dumps(result))
+            evidence['accountChanges'] = evidence.get('accountChanges', 0) + 1
+            if encrypted:
+                self.command('printf %s ' + shlex.quote(new) + ' | cryptsetup open --test-passphrase --key-file - /dev/vda2\n' +
+                             '! printf %s ' + shlex.quote(current) + ' | cryptsetup open --test-passphrase --key-file - /dev/vda2', timeout=90)
+            self.command('test ! -e /var/lib/cybexos/password-change.json')
+            self.reboot(encrypted, password=new)
+            self.login_desktop(password=new)
+            self.check_welcome_closed()
+            self.command('test "$(timeout 20 ' + prefix + 'secret-tool lookup cybexos qualification)" = qa-keyring-value', timeout=35)
+            evidence['roundTrips'] += 1
+        self.command(prefix + 'secret-tool clear cybexos qualification')
+        evidence.update(result='passed', checks=['real packaged worker and PAM',
+            'old disk key rejected' if encrypted else 'no disk change',
+            'reboot and automatic desktop login after disk unlock' if self.autologin else 'reboot and password desktop login',
+            'login keyring unlocked with changed password'])
+        return evidence
+
+    def qmp_commands(self, *commands):
+        """Run QMP commands on the VM's own monitor, in order."""
+        with socket.socket(socket.AF_UNIX) as qmp:
+            qmp.connect(str(self.qmp))
+            with qmp.makefile('rwb', buffering=0) as stream:
+                json.loads(stream.readline())
+                for command in ({'execute': 'qmp_capabilities'}, *commands):
+                    stream.write((json.dumps(command) + '\n').encode())
+                    while True:
+                        result = json.loads(stream.readline())
+                        if 'error' in result:
+                            raise RuntimeError(str(result['error']))
+                        if 'return' in result:
+                            break
+
+    def boot_screenshots(self, directory, count=25):
+        """Capture the boot menu and splash at one-second intervals."""
+        for index in range(count):
+            time.sleep(1)
+            self.screenshot(directory / f'{index:02d}.png')
+
+    def quiet_boot(self):
+        """Check the installed boot's serial console for kernel and EFI stub text.
+
+        The QA machine's kernel console includes ttyS0, so any kernel or EFI
+        stub message at the console level reaches this log. On a serial console
+        Plymouth always uses its text view and asks systemd to print unit
+        status there; those lines are counted but expected. Without a serial
+        console Plymouth keeps them in its boot log behind the splash.
+        """
+        self.log.flush()
+        text = (self.directory / 'serial.log').read_text(errors='replace')
+        boot = text.rsplit('BdsDxe: starting', 1)[-1].split('login:', 1)[0]
+        boot = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', '', boot)
+        found = {'kernel': len(re.findall(r'\[\s*\d+\.\d{6}\]', boot)), 'efiStub': boot.count('EFI stub:')}
+        return {'result': 'passed' if not any(found.values()) else 'failed', 'linesOnConsole': found,
+                'plymouthTextViewStatusLines': len(re.findall(r'\[\s*(?:OK|FAILED|DEPEND|TIME)\s*\]', boot)),
+                'scope': 'serial console of the installed boot until the login prompt'}
+
+    def screenshot(self, path):
+        """Capture the actual VM display, never a reconstructed installer screen."""
+        from PIL import Image
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix('.ppm')
+        self.qmp_commands({'execute': 'screendump', 'arguments': {'filename': str(temporary)}})
+        try:
+            with Image.open(temporary) as display:
+                display.save(path)
+                return display.size
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    KEYS = {' ': 'spc', '!': 'shift-1', '-': 'minus', '.': 'dot', '@': 'shift-2', '_': 'shift-minus'}
+
+    def press(self, *keys):
+        """Real keyboard input through the VM's PS/2 keyboard."""
+        for key in keys:
+            self.qmp_commands({'execute': 'human-monitor-command', 'arguments': {'command-line': 'sendkey ' + key}})
+            time.sleep(0.12)
+
+    def type_text(self, text):
+        self.press(*[self.KEYS.get(c, 'shift-' + c.lower() if c.isupper() else c) for c in text])
+
+    def click(self, x, y, size=(1280, 800)):
+        """A real pointer click at canvas coordinates through the USB tablet.
+
+        The screen fits its 1280×800 canvas to the display and centres it, with
+        the same zoom rule as cybexos-installer (src/zoom.rs).
+        """
+        zoom = round(min(max(min(size[0] / 1280, size[1] / 800), 0.8), 3.0), 2)
+        px = ((size[0] / zoom - 1280) / 2 + x) * zoom
+        py = ((size[1] / zoom - 800) / 2 + y) * zoom
+        def axis(value, extent):
+            return {'type': 'abs', 'data': {'axis': value, 'value': int(round(extent))}}
+        position = [axis('x', px * 32767 / (size[0] - 1)), axis('y', py * 32767 / (size[1] - 1))]
+        button = lambda down: {'type': 'btn', 'data': {'down': down, 'button': 'left'}}
+        self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': position}})
+        time.sleep(0.2)
+        self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': [button(True)]}})
+        # USB polls button reports; a press and release in one polling interval
+        # can collapse into a pointer move without a click.
+        time.sleep(0.1)
+        self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': [button(False)]}})
+        time.sleep(0.3)
+
+    def installer_state(self, timeout=20):
+        """The installer service's current snapshot, exactly as the screen receives it."""
+        import base64
+        # Console text can interleave with the serial output; read again then.
+        for attempt in range(3):
+            raw = self.command(f'cybexos-installerd --client --timeout {timeout} | base64 -w0', timeout=timeout + 60).strip()
+            try:
+                return json.loads(base64.b64decode(raw, validate=True))
+            except ValueError:
+                if attempt == 2:
+                    raise
+                time.sleep(1)
+
+    def installer_request(self, request):
+        self.command('cybexos-installerd --client --timeout 5 --request ' + shlex.quote(json.dumps(request)) + ' >/dev/null', timeout=60)
+
+    def wait_installer(self, predicate, what, timeout=600, interval=2):
+        deadline = time.monotonic() + timeout
+        state = {}
+        while time.monotonic() < deadline:
+            state = self.installer_state()
+            if predicate(state):
+                return state
+            if state.get('phase') in ('error', 'cancelled'):
+                raise RuntimeError(f'Installer stopped while waiting for {what}: ' + str(state.get('error')))
+            time.sleep(interval)
+        raise RuntimeError(f'Timed out waiting for {what}; last phase {state.get("phase")}, error {state.get("error")!r}')
+
+    def graphical_install(self, encrypted, applications, screenshots=None):
+        """Install through the real tty1 screen with real keyboard and pointer input.
+
+        The screen (cybexos-installer) and its state service (cybexos-installerd)
+        are the packaged ISO units. The serial console only observes the
+        service's snapshots; every choice that matters is made on the screen:
+        development consent, navigation, encryption, name, username, both
+        passwords and the final erase click. Only QA-only choices without a
+        bearing on the screen (serial console, the smaller application set)
+        are set through the same service the screen uses.
+        """
+        evidence = {'result': 'running'}
+        shot = lambda name: screenshots and self.screenshot(screenshots / name)
+        self.command('systemctl is-active cybexos-installerd.service cybexos-installer-ui.service')
+        self.command('test "$(systemctl show cybexos-installer-ui.service -p User --value)" = cybexos-installer')
+        # The bracket keeps pgrep -f from matching this command's own shell.
+        self.command("! id nixos && ! pgrep -x Hyprland && ! pgrep -f '[q]uickshell' && ! systemctl is-active --quiet display-manager.service")
+        evidence['installerOnlyRuntime'] = 'tty1 kiosk as cybexos-installer; no live account, compositor or display manager'
+        # The installed QA system keeps a serial console for this harness.
+        self.command("mkdir -p /run/systemd/system/cybexos-installerd.service.d\n"
+                     "printf '[Service]\\nEnvironment=CYBEXOS_INSTALLER_WORKER_ARGS=--serial-console\\n' > /run/systemd/system/cybexos-installerd.service.d/qa.conf\n"
+                     "systemctl daemon-reload\nsystemctl restart cybexos-installerd.service")
+        # The restart disconnects the screen; keys sent before it reconnects
+        # reach no page. Wait for the service's report of an attached screen.
+        state = self.wait_installer(lambda s: s.get('phase') in ('development', 'setup') and s.get('screens', 0) > 0,
+                                    'the release checks and the reconnected screen')
+        size = self.screenshot(screenshots / 'welcome.png') if screenshots else (1280, 800)
+        evidence['display'] = list(size)
+        if state['phase'] == 'development':
+            self.press('ret')
+            state = self.wait_installer(lambda s: s.get('phase') == 'setup', 'development consent')
+            evidence['developmentConsent'] = 'Enter on the screen'
+        shot('welcome-ready.png')
+        if applications == 'minimal':
+            self.installer_request({'action': 'draft', 'values': {'apps': {
+                'developer': False, 'proprietary': False, 'steam': False, 'docker': False, 'connectedWidgets': False}}})
+        self.press('ret')
+        state = self.wait_installer(lambda s: s['draft']['screen'] == 'disk', 'the disk step')
+        if len([d for d in state['disks'] if d['available']]) == 1 and not state['draft']['disk']:
+            raise RuntimeError('The only available disk was not preselected')
+        if not encrypted:
+            self.click(1169, 291, size)
+            state = self.wait_installer(lambda s: s['draft']['encrypted'] is False, 'the encryption switch')
+            evidence['encryptionSwitch'] = 'pointer click turned encryption off'
+        shot('disk.png')
+        self.press('ret')
+        state = self.wait_installer(lambda s: s['draft']['screen'] == 'account', 'the account step')
+        self.type_text('Cybex QA')
+        self.press('ret', 'ctrl-a')
+        self.type_text('CybexQA')
+        state = self.wait_installer(lambda s: s['draft']['username'] == 'cybexqa', 'the lowercase username')
+        if state['draft']['fullName'] != 'Cybex QA':
+            raise RuntimeError('The typed name did not reach the installer service: ' + repr(state['draft']['fullName']))
+        evidence['lowercaseUsername'] = 'typed CybexQA; the screen kept cybexqa'
+        self.press('ret')
+        self.type_text(PASSWORD)
+        self.press('ret')
+        self.type_text(PASSWORD)
+        shot('account.png')
+        self.press('ret')
+        state = self.wait_installer(lambda s: s.get('phase') == 'review' and not s.get('reviewPending'), 'the review')
+        plan = state['review']
+        expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': '/dev/vda'}
+        if {key: plan.get(key) for key in expected} != expected:
+            raise RuntimeError('Reviewed plan differs from the screen input: ' + json.dumps(plan))
+        evidence['reviewedPlan'] = {key: plan.get(key) for key in ('username', 'fullName', 'hostname', 'timezone', 'keyboard', 'encrypted', 'autoLogin', 'features')}
+        shot('review.png')
+        install_started = time.monotonic()
+        self.click(1024, 755, size)
+        self.wait_installer(lambda s: s.get('phase') in ('installing', 'complete'), 'the erase confirmation', timeout=120)
+        shot('installing.png')
+        state = self.wait_installer(lambda s: s.get('phase') == 'complete', 'installation', timeout=10800, interval=20)
+        shot('installation-complete.png')
+        evidence.update(result='passed', completed=state.get('result'),
+                        observedElapsedSeconds=round(time.monotonic() - install_started, 3),
+                        workerElapsedSeconds=state.get('elapsed'), pollingIntervalSeconds=20)
+        return evidence
+
+    def stop(self):
+        if self.process is not None:
+            if self.process.isalive():
+                self.process.terminate(force=True)
+            self.process.close()
+            self.log.close()
+            self.process=None
+        if self.control_directory is not None:
+            self.control_directory.cleanup()
+            self.control_directory = None
+
+
+def wait_state(vm, expected, timeout=2100, previous=None):
+    """Observe the real worker; asynchronous acceptance is not completion."""
+    script = '''deadline=$((SECONDS + TIMEOUT))
+while test "$SECONDS" -lt "$deadline"; do
+  read -r state transaction < <(cybex update status | python3 -c 'import json,sys;s=json.load(sys.stdin);print(s["state"],s.get("transaction",""))')
+  if test "$transaction" = PREVIOUS; then sleep 2; continue; fi
+  case "$state" in
+    EXPECTED) cybex update status; exit 0 ;;
+    failed|rolled-back) cybex update status; exit 1 ;;
+  esac
+  sleep 2
+done
+cybex update status
+exit 1'''.replace('TIMEOUT', str(timeout)).replace('EXPECTED', '|'.join(expected)).replace('PREVIOUS', shlex.quote(previous or 'no-previous-transaction'))
+    return vm.command(script, timeout=timeout + 30)
+
+
+def stage_request(vm, scope='local'):
+    previous = json.loads(vm.command('cybex update status').strip()).get('transaction')
+    vm.command('cybex update stage ' + shlex.quote(scope))
+    return previous
+
+
+def stage(vm, scope='local'):
+    previous = stage_request(vm, scope)
+    wait_state(vm, ('ready',), previous=previous)
+    vm.command('cybex update status > /run/qa-status.json')
+    # Parsing directly from the serial console can include prompts; have the
+    # guest produce only base64 JSON between the command's completion markers.
+    import base64
+    payload = vm.command('base64 -w0 /run/qa-status.json').strip()
+    return json.loads(base64.b64decode(payload))
+
+
+def boot_selection(vm):
+    """GRUB's persistent and one-shot selections, read from the installed ESP."""
+    return json.loads(vm.command('''python3 - <<'QA'
+import json
+from pathlib import Path
+lines = Path('/boot/grub/grubenv').read_text().splitlines()[1:]
+print(json.dumps(dict(line.split('=', 1) for line in lines if line and not line.startswith('#'))))
+QA''').strip())
+
+
+def grub_selection(system):
+    return 'cybexos-generations>cybexos-system-' + system[len('/nix/store/'):][:32]
+
+
+def apply(vm, status):
+    vm.command('cybex update apply ' + shlex.quote(status['transaction']) + ' ' + shlex.quote(status['reviewToken']))
+    wait_state(vm, ('awaiting-boot',), timeout=300)
+    pending = json.loads(vm.command('cat /var/lib/cybexos/pending.json').strip())
+    selection = boot_selection(vm)
+    if selection.get('saved_entry') != grub_selection(pending['previousSystem']) or selection.get('next_entry') != grub_selection(pending['system']):
+        raise RuntimeError('Trial boot selection differs from the pending deployment: ' + json.dumps(selection))
+
+
+def trial_boot(vm, encrypted, states=('awaiting-login',)):
+    vm.reboot(encrypted)
+    wait_state(vm, states, timeout=300)
+    # GRUB consumes the one-shot selection while booting it.
+    if boot_selection(vm).get('next_entry'):
+        raise RuntimeError('GRUB kept the one-shot trial selection after booting it')
+
+
+def authenticated_boot(vm, encrypted):
+    # After automatic login the desktop may confirm before this first poll.
+    trial_boot(vm, encrypted, ('awaiting-login', 'done') if vm.autologin else ('awaiting-login',))
+    vm.login_desktop()
+    vm.command('cybexos-health desktop-required', timeout=180)
+
+
+def confirm(vm):
+    """The signed-in desktop requests confirmation itself; health decides."""
+    wait_state(vm, ('done',), timeout=300)
+    request = json.loads(vm.command('cybex update status').strip())['request']
+    if request.get('action') != 'confirm' or request.get('state') != 'done':
+        raise RuntimeError('The trial boot was not confirmed by its own request: ' + json.dumps(request))
+    # Quickshell started the fixed unit through the session's polkit rule.
+    vm.command("journalctl -b -u cybexos-update-confirm.service -o cat --no-pager | grep -F '\"accepted\": true'")
+    vm.command('test ! -e /var/lib/cybexos/pending.json')
+    current = vm.command('readlink -f /run/current-system').strip()
+    if boot_selection(vm).get('saved_entry') != grub_selection(current):
+        raise RuntimeError('Confirmation did not make the trial generation the boot default')
+
+
+PERSONAL_MODULE = '''{ pkgs, ... }: {
+  environment.systemPackages = [ pkgs.hello ];
+  environment.etc."cybexos-qualification-generation".text = "baseline";
+  networking.wg-quick.interfaces.qualification = {
+    autostart = false; address = [ "192.0.2.2/32" ];
+    privateKeyFile = "/var/lib/cybexos/secrets/qualification-vpn.key";
+  };
+  systemd.services.cybexos-qualification-state = {
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; StateDirectory = "cybexos-qualification"; };
+    script = "test -e /var/lib/cybexos-qualification/state || printf personal-state > /var/lib/cybexos-qualification/state";
+  };
+}
+'''
+
+
+def edit_import(vm, filename, text=None):
+    """Modify only a task-owned local module and its explicit import."""
+    code = '''from pathlib import Path
+root = Path('/etc/nixos/local')
+path = root / FILENAME
+default = root / 'default.nix'
+text = default.read_text()
+TEXT
+'''.replace('FILENAME', repr(filename))
+    if text is None:
+        action = "default.write_text(text.replace('./' + path.name + ' ', '', 1)); path.unlink()"
+    else:
+        action = "path.write_text(" + repr(text) + "); default.write_text(text.replace('imports = [ ', 'imports = [ ./' + path.name + ' ', 1))"
+    vm.command("python3 - <<'QA'\n" + code.replace('TEXT', action) + '\nQA')
+
+
+def qualify_lifecycle(vm, encrypted, checks=None):
+    """Deploy a personal known-good baseline before testing candidate rollback.
+
+    QA secrets are generated only inside the disposable guest; they do not
+    enter a Nix expression, retained evidence or host serial log.
+    """
+    checks = {} if checks is None else checks
+    discovery = json.loads(vm.command('cybex update check', timeout=240).strip())
+    if discovery['upstream']['state'] not in ('current', 'available'):
+        raise RuntimeError('Cannot qualify independent upstream discovery: ' + json.dumps(discovery))
+    vendor = discovery['cybexos']
+    if not ((vendor['state'] == 'unpublished' and not vendor.get('error'))
+            or (vendor['state'] == 'unavailable' and vendor.get('error'))):
+        raise RuntimeError('This development test requires an unpublished or accurately unavailable vendor channel: ' + json.dumps(discovery))
+    before = json.loads(vm.command('''python3 - <<'QA'
+from pathlib import Path
+import hashlib, json
+path = Path('/etc/nixos/flake.lock')
+lock = json.loads(path.read_text())
+root = lock['nodes'][lock['root']]['inputs']
+print(json.dumps({'lockSha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                 **{name: lock['nodes'][root[name]]['locked'] for name in ('nixpkgs', 'cybexos')}}))
+QA
+''').strip())
+    # Background preparation: the same unit the desktop starts, deciding on
+    # its own discovery. Without a newer Nixpkgs it must do nothing.
+    vm.command('cybex update automatic prepare on')
+    previous = json.loads(vm.command('cybex update status').strip()).get('transaction')
+    vm.command('systemctl start cybexos-update-auto.service', timeout=900)
+    # The unit's own result line; systemd adds its lifecycle messages around it.
+    automatic = json.loads(vm.command("journalctl -b -u cybexos-update-auto.service -o cat --no-pager | grep '^{' | tail -n 1").strip())
+    if discovery['upstream']['state'] == 'available':
+        if automatic.get('scope') != 'upstream' or not automatic.get('accepted'):
+            raise RuntimeError('Background preparation did not request the available upstream update: ' + json.dumps(automatic))
+        wait_state(vm, ('ready',), previous=previous)
+        vm.command('cybex update status > /run/qa-status.json')
+        import base64
+        upstream = json.loads(base64.b64decode(vm.command('base64 -w0 /run/qa-status.json').strip()))
+        if 'nixos' not in [row['id'] for row in upstream['highlights']['components']]:
+            raise RuntimeError('The readable review omits the changed NixOS build: ' + json.dumps(upstream['highlights']))
+    else:
+        if automatic != {'skipped': 'current'}:
+            raise RuntimeError('Background preparation acted without an available update: ' + json.dumps(automatic))
+        upstream = stage(vm, 'upstream')
+    vm.command('cybex update automatic prepare off')
+    checks['automaticPreparation'] = {'result': 'passed', 'outcome': automatic,
+                                      'highlights': upstream.get('highlights')}
+    if upstream['inputs']['cybexos'] != before['cybexos']:
+        raise RuntimeError('Upstream staging changed the installed Cybex OS identity')
+    after_hash = vm.command("sha256sum /etc/nixos/flake.lock | cut -d ' ' -f 1").strip()
+    if after_hash != before['lockSha256']:
+        raise RuntimeError('Staging changed the working machine lock')
+    checks['upstreamWithUnavailableVendor'] = {
+        'result': 'passed', 'discovery': discovery, 'transaction': upstream['transaction'],
+        'upstreamBefore': before['nixpkgs'], 'upstreamAfter': upstream['inputs']['nixpkgs'],
+        'upstreamChanged': before['nixpkgs'] != upstream['inputs']['nixpkgs'], 'applied': False,
+        'scope': 'actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification'}
+    edit_import(vm, 'qualification.nix', PERSONAL_MODULE)
+    vm.command('''python3 - <<'QA'
+from pathlib import Path
+import json, os, pwd, base64
+secret = Path('/var/lib/cybexos/secrets/qualification-vpn.key')
+secret.write_text(base64.b64encode(os.urandom(32)).decode() + '\\n'); secret.chmod(0o600)
+user = pwd.getpwnam('cybexqa'); home = Path(user.pw_dir)
+plugin = home / '.local/share/cybexos/plugins/personal.qualification'
+plugin.mkdir(parents=True)
+(plugin / 'manifest.json').write_text(json.dumps({'id':'personal.qualification','name':'Qualification', 'version':'1.0.0','apiVersion':1,'entrypoint':'Widget.qml'}))
+(plugin / 'Widget.qml').write_text('import QtQuick\\nText { required property var pluginApi; text: pluginApi.settings.label; Component.onCompleted: console.log("CYBEXOS_QA_PLUGIN_API:" + pluginApi.version + ":" + pluginApi.settings.label) }\\n')
+preferences = home / '.config/cybexos/shell.json'
+saved = json.loads(preferences.read_text()) if preferences.exists() else {}
+saved['reducedMotion'] = True
+preferences.write_text(json.dumps(saved))
+for path in [plugin, *plugin.rglob('*'), preferences]:
+    os.chown(path, user.pw_uid, user.pw_gid)
+QA
+runuser -u cybexqa -- cybex plugin enable personal.qualification --width 120 --order 2
+runuser -u cybexqa -- cybex plugin set personal.qualification label '"persistent-widget"'
+runuser -u cybexqa -- sh -c 'printf personal-plugin-state > "$HOME/.local/share/cybexos/plugin-data/personal.qualification/state"'
+''')
+    baseline = stage(vm)
+    apply(vm, baseline)
+    authenticated_boot(vm, encrypted)
+    confirm(vm)
+    checks['personalBaseline'] = {'result': 'passed', 'transaction': baseline['transaction']}
+    # Snapshot after the shell has normalized the supported preference schema.
+    vm.command('''uid=$(id -u cybexqa)
+invocation=$(runuser -u cybexqa -- env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus systemctl --user show quickshell.service -p InvocationID --value)
+journalctl --no-pager _SYSTEMD_INVOCATION_ID=$invocation | grep -F 'CYBEXOS_QA_PLUGIN_API:1:persistent-widget'
+systemctl is-active cybexos-qualification-state.service
+hello --version
+test "$(cat /etc/cybexos-qualification-generation)" = baseline
+# The lifecycle selects /etc/nixos through an owned working-tree symlink.
+# Resolve that root before pure evaluation, matching the staged configuration.
+configuration=$(readlink -f /etc/nixos)
+test "$(nix eval --raw --no-update-lock-file "path:$configuration#nixosConfigurations.cybexos.config.networking.wg-quick.interfaces.qualification.privateKeyFile")" = /var/lib/cybexos/secrets/qualification-vpn.key
+python3 - <<'QA'
+from pathlib import Path
+import hashlib, json
+paths = ['/etc/nixos/local/default.nix', '/etc/nixos/local/qualification.nix',
+ '/var/lib/cybexos/secrets/qualification-vpn.key', '/var/lib/cybexos-qualification/state',
+ '/home/cybexqa/.config/cybexos/shell.json', '/home/cybexqa/.config/cybexos/plugins.json',
+ '/home/cybexqa/.local/share/cybexos/plugins/personal.qualification/manifest.json',
+ '/home/cybexqa/.local/share/cybexos/plugins/personal.qualification/Widget.qml',
+ '/home/cybexqa/.local/share/cybexos/plugin-data/personal.qualification/state']
+Path('/var/lib/cybexos-qualification/hashes.json').write_text(json.dumps({p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths}))
+QA
+''')
+    preserve = '''python3 - <<'QA'
+from pathlib import Path
+import hashlib, json
+for path, expected in json.loads(Path('/var/lib/cybexos-qualification/hashes.json').read_text()).items():
+    assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == expected, 'Personal file changed: ' + path
+QA
+systemctl is-active cybexos-qualification-state.service
+hello --version
+cybexos-health desktop-required
+'''
+    for name, expression in (
+        ('evaluationFailure', '{ ... }: throw "intentional qualification evaluation failure"'),
+        ('buildFailure', '{ pkgs, ... }: { environment.systemPackages = [ (pkgs.runCommand "cybexos-qualification-build-failure" {} "exit 93") ]; }')):
+        vm.command('readlink -f /run/current-system > /run/qa-system-before; sha256sum /etc/nixos/flake.lock > /run/qa-lock-before')
+        edit_import(vm, 'qualification-fault.nix', expression)
+        previous = stage_request(vm)
+        wait_state(vm, ('failed',), previous=previous)
+        vm.command('test "$(readlink -f /run/current-system)" = "$(cat /run/qa-system-before)"; sha256sum -c /run/qa-lock-before\ntest ! -e /var/lib/cybexos/pending.json')
+        edit_import(vm, 'qualification-fault.nix')
+        vm.command(preserve)
+        checks[name] = {'result': 'passed'}
+
+    # Kill the actual staging worker during a real build, then let the boot
+    # recovery service inspect its durable status. No fabricated pending record.
+    edit_import(vm, 'qualification-fault.nix', '{ pkgs, ... }: { environment.systemPackages = [ (pkgs.runCommand "cybexos-qualification-interruption" {} "sleep 300; touch $out") ]; }')
+    previous = stage_request(vm)
+    wait_state(vm, ('building',), timeout=180, previous=previous)
+    worker = json.loads(vm.command('cybex update status').strip())['request']['unit']
+    if not re.fullmatch(r'cybexos-update@[a-f0-9]{32}\.service', worker):
+        raise AssertionError('Invalid update worker: ' + worker)
+    vm.command('systemctl kill --kill-whom=all --signal=KILL ' + worker)
+    wait_state(vm, ('interrupted',), timeout=60)
+    vm.reboot(encrypted)
+    wait_state(vm, ('interrupted',), timeout=180)
+    vm.login_desktop()
+    edit_import(vm, 'qualification-fault.nix')
+    vm.command(preserve)
+    checks['interruptedStageRecovery'] = {'result': 'passed'}
+
+    # An unconfirmed trial boots once; the next boot returns to the previous
+    # generation and recovery restores it. This candidate is then quarantined.
+    # Automatic confirmation would keep this candidate on an autologin boot.
+    vm.command('cybex update automatic confirm off')
+    edit_import(vm, 'qualification-unconfirmed.nix', '{ ... }: { environment.etc."cybexos-qualification-unconfirmed".text = "unconfirmed"; }')
+    unconfirmed = stage(vm)
+    apply(vm, unconfirmed)
+    trial_boot(vm, encrypted)
+    vm.command('test "$(cat /etc/cybexos-qualification-unconfirmed)" = unconfirmed')
+    vm.reboot(encrypted)
+    wait_state(vm, ('rolled-back',), timeout=180)
+    vm.command('test ! -e /etc/cybexos-qualification-unconfirmed\ntest ! -e /var/lib/cybexos/pending.json\n'
+               'test ! -e /etc/nixos/local/qualification-unconfirmed.nix')
+    vm.login_desktop()
+    vm.command(preserve)
+    checks['unconfirmedTrialFallback'] = {'result': 'passed', 'transaction': unconfirmed['transaction']}
+    vm.command('cybex update automatic confirm on')
+
+    edit_import(vm, 'qualification-candidate.nix', '{ ... }: { environment.etc."cybexos-qualification-candidate".text = "candidate"; }')
+    candidate = stage(vm)
+    apply(vm, candidate)
+    authenticated_boot(vm, encrypted)
+    confirm(vm)
+    # default.nix now intentionally includes the candidate import.
+    vm.command(preserve.replace('    assert hashlib', "    if path.endswith('/local/default.nix'): continue\n    assert hashlib"))
+    vm.command('test "$(cat /etc/cybexos-qualification-candidate)" = candidate')
+    checks['localApplyBootConfirm'] = {'result': 'passed', 'transaction': candidate['transaction']}
+    vm.command('cybex update rollback ' + candidate['transaction'])
+    wait_state(vm, ('rolled-back',), timeout=180)
+    vm.reboot(encrypted)
+    vm.login_desktop()
+    vm.command(preserve)
+    vm.command('test ! -e /etc/cybexos-qualification-candidate\ntest "$(cat /etc/cybexos-qualification-generation)" = baseline\ntest ! -e /var/lib/cybexos/pending.json')
+    checks['rollbackAndPersonalPersistence'] = {'result': 'passed'}
+    return checks
+
+
+def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=False, applications='minimal', screenshots=None):
+    evidence = {} if evidence is None else evidence
+    milestones = evidence.setdefault('milestones', {})
+    case=base/('encrypted' if encrypted else 'plain');case.mkdir()
+    disk=case/'disk.qcow2'
+    subprocess.run(['qemu-img','create','-f','qcow2',str(disk),'80G'],check=True,capture_output=True)
+    plan={'disk':'/dev/vda','serial':'CYBEXOS-QA-DISK','hostname':'cybexos-qa','username':'cybexqa',
+          'timezone':'UTC','locale':'en_US.UTF-8','keyboard':'us','encrypted':encrypted,'autoLogin':encrypted,
+          'secureBoot':False,'nvidiaOpen':True,'serialConsole':True,
+          'features':{'developer':False,'proprietary':False,'steam':False,'docker':False,'connectedWidgets':False}}
+    if applications == 'standard':
+        plan.pop('features')
+    import base64
+    plan64=base64.b64encode(json.dumps(plan).encode()).decode()
+    secrets=json.dumps({'password':PASSWORD})
+    vm=VM(case,disk,iso)
+    vm.autologin = encrypted
+    try:
+        vm.start();vm.login(live=True)
+        identity=json.loads(vm.command('cat /etc/cybexos/release.json').strip())
+        source_metadata=json.loads(vm.command('nix flake metadata --json \"path:$(cat /etc/cybexos/installer-source)\"', timeout=240).strip())
+        if identity['narHash'] != source_metadata['locked']['narHash']:
+            raise RuntimeError('ISO release identity differs from its installer source NAR')
+        evidence['isoReleaseIdentity'] = identity
+        milestones['isoSourceIdentity'] = {'result': 'passed'}
+        vm.command(f'printf %s {plan64} | base64 -d > /run/qa-plan.json')
+        try:
+            if interactive:
+                milestones['nativeGuiAssertions'] = vm.graphical_install(encrypted, applications, screenshots)
+            else:
+                vm.command('systemctl stop cybexos-installer-ui.service cybexos-installerd.service\n'
+                           'for n in $(seq 1 30); do pgrep -f "[c]ybexos-install --json-ui" >/dev/null || exit 0; sleep 1; done; exit 1', timeout=90)
+                vm.command('cybexos-install --plan-file /run/qa-plan.json --secrets-fd 3 --development-source "$(cat /etc/cybexos/installer-source)" 3< <(printf %s '+shlex.quote(secrets)+')',timeout=10800)
+        except RuntimeError as error:
+            diagnostics = vm.command('tail -c 6000 /run/cybexos-installer.log 2>/dev/null || true')
+            raise RuntimeError(str(error) + '\nInstaller diagnostics (disposable QA guest):\n' + diagnostics) from error
+        milestones['installerCompleted'] = {'result': 'passed', 'interface': 'tty1 Slint screen with real QMP keyboard and pointer input' if interactive else 'JSON plan', 'applications': applications}
+        vm.process.sendline('systemctl poweroff');vm.process.expect(pexpect.EOF,timeout=90);vm.stop()
+        vm.iso=None;vm.start()
+        if screenshots:
+            vm.boot_screenshots(screenshots / 'installed-boot')
+        vm.login(encrypted=encrypted)
+        milestones['installedBootAndSerialPasswordLogin'] = {'result': 'passed'}
+        # Background preparation waits ten minutes after sign-in and for the
+        # boot timer. Keep the run deterministic; the lifecycle scenario
+        # exercises it explicitly.
+        policy = json.loads(vm.command('cybex update status').strip())['automatic']
+        if policy != {'prepare': True, 'confirm': True}:
+            raise RuntimeError('Fresh installation has an unexpected automatic update policy: ' + json.dumps(policy))
+        vm.command('cybex update automatic prepare off')
+        milestones['automaticUpdatePolicy'] = {'result': 'passed', 'default': policy, 'preparationDuringRun': False}
+        milestones['quietBoot'] = vm.quiet_boot()
+        vm.command('''grep -q "^submenu 'Earlier versions  ›' --class history --class submenu --id cybexos-generations {$" /boot/grub/grub.cfg
+grep -q '^ *set theme=.*/theme/theme.txt$' /boot/grub/grub.cfg && grep -qx 'set theme=.*/theme/startup-4.txt' /boot/grub/grub.cfg
+grep -q "^menuentry 'Cybex OS $(sed -E 's/.*"version":"([^"]+)".*/\\1/' /etc/cybexos/release.json)' --class cybexos " /boot/grub/grub.cfg
+grep -q 'file = "eyebrow-startup.png"' /boot/theme/theme.txt && test -s /boot/theme/logo.png && test -s /boot/theme/entries.pf2 && test -s /boot/theme/unicode.pf2
+! grep -E "^ *(menuentry|submenu) .(NixOS|Cybex OS - )" /boot/grub/grub.cfg
+grep -q '^ *set timeout_style=hidden$' /boot/grub/grub.cfg
+systemctl is-active -q cybexos-boot-started.service && ! grep -aq '^cybexos_boot=' /boot/grub/grubenv
+cmp /boot/EFI/CybexOS/grubx64.efi /boot/EFI/BOOT/BOOTX64.EFI
+efibootmgr | grep -q "^Boot$(efibootmgr | sed -n 's/^BootCurrent: //p')\\* CybexOS"
+! efibootmgr | grep -qi nixos
+grep -qw quiet /proc/cmdline && test "$(cut -f1 /proc/sys/kernel/printk)" = 0
+grep -qw systemd.show_status=false /proc/cmdline && grep -qw rd.systemd.show_status=false /proc/cmdline''')
+        milestones['installedBootMenu'] = {'result': 'passed', 'checks': [
+            'GRUB with the installer theme', 'labelled exact-system generations', 'removable fallback loader',
+            'firmware boot entry', 'quiet kernel command line', 'hidden menu with versioned titles',
+            'confirmed start cleared its pending mark']}
+        vm.command('test -L /etc/nixos && test -e /etc/cybexos/runtime/quickshell/shell.qml')
+        installation = json.loads(vm.command('cat /var/lib/cybexos/installation.json').strip())
+        if 'prebuilt' in installation:
+            milestones['prebuiltStoreTransfer'] = installation['prebuilt']
+        installed_identity=json.loads(vm.command('cat /etc/cybexos/release.json').strip())
+        installed_source=json.loads(vm.command('''python3 - <<'QA_SOURCE'
+import json
+from pathlib import Path
+lock = json.loads(Path('/etc/nixos/flake.lock').read_text())
+print(json.dumps(lock['nodes'][lock['nodes'][lock['root']]['inputs']['cybexos']]['locked']))
+QA_SOURCE''').strip())
+        milestones['installedSourceIdentity'] = check_installed_identity(identity, installed_identity, installed_source)
+        vm.command('cybexos-verify-encryption' if encrypted else '! cybexos-verify-encryption')
+        milestones['runtimeEncryption'] = {'result': 'passed', 'encrypted': encrypted}
+        vm.command('cybexos-desktop-check')
+        milestones['desktopConfigurationCheck'] = {'result': 'passed'}
+        vm.login_desktop()
+        vm.command('cybexos-health desktop-required',timeout=180)
+        vm.check_desktop_defaults()
+        # The first frame can follow desktop health by a compositor turn.
+        deadline = time.monotonic() + 30
+        while True:
+            welcome = json.loads(vm.welcome('status'))
+            if welcome['open']:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Welcome did not open at first login: ' + json.dumps(welcome))
+            time.sleep(0.5)
+        hello = vm.hello_services()
+        vm.wait_welcome_layers(['qs-welcome'])
+        if screenshots:
+            vm.screenshot(screenshots / 'welcome-first-login.png')
+        # A window opened over the full-screen guide makes it step aside
+        # (Hyprland's openwindow event), leaving only the resume pill.
+        vm.settings('open home')
+        vm.wait_welcome_state(lambda state: state['open'] and state['aside'], 'Welcome did not step aside for Settings')
+        vm.wait_welcome_layers(['qs-welcome-resume'])
+        if screenshots:
+            time.sleep(1)
+            vm.screenshot(screenshots / 'welcome-aside.png')
+        vm.settings('close')
+        vm.welcome("open ''")
+        vm.wait_welcome_state(lambda state: state['open'] and not state['aside'], 'Resume did not bring the guide back')
+        vm.wait_welcome_layers(['qs-welcome'])
+        vm.welcome('close')
+        vm.check_welcome_closed()
+        vm.wait_welcome_unmapped()
+        # A failed summary fails the case after the remaining checks have run.
+        summarized = all(state['loaded'] and not state['failed'] for state in hello.values())
+        milestones['welcomeFirstLogin'] = {'result': 'passed' if summarized else 'failed', 'opened': True,
+                                           'fullScreenLayer': 'qs-welcome', 'steppedAsideForWindow': True,
+                                           'resumed': True, 'dismissed': True, 'unmapped': True,
+                                           'helloSummaryServices': hello}
+        if screenshots:
+            # The compositor's next frame follows the unmapped layer.
+            time.sleep(2)
+            vm.screenshot(screenshots / 'installed-desktop.png')
+        # A failure here fails the case after the remaining checks have run.
+        try:
+            milestones['keyboardShortcutsRuntime'] = vm.keyboard_shortcuts(screenshots)
+        except (RuntimeError, ValueError, KeyError, AttributeError) as error:
+            milestones['keyboardShortcutsRuntime'] = {'result': 'failed', 'error': str(error)[-4000:]}
+        milestones['authenticatedDesktopHealth'] = {'result': 'passed', 'login': 'SDDM automatic login after disk unlock, keyring unlocked' if encrypted else 'SDDM password login'}
+        vm.authorization(milestones.setdefault('desktopAuthorization', {}))
+        vm.password_change(encrypted, milestones.setdefault('sharedPasswordChanges', {}))
+        if milestones['quietBoot']['result'] != 'passed':
+            raise RuntimeError('The installed boot printed console text: ' + json.dumps(milestones['quietBoot']))
+        if lifecycle:
+            qualify_lifecycle(vm, encrypted, evidence.setdefault('lifecycle', {}))
+        if milestones['welcomeFirstLogin']['result'] != 'passed':
+            raise RuntimeError('The welcome guide could not summarize the installer choices: '
+                               + json.dumps(milestones['welcomeFirstLogin']['helloSummaryServices']))
+        if milestones['keyboardShortcutsRuntime']['result'] != 'passed':
+            raise RuntimeError('Keyboard shortcuts runtime check failed: ' + milestones['keyboardShortcutsRuntime']['error'][-2000:])
+        if not lifecycle:
+            evidence.update(result='passed', scope='actual ISO install, installed boot/login, encryption; no update application')
+        else:
+            evidence.update(result='passed', scope='actual ISO installation, boot/login, background preparation, local updater failure/interruption, staged application, GRUB trial boot, unconfirmed-trial fallback, automatic confirmation from the signed-in desktop and rollback; no signed channel or physical qualification')
+        return evidence
+    except Exception:
+        evidence['failureDiagnostics'] = vm.failure_diagnostics()
+        raise
+    finally:
+        vm.stop()
+
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument('iso',type=Path);parser.add_argument('--output',type=Path)
+    parser.add_argument('--case', choices=('plain', 'encrypted', 'both'), default='both')
+    parser.add_argument('--interactive', action='store_true', help='Install through the real tty1 installer screen with keyboard and pointer input, including the erase click')
+    parser.add_argument('--applications', choices=('standard', 'minimal'), default='standard', help='Use shared default application groups or the smaller optional selection')
+    parser.add_argument('--work-dir', type=Path, help='Parent for disposable VM files; use task storage rather than a memory-backed /tmp')
+    parser.add_argument('--screenshots', type=Path, help='Retain actual VM display captures for UX review')
+    parser.add_argument('--scenario', choices=('install', 'lifecycle'), default='lifecycle',
+                        help='install stops after actual installed desktop login; lifecycle additionally exercises local deployments and recovery')
+    args=parser.parse_args();iso=args.iso.resolve()
+    result={'kind':'isolated-installation-evidence','isoSha256':hashlib.file_digest(iso.open('rb'),'sha256').hexdigest(),'checks':{}}
+    if args.work_dir:
+        args.work_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='cybexos-qualification-', dir=args.work_dir) as temporary:
+        for encrypted in ((False,True) if args.case == 'both' else (args.case == 'encrypted',)):
+            name='encrypted-install' if encrypted else 'plain-install'
+            evidence = result['checks'][name] = {'result': 'running'}
+            screenshots = args.screenshots.resolve() / name if args.screenshots else None
+            try:qualify(iso,encrypted,Path(temporary), args.scenario == 'lifecycle', evidence,
+                        interactive=args.interactive, applications=args.applications, screenshots=screenshots)
+            except Exception as error:evidence.update(result='failed', error=str(error))
+            if args.output:
+                args.output.write_text(json.dumps(result, indent=2) + '\n')
+    data=json.dumps(result,indent=2)+'\n'
+    if args.output:args.output.write_text(data)
+    print(data)
+    if any(v['result']!='passed' for v in result['checks'].values()):raise SystemExit(1)
+
+
+if __name__=='__main__':main()

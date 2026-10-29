@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Re-vendor the built-in Model Usage widget from its upstream plugin.
+
+    scripts/sync-model-usage <commit> [--source <git-url-or-checkout>]
+
+Copies the plugin's runtime files at one commit into the shell tree
+(desktop/quickshell/ModelUsage/) and its unit tests into
+tests/model-usage/, replacing what was there, then records the commit. The
+files receive the reviewed scripts/model-usage/integration.patch. A patch
+conflict aborts before replacing the installed copy. Review the diff and
+check that the manifest's
+settings still match Common/SettingsHelpers.js (tests/model-usage.py does),
+and run ./tests/run before committing.
+"""
+import argparse
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tarfile
+import tempfile
+
+REPOSITORY = "https://github.com/DigitalPals/omarchy-modelusage.git"
+ROOT = Path(__file__).resolve().parents[1]
+RUNTIME = ROOT / "desktop/quickshell/ModelUsage"
+TESTS = ROOT / "tests/model-usage"
+INTEGRATION = ROOT / "scripts/model-usage/integration.patch"
+# Kept across syncs: Cybex OS's own notes on the vendored copy.
+LOCAL = {"README.md"}
+
+
+def runtime_file(name):
+    top = name.split("/", 1)[0]
+    return (("/" not in name and (name.endswith(".qml") or name == "UsageLogic.js"))
+            or top in ("assets", "scripts")
+            or name in ("LICENSE", "THIRD_PARTY_NOTICES.md"))
+
+
+def test_file(name):
+    # test_project.py checks the plugin's packaging (manifest, README and
+    # docs), which are not vendored; tests/qml and the fakes drive an Omarchy
+    # shell harness.
+    return (re.fullmatch(r"tests/test_[a-z_]+\.(py|js)", name) is not None
+            and name != "tests/test_project.py") or name.startswith("tests/fixtures/") or name in (
+                "tests/qml/live-shell.qml", "tests/fake_live.py")
+
+
+def replace(directory, files, extract, strip=""):
+    for path in directory.iterdir() if directory.exists() else []:
+        if path.name in LOCAL:
+            continue
+        shutil.rmtree(path) if path.is_dir() else path.unlink()
+    for name in files:
+        target = directory / name[len(strip):]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(extract(name))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("commit")
+    parser.add_argument("--source", default=REPOSITORY)
+    args = parser.parse_args()
+    if not re.fullmatch(r"[0-9a-f]{40}", args.commit):
+        parser.error("commit must be a full 40-character hash")
+    with tempfile.TemporaryDirectory(prefix="model-usage-") as temporary:
+        checkout = Path(temporary) / "checkout"
+        subprocess.run(["git", "clone", "--quiet", "--", args.source, str(checkout)], check=True)
+        archive = Path(temporary) / "tree.tar"
+        subprocess.run(["git", "-C", str(checkout), "archive", "--output", str(archive),
+                        args.commit], check=True)
+        with tarfile.open(archive) as tree:
+            names = [member.name for member in tree.getmembers() if member.isfile()]
+
+            def extract(name):
+                return tree.extractfile(name).read()
+
+            staged = Path(temporary) / "runtime"
+            replace(staged, sorted(filter(runtime_file, names)), extract)
+            subprocess.run(["git", "apply", "--check", str(INTEGRATION)], cwd=staged, check=True)
+            subprocess.run(["git", "apply", str(INTEGRATION)], cwd=staged, check=True)
+            files = sorted(path.relative_to(staged).as_posix() for path in staged.rglob("*") if path.is_file())
+            replace(RUNTIME, files, lambda name: (staged / name).read_bytes())
+            replace(TESTS, sorted(filter(test_file, names)), extract, strip="tests/")
+            manifest = json.loads(extract("manifest.json"))
+    (TESTS / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    readme = RUNTIME / "README.md"
+    text = readme.read_text()
+    text = re.sub(r"(?m)^Commit: `[0-9a-f]{40}` \(version [^)]*\)$",
+                  f"Commit: `{args.commit}` (version {manifest['version']})", text)
+    readme.write_text(text)
+    print(f"Vendored Model Usage {manifest['version']} at {args.commit}")
+
+
+if __name__ == "__main__":
+    main()

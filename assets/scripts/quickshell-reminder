@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# Persistent minute-based reminders for the Quickshell menubar.
+
+set -euo pipefail
+
+state_dir="${QUICKSHELL_REMINDER_STATE_DIR:-$HOME/.local/state/cybexos/shell/reminders}"
+script_path="$(readlink -f -- "$0")"
+
+usage() {
+  cat >&2 <<'EOF'
+usage:
+  quickshell-reminder add MINUTES [MESSAGE]
+  quickshell-reminder list --json
+  quickshell-reminder cancel ID
+  quickshell-reminder clear
+EOF
+  exit 2
+}
+
+require_tools() {
+  command -v jq >/dev/null 2>&1 || {
+    printf 'quickshell-reminder: jq is required\n' >&2
+    exit 1
+  }
+}
+
+valid_id() {
+  [[ ${1:-} =~ ^[A-Za-z0-9_-]+$ ]]
+}
+
+record_path() {
+  valid_id "${1:-}" || return 1
+  printf '%s/%s.json\n' "$state_dir" "$1"
+}
+
+ensure_state_dir() {
+  mkdir -p -- "$state_dir"
+  chmod 0700 -- "$state_dir"
+}
+
+timer_base() {
+  printf 'quickshell-reminder-%s' "$1"
+}
+
+schedule_record() {
+  local id=$1 due=$2 base
+  base=$(timer_base "$id")
+  systemd-run --user --unit="$base" \
+    --on-calendar="@$due" \
+    --timer-property=Persistent=true \
+    --timer-property=AccuracySec=1s \
+    --collect -- "$script_path" fire "$id" >/dev/null
+}
+
+# Batch operations (clear, restore) set this so the shell is told once, at
+# the end, instead of once per record.
+suppress_refresh=0
+
+# The shell runs by path, so a bare `qs ipc call` finds no configuration;
+# cybexos-runtime names the active runtime. Best effort: the shell's own
+# settle and restore reads are the fallback for a missed call.
+refresh_shell() {
+  local runtime=${HOME:-}/.local/bin/cybexos-runtime
+  ((suppress_refresh == 0)) || return 0
+  [[ -x $runtime ]] || return 0
+  "$runtime" ipc reminders refresh >/dev/null 2>&1 || true
+}
+
+list_json() {
+  ensure_state_dir
+  local records=()
+  shopt -s nullglob
+  records=("$state_dir"/*.json)
+  shopt -u nullglob
+  if ((${#records[@]} == 0)); then
+    printf '[]\n'
+    return
+  fi
+  jq -s 'map(select(type == "object" and (.id | type == "string")
+      and (.due | type == "number"))) | sort_by(.due, .id)' "${records[@]}"
+}
+
+add_reminder() {
+  local minutes=${1:-} message=${2:-}
+  [[ $minutes =~ ^[1-9][0-9]*$ ]] || {
+    printf 'quickshell-reminder: MINUTES must be a positive integer\n' >&2
+    exit 2
+  }
+
+  ensure_state_dir
+  local now due id path temporary
+  now=$(date +%s)
+  due=$((now + minutes * 60))
+  id="${now}-$$-${RANDOM}"
+  path=$(record_path "$id")
+  temporary=$(mktemp "$state_dir/.${id}.XXXXXX")
+  if [[ -z $message ]]; then
+    message="Your $minutes minutes are up."
+  fi
+
+  jq -n --arg id "$id" --argjson minutes "$minutes" --arg message "$message" \
+    --argjson created "$now" --argjson due "$due" \
+    '{id: $id, minutes: $minutes, message: $message, created: $created, due: $due}' \
+    >"$temporary"
+  chmod 0600 -- "$temporary"
+  mv -f -- "$temporary" "$path"
+
+  if ! schedule_record "$id" "$due"; then
+    rm -f -- "$path"
+    printf 'quickshell-reminder: could not schedule reminder\n' >&2
+    exit 1
+  fi
+  printf '%s\n' "$id"
+  refresh_shell
+}
+
+cancel_reminder() {
+  local id=${1:-} path base
+  valid_id "$id" || {
+    printf 'quickshell-reminder: invalid reminder id\n' >&2
+    exit 2
+  }
+  path=$(record_path "$id")
+  base=$(timer_base "$id")
+  systemctl --user stop "$base.timer" "$base.service" >/dev/null 2>&1 || true
+  rm -f -- "$path"
+  refresh_shell
+}
+
+clear_reminders() {
+  ensure_state_dir
+  local records=() file id
+  shopt -s nullglob
+  records=("$state_dir"/*.json)
+  shopt -u nullglob
+  suppress_refresh=1
+  for file in "${records[@]}"; do
+    id=${file##*/}
+    id=${id%.json}
+    if valid_id "$id"; then
+      cancel_reminder "$id"
+    fi
+  done
+  suppress_refresh=0
+  refresh_shell
+}
+
+# Returns rather than exits: restore calls this in-process for every overdue
+# record, and one unreadable or undeliverable record must not end that loop
+# before the later records are delivered or rescheduled. Status 0 means the
+# record is gone (delivered, or already removed), 1 retained, 2 invalid id.
+fire_reminder() {
+  local id=${1:-} path message
+  valid_id "$id" || return 2
+  path=$(record_path "$id") || return 2
+  [[ -f $path ]] || return 0
+  message=$(jq -er '.message | select(type == "string")' "$path") || return 1
+
+  # notify-send returns nonzero when no notification server is available.
+  # Keep the canonical record in that case so restore can retry it later.
+  if ! notify-send --app-name="Quickshell Reminders" --icon=alarm \
+      "Reminder" "$message"; then
+    printf 'quickshell-reminder: notification delivery failed; reminder retained\n' >&2
+    return 1
+  fi
+  rm -f -- "$path" || return 1
+  refresh_shell
+}
+
+# Tells the shell only when something changed: the shell polls this while
+# it holds reminders, and an unchanged list is not worth a round trip.
+restore_reminders() {
+  ensure_state_dir
+  local now records=() file id due base failed=0 changed=0
+  now=$(date +%s)
+  shopt -s nullglob
+  records=("$state_dir"/*.json)
+  shopt -u nullglob
+  suppress_refresh=1
+  for file in "${records[@]}"; do
+    id=${file##*/}
+    id=${id%.json}
+    valid_id "$id" || continue
+    due=$(jq -er '.due | select(type == "number") | floor' "$file") || continue
+    if ((due <= now)); then
+      if fire_reminder "$id"; then
+        changed=1
+      else
+        failed=1
+      fi
+      continue
+    fi
+    base=$(timer_base "$id")
+    if ! systemctl --user is-active --quiet "$base.timer"; then
+      if schedule_record "$id" "$due"; then
+        changed=1
+      else
+        failed=1
+      fi
+    fi
+  done
+  suppress_refresh=0
+  ((changed == 0)) || refresh_shell
+  return "$failed"
+}
+
+require_tools
+command=${1:-}
+ensure_state_dir
+# Record files and their transient timers form one logical state machine.
+# Serialize add/cancel/clear/fire/restore so a timer firing cannot race a user
+# cancellation into re-creating or deleting the wrong half of that state.
+exec 9>"$state_dir/operation.lock"
+flock 9
+case $command in
+  add)
+    (($# >= 2)) || usage
+    minutes=$2
+    shift 2
+    add_reminder "$minutes" "$*"
+    ;;
+  list)
+    [[ $# == 2 && $2 == --json ]] || usage
+    list_json
+    ;;
+  cancel)
+    [[ $# == 2 ]] || usage
+    cancel_reminder "$2"
+    ;;
+  clear)
+    [[ $# == 1 ]] || usage
+    clear_reminders
+    ;;
+  restore)
+    [[ $# == 1 ]] || usage
+    restore_reminders
+    ;;
+  fire)
+    [[ $# == 2 ]] || usage
+    status=0
+    fire_reminder "$2" || status=$?
+    exit "$status"
+    ;;
+  *) usage ;;
+esac

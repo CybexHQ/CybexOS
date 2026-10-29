@@ -1,0 +1,42 @@
+pragma Singleton
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+Singleton {
+    id: root
+    readonly property bool externalBusy: external.running
+    property string externalDomain: "accounts"
+    function openExternal(domain) {
+        if (external.running) return;
+        // Native tools can be tiled below this floating Settings window.
+        // Dismiss it so the window we launch is visible and receives input.
+        Settings.closePanel();
+        externalDomain = domain;
+        external.running = true;
+    }
+    property Process external: Process {
+        command: [root.externalDomain === "accounts" ? "gnome-online-accounts-gtk"
+            : root.externalDomain === "sound" ? "pavucontrol" : "nm-connection-editor"]
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: exitCode => {
+            const service = root.externalDomain === "accounts" ? root.accounts
+                : root.externalDomain === "sound" ? root.sound : root.network;
+            if (exitCode !== 0)
+                service.error = "The advanced settings window could not open. Check that its package is installed.";
+            service.refresh();
+        }
+    }
+    readonly property SystemSettingsBackend sound: SystemSettingsBackend { domain: "sound" }
+    readonly property SystemSettingsBackend network: SystemSettingsBackend { domain: "network" }
+    readonly property SystemSettingsBackend keybindings: SystemSettingsBackend { domain: "keybindings" }
+    readonly property SystemSettingsBackend input: SystemSettingsBackend { domain: "input" }
+    readonly property SystemSettingsBackend region: SystemSettingsBackend { domain: "region" }
+    readonly property SystemSettingsBackend security: SystemSettingsBackend { domain: "security" }
+    readonly property SystemSettingsBackend sshServer: SystemSettingsBackend { domain: "ssh-server" }
+    readonly property SystemSettingsBackend accounts: SystemSettingsBackend {
+        domain: "accounts"
+        onCompleted: result => { if (result.success) Calendar.refreshDefault(); }
+    }
+}

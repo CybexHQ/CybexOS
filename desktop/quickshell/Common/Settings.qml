@@ -1,0 +1,1335 @@
+pragma Singleton
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Services.Notifications
+import "SettingsHelpers.js" as SettingsHelpers
+import "ProcHelpers.js" as ProcHelpers
+import "Persistence"
+
+// Shell settings store (design v2, "Shell settings"). Single source of truth
+// for user-tunable shell configuration: merged over defaults on load,
+// debounce-saved, and watched so external edits of the JSON apply live.
+//
+// The path is a fixed user-owned config file rather than
+// Quickshell.statePath(): statePath resolves under by-shell/<config-hash>/, so
+// a dev run from a different vendor directory would silently fork settings.
+//
+// Dependency rule: Theme binds to Settings, never the reverse. Keeping the
+// direction one-way is what makes the live-apply bindings loop-free.
+Singleton {
+    id: root
+
+    readonly property string filePath:
+        Quickshell.env("HOME") + "/.config/cybexos/shell.json"
+
+    readonly property bool connectedWidgetsConfigured:
+        Quickshell.env("CYBEXOS_CONNECTED_WIDGETS") === "1"
+    // The installer's assistant feature (docs/assistant.md). Unset, as in a
+    // source-tree run, it counts as on: the default.
+    readonly property bool assistantConfigured:
+        Quickshell.env("CYBEXOS_ASSISTANT") !== "0"
+    // The installer's developer tooling feature (quickshell.service sets
+    // it). Unset, as in a source-tree run, it counts as on: the default.
+    readonly property bool developerToolsConfigured:
+        Quickshell.env("CYBEXOS_DEVELOPER_TOOLS") !== "0"
+    readonly property var defaults: {
+        const value = SettingsHelpers.defaults();
+        return value;
+    }
+    readonly property var fontChoices: SettingsHelpers.FONT_CHOICES
+    readonly property var barColorChoices: SettingsHelpers.BAR_COLOR_CHOICES
+
+    // ---- Persisted settings ----------------------------------------------
+    property string wall: defaults.wall
+    property string wallDir: defaults.wallDir
+    property string shuffle: defaults.shuffle
+    property string themeMode: defaults.themeMode
+    property bool glassEnabled: defaults.glassEnabled
+    property bool highContrast: defaults.highContrast
+    property bool reducedMotion: defaults.reducedMotion
+    property int shellFontSize: defaults.shellFontSize
+    property int shellScale: defaults.shellScale
+    property string surfaceBorderMode: defaults.surfaceBorderMode
+    property string surfaceBorderColor: defaults.surfaceBorderColor
+    property int surfaceBorderWidth: defaults.surfaceBorderWidth
+    property int surfaceBorderOpacity: defaults.surfaceBorderOpacity
+    property int surfaceCornerRadius: defaults.surfaceCornerRadius
+    property int pluginScale: defaults.pluginScale
+    property string pluginBorderMode: defaults.pluginBorderMode
+    property string pluginBorderColor: defaults.pluginBorderColor
+    property int pluginBorderWidth: defaults.pluginBorderWidth
+    property int pluginBorderOpacity: defaults.pluginBorderOpacity
+    property int pluginRadius: defaults.pluginRadius
+    property var pluginThemeOverrides: defaults.pluginThemeOverrides
+    property string textScale: defaults.textScale
+    property string interfaceDensity: defaults.interfaceDensity
+    property string barColorMode: defaults.barColorMode
+    property int barCustomHue: defaults.barCustomHue
+    property int barCustomSaturation: defaults.barCustomSaturation
+    property int barCustomLightness: defaults.barCustomLightness
+    property int barHeight: defaults.barHeight
+    property int barRadius: defaults.barRadius
+    property string font: defaults.font
+    property string accent: defaults.accent
+    property string paletteMode: defaults.paletteMode
+    property string theme: defaults.theme
+    property var themePalette: defaults.themePalette
+    property string position: defaults.position
+    property string barStyle: defaults.barStyle
+    property int gap: defaults.gap
+    property bool autoHide: defaults.autoHide
+    property bool exclusive: defaults.exclusive
+    property bool clock24: defaults.clock24
+    property string unit: defaults.unit
+    property int warmth: defaults.warmth
+    property string osd: defaults.osd
+    property real scrollFactor: defaults.scrollFactor
+    property bool nightLight: defaults.nightLight
+    property int idleLockMins: defaults.idleLockMins
+    property int idleScreenOffMins: defaults.idleScreenOffMins
+    property int idleSuspendMins: defaults.idleSuspendMins
+    property bool idleSuspendBatteryOnly: defaults.idleSuspendBatteryOnly
+    property string idleInhibitMode: defaults.idleInhibitMode
+    property double idleInhibitUntilMs: defaults.idleInhibitUntilMs
+    property bool notifDnd: defaults.notifDnd
+    property double notifDndUntilMs: defaults.notifDndUntilMs
+    property string notifQuiet: defaults.notifQuiet
+    property int notifQuietStart: defaults.notifQuietStart
+    property int notifQuietEnd: defaults.notifQuietEnd
+    property int notifDuration: defaults.notifDuration
+    property string notifPosition: defaults.notifPosition
+    property string notifDensity: defaults.notifDensity
+    property bool notifIcons: defaults.notifIcons
+    property bool notifProgress: defaults.notifProgress
+    property int notifBodyLines: defaults.notifBodyLines
+    property bool notifHistoryPersist: defaults.notifHistoryPersist
+    property int notifHistoryCount: defaults.notifHistoryCount
+    property int notifHistoryHours: defaults.notifHistoryHours
+    property int notifHistoryBytes: defaults.notifHistoryBytes
+    property int notifDedupeSeconds: defaults.notifDedupeSeconds
+    property int notifBurstLimit: defaults.notifBurstLimit
+    property int notifPopupGroups: defaults.notifPopupGroups
+    property int notifPopupPerGroup: defaults.notifPopupPerGroup
+    property string notifFullscreen: defaults.notifFullscreen
+    property var drawerTabs: defaults.drawerTabs
+    property var drawerOverview: defaults.drawerOverview
+    property string drawerHover: defaults.drawerHover
+    property int drawerWidth: defaults.drawerWidth
+    property var mods: defaults.mods
+    property var modOpts: defaults.modOpts
+    property bool dock: defaults.dock
+    property bool dockAutoHide: defaults.dockAutoHide
+    property var dockPinned: defaults.dockPinned
+    property string assistantAgent: defaults.assistantAgent
+    property string assistantApprovalPolicy: defaults.assistantApprovalPolicy
+    property string assistantClaudeModel: defaults.assistantClaudeModel
+    property string assistantCodexModel: defaults.assistantCodexModel
+    property bool assistantSpeak: defaults.assistantSpeak
+    property bool assistantScreenContext: defaults.assistantScreenContext
+    property string assistantCharacter: defaults.assistantCharacter
+    property bool assistantShown: defaults.assistantShown
+    property string assistantScreen: defaults.assistantScreen
+    property int assistantX: defaults.assistantX
+    property int assistantY: defaults.assistantY
+
+    // ---- Runtime state (not persisted) -----------------------------------
+    property bool panelOpen: false
+    property string page: "home"
+    property bool loaded: false
+    property bool firstRun: false
+    property bool savePending: false
+    property bool saveError: false
+    property bool loadError: false
+    property string loadErrorText: ""
+    readonly property bool persistenceError: loadError || saveError
+    property double lastSavedAt: 0
+    property var resetSnapshot: null
+    property string resetLabel: ""
+    property string announcement: ""
+    // The settings row the nav search jumped to. Rows watch it, flash, and
+    // the view clears it after the highlight has had its moment.
+    property string highlightKey: ""
+    // A widget whose settings dialog the Widgets page should open once it
+    // loads — how another page links to a widget's own options.
+    property string widgetRequest: ""
+    // Change counter for dirty-state bindings; see scheduleSave().
+    property int revision: 0
+    property bool migrationPending: false
+    property alias writeInFlight: document.busy
+    property alias writeSnapshot: document.submitted
+    property alias lastPersistedText: document.baseline
+    property alias sourceDocument: document.source
+    property alias explicitOverrides: document.explicitKeys
+    property var resetOverrides: []
+    // Last observed file bytes, retained for read-error diagnostics.
+    property string storeText: ""
+    // A reload that came due while a write was in flight; see reloadStore().
+    property bool reloadAfterWrite: false
+    property bool initialLoadHandled: false
+    // The file on disk came from a newer schema; see protectNewerFile().
+    property bool newerSchema: false
+    // An empty or unparsable reload is being read a second time.
+    property bool recheckPending: false
+    // Blocks every save while an unreadable settings file is being moved
+    // aside, and stays set if that move fails — overwriting it then would
+    // destroy the only copy of the user's settings.
+    property bool corruptBackupPending: false
+    readonly property bool undoAvailable: resetSnapshot !== null
+
+    // Guards saves while loaded values are being applied.
+    property bool ready: false
+
+    // Fixed choices stay available while wallpaper mode is active. Theme
+    // selects Palette's roles when they are ready and falls back to these
+    // values without changing paletteMode when Matugen is unavailable.
+    readonly property string effectiveAccent: accent
+    readonly property string effectiveBarColor: SettingsHelpers.resolveBarColor(
+        barColorMode, themeMode, barCustomHue, barCustomSaturation, barCustomLightness)
+    readonly property bool modsModified:
+        JSON.stringify(mods) !== JSON.stringify(defaults.mods)
+
+    // The Settings sidebar, in order: Home, then one entry per page grouped
+    // by what the person is doing rather than by where the value is stored
+    // (2026-10 redesign: three groups of six, every page its own glyph).
+    // SettingsView draws the rail from this list, SettingsPage takes its
+    // reset label from it, and IPC and search accept exactly these ids.
+    // A page with `tabs` holds several views; the rail shows it once.
+    readonly property var pages: [
+        { id: "home", label: I18n.tr("Home"), glyph: "home",
+            description: I18n.tr("This computer at a glance") },
+        { id: "appearance", group: "Personalize", label: I18n.tr("Appearance"), glyph: "palette",
+            description: I18n.tr("Theme, text and size, colors and panels") },
+        { id: "wallpaper", group: "Personalize", label: I18n.tr("Wallpaper"), glyph: "image",
+            description: I18n.tr("Desktop image and automatic rotation") },
+        { id: "bar", group: "Personalize", label: I18n.tr("Bar & Control Center"), glyph: "space_dashboard",
+            description: I18n.tr("Widgets, Control Center, placement and behavior") },
+        { id: "workspaces", group: "Personalize", label: I18n.tr("Workspaces & dock"), glyph: "view_quilt",
+            description: I18n.tr("Per-display workspaces, layouts, floating windows and the dock") },
+        { id: "notifications", group: "Personalize", label: I18n.tr("Notifications"), glyph: "notifications",
+            description: I18n.tr("Pop-ups, quiet hours and the on-screen display") },
+        { id: "plugins", group: "Personalize", label: I18n.tr("Plugins"), glyph: "extension",
+            description: I18n.tr("Community widgets, panels and services from Omarchy") },
+        { id: "displays", group: "Devices", label: I18n.tr("Displays"), glyph: "monitor",
+            description: I18n.tr("Arrangement, resolution, scale and night light"), system: true },
+        { id: "sound", group: "Devices", label: I18n.tr("Sound"), glyph: "volume_up",
+            description: I18n.tr("Devices, profiles and application audio"), system: true },
+        { id: "network", group: "Devices", label: I18n.tr("Network"), glyph: "wifi",
+            description: I18n.tr("Connections, VPN, hotspot, IP addresses and DNS"), system: true },
+        { id: "touchpad", group: "Devices", label: I18n.tr("Touchpad"), glyph: "mouse",
+            description: I18n.tr("Tap, natural scrolling, gestures and sensitivity"), system: true },
+        { id: "keyboard", group: "Devices", label: I18n.tr("Keyboard"), glyph: "keyboard",
+            description: I18n.tr("Layouts, layout switching and shortcuts"), system: true,
+            tabs: [
+                { id: "layouts", label: I18n.tr("Layouts"), description: I18n.tr("Layouts and layout switching") },
+                { id: "shortcuts", label: I18n.tr("Shortcuts"), description: I18n.tr("View, change and add keyboard shortcuts") }
+            ] },
+        { id: "power", group: "Devices", label: I18n.tr("Power"), glyph: "power",
+            description: I18n.tr("Screen off, lock, suspend and stay awake") },
+        { id: "security", group: "System", label: I18n.tr("Security"), glyph: "security",
+            description: I18n.tr("Password, fingerprint, security keys and SSH Server"), system: true },
+        { id: "accounts", group: "System", label: I18n.tr("Online accounts"), glyph: "account_circle",
+            description: I18n.tr("Connected accounts and calendar access"), system: true },
+        { id: "assistant", group: "System", label: I18n.tr("Assistant"), glyph: "assistant",
+            description: I18n.tr("Agent, sign-in, voice, screen context and character") },
+        { id: "applications", group: "System", label: I18n.tr("Applications"), glyph: "apps",
+            description: I18n.tr("Default applications and installed software") },
+        { id: "region", group: "System", label: I18n.tr("Region & language"), glyph: "language",
+            description: I18n.tr("Timezone, language, clock and temperature formats") },
+        { id: "backup", group: "System", label: I18n.tr("Backup & storage"), glyph: "database",
+            description: I18n.tr("Personal-file backups, recovery points and disk space"),
+            tabs: [
+                { id: "backups", label: I18n.tr("Backups"), description: I18n.tr("Personal-file backups and restores") },
+                { id: "recovery", label: I18n.tr("Recovery points"), description: I18n.tr("System recovery points and how long they are kept") },
+                { id: "storage", label: I18n.tr("Disk space"), description: I18n.tr("Disk space and system cleanup") }
+            ] }
+    ]
+    readonly property var pageGroups: ["Personalize", "Devices", "System"]
+    readonly property var validPages: pages.map(entry => entry.id)
+    // Ids from before a redesign, still accepted from IPC, scripts and
+    // muscle memory. The 2026-09 System page split four ways; the 2026-10
+    // pages that merged open their tab (legacyTabs), and About became Home.
+    // A key that names a row lands on the page that now holds it (keyPages).
+    readonly property var legacyPages: ({
+        modules: "bar", widgets: "bar", system: "power", drawer: "bar",
+        shortcuts: "keyboard", storage: "backup", about: "home"
+    })
+    readonly property var legacyTabs: ({ shortcuts: "shortcuts", storage: "storage" })
+    readonly property var keyPages: ({
+        clock24: "region", unit: "region",
+        scrollFactor: "touchpad",
+        nightLight: "displays", warmth: "displays",
+        osd: "notifications",
+        recoveryPoints: "backup",
+        idleLockMins: "power", idleScreenOffMins: "power", idleSuspendMins: "power",
+        idleSuspendBatteryOnly: "power", idleInhibitMode: "power"
+    })
+    readonly property var keyTabs: ({ recoveryPoints: "recovery" })
+    // The view each tabbed page shows, kept per page for the session, so a
+    // return to Keyboard comes back to Shortcuts if that is where you were.
+    property var pageTabs: ({ keyboard: "layouts", backup: "backups" })
+    readonly property string tab: pageTabs[page] || ""
+
+    function pageInfo(id) {
+        return pages.find(entry => entry.id === id) || pages[0];
+    }
+
+    function tabsOf(id) {
+        return pageInfo(id).tabs || [];
+    }
+
+    function setTab(id, tabId) {
+        if (!tabsOf(id).some(entry => entry.id === tabId) || pageTabs[id] === tabId)
+            return;
+        const next = Object.assign({}, pageTabs);
+        next[id] = tabId;
+        pageTabs = next;
+    }
+
+    // The page an outside caller means: a current id as is, a legacy id
+    // through legacyPages, and a legacy id that names a moved row through
+    // keyPages. Returns "" for anything else.
+    function resolvePage(targetPage, key) {
+        if (key && keyPages[key] !== undefined
+                && (targetPage === "system" || targetPage === undefined || targetPage === ""))
+            return keyPages[key];
+        if (validPages.indexOf(targetPage) !== -1)
+            return targetPage;
+        if (legacyPages[targetPage] !== undefined)
+            return legacyPages[targetPage];
+        return "";
+    }
+
+    // The tab an outside caller means on a tabbed page: the one a legacy id
+    // or a moved row names, otherwise the page's first view. Untabbed pages
+    // and unknown ids name none.
+    function resolveTab(targetPage, key) {
+        const resolved = resolvePage(targetPage, key);
+        const tabs = tabsOf(resolved);
+        if (resolved === "" || tabs.length === 0)
+            return "";
+        if (key && keyTabs[key] !== undefined)
+            return keyTabs[key];
+        if (legacyTabs[targetPage] !== undefined)
+            return legacyTabs[targetPage];
+        return tabs[0].id;
+    }
+
+    // Back (Alt+Left in the window): the pages visited since Settings
+    // opened, newest last. Search jumps, Home's links and deep links all
+    // move between pages out of rail order, so the rail alone cannot say
+    // how to return. Closing the window forgets the trail.
+    property var pageHistory: []
+    property string previousPage: page
+    property bool restoringPage: false
+    readonly property bool canGoBack: pageHistory.length > 0
+    onPageChanged: {
+        if (!restoringPage && panelOpen && previousPage !== "" && previousPage !== page)
+            pageHistory = pageHistory.concat([previousPage]).slice(-30);
+        previousPage = page;
+    }
+    function goBack() {
+        if (pageHistory.length === 0)
+            return false;
+        const target = pageHistory[pageHistory.length - 1];
+        pageHistory = pageHistory.slice(0, -1);
+        restoringPage = true;
+        page = target;
+        restoringPage = false;
+        return true;
+    }
+
+    // One dirty/reset key list per settings page. A system page (Network,
+    // Sound, Accounts) has no shell.json values, so it has no list.
+    readonly property var sectionKeys: ({
+        wallpaper: ["wall", "wallDir", "shuffle"],
+        appearance: ["themeMode", "glassEnabled", "highContrast", "reducedMotion",
+            "textScale", "interfaceDensity", "shellFontSize", "shellScale", "surfaceBorderMode", "surfaceBorderColor", "surfaceBorderWidth", "surfaceBorderOpacity", "surfaceCornerRadius",
+            "font", "accent", "paletteMode", "theme", "themePalette",
+            "pluginScale", "pluginBorderMode", "pluginBorderColor", "pluginBorderWidth", "pluginBorderOpacity", "pluginRadius", "pluginThemeOverrides"],
+        // The widget layout and every widget's options belong to the Bar
+        // page, which also owns the bar's background color. The dock has
+        // its own place on Workspaces & dock.
+        bar: ["position", "barStyle", "gap", "barHeight", "barRadius", "autoHide",
+            "exclusive", "barColorMode", "barCustomHue", "barCustomSaturation",
+            "barCustomLightness", "mods", "modOpts"],
+        // The dock moved to Workspaces & dock with its switches (2026-10).
+        workspaces: ["dock", "dockAutoHide", "dockPinned"],
+        plugins: [],
+        drawer: ["drawerTabs", "drawerOverview", "drawerHover", "drawerWidth"],
+        notifications: ["notifDnd", "notifDndUntilMs", "notifQuiet", "notifQuietStart", "notifQuietEnd",
+            "notifDuration", "notifPosition", "notifDensity", "notifIcons",
+            "notifProgress", "notifBodyLines", "osd", "notifHistoryPersist",
+            "notifHistoryCount", "notifHistoryHours", "notifHistoryBytes",
+            "notifDedupeSeconds", "notifBurstLimit", "notifPopupGroups",
+            "notifPopupPerGroup", "notifFullscreen"],
+        // Night light is a shell setting that lives beside the display rows.
+        displays: ["nightLight", "warmth"],
+        touchpad: ["scrollFactor"],
+        power: ["idleLockMins", "idleScreenOffMins", "idleSuspendMins",
+            "idleSuspendBatteryOnly", "idleInhibitMode", "idleInhibitUntilMs"],
+        region: ["clock24", "unit"],
+        // Where the character stands and whether it is out are runtime
+        // state, reset with the page as idle inhibition is with Power.
+        assistant: ["assistantAgent", "assistantApprovalPolicy", "assistantClaudeModel", "assistantCodexModel",
+            "assistantSpeak", "assistantScreenContext", "assistantCharacter",
+            "assistantShown", "assistantScreen", "assistantX", "assistantY"],
+        backup: [],
+        keyboard: [],
+        home: []
+    })
+
+    // ---- Independent settings window -----------------------------------
+    property string panelScreenName: ""
+    signal presentPanel()
+
+    function showPanel(targetPage, targetScreenName, key) {
+        const resolved = resolvePage(targetPage, key);
+        if (targetPage === "drawer")
+            openWidgetSettings("control");
+        else if (resolved !== "") {
+            const tab = resolveTab(targetPage, key);
+            if (tab !== "")
+                setTab(resolved, tab);
+            page = resolved;
+        }
+        Popouts.close();
+        // Hyprland focuses a window as it maps; only one already open needs
+        // raising. A focus-by-title sent with the map would arrive before the
+        // window exists and only log "window not found".
+        if (panelOpen) {
+            presentPanel();
+            return;
+        }
+        panelScreenName = targetScreenName || (Screens.focused ? Screens.focused.name : "");
+        panelOpen = true;
+    }
+
+    // Opens a page scrolled to one row, which flashes as a search result does.
+    function showSetting(targetPage, key, targetScreenName) {
+        showPanel(targetPage, targetScreenName, key);
+        highlightKey = "";
+        highlightKey = key;
+    }
+
+    function togglePanel(targetPage, targetScreenName) {
+        if (panelOpen)
+            closePanel();
+        else
+            showPanel(targetPage, targetScreenName);
+    }
+
+    function openExternalUrl(value) {
+        closePanel();
+        return Qt.openUrlExternally(value);
+    }
+
+    function closePanel() {
+        panelOpen = false;
+        pageHistory = [];
+    }
+
+    function openWidgetSettings(id) {
+        widgetRequest = id;
+        page = "bar";
+    }
+
+    function sectionDirty(section) {
+        return (sectionKeys[section] || []).some(key =>
+            JSON.stringify(root[key]) !== JSON.stringify(defaults[key]));
+    }
+
+    // ---- Writers ---------------------------------------------------------
+    function clearUndo() {
+        resetTimer.stop();
+        resetSnapshot = null;
+        resetLabel = "";
+    }
+
+    function markExplicit(key) {
+        if (!Object.prototype.hasOwnProperty.call(defaults, key))
+            return false;
+        migrationPending = false;
+        if (explicitOverrides.indexOf(key) === -1)
+            explicitOverrides = explicitOverrides.concat([key]);
+        // Selecting the current default is still an explicit choice, even
+        // when QML emits no property change signal for its equal value.
+        scheduleSave();
+        return true;
+    }
+
+    // A value a person chose, with the one it replaced: Home's "Recently
+    // changed" list (SettingsRecent) is built from these.
+    signal valueSet(string key, var before, var after)
+
+    function set(key, value) {
+        if (!markExplicit(key))
+            return;
+        clearUndo();
+        const before = root[key];
+        root[key] = SettingsHelpers.normalizeKey(key, value);
+        valueSet(key, before, root[key]);
+    }
+
+    function previewBarColor(mode) {
+        return SettingsHelpers.resolveBarColor(mode, themeMode, barCustomHue,
+            barCustomSaturation, barCustomLightness);
+    }
+
+    function setModuleEnabled(id, on) {
+        clearUndo();
+        markExplicit("mods");
+        const next = { left: [], center: [], right: [] };
+        for (const col of ["left", "center", "right"])
+            next[col] = mods[col].map(m => m.id === id
+                ? ({ id: m.id, on: on, detail: m.detail }) : m);
+        mods = next;
+    }
+
+    function setModuleDetail(id, detail) {
+        clearUndo();
+        markExplicit("mods");
+        const next = { left: [], center: [], right: [] };
+        for (const col of ["left", "center", "right"])
+            next[col] = mods[col].map(m => m.id === id
+                ? ({ id: m.id, on: m.on, detail: SettingsHelpers.detailIn(detail) }) : m);
+        mods = next;
+    }
+
+    function setModuleOption(id, key, value) {
+        const changes = {};
+        changes[key] = value;
+        setModuleOptions(id, changes);
+    }
+
+    function setModuleOptions(id, changes) {
+        clearUndo();
+        markExplicit("modOpts");
+        const next = SettingsHelpers.clone(modOpts);
+        for (const key of Object.keys(changes || ({})))
+            next[id][key] = changes[key];
+        modOpts = SettingsHelpers.normalizeModOpts(next);
+    }
+
+    function setModuleOrder(left, center, right) {
+        clearUndo();
+        markExplicit("mods");
+        mods = SettingsHelpers.normalizeMods({ left: left, center: center, right: right });
+    }
+
+    function setDrawerTabEnabled(id, on) {
+        clearUndo();
+        markExplicit("drawerTabs");
+        drawerTabs = SettingsHelpers.normalizeDrawerTabs(drawerTabs.map(tab =>
+            tab.id === id ? ({ id: tab.id, on: on }) : tab));
+    }
+
+    function setDrawerTabOrder(ids) {
+        clearUndo();
+        markExplicit("drawerTabs");
+        const held = {};
+        for (const tab of drawerTabs)
+            held[tab.id] = tab.on;
+        drawerTabs = SettingsHelpers.normalizeDrawerTabs(ids.map(id =>
+            ({ id: id, on: held[id] !== false })));
+    }
+
+    function setDrawerOverviewKey(key, on) {
+        clearUndo();
+        markExplicit("drawerOverview");
+        const next = SettingsHelpers.clone(drawerOverview);
+        next[key] = on;
+        drawerOverview = SettingsHelpers.normalizeDrawerOverview(next);
+    }
+
+    function modulePresetIds(name) {
+        return name === "everything"
+            ? SettingsHelpers.MODULE_IDS
+            : name === "connected"
+            ? ["ws", "media", "indicators", "clock", "weather", "notes", "modelusage",
+                "updates", "gh", "t3", "hermes", "tray", "notifications", "vol", "wifi", "bt", "batt", "control"]
+            : ["ws", "media", "indicators", "clock", "weather", "notes", "updates", "tray",
+                "notifications", "vol", "wifi", "batt", "control"];
+    }
+
+    function applyModulePreset(name) {
+        const enabled = modulePresetIds(name);
+        clearUndo();
+        migrationPending = false;
+        resetOverrides = explicitOverrides.slice();
+        markExplicit("mods");
+        resetSnapshot = { mods: SettingsHelpers.clone(mods) };
+        resetLabel = "Widget profile";
+        const next = { left: [], center: [], right: [] };
+        for (const col of ["left", "center", "right"])
+            next[col] = mods[col].map(entry => ({
+                id: entry.id,
+                on: enabled.indexOf(entry.id) !== -1,
+                detail: entry.detail
+            }));
+        mods = next;
+        announcement = "Applied " + name
+            + " widget profile. Undo available for eight seconds.";
+        resetTimer.restart();
+    }
+
+    // Several values changed as one step that Undo reverses, the way a
+    // widget profile is: a named theme sets the mode, colours, bar and font
+    // together (Common/Themes.qml). Every value passes the schema's
+    // normalization, so nothing the file could not hold reaches memory.
+    function applyValues(values, label, message) {
+        clearUndo();
+        migrationPending = false;
+        resetOverrides = explicitOverrides.slice();
+        const keys = Object.keys(values || ({})).filter(key =>
+            Object.prototype.hasOwnProperty.call(defaults, key));
+        const previous = {};
+        for (const key of keys)
+            previous[key] = SettingsHelpers.clone(root[key]);
+        for (const key of keys) {
+            markExplicit(key);
+            root[key] = SettingsHelpers.normalizeKey(key, values[key]);
+        }
+        resetSnapshot = previous;
+        resetLabel = label;
+        announcement = message;
+        resetTimer.restart();
+    }
+
+    function resetKeys(keys, label) {
+        migrationPending = false;
+        resetOverrides = explicitOverrides.slice();
+        explicitOverrides = explicitOverrides.filter(key => keys.indexOf(key) === -1);
+        const previous = {};
+        for (const key of keys)
+            previous[key] = SettingsHelpers.clone(root[key]);
+        resetSnapshot = previous;
+        resetLabel = label || (keys.length === 1 ? "Setting" : "Settings");
+        for (const key of keys)
+            root[key] = key === "mods" ? SettingsHelpers.clone(defaults.mods)
+                : key === "modOpts" ? SettingsHelpers.defaultModOpts()
+                : defaults[key];
+        scheduleSave();
+        announcement = resetLabel + " reset. Undo available for eight seconds.";
+        resetTimer.restart();
+    }
+
+    // One widget's options and detail policy, with the same undo window as
+    // every other reset. The page-level reset would take the whole bar
+    // layout with it.
+    function resetModule(id, label) {
+        if (id === "control") {
+            resetKeys(sectionKeys.drawer, label || "Control Center");
+            return;
+        }
+        migrationPending = false;
+        resetOverrides = explicitOverrides.slice();
+        markExplicit("mods");
+        markExplicit("modOpts");
+        resetSnapshot = { mods: SettingsHelpers.clone(mods), modOpts: SettingsHelpers.clone(modOpts) };
+        resetLabel = label || "Widget";
+        const next = { left: [], center: [], right: [] };
+        for (const col of ["left", "center", "right"])
+            next[col] = mods[col].map(m => m.id === id
+                ? ({ id: m.id, on: m.on, detail: "auto" }) : m);
+        mods = next;
+        const options = SettingsHelpers.clone(modOpts);
+        if (options[id] !== undefined)
+            options[id] = SettingsHelpers.clone(defaults.modOpts[id]);
+        modOpts = SettingsHelpers.normalizeModOpts(options);
+        scheduleSave();
+        announcement = resetLabel + " reset. Undo available for eight seconds.";
+        resetTimer.restart();
+    }
+
+    function moduleDirty(id) {
+        if (id === "control")
+            return sectionKeys.drawer.some(key => JSON.stringify(root[key]) !== JSON.stringify(defaults[key]));
+        const entry = ["left", "center", "right"]
+            .map(col => mods[col].find(m => m.id === id)).find(m => m !== undefined);
+        return (entry !== undefined && entry.detail !== "auto")
+            || JSON.stringify(modOpts[id]) !== JSON.stringify(defaults.modOpts[id]);
+    }
+
+    function resetSection(section, label) {
+        const labels = { drawer: "Control Center", displays: "Night light" };
+        resetKeys(sectionKeys[section] || [],
+            label || labels[section] || pageInfo(section).label);
+    }
+
+    function resetAll() {
+        resetKeys(Object.keys(defaults), "All settings");
+    }
+
+    function undoReset() {
+        if (!resetSnapshot)
+            return;
+        const previous = resetSnapshot;
+        explicitOverrides = resetOverrides.slice();
+        resetTimer.stop();
+        for (const key of Object.keys(previous))
+            root[key] = SettingsHelpers.clone(previous[key]);
+        resetSnapshot = null;
+        const label = resetLabel;
+        resetLabel = "";
+        scheduleSave();
+        announcement = label + " restored.";
+    }
+
+    function retrySave() {
+        if (loadError) {
+            announcement = "Retrying the settings file…";
+            store.reload();
+            return;
+        }
+        savePending = true;
+        saveNow();
+    }
+
+    // ---- Persistence -----------------------------------------------------
+    // The persisted set is exactly the schema's keys, read off this object by
+    // name. Enumerating them here as well is how a new setting gets added and
+    // then silently never saved; settings.test.cjs holds the schema and the
+    // property declarations together instead.
+    function snapshot() {
+        const out = {};
+        for (const key of Object.keys(root.defaults))
+            out[key] = root[key];
+        return out;
+    }
+
+    SettingsDocument {
+        id: document
+        values: root.snapshot()
+        context: ({ connectedWidgets: root.connectedWidgetsConfigured })
+    }
+
+    function documentText() {
+        return document.text();
+    }
+
+    // One-time migration of the old QS_WEATHER_* env configuration: only a
+    // file that predates modOpts (or no file at all) takes the env values;
+    // after the first save modOpts exists on disk and the seed never re-fires.
+    function seedWeatherFromEnv(parsed, modOptions) {
+        if (parsed !== null && parsed.modOpts !== undefined)
+            return modOptions;
+        const lat = Quickshell.env("QS_WEATHER_LAT");
+        const lon = Quickshell.env("QS_WEATHER_LON");
+        const place = Quickshell.env("QS_WEATHER_PLACE");
+        if (!lat && !lon && !place)
+            return modOptions;
+        const next = SettingsHelpers.clone(modOptions);
+        if (lat)
+            next.weather.lat = Number(lat);
+        if (lon)
+            next.weather.lon = Number(lon);
+        if (place)
+            next.weather.place = place;
+        return SettingsHelpers.normalizeModOpts(next);
+    }
+
+    // A file we cannot read is not a first run — those bytes are the user's
+    // only copy. Move them aside before anything is allowed to save over them.
+    function backUpCorruptFile() {
+        if (corruptBackupPending)
+            return;
+        corruptBackupPending = true;
+        console.warn("settings: unreadable file at", filePath, "— backing it up");
+        corruptBackupProc.backupPath = filePath + ".corrupt-" + Math.floor(Date.now() / 1000);
+        corruptBackupProc.command = ["mv", filePath, corruptBackupProc.backupPath];
+        corruptBackupProc.running = true;
+    }
+
+    // `announcement` only ever reaches an Accessible.AlertMessage inside the
+    // settings window, so a user who never opens it would never learn their
+    // settings file was unreadable. Corruption — and only corruption — also
+    // raises a critical notification, which persists until dismissed.
+    //
+    // This is the one place Settings reaches for Notifs, which binds back to
+    // Settings.notifDnd. It is a one-shot call from a Process exit handler,
+    // never a binding, and it cannot run before both singletons exist: the
+    // `mv` has to start and finish first. The dependency rule above stands.
+    function notifyCorruption(message) {
+        Notifs.send({
+            appName: "Cybex OS Settings",
+            appIcon: "preferences-system",
+            urgency: NotificationUrgency.Critical,
+            summary: I18n.tr("Settings file problem"),
+            body: message
+        });
+    }
+
+    function assignChanged(key, value) {
+        if (JSON.stringify(root[key]) !== JSON.stringify(value))
+            root[key] = value;
+    }
+
+    function applyLoaded(rawText) {
+        initialLoadHandled = true;
+        storeText = rawText;
+        const result = SettingsHelpers.parse(rawText);
+        // An editor that truncates before writing exposes an empty or partial
+        // file for a moment. Once settings are live, read it once more before
+        // treating that as a reset or as damage.
+        if (loaded && result.status !== "ok" && !recheckPending) {
+            recheckPending = true;
+            reloadTimer.restart();
+            return;
+        }
+        recheckPending = false;
+        loadError = false;
+        loadErrorText = "";
+        newerSchema = SettingsHelpers.isNewerSchema(result.value);
+        // Before the no-op check below: a corrupt file whose defaults happen to
+        // match the running state would otherwise slip through unprotected.
+        if (result.status === "corrupt")
+            backUpCorruptFile();
+        // Still empty (or gone) after the recheck: keep the running settings
+        // rather than dropping to defaults mid-session. Only an absent file at
+        // startup is a first run; the next change writes a complete file.
+        if (loaded && result.status === "empty") {
+            ready = true;
+            return;
+        }
+        if (newerSchema)
+            protectNewerFile(result.value.v);
+        let parsed = result.value;
+        if (loaded && savePending && !newerSchema && result.status === "ok") {
+            try {
+                parsed = SettingsHelpers.rebaseDocuments(sourceDocument,
+                    SettingsHelpers.parse(documentText()).value, parsed);
+            } catch (error) {
+                // The authoritative writer will refuse the conflict and keep
+                // the pending candidate in a recoverable sidecar before the
+                // external values replace the form. Keep this base unchanged.
+                announcement = String(error);
+                reloadAfterWrite = true;
+                saveTimer.restart();
+                return;
+            }
+        }
+        const retainPending = savePending;
+        const previousText = lastPersistedText;
+        if (result.status !== "corrupt")
+            lastPersistedText = rawText;
+        // Skip echoes of our own atomic writes (watchChanges reports them)
+        // byte for byte, then external edits that merge back to the current
+        // state.
+        if (loaded && result.status === "ok" && rawText === previousText) {
+            ready = true;
+            return;
+        }
+        sourceDocument = result.value || ({});
+        explicitOverrides = SettingsHelpers.overrideKeys(parsed);
+        const merged = SettingsHelpers.merge(parsed,
+            { connectedWidgets: root.connectedWidgetsConfigured });
+        if (loaded && SettingsHelpers.serialize(merged) === SettingsHelpers.serialize(snapshot())) {
+            ready = true;
+            return;
+        }
+        ready = false;
+        saveTimer.stop();
+        savePending = false;
+        clearUndo();
+        // An external edit usually touches one key. The var keys (mods,
+        // modOpts, …) notify on every assignment, and each notification
+        // rebuilds their consumers, so unchanged values are left alone.
+        for (const key of Object.keys(root.defaults))
+            assignChanged(key, merged[key]);
+        // The one key that is not a straight copy: a file predating modOpts
+        // (or no file at all) still takes the retired QS_WEATHER_* env
+        // configuration on its way in.
+        const seededOptions = seedWeatherFromEnv(parsed, merged.modOpts);
+        assignChanged("modOpts", seededOptions);
+        if (JSON.stringify(seededOptions) !== JSON.stringify(merged.modOpts)
+                && explicitOverrides.indexOf("modOpts") === -1)
+            explicitOverrides = explicitOverrides.concat(["modOpts"]);
+        ready = true;
+        migrationPending = parsed !== null && parsed.v !== SettingsHelpers.VERSION;
+        firstRun = result.status === "empty";
+        loaded = true;
+        applyScrollFactor();
+        applyGlassEffect();
+        if (retainPending && !newerSchema) {
+            migrationPending = false;
+            scheduleSave();
+        }
+    }
+
+    // After a rollback to an older shell the file carries keys and option
+    // values this schema would drop on its next save. Apply what this version
+    // understands, but leave the file alone: the same error path as an
+    // unreadable file closes every write, and Retry re-reads it.
+    function protectNewerFile(version) {
+        loadError = true;
+        loadErrorText = filePath + " was saved by a newer Cybex OS (settings version "
+            + version + "). Changes apply but are not saved, so its newer settings are kept.";
+        saveTimer.stop();
+        savePending = false;
+        announcement = loadErrorText;
+        console.warn("settings: file schema", version, "is newer than", SettingsHelpers.VERSION,
+            "— not saving");
+    }
+
+    function handleLoadFailure(error) {
+        initialLoadHandled = true;
+        storeText = "";
+        if (error === FileViewError.FileNotFound) {
+            loadError = false;
+            loadErrorText = "";
+            applyLoaded("");
+            return;
+        }
+
+        // Keep the last known-good in-memory values, and close every write
+        // path. Treating permission/IO failures as an empty first run would
+        // make the next setting change replace a file we never read.
+        recheckPending = false;
+        ready = false;
+        loadError = true;
+        loadErrorText = "Could not read " + filePath + " ("
+            + FileViewError.toString(error) + ").";
+        saveTimer.stop();
+        savePending = false;
+        announcement = loadErrorText + " Settings will not be saved until it can be read.";
+        console.warn("settings load failed:", FileViewError.toString(error));
+    }
+
+    // A retried write may carry one extra trailing newline (see saveNow());
+    // it is still the same settings file.
+    function sameContent(text, written) {
+        return text === written || text + "\n" === written;
+    }
+
+    // FileView reads nothing while its own write is in flight: a reload()
+    // under a write is dropped rather than queued. A reload that comes due
+    // then (an external edit, or our own write's echo) runs once the write
+    // has settled instead.
+    function reloadStore() {
+        if (writeInFlight) {
+            reloadAfterWrite = true;
+            return;
+        }
+        store.reload();
+    }
+
+    function releaseWriteGuard() {
+        writeInFlight = false;
+        writeSnapshot = "";
+        if (reloadAfterWrite) {
+            reloadAfterWrite = false;
+            reloadTimer.restart();
+        }
+    }
+
+    function handleSaveSucceeded(committed) {
+        const wasRetry = saveError;
+        const state = document.complete(committed || writeSnapshot);
+        storeText = lastPersistedText;
+        ready = false;
+        for (const key of Object.keys(root.defaults))
+            assignChanged(key, state.values[key]);
+        ready = true;
+        releaseWriteGuard();
+        saveError = false;
+        lastSavedAt = Date.now();
+        savePending = state.pending;
+        if (wasRetry)
+            announcement = "Settings saved.";
+        if (state.pending)
+            saveTimer.restart();
+    }
+
+    function handleSaveFailure(error) {
+        // Keep the pending document available for retry. The transaction
+        // helper preserves the old file when publication fails.
+        storeText = writeSnapshot;
+        releaseWriteGuard();
+        savePending = false;
+        saveError = true;
+        announcement = "Could not save settings. Retry is available.";
+        console.warn("settings save failed:", FileViewError.toString(error));
+    }
+
+    function saveNow() {
+        if (!ready || migrationPending || corruptBackupPending || loadError
+                || writeInFlight)
+            return;
+        const next = documentText();
+        // Already on disk: settle without writing. That includes a failed
+        // save whose change was undone before Retry — the atomic write left
+        // the previous file in place.
+        if (sameContent(next, lastPersistedText)) {
+            savePending = false;
+            if (saveError) {
+                saveError = false;
+                announcement = "Settings saved.";
+            }
+            return;
+        }
+        if (!document.begin())
+            return;
+        settingsWriter.inputText = JSON.stringify({ baseline: lastPersistedText,
+            candidate: writeSnapshot, version: SettingsHelpers.VERSION }) + "\n";
+        settingsWriter.running = true;
+    }
+
+    CommandRequest {
+        id: settingsWriter
+        command: ["python3", "-B", Quickshell.shellDir + "/scripts/settings-store", root.filePath]
+        stdinEnabled: true
+        timeoutMs: 10000
+        timeoutMessage: "Saving settings timed out. Your previous file is intact."
+        onCompleted: (code, body, error) => {
+            let result = {};
+            try { result = JSON.parse(body); } catch (_) {}
+            if (code === 0 && result.ok && typeof result.text === "string") {
+                try {
+                    root.handleSaveSucceeded(result.text);
+                    return;
+                } catch (failure) {
+                    result.error = String(failure);
+                }
+            }
+            root.handleSaveFailure(FileViewError.Unknown);
+            root.announcement = result.error || error || "Could not save settings. Retry is available.";
+            if (result.error && result.error.indexOf("Your pending edit is saved at ") !== -1) {
+                // The rejected edit is retained byte-for-byte in its sidecar;
+                // refresh the form so Retry cannot repeat the same conflict.
+                root.saveError = false;
+                store.reload();
+            }
+        }
+    }
+
+    function scheduleSave() {
+        // Bumped on every value change, saved or not: bindings that call the
+        // sectionDirty() *function* re-evaluate by referencing this counter.
+        revision++;
+        if (!ready || migrationPending || corruptBackupPending || loadError)
+            return;
+        savePending = true;
+        saveTimer.restart();
+    }
+
+    onWallChanged: scheduleSave()
+    onWallDirChanged: scheduleSave()
+    onShuffleChanged: scheduleSave()
+    onThemeModeChanged: scheduleSave()
+    onGlassEnabledChanged: {
+        scheduleSave();
+        applyGlassEffect();
+    }
+    onHighContrastChanged: {
+        scheduleSave();
+        applyGlassEffect();
+    }
+    onReducedMotionChanged: scheduleSave()
+    onShellFontSizeChanged: scheduleSave()
+    onShellScaleChanged: scheduleSave()
+    onSurfaceBorderModeChanged: scheduleSave()
+    onSurfaceBorderColorChanged: scheduleSave()
+    onSurfaceBorderWidthChanged: scheduleSave()
+    onSurfaceBorderOpacityChanged: scheduleSave()
+    onSurfaceCornerRadiusChanged: scheduleSave()
+    onPluginScaleChanged: scheduleSave()
+    onPluginBorderModeChanged: scheduleSave()
+    onPluginBorderColorChanged: scheduleSave()
+    onPluginBorderWidthChanged: scheduleSave()
+    onPluginBorderOpacityChanged: scheduleSave()
+    onPluginRadiusChanged: scheduleSave()
+    onPluginThemeOverridesChanged: scheduleSave()
+    onTextScaleChanged: scheduleSave()
+    onInterfaceDensityChanged: scheduleSave()
+    onBarColorModeChanged: scheduleSave()
+    onBarCustomHueChanged: scheduleSave()
+    onBarCustomSaturationChanged: scheduleSave()
+    onBarCustomLightnessChanged: scheduleSave()
+    onBarHeightChanged: scheduleSave()
+    onBarRadiusChanged: scheduleSave()
+    onFontChanged: scheduleSave()
+    onAccentChanged: scheduleSave()
+    onPaletteModeChanged: scheduleSave()
+    onThemeChanged: scheduleSave()
+    onThemePaletteChanged: scheduleSave()
+    onPositionChanged: scheduleSave()
+    onBarStyleChanged: scheduleSave()
+    onGapChanged: scheduleSave()
+    onAutoHideChanged: scheduleSave()
+    onExclusiveChanged: scheduleSave()
+    onClock24Changed: scheduleSave()
+    onUnitChanged: scheduleSave()
+    onWarmthChanged: scheduleSave()
+    onOsdChanged: scheduleSave()
+    onNightLightChanged: scheduleSave()
+    onIdleLockMinsChanged: scheduleSave()
+    onIdleScreenOffMinsChanged: scheduleSave()
+    onIdleSuspendMinsChanged: scheduleSave()
+    onIdleSuspendBatteryOnlyChanged: scheduleSave()
+    onIdleInhibitModeChanged: scheduleSave()
+    onIdleInhibitUntilMsChanged: scheduleSave()
+    onScrollFactorChanged: {
+        scheduleSave();
+        applyScrollFactor();
+    }
+    onNotifDndChanged: scheduleSave()
+    onNotifDndUntilMsChanged: scheduleSave()
+    onNotifQuietChanged: scheduleSave()
+    onNotifQuietStartChanged: scheduleSave()
+    onNotifQuietEndChanged: scheduleSave()
+    onNotifDurationChanged: scheduleSave()
+    onNotifPositionChanged: scheduleSave()
+    onNotifDensityChanged: scheduleSave()
+    onNotifIconsChanged: scheduleSave()
+    onNotifProgressChanged: scheduleSave()
+    onNotifBodyLinesChanged: scheduleSave()
+    onNotifHistoryPersistChanged: scheduleSave()
+    onNotifHistoryCountChanged: scheduleSave()
+    onNotifHistoryHoursChanged: scheduleSave()
+    onNotifHistoryBytesChanged: scheduleSave()
+    onNotifDedupeSecondsChanged: scheduleSave()
+    onNotifBurstLimitChanged: scheduleSave()
+    onNotifPopupGroupsChanged: scheduleSave()
+    onNotifPopupPerGroupChanged: scheduleSave()
+    onNotifFullscreenChanged: scheduleSave()
+    onDrawerTabsChanged: scheduleSave()
+    onDrawerOverviewChanged: scheduleSave()
+    onDrawerHoverChanged: scheduleSave()
+    onDrawerWidthChanged: scheduleSave()
+    onModsChanged: scheduleSave()
+    onModOptsChanged: scheduleSave()
+    onDockChanged: scheduleSave()
+    onDockAutoHideChanged: scheduleSave()
+    onDockPinnedChanged: scheduleSave()
+
+    Timer {
+        id: saveTimer
+        interval: 400
+        onTriggered: root.saveNow()
+    }
+
+    Timer {
+        id: reloadTimer
+        interval: 250
+        onTriggered: root.reloadStore()
+    }
+
+    Timer {
+        id: resetTimer
+        interval: 8000
+        onTriggered: root.clearUndo()
+    }
+
+    // Debounce pointer motion from the slider, then apply the final value to
+    // Hyprland immediately. input.lua reads the same persisted setting so a
+    // compositor reload or reboot retains it.
+    property real dispatchedScrollFactor: -1
+
+    function applyScrollFactor() {
+        if (loaded)
+            scrollApplyTimer.restart();
+    }
+
+    Timer {
+        id: scrollApplyTimer
+        interval: 75
+        onTriggered: {
+            if (scrollFactorProc.running)
+                return;
+            root.dispatchedScrollFactor = root.scrollFactor;
+            // A Lua-configured Hyprland refuses `hyprctl keyword`, and says
+            // so with exit status 0.
+            scrollFactorProc.command = ["hyprctl", "eval",
+                "hl.config({ input = { touchpad = { scroll_factor = "
+                    + root.scrollFactor.toFixed(1) + " } } })"];
+            scrollFactorProc.running = true;
+        }
+    }
+
+    Process {
+        id: scrollFactorProc
+
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                console.warn("could not apply touchpad scroll speed:", exitCode);
+            if (Math.abs(root.dispatchedScrollFactor - root.scrollFactor) > 0.001)
+                scrollApplyTimer.restart();
+        }
+    }
+
+    // The layer namespace is fixed once Quickshell connects the Wayland
+    // surface, so glass is toggled through the named rule handle exported by
+    // looknfeel.lua. Surface fills still change synchronously through Theme;
+    // this call removes the compositor pass as well.
+    property bool dispatchedGlassEnabled: true
+    property bool glassApplyError: false
+
+    function applyGlassEffect() {
+        if (!loaded || glassApplyProc.running)
+            return;
+        dispatchedGlassEnabled = glassEnabled && !highContrast;
+        glassApplyProc.command = ["hyprctl", "eval",
+            "quickshell_blur_rule:set_enabled("
+                + (dispatchedGlassEnabled ? "true" : "false") + ")"];
+        glassApplyProc.running = true;
+    }
+
+    Timer {
+        id: glassReplayTimer
+        interval: 0
+        onTriggered: root.applyGlassEffect()
+    }
+
+    Process {
+        id: glassApplyProc
+        property bool exitSeen: false
+        property int lastExit: 0
+
+        onExited: exitCode => {
+            exitSeen = true;
+            lastExit = exitCode;
+        }
+        onRunningChanged: {
+            if (running) {
+                exitSeen = false;
+                lastExit = 0;
+                return;
+            }
+            const code = exitSeen ? lastExit : ProcHelpers.NOT_STARTED;
+            root.glassApplyError = code !== 0;
+            if (code !== 0)
+                console.warn("could not apply compositor glass effect:", code);
+            if (root.dispatchedGlassEnabled !== (root.glassEnabled && !root.highContrast))
+                glassReplayTimer.restart();
+        }
+    }
+
+    // Power saver takes the compositor's polish too: cybexos_power_saver() in
+    // looknfeel.lua uses one blur pass and turns animations off, and
+    // holds that across a config reload. It is sent on startup as well, which
+    // also lifts a saver left behind by a shell that exited meanwhile.
+    property bool dispatchedPowerSaver: false
+
+    function applyPowerSaver() {
+        if (powerSaverProc.running)
+            return;
+        dispatchedPowerSaver = Activity.powerSaver;
+        powerSaverProc.command = ["hyprctl", "eval",
+            "cybexos_power_saver(" + (dispatchedPowerSaver ? "true" : "false") + ")"];
+        powerSaverProc.running = true;
+    }
+
+    Connections {
+        target: Activity
+
+        function onPowerSaverChanged() {
+            root.applyPowerSaver();
+        }
+    }
+
+    // Hyprland 0.56 starts a fresh Lua state on every configuration reload:
+    // the saver state looknfeel.lua kept in _G is gone and the reload has
+    // just put the full effects back. shell.qml calls this on the
+    // compositor's configreloaded event so an active saver is sent again.
+    property bool powerSaverResendPending: false
+
+    function compositorReloaded() {
+        if (!Activity.powerSaver)
+            return;
+        if (powerSaverProc.running) {
+            powerSaverResendPending = true;
+            return;
+        }
+        applyPowerSaver();
+    }
+
+    Timer {
+        id: powerSaverReplayTimer
+        interval: 0
+        onTriggered: root.applyPowerSaver()
+    }
+
+    Process {
+        id: powerSaverProc
+        property bool exitSeen: false
+        property int lastExit: 0
+
+        onExited: exitCode => {
+            exitSeen = true;
+            lastExit = exitCode;
+        }
+        onRunningChanged: {
+            if (running) {
+                exitSeen = false;
+                lastExit = 0;
+                return;
+            }
+            const code = exitSeen ? lastExit : ProcHelpers.NOT_STARTED;
+            if (code !== 0)
+                console.warn("could not apply power saver compositor effects:", code);
+            if (root.dispatchedPowerSaver !== Activity.powerSaver || root.powerSaverResendPending) {
+                root.powerSaverResendPending = false;
+                powerSaverReplayTimer.restart();
+            }
+        }
+    }
+
+    Process {
+        id: corruptBackupProc
+
+        property string backupPath: ""
+
+        onExited: exitCode => {
+            if (exitCode === 0) {
+                root.corruptBackupPending = false;
+                root.announcement = "The settings file could not be read. It was kept as "
+                    + corruptBackupProc.backupPath + " and the defaults were restored.";
+                root.notifyCorruption(root.announcement);
+                return;
+            }
+            // Deliberately leaves corruptBackupPending set: saving now would
+            // overwrite the file we just failed to copy.
+            root.announcement = "The settings file could not be read or backed up. "
+                + "Settings will not be saved until " + root.filePath + " is moved aside.";
+            root.notifyCorruption(root.announcement);
+            console.warn("settings: backing up", root.filePath, "failed with exit", exitCode);
+        }
+    }
+
+    FileView {
+        id: store
+        path: root.filePath
+        printErrors: false
+        // Reads/watch notifications only. The settings-store process verifies
+        // merge, fsync and atomic publication before reporting save success.
+        atomicWrites: true
+        blockWrites: false
+        blockLoading: true
+        watchChanges: true
+        // Coalesce an editor's truncate-and-write into one reload once
+        // settings are live; the initial load stays synchronous.
+        onFileChanged: {
+            if (root.loaded)
+                reloadTimer.restart();
+            else
+                reload();
+        }
+        onLoaded: root.applyLoaded(text())
+        onLoadFailed: error => root.handleLoadFailure(error)
+    }
+
+    // Force the load to complete during singleton construction so the first
+    // Theme/Bar bindings never see one frame of defaults.
+    Component.onCompleted: {
+        if (!loaded && !initialLoadHandled) {
+            const initialText = store.text();
+            // A blocking read emits loaded/loadFailed before returning. The
+            // fallback only covers an already-preloaded FileView that emitted
+            // its signal before this singleton's completion handler ran.
+            if (!initialLoadHandled && store.loaded)
+                applyLoaded(initialText);
+        }
+        applyPowerSaver();
+    }
+}

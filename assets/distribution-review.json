@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "status": "owner-review-required",
+  "scopes": {
+    "iso": "Review actual Nix closure, firmware, codecs, proprietary payloads, fonts, artwork, third-party notices and corresponding-source obligations.",
+    "source": "Review source/license notices and bundled extension redistribution.",
+    "web": "Review compiled web dependencies, fonts, marks and artwork."
+  }
+}

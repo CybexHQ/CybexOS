@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "scope": "Website promotional landscape images",
+  "rightsPolicy": {
+    "status": "documented-original-artwork",
+    "meaning": "New original procedural art under the repository MIT license; no third-party rights inferred."
+  },
+  "assets": [
+    {
+      "path": "web/public/wallpapers/moon-mountains-1280.png",
+      "sha256": "512bacc6deb6ef4b07de02922804511a38c54943c29d077175d1a32cfa372f88",
+      "bytes": 7401,
+      "mediaType": "image/png",
+      "dimensions": [
+        1280,
+        720
+      ],
+      "rightsStatus": "documented",
+      "creator": "CybexOS contributors (procedural artwork authored for this change)",
+      "sourceUrl": "scripts/generate-wallpapers.py",
+      "license": "MIT",
+      "creation": {
+        "method": "Original geometric landscape; no input images",
+        "generatorSha256": "0f153b295f5f1537d1525e7d6c095a6f3de12943169a893367446c63e57d0f42",
+        "palette": "moon-mountains",
+        "width": 1280
+      }
+    },
+    {
+      "path": "web/public/wallpapers/moon-mountains-2560.png",
+      "sha256": "3400990fc1b5a986949e680e9a6469d191ba792e9d7fadb10cc18e68b0b79480",
+      "bytes": 19993,
+      "mediaType": "image/png",
+      "dimensions": [
+        2560,
+        1440
+      ],
+      "rightsStatus": "documented",
+      "creator": "CybexOS contributors (procedural artwork authored for this change)",
+      "sourceUrl": "scripts/generate-wallpapers.py",
+      "license": "MIT",
+      "creation": {
+        "method": "Original geometric landscape; no input images",
+        "generatorSha256": "0f153b295f5f1537d1525e7d6c095a6f3de12943169a893367446c63e57d0f42",
+        "palette": "moon-mountains",
+        "width": 2560
+      }
+    },
+    {
+      "path": "web/public/wallpapers/moon-mountains-5120.png",
+      "sha256": "69361c0f10d5a6118f1296982a7b39ce960af1f7bffe992e09d8095ae13c9e61",
+      "bytes": 63903,
+      "mediaType": "image/png",
+      "dimensions": [
+        5120,
+        2880
+      ],
+      "rightsStatus": "documented",
+      "creator": "CybexOS contributors (procedural artwork authored for this change)",
+      "sourceUrl": "scripts/generate-wallpapers.py",
+      "license": "MIT",
+      "creation": {
+        "method": "Original geometric landscape; no input images",
+        "generatorSha256": "0f153b295f5f1537d1525e7d6c095a6f3de12943169a893367446c63e57d0f42",
+        "palette": "moon-mountains",
+        "width": 5120
+      }
+    }
+  ]
+}

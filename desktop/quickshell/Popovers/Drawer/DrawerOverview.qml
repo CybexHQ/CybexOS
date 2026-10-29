@@ -1,0 +1,409 @@
+pragma ComponentBehavior: Bound
+import QtQuick
+import Quickshell
+import Quickshell.Services.Mpris
+import "../../Common"
+import ".."
+
+// The drawer's Overview tab: system identity and health, the top processes,
+// now playing, the two sliders, quick-toggle tiles, updates, and the session
+// footer.
+// Everything here is a summary — each row's own tab or panel carries the
+// detail.
+Column {
+    id: root
+
+    property var updateService: Updates
+
+    width: parent ? parent.width : 0
+    spacing: Theme.scaled(14)
+
+    // The hero's live metrics and brightness share one watcher claim. Keyed
+    // on visibility, not construction: the drawer's `control` instance stays
+    // latched by the popout host.
+    Claim {
+        active: root.visible
+        onClaimed: SysInfo.acquire()
+        onReleased: SysInfo.release()
+    }
+
+    DrawerSystemHero {
+        width: parent.width
+    }
+
+    // ---- top processes -------------------------------------------------
+    // Hidden, it reads nothing: its sampler is claimed by visibility.
+    DrawerProcesses {
+        visible: Settings.drawerOverview.processes === true
+        width: parent.width
+    }
+
+    // ---- now playing ---------------------------------------------------
+    Rectangle {
+        visible: Media.hasTrack && Settings.drawerOverview.media === true
+        width: parent.width
+        height: Math.max(Theme.scaled(64), mediaText.implicitHeight + Theme.scaled(20))
+        radius: 10
+        color: Theme.chip
+
+        Item {
+            id: art
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            width: 44
+            height: 44
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 8
+                color: Theme.chipHover
+
+                Sym {
+                    anchors.centerIn: parent
+                    name: Media.glyph
+                    size: 20
+                    color: Theme.textMid
+                    visible: artImage.status !== Image.Ready
+                }
+            }
+
+            Image {
+                id: artImage
+                anchors.fill: parent
+                source: Media.player ? Media.player.trackArtUrl : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                sourceSize: Qt.size(88, 88)
+                visible: status === Image.Ready
+            }
+        }
+
+        Column {
+            id: mediaText
+            anchors.left: art.right
+            anchors.leftMargin: 12
+            anchors.right: transport.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+
+            Text {
+                width: parent.width
+                text: Media.player ? Media.player.trackTitle : ""
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.primary
+                font.weight: Theme.weightSemibold
+                color: Theme.textHi
+                elide: Text.ElideRight
+            }
+
+            Text {
+                width: parent.width
+                text: {
+                    if (!Media.player)
+                        return "";
+                    const artist = Media.player.trackArtist;
+                    const app = Media.player.identity;
+                    return artist !== "" && app !== ""
+                        ? artist + " · " + app : (artist || app);
+                }
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.secondary
+                color: Theme.textFaint
+                elide: Text.ElideRight
+            }
+        }
+
+        Row {
+            id: transport
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+
+            DrawerIconButton {
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: "skip_previous"
+                width: 30
+                height: 30
+                enabled: Media.player !== null && Media.player.canGoPrevious
+                accessibleName: "Previous track"
+                onClicked: Media.player.previous()
+            }
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                radius: 15
+                color: Theme.accent
+
+                Sym {
+                    anchors.centerIn: parent
+                    name: Media.player
+                        && Media.player.playbackState === MprisPlaybackState.Playing
+                        ? "pause" : "play_arrow"
+                    size: 18
+                    color: Theme.accentFg
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (Media.player)
+                            Media.player.togglePlaying();
+                    }
+                }
+
+                Accessible.role: Accessible.Button
+                Accessible.name: I18n.tr("Play or pause")
+            }
+
+            DrawerIconButton {
+                anchors.verticalCenter: parent.verticalCenter
+                glyph: "skip_next"
+                width: 30
+                height: 30
+                enabled: Media.player !== null && Media.player.canGoNext
+                accessibleName: "Next track"
+                onClicked: Media.player.next()
+            }
+        }
+    }
+
+    // ---- sliders --------------------------------------------------------
+    Column {
+        visible: Settings.drawerOverview.sliders === true
+        width: parent.width
+        spacing: 8
+
+        DrawerSliderRow {
+            glyph: "sunny"
+            visible: SysInfo.brightness >= 0
+            value: Math.max(0, SysInfo.brightness) / 100
+            showValue: true
+            accessibleName: "Screen brightness"
+            onMoved: v => SysInfo.setBrightness(v * 100)
+        }
+
+        DrawerSliderRow {
+            glyph: Audio.muted || Audio.volume === 0 ? "volume_off"
+                : Audio.volume < 50 ? "volume_down" : "volume_up"
+            value: Audio.level
+            ready: Audio.ready
+            showValue: true
+            accessibleName: "Output volume"
+            onMoved: v => Audio.setVolume(v)
+        }
+    }
+
+    // ---- quick toggles ---------------------------------------------------
+    Grid {
+        visible: Settings.drawerOverview.tiles === true
+        width: parent.width
+        columns: 4
+        columnSpacing: 6
+        rowSpacing: 6
+
+        readonly property real tileWidth: (width - columnSpacing * 3) / 4
+
+        DrawerTile {
+            width: parent.tileWidth
+            glyph: "dark_mode"
+            label: I18n.tr("Dark")
+            on: Settings.themeMode === "dark"
+            onToggled: Settings.set("themeMode",
+                Settings.themeMode === "dark" ? "light" : "dark")
+        }
+
+        DrawerTile {
+            width: parent.tileWidth
+            glyph: "do_not_disturb_on"
+            label: I18n.tr("Focus")
+            on: Notifs.dnd
+            onToggled: Notifs.setDnd(!Notifs.dnd)
+        }
+
+        DrawerTile {
+            width: parent.tileWidth
+            glyph: "nightlight"
+            label: I18n.tr("Night")
+            on: SysInfo.nightLight
+            onToggled: SysInfo.toggleNightLight()
+        }
+
+        DrawerTile {
+            width: parent.tileWidth
+            glyph: "coffee"
+            label: I18n.tr("Awake")
+            on: SysInfo.idleInhibited
+            onToggled: SysInfo.toggleIdleInhibited()
+        }
+    }
+
+    // ---- updates ---------------------------------------------------------
+    Column {
+        objectName: "overviewUpdates"
+        visible: Settings.drawerOverview.updates === true && root.updateService.overviewVisible
+        width: parent.width
+        spacing: 6
+
+        SectionLabel {
+            width: parent.width
+            text: I18n.tr("SYSTEM UPDATES")
+            detail: root.updateService.checkedLabel
+        }
+
+        Rectangle {
+            width: parent.width
+            height: Math.max(56, updateCopy.implicitHeight + 16)
+            radius: Theme.rowRadius
+            color: "transparent"
+
+            Sym {
+                id: updatesGlyph
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                name: root.updateService.hasUpdates ? "deployed_code_update" : "info"
+                size: 18
+                color: root.updateService.error !== "" ? Theme.amber : Theme.textMid
+            }
+
+            Column {
+                id: updateCopy
+                anchors.left: updatesGlyph.right
+                anchors.leftMargin: 12
+                anchors.right: updateAction.left
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 3
+
+                Text {
+                    width: parent.width
+                    text: root.updateService.summary
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.primary
+                    font.weight: Theme.weightMedium
+                    color: Theme.textHi
+                    wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.updateService.hasUpdates || root.updateService.ready
+                    text: root.updateService.scopeLabel
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.metadata
+                    color: Theme.textFaint
+                    wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
+                }
+            }
+
+            ActionButton {
+                id: updateAction
+                objectName: "overviewUpdateReview"
+                anchors.right: parent.right
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                label: root.updateService.hasUpdates || root.updateService.ready
+                    ? I18n.tr("Review") : I18n.tr("Details")
+                fill: root.updateService.hasUpdates ? Theme.accent : Theme.chip
+                tint: root.updateService.hasUpdates ? Theme.accentFg : Theme.textHi
+                hPadding: 20
+                onTriggered: {
+                    Popouts.close();
+                    root.updateService.show();
+                }
+            }
+        }
+    }
+
+    // ---- session ---------------------------------------------------------
+    Item {
+        width: parent.width
+        // Keep the focus border and scaled buttons inside the clipped body.
+        height: Theme.inlineActionHeight + Theme.scaled(16)
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            color: Theme.hairlineSoft
+        }
+
+        Row {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: Theme.scaled(4)
+            spacing: 2
+
+            DrawerIconButton {
+                glyph: "lock"
+                accessibleName: "Lock"
+                onClicked: { Popouts.close(); Session.lock(); }
+            }
+
+            DrawerIconButton {
+                glyph: "bedtime"
+                accessibleName: "Suspend"
+                onClicked: { Popouts.close(); Session.suspend(); }
+            }
+
+            DrawerIconButton {
+                glyph: "logout"
+                accessibleName: "Log out"
+                onClicked: { Popouts.close(); Session.logout(); }
+            }
+
+            DrawerIconButton {
+                glyph: "restart_alt"
+                accessibleName: "Restart"
+                onClicked: { Popouts.close(); Session.reboot(); }
+            }
+
+            DrawerIconButton {
+                glyph: "power_settings_new"
+                accessibleName: "Shut down"
+                onClicked: { Popouts.close(); Session.shutdown(); }
+            }
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: Theme.scaled(4)
+            spacing: 2
+
+            DrawerIconButton {
+                glyph: "photo_camera"
+                accessibleName: "Screenshot"
+                onClicked: {
+                    Popouts.close();
+                    Quickshell.execDetached(["sh", "-c",
+                        "screenshot region"]);
+                }
+            }
+
+            DrawerIconButton {
+                glyph: "keyboard"
+                accessibleName: "Keyboard shortcuts"
+                onClicked: Session.toggleKeys()
+            }
+
+            DrawerIconButton {
+                glyph: "settings"
+                accessibleName: "Cybex OS Settings"
+                onClicked: {
+                    Popouts.close();
+                    Settings.showPanel(undefined, Popouts.hostScreenName);
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Share clipboard text, files, or folders through LocalSend.
+
+set -euo pipefail
+umask 077
+
+mode="${1:-}"
+shift || true
+
+if [ -z "$mode" ]; then
+  echo "Usage: localsend-share <clipboard|file|folder> [path...]" >&2
+  exit 1
+fi
+
+# Picker candidates under $HOME. A bare `find "$HOME"` walks every cache,
+# toolchain and browser profile before the useful paths; fd skips hidden and
+# ignored trees, and the fallback prunes dot-directories the same way.
+candidates() {
+  if command -v fd >/dev/null 2>&1; then
+    fd --type "$1" . "$HOME" 2>/dev/null || true
+  else
+    find "$HOME" -mindepth 1 -name '.*' -prune -o -type "$1" -print 2>/dev/null || true
+  fi
+}
+
+case "$mode" in
+  clipboard)
+    text=$(wl-paste --no-newline)
+    [[ -n $text ]] || exit 0
+    # systemd's default description includes argv; never retain clipboard
+    # contents in the service-start journal entry.
+    systemd-run --user --quiet --collect --description='Share clipboard via LocalSend' localsend --text "$text"
+    ;;
+  file|folder)
+    if [ "$#" -gt 0 ]; then
+      systemd-run --user --quiet --collect localsend "$@"
+      exit 0
+    fi
+
+    if [ "$mode" = "folder" ]; then
+      selection="$(candidates d | fzf --prompt 'Folder> ' --height 40% --reverse || true)"
+    else
+      selection="$(candidates f | fzf --multi --prompt 'Files> ' --height 40% --reverse || true)"
+    fi
+
+    [ -z "$selection" ] && exit 0
+    mapfile -t paths <<< "$selection"
+    systemd-run --user --quiet --collect localsend "${paths[@]}"
+    ;;
+  *)
+    echo "Unknown share mode: $mode" >&2
+    exit 1
+    ;;
+esac

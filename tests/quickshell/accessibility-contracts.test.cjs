@@ -1,0 +1,179 @@
+const test = require("node:test");
+const { untranslated } = require("./shell.cjs");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { shellDir } = require("./shell.cjs");
+
+// Quickshell's Cybex OS package embeds quickshell-coreplugin into the `qs`
+// executable, so standalone qmltestrunner cannot instantiate these controls.
+// Keep the pure-JS helper runtime tests in tests/qml and guard the shell-bound
+// interaction contract here until the package exposes a loadable QML plugin.
+function read(relative) {
+    return untranslated(fs.readFileSync(path.join(shellDir, relative), "utf8"));
+}
+
+test("popover action primitives are keyboard and assistive-technology operable", () => {
+    const link = read("Popovers/LinkText.qml");
+    assert.match(link, /activeFocusOnTab:\s*enabled && visible/);
+    assert.match(link, /Accessible\.role:\s*Accessible\.Button/);
+    assert.match(link, /Accessible\.name:\s*accessibleName/);
+    assert.match(link, /Qt\.Key_Return[\s\S]*Qt\.Key_Enter[\s\S]*Qt\.Key_Space/);
+    assert.match(link, /font\.underline:\s*activeFocus/,
+        "a keyboard-focused text action needs a visible focus state");
+
+    const slider = read("Popovers/FillSlider.qml");
+    assert.match(slider, /Accessible\.role:\s*Accessible\.Slider/);
+    assert.match(slider, /Accessible\.onIncreaseAction:\s*applyValue/);
+    assert.match(slider, /Accessible\.onDecreaseAction:\s*applyValue/);
+    for (const key of ["Left", "Right", "PageDown", "PageUp", "Home", "End"])
+        assert.match(slider, new RegExp(`Qt\\.Key_${key}`));
+    assert.match(slider,
+        /glyphIsButton[\s\S]*activeFocusOnTab:\s*visible && root\.ready[\s\S]*Accessible\.role:\s*Accessible\.Button/,
+        "the mute glyph must be a separate named keyboard action");
+});
+
+test("every overflowed widget remains keyboard reachable with visible focus", () => {
+    const overflow = read("Popovers/OverflowPopover.qml");
+    assert.match(overflow, /activeFocusOnTab:\s*true/,
+        "every repeated row must participate in sequential Tab focus");
+    assert.match(overflow,
+        /color:\s*rowMouse\.containsMouse \|\| activeFocus[\s\S]{0,100}?Theme\.hoverFill/,
+        "keyboard focus needs the same visible highlight as pointer hover");
+    assert.match(overflow,
+        /Accessible\.role:\s*Accessible\.Button[\s\S]*Accessible\.name:\s*modelData\.label/);
+    assert.match(overflow,
+        /Qt\.Key_Return[\s\S]*Qt\.Key_Enter[\s\S]*Qt\.Key_Space/);
+});
+
+test("notification history exposes primary, action, disclosure, dismiss, and clear paths", () => {
+    const card = read("Common/NotifCard.qml");
+    const actions = read("Common/NotifActions.qml");
+    const centre = read("Popovers/Drawer/DrawerNotifications.qml");
+    const drawer = read("Popovers/Drawer/DrawerPopover.qml");
+    const footer = read("Popovers/Drawer/DrawerFooter.qml");
+
+    assert.match(card, /activeFocusOnTab:\s*keyboardEnabled\s*\n/,
+        "nonactivatable cards still need a keyboard entry point for code, links and snooze actions");
+    assert.match(card, /Accessible\.role:\s*actionable \? Accessible\.Button : Accessible\.StaticText/);
+    assert.match(card, /Qt\.Key_Delete[\s\S]*card\.closeRequested\(\)/);
+    assert.match(card,
+        /id:\s*closeButton[\s\S]*activeFocusOnTab:\s*card\.keyboardEnabled[\s\S]*Accessible\.name:[\s\S]{0,120}"Dismiss notification from %1"/);
+    assert.match(card,
+        /id:\s*textDisclosure[\s\S]*activeFocusOnTab:\s*visible && card\.keyboardEnabled[\s\S]*Accessible\.name:/);
+    assert.match(actions,
+        /activeFocusOnTab:\s*root\.keyboardEnabled && root\.reveal[\s\S]*Accessible\.name:\s*pillText\.text/);
+    assert.match(actions, /hasFocusedAction:\s*focusedActions > 0/,
+        "focus must keep contextual actions revealed after the pointer leaves");
+
+    assert.match(drawer, /id: notificationsTab[\s\S]*DrawerNotifications \{/);
+    assert.match(centre, /keyboardEnabled:\s*true/);
+    assert.match(centre, /DrawerFooter \{[\s\S]*actionText: Notifs\.count > 0[\s\S]*onActionClicked: Notifs\.clearAll\(\)/);
+    assert.match(footer, /onClicked: root\.actionClicked\(\)/);
+    assert.match(centre, /delegate: ActionButton \{[\s\S]*id: modeChoice[\s\S]*onTriggered: Notifs\.setDnd\(modelData\.dnd\)/);
+    assert.match(centre, /Accessible\.role: Accessible\.RadioButton[\s\S]*Accessible\.checked: modeChoice\.on/);
+    const primitive = read("Popovers/ActionButton.qml");
+    assert.match(primitive, /activeFocusOnTab: enabled && visible && revealed/);
+    assert.match(primitive, /Accessible\.onPressAction:/);
+    assert.match(primitive, /Qt\.Key_Return[\s\S]*Qt\.Key_Enter[\s\S]*Qt\.Key_Space/);
+    assert.match(primitive, /border\.width: activeFocus \? 1 : 0/);
+
+});
+
+test("Control Center focus reaches rows, toggles, audio, capture, session, and footer actions", () => {
+    const control = read("Popovers/ControlCenterPopover.qml");
+    assert.match(control, /focus:\s*visible/);
+    assert.match(control,
+        /Keys\.onEscapePressed:[\s\S]{0,260}?pendingSessionKey[\s\S]{0,260}?Popouts\.close\(\)/,
+        "Escape cancels a pending destructive action before closing the panel");
+    assert.match(control,
+        /function focusInitial\(\)[\s\S]*brightnessSlider\.ready \? brightnessSlider : outputButton/);
+
+    for (const component of ["RadioRow", "QuickTile", "SessionAction"])
+        assert.match(control, new RegExp(
+            `component ${component}:[\\s\\S]*?activeFocusOnTab: true[\\s\\S]*?Accessible\\.role:[\\s\\S]*?Keys\\.onPressed:`));
+    assert.match(control,
+        /component QuickTile:[\s\S]*Accessible\.checked:\s*tile\.effective/,
+        "quick toggles must expose observed state, not just persisted intent");
+    assert.match(control,
+        /component QuickTile:[\s\S]*Accessible\.description:\s*tile\.statusDescription/,
+        "pending and failure state must be announced with the toggle");
+    assert.match(control,
+        /id:\s*outputButton[\s\S]*Accessible\.name:\s*"Choose audio output"/);
+    assert.match(control,
+        /required property var modelData[\s\S]*Accessible\.name:\s*capture\.label[\s\S]*root\.runCapture/);
+    for (const label of ["Open Cybex OS Settings", "Keyboard shortcuts"])
+        assert.match(control, new RegExp(`Accessible\\.name: "${label}"`));
+});
+
+test("Bluetooth and media panels announce state and expose one focusable action per control", () => {
+    const bluetooth = read("Popovers/BluetoothPopover.qml");
+    assert.match(bluetooth, /function focusInitial\(\)[\s\S]*bluetoothToggle\.forceActiveFocus/);
+    assert.match(bluetooth,
+        /readonly property string actionName:[\s\S]*activeFocusOnTab:\s*enabled[\s\S]*Accessible\.name:\s*actionName/);
+    assert.match(bluetooth, /Qt\.Key_(?:Down|Right)[\s\S]*nextItemInFocusChain\(true\)/);
+    assert.match(bluetooth, /Accessible\.role:\s*Accessible\.AlertMessage/);
+
+    const media = read("Popovers/MediaPopover.qml");
+    assert.match(media, /function focusInitial\(\)/);
+    assert.match(media,
+        /component TransportButton:[\s\S]*activeFocusOnTab:\s*available[\s\S]*Accessible\.checked:\s*toggle && active/);
+    assert.match(media, /Qt\.Key_(?:Right|Down)[\s\S]*nextItemInFocusChain\(true\)/);
+    assert.match(media,
+        /Accessible\.name:\s*"Choose media player"[\s\S]*root\.selectSource\(-1\)/);
+    assert.match(media, /Accessible\.role:\s*Accessible\.AlertMessage/);
+});
+
+test("reduced-motion mode stops infinite activity loops instead of busy-looping at zero duration", () => {
+    const theme = read("Common/Theme.qml");
+    assert.match(theme, /Quickshell\.env\("QS_REDUCED_MOTION"\)/);
+    assert.match(theme,
+        /\(Quickshell\.env\("QS_REDUCED_MOTION"\) \|\| ""\)\.trim\(\)\.toLowerCase\(\)/,
+        "an unset optional environment override must retain the default motion mode");
+    assert.match(theme, /readonly property bool reducedMotion:/);
+
+    for (const relative of [
+        "Bar/Modules/Indicators.qml",
+        "Popovers/BatteryPopover.qml",
+        "Popovers/T3Composer.qml",
+        "Popovers/T3ThreadPage.qml",
+        "Popovers/WifiPopover.qml"
+    ]) {
+        const source = read(relative);
+        const loops = [...source.matchAll(/(?:RotationAnimation|SequentialAnimation)[\s\S]*?loops:\s*Animation\.Infinite/g)];
+        assert.ok(loops.length > 0, `${relative} no longer contains the loop this contract covers`);
+        for (const match of loops)
+            assert.match(match[0], /running:[^\n]*(?:\n\s*)?[^\n]*!Theme\.reducedMotion/,
+                `${relative} has an infinite loop that ignores reduced motion`);
+    }
+});
+
+test("the reusable wallpaper picker exposes accessible selection and apply actions", () => {
+    const picker = read("Settings/WallpaperPicker.qml");
+    const grid = read("Settings/WallpaperGrid.qml");
+    const preview = read("Settings/WallpaperPreviewPanel.qml");
+    const online = read("Settings/WallpaperOnlineView.qml");
+    assert.match(picker, /signal applied\(string fileName\)/);
+    assert.match(picker, /signal escapeRequested\(\)/);
+    assert.match(picker, /Keys.onEscapePressed/);
+    assert.match(grid, /activeFocusOnTab: index === root.currentIndex/);
+    assert.match(grid, /Accessible.role: Accessible.Button/);
+    assert.match(grid, /Accessible.name:.*Select wallpaper %1/);
+    assert.match(grid, /Accessible.selected: chosen/);
+    for (const key of ["Left", "Right", "Up", "Down", "Return", "Enter"])
+        assert.match(grid, new RegExp(`Qt.Key_${key}`));
+    assert.match(grid, /root.selected\(modelData\)/);
+    assert.doesNotMatch(grid, /Wallpaper.set|OnlineWallpapers.apply/);
+    assert.match(preview, /id: useButton[\s\S]*primary: true[\s\S]*Use this wallpaper/);
+    assert.match(preview, /anchors.bottom: useButton.top/,
+        "the primary action remains visible while metadata scrolls");
+    // The colour palette is one compact control that opens a swatch grid.
+    const colour = read("Settings/WallpaperColourFilter.qml");
+    assert.match(online, /WallpaperColourFilter \{[\s\S]*?current: OnlineWallpapers\.color/);
+    assert.match(colour, /Accessible.role: Accessible.ComboBox[\s\S]*Accessible.name:.*Filter by colour"/);
+    assert.match(colour, /Accessible.role: Accessible.RadioButton[\s\S]*Accessible.name:.*Filter by colour %1/);
+    assert.match(colour, /activeFocusOnTab: index === grid.focusIndex/, "the grid is one tab stop");
+    for (const key of ["Left", "Right", "Up", "Down", "Home", "End", "Return", "Enter", "Space"])
+        assert.match(colour, new RegExp(`Qt.Key_${key}`));
+    assert.match(colour, /closePolicy: Controls.Popup.CloseOnEscape/);
+});

@@ -1,0 +1,34 @@
+state_file = "auto"
+
+[hotkey]
+enabled = false
+
+# Quickshell already exposes recording/transcription state in the managed
+# menubar; do not probe for Voxtype's separate optional OSD frontend.
+[osd]
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+
+[whisper]
+model = "base"
+language = "auto"
+translate = false
+# Load the model when a recording starts and release it when idle, instead of
+# keeping it resident on the GPU for the whole session. The first dictation
+# after an idle period pays a short load delay.
+on_demand_loading = true
+
+[output]
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 1
+driver_order = ["wtype", "clipboard"]
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = false
