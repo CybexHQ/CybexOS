@@ -1,14 +1,98 @@
+--- a/BlockMeter.qml
++++ b/BlockMeter.qml
+@@ -2,6 +2,7 @@
+ 
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ 
+ // Omarchy-native segmented quota meter. Every segment is a single track item;
+ // only the boundary fragment is overlaid, so the strip is not rendered twice.
+@@ -10,7 +11,7 @@
+   id: root
+ 
+   property real value: 0
+-  property color fillColor: Color.foreground
++  property color fillColor: Commons.Color.foreground
+   property color trackColor: Qt.rgba(fillColor.r, fillColor.g, fillColor.b, 0.14)
+   property int blockWidth: Math.max(2, Style.space(5))
+   property int blockGap: Math.max(1, Style.space(2))
+--- a/CostPriceEditor.qml
++++ b/CostPriceEditor.qml
+@@ -2,13 +2,14 @@
+ 
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
+ 
+ Column {
+   id: root
+-  property color foreground: Color.foreground
+-  property color urgent: Color.urgent
++  property color foreground: Commons.Color.foreground
++  property color urgent: Commons.Color.urgent
+   property string fontFamily: Style.font.family
+   property string loadError: ""
+   property int draftGeneration: 0
+--- a/CostSettings.qml
++++ b/CostSettings.qml
+@@ -3,14 +3,15 @@
+ import QtQuick.Controls as Controls
+ import Quickshell.Io
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
+ 
+ Column {
+   id: root
+-  property color foreground: Color.foreground
+-  property color urgent: Color.urgent
+-  property color surface: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color urgent: Commons.Color.urgent
++  property color surface: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
+   property var sources: []
+   property string errorText: ""
+@@ -69,7 +70,7 @@
+     prices.begin(String(settings.costPriceOverrides || "{}"))
+     try {
+       var rows = JSON.parse(String(settings.costT3Servers || "[]"))
+-      if (!Array.isArray(rows) || rows.length > 4) throw new Error()
++      if (!(Array.isArray(rows) || rows instanceof Array) || rows.length > 4) throw new Error()
+       for (var i = 0; i < rows.length; i++) {
+         var row = rows[i]
+         if (!row || typeof row.id !== "string" || typeof row.url !== "string" || typeof row.name !== "string") throw new Error()
 --- a/Panel.qml
 +++ b/Panel.qml
-@@ -19,6 +19,7 @@
+@@ -5,6 +5,7 @@
+ import QtQuick.Effects
+ import Quickshell.Io
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
+ 
+@@ -14,11 +15,12 @@
+   ipcTarget: "digitalpals.model-usage"
+   manageIpc: false
+ 
+-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+-  readonly property color urgent: bar ? bar.urgent : Color.urgent
++  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
++  readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
    readonly property color dim: Qt.darker(foreground, 1.55)
-   readonly property color surface: Color.popups.background
+-  readonly property color surface: Color.popups.background
++  readonly property color surface: Commons.Color.popups.background
    readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 +  property bool automaticRefreshEnabled: true
  
    readonly property bool proxyMode: backend.usageSource === "cliproxy"
    readonly property var providers: UsageLogic.availableProviders(proxyMode
-@@ -30,8 +31,17 @@
+@@ -30,8 +32,17 @@
    property string settingsReturnView: "limits"
    readonly property bool configuring: viewMode === "settings" || viewMode === "cost-settings"
    readonly property var activeSettingsForm: viewMode === "cost-settings" ? costConfigForm : configForm
@@ -28,7 +112,7 @@
    property alias resetAction: resetBackend
    property double nowMs: Date.now()
  
-@@ -66,7 +76,7 @@
+@@ -66,7 +77,7 @@
    readonly property var provider: providerSummary
    readonly property var proxyAccounts: UsageLogic.listOrEmpty(providerSummary && providerSummary.accounts)
    readonly property bool accountOverview: proxyMode && proxyAccounts.length > 0
@@ -37,7 +121,7 @@
    readonly property var providerOptions: {
      var result = []
      for (var i = 0; i < providers.length; i++)
-@@ -135,6 +145,7 @@
+@@ -135,6 +146,7 @@
    }
  
    function showSettings() {
@@ -45,7 +129,7 @@
      if (!configuring) settingsReturnView = viewMode
      configForm.begin(settings)
      viewMode = "settings"
-@@ -143,6 +154,7 @@
+@@ -143,6 +155,7 @@
    }
  
    function showCostSettings() {
@@ -53,7 +137,7 @@
      settingsReturnView = "costs"
      costConfigForm.begin(settings)
      viewMode = "cost-settings"
-@@ -365,9 +377,12 @@
+@@ -365,9 +378,12 @@
    implicitWidth: percentageMode ? percentageGroup.implicitWidth : iconButton.implicitWidth
    implicitHeight: percentageMode ? percentageGroup.implicitHeight : iconButton.implicitHeight
  
@@ -66,7 +150,7 @@
      nowMs = Date.now()
      if (viewMode === "costs") costBackend.ensureLoaded()
      if (panelFlick) panelFlick.contentY = 0
-@@ -377,27 +392,27 @@
+@@ -377,27 +393,27 @@
        else keyCatcher.forceActiveFocus()
      })
    } else {
@@ -103,7 +187,7 @@
      id: activityBackend
      usageBackend: backend
      settings: root.settings
-@@ -408,10 +423,10 @@
+@@ -408,10 +424,10 @@
      usageBackend: backend
      onFinished: backend.refresh()
      onStateChanged: {
@@ -117,7 +201,7 @@
        })
      }
    }
-@@ -560,8 +575,24 @@
+@@ -560,8 +576,24 @@
      }
    }
  
@@ -143,52 +227,218 @@
      anchorItem: root.percentageMode ? percentageGroup : iconButton
      owner: root
      bar: root.bar
---- a/UsageLogic.js
-+++ b/UsageLogic.js
-@@ -3,6 +3,43 @@
- // One observer per connection across bars, monitors and open panels. The
- // shared object has no panel parent; the final consumer explicitly stops it.
- var liveConnections = ({})
-+var sharedBackends = ({})
-+
-+function acquireBackend(type, key, properties, factory) {
-+  var identity = type + ":" + key
-+  var entry = sharedBackends[identity]
-+  if (!entry) {
-+    if (!factory) factory = Qt.createComponent(type + ".qml")
-+    var object = factory.createObject(null, properties)
-+    if (!object) return null
-+    entry = { object: object, references: 0, activeReferences: 0 }
-+    sharedBackends[identity] = entry
-+  }
-+  entry.references++
-+  if (properties.automaticRefreshEnabled) entry.activeReferences++
-+  entry.object.automaticRefreshEnabled = entry.activeReferences > 0
-+  return entry.object
-+}
-+
-+function updateBackendActivity(type, key, wasActive, active) {
-+  var entry = sharedBackends[type + ":" + key]
-+  if (!entry || wasActive === active) return
-+  entry.activeReferences += active ? 1 : -1
-+  entry.object.automaticRefreshEnabled = entry.activeReferences > 0
-+}
-+
-+function releaseBackend(type, key, active) {
-+  var identity = type + ":" + key
-+  var entry = sharedBackends[identity]
-+  if (!entry) return
-+  entry.references--
-+  if (active) entry.activeReferences--
-+  if (entry.references <= 0) {
-+    delete sharedBackends[identity]
-+    entry.object.stop()
-+    entry.object.destroy()
-+  } else entry.object.automaticRefreshEnabled = entry.activeReferences > 0
-+}
+@@ -1039,7 +1071,7 @@
+     readonly property var windows: UsageLogic.accountWindows(account, root.expandedAccountLimits)
+     readonly property bool healthy: account.status === "ok"
+     implicitHeight: accountContent.implicitHeight + contentTopInset + contentBottomInset
+-    color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
++    color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
+     borderSpec: Border.flat(root.alpha(root.foreground, 0.22), Style.spacing.hairline)
+     padding: Style.spacing.xxl
+     radius: root.usageCardRadius
+@@ -1269,10 +1301,10 @@
+     implicitHeight: limitContent.implicitHeight + contentTopInset + contentBottomInset
+     color: severity === "critical"
+       ? root.alpha(root.urgent, 0.09)
+-      : Style.normalFillFor(root.foreground, Color.accent, root.urgent)
++      : Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
+     borderSpec: stressed
+       ? Border.flat(root.alpha(root.urgent, severity === "critical" ? 0.45 : 0.28), Style.spacing.hairline)
+-      : Border.controlSpec("normal", root.foreground, Color.accent, root.urgent)
++      : Border.controlSpec("normal", root.foreground, Commons.Color.accent, root.urgent)
+     padding: Style.spacing.xxl
+     radius: root.usageCardRadius
  
- function acquireLive(key, factory, properties) {
-   var entry = liveConnections[key]
+@@ -1356,8 +1388,8 @@
+       && Number(credits.limit) > 0
+ 
+     implicitHeight: creditsContent.implicitHeight + contentTopInset + contentBottomInset
+-    color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
+-    borderSpec: Border.controlSpec("normal", root.foreground, Color.accent, root.urgent)
++    color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
++    borderSpec: Border.controlSpec("normal", root.foreground, Commons.Color.accent, root.urgent)
+     padding: Style.spacing.xxl
+     radius: root.usageCardRadius
+ 
+--- a/ResetConfirmation.qml
++++ b/ResetConfirmation.qml
+@@ -1,13 +1,14 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ 
+ Column {
+   id: root
+   required property var backend
+-  property color foreground: Color.foreground
+-  property color background: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color background: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
+   signal closeRequested()
+   spacing: Style.spacing.lg
+--- a/SettingsActions.qml
++++ b/SettingsActions.qml
+@@ -1,12 +1,13 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ 
+ Column {
+   id: root
+-  property color foreground: Color.foreground
+-  property color urgent: Color.urgent
++  property color foreground: Commons.Color.foreground
++  property color urgent: Commons.Color.urgent
+   property string fontFamily: Style.font.family
+   property string errorText: ""
+   property bool saving: false
+--- a/SettingsCredential.qml
++++ b/SettingsCredential.qml
+@@ -1,6 +1,7 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ 
+ Column {
+@@ -10,7 +11,7 @@
+   property bool changing: false
+   property alias text: field.text
+   property string editorObjectName: ""
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+   signal edited(string value)
+   signal revealRequested(var item)
+--- a/SettingsHeader.qml
++++ b/SettingsHeader.qml
+@@ -1,12 +1,13 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ 
+ Item {
+   id: root
+   property string title: "Settings"
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+   signal closeRequested()
+   signal revealRequested(var item)
+--- a/SettingsSection.qml
++++ b/SettingsSection.qml
+@@ -1,13 +1,14 @@
+ pragma ComponentBehavior: Bound
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ 
+ Column {
+   id: root
+   property string title: ""
+   property string summary: ""
+   property alias expanded: disclosure.checked
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+   default property alias content: body.data
+   signal revealRequested(var item)
+--- a/UsageActivityBackend.qml
++++ b/UsageActivityBackend.qml
+@@ -8,6 +8,8 @@
+   visible: false
+   required property var usageBackend
+   property var settings: ({})
++  property bool automaticRefreshEnabled: true
++  property bool stopped: false
+   property var legacyProviders: []
+   readonly property var providers: useLive ? (liveConnection ? liveConnection.providers : []) : legacyProviders
+   property string legacyError: ""
+@@ -16,6 +18,7 @@
+   readonly property double lastSuccessAt: useLive ? (liveConnection ? liveConnection.lastSuccessAt : 0) : legacySuccessAt
+   property bool pendingRefresh: false
+   property bool launchPending: false
++  property double lastAttemptAt: 0
+   property string scriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-activity.py"))
+   readonly property string keeperUrl: String(settings.costKeeperUrl || "")
+   readonly property string passwordFile: String(settings.costKeeperPasswordFile || "")
+@@ -29,7 +32,7 @@
+   readonly property string liveState: useLive ? (liveConnection ? liveConnection.state : "unavailable") : "off"
+   readonly property var liveAccounts: useLive && liveConnection ? liveConnection.accounts : []
+   readonly property string liveNotice: useLive ? (liveConnection ? liveConnection.message : "Live activity unavailable.") : ""
+-  readonly property string connectionId: JSON.stringify([usageBackend.connectionId, usageBackend.proxyImplementation, keeperUrl, passwordFile, useLive, liveScriptPath])
++  readonly property string connectionId: JSON.stringify([usageBackend.connectionId, rustProxy ? "rust" : "keeper", keeperUrl, passwordFile, useLive, liveScriptPath])
+ 
+   function syncLive() {
+     if (!ready) return
+@@ -53,10 +56,12 @@
+     ? "Configure CPA Usage Keeper in settings to track the last-used account."
+     : fetchError !== "" ? fetchError : lastSuccessAt <= 0 ? "Loading account activity…" : ""
+ 
+-  function refresh() {
+-    if (!trackingEnabled || useLive) return
+-    if (process.running || launchPending) { pendingRefresh = true; return }
++  function refresh(manual) {
++    if (stopped || (!manual && !automaticRefreshEnabled) || !trackingEnabled || useLive) return
++    if (process.running || launchPending) { pendingRefresh = pendingRefresh || !!manual; return }
++    if (!manual && Date.now() - lastAttemptAt < 1000) return
+     launchPending = true
++    lastAttemptAt = Date.now()
+     pendingRefresh = false
+     var command = ["python3", scriptPath, "--cliproxy-url", usageBackend.cliproxyUrl,
+       "--timeout", "10"]
+@@ -67,9 +72,25 @@
+     process.connectionId = connectionId
+     process.running = true
+   }
++  function stop() {
++    stopped = true
++    ready = false
++    pendingRefresh = false
++    process.running = false
++    liveConnection = null
++    if (liveKey !== "") UsageLogic.releaseLive(liveKey)
++    liveKey = ""
++  }
++  onAutomaticRefreshEnabledChanged: if (automaticRefreshEnabled && !stopped) refresh()
++  Connections {
++    target: root.usageBackend
++    ignoreUnknownSignals: true
++    function onRefreshed(manual) { root.refresh(manual) }
++  }
+ 
+   function settle() {
+     launchPending = false
++    if (stopped) return
+     if (process.connectionId !== connectionId || !trackingEnabled || useLive) {
+       pendingRefresh = trackingEnabled && !useLive
+     } else {
+@@ -88,7 +109,7 @@
+       }
+     }
+     if (pendingRefresh) Qt.callLater(function() {
+-      if (root.pendingRefresh) root.refresh()
++      if (root.pendingRefresh) root.refresh(true)
+     })
+   }
+ 
+@@ -142,7 +163,7 @@
+   }
+   Timer {
+     interval: 15000
+-    running: root.trackingEnabled && !root.useLive
++    running: root.automaticRefreshEnabled && !root.stopped && root.trackingEnabled && !root.useLive
+     repeat: true
+     triggeredOnStart: true
+     onTriggered: root.refresh()
 --- a/UsageBackend.qml
 +++ b/UsageBackend.qml
 @@ -9,6 +9,8 @@
@@ -290,94 +540,309 @@
      repeat: true
      triggeredOnStart: true
      onTriggered: root.requestRefresh(false)
---- a/UsageActivityBackend.qml
-+++ b/UsageActivityBackend.qml
-@@ -8,6 +8,8 @@
-   visible: false
-   required property var usageBackend
-   property var settings: ({})
-+  property bool automaticRefreshEnabled: true
-+  property bool stopped: false
-   property var legacyProviders: []
-   readonly property var providers: useLive ? (liveConnection ? liveConnection.providers : []) : legacyProviders
-   property string legacyError: ""
-@@ -16,6 +18,7 @@
-   readonly property double lastSuccessAt: useLive ? (liveConnection ? liveConnection.lastSuccessAt : 0) : legacySuccessAt
-   property bool pendingRefresh: false
-   property bool launchPending: false
-+  property double lastAttemptAt: 0
-   property string scriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-activity.py"))
-   readonly property string keeperUrl: String(settings.costKeeperUrl || "")
-   readonly property string passwordFile: String(settings.costKeeperPasswordFile || "")
-@@ -29,7 +32,7 @@
-   readonly property string liveState: useLive ? (liveConnection ? liveConnection.state : "unavailable") : "off"
-   readonly property var liveAccounts: useLive && liveConnection ? liveConnection.accounts : []
-   readonly property string liveNotice: useLive ? (liveConnection ? liveConnection.message : "Live activity unavailable.") : ""
--  readonly property string connectionId: JSON.stringify([usageBackend.connectionId, usageBackend.proxyImplementation, keeperUrl, passwordFile, useLive, liveScriptPath])
-+  readonly property string connectionId: JSON.stringify([usageBackend.connectionId, rustProxy ? "rust" : "keeper", keeperUrl, passwordFile, useLive, liveScriptPath])
+--- a/UsageCosts.qml
++++ b/UsageCosts.qml
+@@ -3,6 +3,7 @@
+ import QtQuick
+ import QtQuick.Controls as Controls
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
  
-   function syncLive() {
-     if (!ready) return
-@@ -53,10 +56,12 @@
-     ? "Configure CPA Usage Keeper in settings to track the last-used account."
-     : fetchError !== "" ? fetchError : lastSuccessAt <= 0 ? "Loading account activity…" : ""
+@@ -21,9 +22,9 @@
+     ? Number(payload.period.days) : periodDays
+   readonly property bool incompletePricing: Number(totals.unpricedRecords || 0) > 0
+   readonly property bool lowPricingCoverage: incompletePricing && priceCoverage(totals) < 0.9
+-  property color foreground: Color.foreground
+-  property color urgent: Color.urgent
+-  property color surface: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color urgent: Commons.Color.urgent
++  property color surface: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
  
--  function refresh() {
--    if (!trackingEnabled || useLive) return
--    if (process.running || launchPending) { pendingRefresh = true; return }
-+  function refresh(manual) {
-+    if (stopped || (!manual && !automaticRefreshEnabled) || !trackingEnabled || useLive) return
-+    if (process.running || launchPending) { pendingRefresh = pendingRefresh || !!manual; return }
-+    if (!manual && Date.now() - lastAttemptAt < 1000) return
-     launchPending = true
-+    lastAttemptAt = Date.now()
-     pendingRefresh = false
-     var command = ["python3", scriptPath, "--cliproxy-url", usageBackend.cliproxyUrl,
-       "--timeout", "10"]
-@@ -67,9 +72,25 @@
-     process.connectionId = connectionId
-     process.running = true
+   readonly property color dim: Qt.darker(foreground, 1.55)
+@@ -436,7 +437,7 @@
+         id: providerSurface
+         width: parent.width
+         implicitHeight: providerRows.implicitHeight + contentTopInset + contentBottomInset
+-        color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
++        color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
+         borderSpec: Border.flat(root.alpha(root.foreground, 0.22), Style.spacing.hairline)
+         padding: Style.spacing.xl
+         radius: Style.cornerRadius
+@@ -611,7 +612,7 @@
+         visible: root.modelsExpanded
+         width: parent.width
+         implicitHeight: modelRows.implicitHeight + contentTopInset + contentBottomInset
+-        color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
++        color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
+         borderSpec: Border.flat(root.alpha(root.foreground, 0.22), Style.spacing.hairline)
+         padding: Style.spacing.xl
+         radius: Style.cornerRadius
+--- a/UsageDisclosure.qml
++++ b/UsageDisclosure.qml
+@@ -3,11 +3,12 @@
+ import QtQuick
+ import QtQuick.Controls as Controls
+ import qs.Commons
++import qs.Commons as Commons
+ 
+ Controls.AbstractButton {
+   id: root
+ 
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+   checkable: true
+   implicitHeight: Math.max(Style.spacing.controlHeight, implicitContentHeight + topPadding + bottomPadding)
+@@ -31,8 +32,8 @@
+   background: Rectangle {
+     radius: Style.space(4)
+     color: root.hovered || root.visualFocus
+-      ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
++      ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+     border.width: root.visualFocus ? Style.spacing.hairline : 0
+-    border.color: Color.accent
++    border.color: Commons.Color.accent
    }
-+  function stop() {
-+    stopped = true
-+    ready = false
-+    pendingRefresh = false
-+    process.running = false
-+    liveConnection = null
-+    if (liveKey !== "") UsageLogic.releaseLive(liveKey)
-+    liveKey = ""
+ }
+--- a/UsageHistory.qml
++++ b/UsageHistory.qml
+@@ -2,6 +2,7 @@
+ 
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
+ 
+@@ -10,7 +11,7 @@
+ 
+   property var history: ({ h24: [], d7: [] })
+   property string mode: "h24"
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+ 
+   readonly property var values: mode === "d7"
+--- a/UsageLogic.js
++++ b/UsageLogic.js
+@@ -3,6 +3,43 @@
+ // One observer per connection across bars, monitors and open panels. The
+ // shared object has no panel parent; the final consumer explicitly stops it.
+ var liveConnections = ({})
++var sharedBackends = ({})
++
++function acquireBackend(type, key, properties, factory) {
++  var identity = type + ":" + key
++  var entry = sharedBackends[identity]
++  if (!entry) {
++    if (!factory) factory = Qt.createComponent(type + ".qml")
++    var object = factory.createObject(null, properties)
++    if (!object) return null
++    entry = { object: object, references: 0, activeReferences: 0 }
++    sharedBackends[identity] = entry
 +  }
-+  onAutomaticRefreshEnabledChanged: if (automaticRefreshEnabled && !stopped) refresh()
++  entry.references++
++  if (properties.automaticRefreshEnabled) entry.activeReferences++
++  entry.object.automaticRefreshEnabled = entry.activeReferences > 0
++  return entry.object
++}
++
++function updateBackendActivity(type, key, wasActive, active) {
++  var entry = sharedBackends[type + ":" + key]
++  if (!entry || wasActive === active) return
++  entry.activeReferences += active ? 1 : -1
++  entry.object.automaticRefreshEnabled = entry.activeReferences > 0
++}
++
++function releaseBackend(type, key, active) {
++  var identity = type + ":" + key
++  var entry = sharedBackends[identity]
++  if (!entry) return
++  entry.references--
++  if (active) entry.activeReferences--
++  if (entry.references <= 0) {
++    delete sharedBackends[identity]
++    entry.object.stop()
++    entry.object.destroy()
++  } else entry.object.automaticRefreshEnabled = entry.activeReferences > 0
++}
+ 
+ function acquireLive(key, factory, properties) {
+   var entry = liveConnections[key]
+@@ -360,13 +397,13 @@
+   if (typeof raw !== "string" || raw.length > 65536)
+     throw new Error("Saved custom prices are invalid. Remove them to restore automatic pricing.")
+   var document = JSON.parse(raw)
+-  if (!document || typeof document !== "object" || Array.isArray(document))
++  if (!document || typeof document !== "object" || (Array.isArray(document) || document instanceof Array))
+     throw new Error("Saved custom prices must be an object.")
+   var fields = ["inputCostPerMillionTokens", "outputCostPerMillionTokens",
+     "cacheReadCostPerMillionTokens", "cacheWriteCostPerMillionTokens"]
+   var rows = Object.keys(document).map(function(model) {
+     var prices = document[model]
+-    if (!prices || typeof prices !== "object" || Array.isArray(prices)
++    if (!prices || typeof prices !== "object" || (Array.isArray(prices) || prices instanceof Array)
+         || Object.keys(prices).some(function(key) { return fields.indexOf(key) < 0 }))
+       throw new Error("Saved custom prices contain unsupported fields.")
+     var row = { model: model }
+--- a/UsageNavigation.qml
++++ b/UsageNavigation.qml
+@@ -2,6 +2,7 @@
+ 
+ import QtQuick
+ import qs.Commons
++import qs.Commons as Commons
+ 
+ Item {
+   id: root
+@@ -10,8 +11,8 @@
+   property var viewOptions: []
+   property var providerOptions: []
+   property string providerId: ""
+-  property color foreground: Color.foreground
+-  property color surface: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color surface: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
+   readonly property bool menuOpen: providerMenu.popup.visible
+   readonly property bool providerVisible: viewMode === "limits" && providerOptions.length > 1
+--- a/UsageSelect.qml
++++ b/UsageSelect.qml
+@@ -3,6 +3,7 @@
+ import QtQuick
+ import QtQuick.Controls as Controls
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ 
+ Controls.ComboBox {
+@@ -12,8 +13,8 @@
+   property string value: ""
+   property string label: ""
+   property string compactLabel: ""
+-  property color foreground: Color.foreground
+-  property color surface: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color surface: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
+   property real popupMaximumWidth: parent ? parent.width : implicitWidth
+   property bool alignPopupRight: false
+@@ -66,9 +67,9 @@
+   background: Rectangle {
+     radius: Style.space(4)
+     color: root.hovered || root.visualFocus || root.menuOpen
+-      ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
++      ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+     border.width: root.visualFocus ? Style.spacing.hairline : 0
+-    border.color: Color.accent
++    border.color: Commons.Color.accent
+   }
+ 
+   popup: Controls.Popup {
+@@ -132,7 +133,7 @@
+     Accessible.name: text
+     contentItem: Text {
+       text: optionDelegate.text
+-      color: optionDelegate.modelData.value === root.value ? Color.accent : root.foreground
++      color: optionDelegate.modelData.value === root.value ? Commons.Color.accent : root.foreground
+       font.family: root.fontFamily
+       font.pixelSize: Style.font.bodySmall
+       font.bold: optionDelegate.modelData.value === root.value
+@@ -142,7 +143,7 @@
+     background: Rectangle {
+       radius: Style.space(4)
+       color: optionDelegate.highlighted
+-        ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
++        ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+     }
+   }
+ }
+--- a/UsageSettings.qml
++++ b/UsageSettings.qml
+@@ -3,15 +3,16 @@
+ import QtQuick
+ import Quickshell.Io
+ import qs.Commons
++import qs.Commons as Commons
+ import qs.Ui as Ui
+ import "UsageLogic.js" as UsageLogic
+ 
+ Column {
+   id: root
+ 
+-  property color foreground: Color.foreground
+-  property color urgent: Color.urgent
+-  property color surface: Color.popups.background
++  property color foreground: Commons.Color.foreground
++  property color urgent: Commons.Color.urgent
++  property color surface: Commons.Color.popups.background
+   property string fontFamily: Style.font.family
+   property string accountDetails: ""
+   property string errorText: ""
+--- /dev/null
++++ b/UsageSharedActivityBackend.qml
+@@ -0,0 +1,57 @@
++import QtQuick
++import "UsageLogic.js" as UsageLogic
++
++Item {
++  id: root
++  visible: false
++  required property var usageBackend
++  property var settings: ({})
++  property bool acquiredActive: false
++  property string scriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-activity.py"))
++  property string liveScriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-live.py"))
++  property var connection: null
++  property string acquiredKey: ""
++  property bool ready: false
++  readonly property string key: usageBackend.connection ? JSON.stringify([
++    usageBackend.key, String(settings.costKeeperUrl || ""),
++    String(settings.costKeeperPasswordFile || ""), settings.liveAccountActivity !== false, scriptPath, liveScriptPath
++  ]) : ""
++  readonly property var providers: connection ? connection.providers : []
++  readonly property string fetchError: connection ? connection.fetchError : ""
++  readonly property double lastSuccessAt: connection ? connection.lastSuccessAt : 0
++  readonly property bool rustProxy: connection ? connection.rustProxy : false
++  readonly property bool useLive: connection ? connection.useLive : false
++  readonly property string liveState: connection ? connection.liveState : "off"
++  readonly property string liveNotice: connection ? connection.liveNotice : ""
++  readonly property var liveAccounts: connection ? connection.liveAccounts : []
++  readonly property string notice: connection ? connection.notice : ""
++
++  function refresh() { if (connection) connection.refresh(true) }
++  function sync() {
++    if (!ready || key === acquiredKey) return
++    connection = null
++    if (acquiredKey !== "") UsageLogic.releaseBackend("UsageActivityBackend", acquiredKey, acquiredActive)
++    acquiredKey = key
++    acquiredActive = usageBackend.automaticRefreshEnabled
++    if (key !== "") connection = UsageLogic.acquireBackend("UsageActivityBackend", key, {
++      usageBackend: usageBackend.connection, settings: settings,
++      automaticRefreshEnabled: acquiredActive, scriptPath: scriptPath, liveScriptPath: liveScriptPath
++    })
++  }
++  onKeyChanged: if (ready) sync()
++  Component.onCompleted: { ready = true; sync() }
++  Component.onDestruction: {
++    ready = false
++    connection = null
++    if (acquiredKey !== "") UsageLogic.releaseBackend("UsageActivityBackend", acquiredKey, acquiredActive)
++  }
 +  Connections {
 +    target: root.usageBackend
-+    ignoreUnknownSignals: true
-+    function onRefreshed(manual) { root.refresh(manual) }
++    function onAutomaticRefreshEnabledChanged() {
++      if (!root.connection) return
++      UsageLogic.updateBackendActivity("UsageActivityBackend", root.acquiredKey, root.acquiredActive,
++        root.usageBackend.automaticRefreshEnabled)
++      root.acquiredActive = root.usageBackend.automaticRefreshEnabled
++    }
 +  }
- 
-   function settle() {
-     launchPending = false
-+    if (stopped) return
-     if (process.connectionId !== connectionId || !trackingEnabled || useLive) {
-       pendingRefresh = trackingEnabled && !useLive
-     } else {
-@@ -88,7 +109,7 @@
-       }
-     }
-     if (pendingRefresh) Qt.callLater(function() {
--      if (root.pendingRefresh) root.refresh()
-+      if (root.pendingRefresh) root.refresh(true)
-     })
-   }
- 
-@@ -142,7 +163,7 @@
-   }
-   Timer {
-     interval: 15000
--    running: root.trackingEnabled && !root.useLive
-+    running: root.automaticRefreshEnabled && !root.stopped && root.trackingEnabled && !root.useLive
-     repeat: true
-     triggeredOnStart: true
-     onTriggered: root.refresh()
++}
 --- /dev/null
 +++ b/UsageSharedBackend.qml
 @@ -0,0 +1,65 @@
@@ -446,63 +911,51 @@
 +    function onRefreshed(manual) { root.refreshed(manual) }
 +  }
 +}
---- /dev/null
-+++ b/UsageSharedActivityBackend.qml
-@@ -0,0 +1,57 @@
-+import QtQuick
-+import "UsageLogic.js" as UsageLogic
-+
-+Item {
-+  id: root
-+  visible: false
-+  required property var usageBackend
-+  property var settings: ({})
-+  property bool acquiredActive: false
-+  property string scriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-activity.py"))
-+  property string liveScriptPath: usageBackend.localPath(Qt.resolvedUrl("scripts/proxy-live.py"))
-+  property var connection: null
-+  property string acquiredKey: ""
-+  property bool ready: false
-+  readonly property string key: usageBackend.connection ? JSON.stringify([
-+    usageBackend.key, String(settings.costKeeperUrl || ""),
-+    String(settings.costKeeperPasswordFile || ""), settings.liveAccountActivity !== false, scriptPath, liveScriptPath
-+  ]) : ""
-+  readonly property var providers: connection ? connection.providers : []
-+  readonly property string fetchError: connection ? connection.fetchError : ""
-+  readonly property double lastSuccessAt: connection ? connection.lastSuccessAt : 0
-+  readonly property bool rustProxy: connection ? connection.rustProxy : false
-+  readonly property bool useLive: connection ? connection.useLive : false
-+  readonly property string liveState: connection ? connection.liveState : "off"
-+  readonly property string liveNotice: connection ? connection.liveNotice : ""
-+  readonly property var liveAccounts: connection ? connection.liveAccounts : []
-+  readonly property string notice: connection ? connection.notice : ""
-+
-+  function refresh() { if (connection) connection.refresh(true) }
-+  function sync() {
-+    if (!ready || key === acquiredKey) return
-+    connection = null
-+    if (acquiredKey !== "") UsageLogic.releaseBackend("UsageActivityBackend", acquiredKey, acquiredActive)
-+    acquiredKey = key
-+    acquiredActive = usageBackend.automaticRefreshEnabled
-+    if (key !== "") connection = UsageLogic.acquireBackend("UsageActivityBackend", key, {
-+      usageBackend: usageBackend.connection, settings: settings,
-+      automaticRefreshEnabled: acquiredActive, scriptPath: scriptPath, liveScriptPath: liveScriptPath
-+    })
-+  }
-+  onKeyChanged: if (ready) sync()
-+  Component.onCompleted: { ready = true; sync() }
-+  Component.onDestruction: {
-+    ready = false
-+    connection = null
-+    if (acquiredKey !== "") UsageLogic.releaseBackend("UsageActivityBackend", acquiredKey, acquiredActive)
-+  }
-+  Connections {
-+    target: root.usageBackend
-+    function onAutomaticRefreshEnabledChanged() {
-+      if (!root.connection) return
-+      UsageLogic.updateBackendActivity("UsageActivityBackend", root.acquiredKey, root.acquiredActive,
-+        root.usageBackend.automaticRefreshEnabled)
-+      root.acquiredActive = root.usageBackend.automaticRefreshEnabled
-+    }
-+  }
-+}
+--- a/UsageTabs.qml
++++ b/UsageTabs.qml
+@@ -3,13 +3,14 @@
+ import QtQuick
+ import QtQuick.Controls as Controls
+ import qs.Commons
++import qs.Commons as Commons
+ 
+ Controls.TabBar {
+   id: root
+ 
+   property var options: []
+   property string value: ""
+-  property color foreground: Color.foreground
++  property color foreground: Commons.Color.foreground
+   property string fontFamily: Style.font.family
+   property real fontSize: Style.font.bodySmall
+   signal changed(string value)
+@@ -47,7 +48,7 @@
+ 
+       contentItem: Text {
+         text: viewTab.text
+-        color: viewTab.checked ? Color.accent : root.foreground
++        color: viewTab.checked ? Commons.Color.accent : root.foreground
+         font.family: root.fontFamily
+         font.pixelSize: root.fontSize
+         // Reserve bold label widths so changing tabs doesn't move controls.
+@@ -58,9 +59,9 @@
+ 
+       background: Rectangle {
+         color: viewTab.hovered || viewTab.visualFocus
+-          ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
++          ? Style.hoverFillFor(root.foreground, Commons.Color.accent) : "transparent"
+         border.width: viewTab.visualFocus ? Style.spacing.hairline : 0
+-        border.color: Color.accent
++        border.color: Commons.Color.accent
+ 
+         Rectangle {
+           anchors.left: parent.left
+@@ -68,7 +69,7 @@
+           anchors.bottom: parent.bottom
+           height: Style.space(2)
+           visible: viewTab.checked
+-          color: Color.accent
++          color: Commons.Color.accent
+         }
+       }
+     }
