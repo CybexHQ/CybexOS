@@ -682,7 +682,7 @@ Singleton {
         }
         historyError = false;
         if (reply.op === "read" && Settings.notifHistoryPersist) {
-            const rows = Array.isArray(reply.entries) ? reply.entries.slice(0, Settings.notifHistoryCount) : [];
+            const rows = (Array.isArray(reply.entries) || reply.entries instanceof Array) ? reply.entries.slice(0, Settings.notifHistoryCount) : [];
             const restored = rows.map((row, index) => {
                 const clean = Object.assign({}, Smart.persistable(row), {
                     key: `history-${historyGeneration}-${index}`, live: false, notif: null,

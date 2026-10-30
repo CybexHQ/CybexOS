@@ -146,7 +146,7 @@ function parseChargeThresholdStatus(output) {
 }
 
 function formatChargeLimit(status) {
-    if (!status || !status.supported || !Array.isArray(status.batteries))
+    if (!status || !status.supported || !(Array.isArray(status.batteries) || status.batteries instanceof Array))
         return MISSING;
 
     var limits = [];

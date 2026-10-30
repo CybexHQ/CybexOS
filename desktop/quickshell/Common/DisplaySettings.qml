@@ -74,7 +74,7 @@ Singleton {
         if (code === 0) {
             try {
                 const result = JSON.parse(body);
-                if (result && !Array.isArray(result) && typeof result.success === "boolean")
+                if (result && !(Array.isArray(result) || result instanceof Array) && typeof result.success === "boolean")
                     return result;
             } catch (_) {}
         }

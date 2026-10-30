@@ -42,7 +42,7 @@ function bubbleMetrics(width, height) {
 // same logical layout. Null when the area is on no output, or too small to
 // hold the bubble without covering most of it.
 function webcamPlacement(region, screens) {
-    if (!region || !Array.isArray(screens))
+    if (!region || !(Array.isArray(screens) || screens instanceof Array))
         return null;
     var cornerX = region.x + region.width - 1;
     var cornerY = region.y + region.height - 1;
@@ -107,7 +107,7 @@ function isInfrared(description) {
 // sensor, otherwise the first camera that is not. -1 when there is none.
 // inputs are { description, isDefault }, in the platform's order.
 function pickCamera(inputs) {
-    if (!Array.isArray(inputs))
+    if (!(Array.isArray(inputs) || inputs instanceof Array))
         return -1;
     var first = -1;
     for (var index = 0; index < inputs.length; index++) {
@@ -128,7 +128,7 @@ function pickCamera(inputs) {
 // to -1 (the camera's own default) when there is no information.
 // formats are { width, height, maxFps }.
 function pickCameraFormat(formats) {
-    if (!Array.isArray(formats))
+    if (!(Array.isArray(formats) || formats instanceof Array))
         return -1;
     var best = -1;
     var fallback = -1;

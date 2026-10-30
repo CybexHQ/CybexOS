@@ -7,8 +7,8 @@ function searchUrl(query) {
 
 function parseResults(body) {
     const data = JSON.parse(body);
-    if (!data || typeof data !== "object" || Array.isArray(data) || data.error
-            || (data.results !== undefined && !Array.isArray(data.results)))
+    if (!data || typeof data !== "object" || (Array.isArray(data) || data instanceof Array) || data.error
+            || (data.results !== undefined && !(Array.isArray(data.results) || data.results instanceof Array)))
         throw new Error("Invalid location response");
     const seen = {};
     const results = [];

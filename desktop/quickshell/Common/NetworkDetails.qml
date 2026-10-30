@@ -35,8 +35,8 @@ Singleton {
     property var snapshot: ({ devices: [], routes: [], profiles: [], wifi: { networks: [] } })
     property var savedProfiles: []
 
-    readonly property var devices: Array.isArray(snapshot.devices) ? snapshot.devices : []
-    readonly property var routes: Array.isArray(snapshot.routes) ? snapshot.routes : []
+    readonly property var devices: (Array.isArray(snapshot.devices) || snapshot.devices instanceof Array) ? snapshot.devices : []
+    readonly property var routes: (Array.isArray(snapshot.routes) || snapshot.routes instanceof Array) ? snapshot.routes : []
     readonly property var physicalDevices: devices.filter(device =>
         NetworkHelpers.physicalType(device) !== "")
     readonly property var ethernetDevices: physicalDevices.filter(device =>
@@ -62,7 +62,7 @@ Singleton {
     }
 
     readonly property var helperNetworks: snapshot.wifi
-        && Array.isArray(snapshot.wifi.networks) ? snapshot.wifi.networks : []
+        && (Array.isArray(snapshot.wifi.networks) || snapshot.wifi.networks instanceof Array) ? snapshot.wifi.networks : []
     // `acquired` is checked first so a released controller holds no binding
     // on the radio's network list: each access point's signal change would
     // otherwise rebuild and regroup the scan with no Network view open.
@@ -154,7 +154,7 @@ Singleton {
     // NetworkManager VPN and WireGuard profiles from the same snapshot, for
     // the drawer's VPN switch. One request at a time; its failure is kept
     // per profile UUID like a Wi-Fi network's.
-    readonly property var vpnProfiles: Array.isArray(snapshot.vpns) ? snapshot.vpns : []
+    readonly property var vpnProfiles: (Array.isArray(snapshot.vpns) || snapshot.vpns instanceof Array) ? snapshot.vpns : []
     property var pendingVpnRequest: ({})
     property var vpnErrors: ({})
     readonly property string vpnBusyUuid: vpnProc.running ? String(pendingVpnRequest.uuid || "") : ""
@@ -678,10 +678,10 @@ Singleton {
             root.dnsBusy = false;
             if (success) {
                 root.dnsProvider = result.provider || "Automatic";
-                root.dnsServers = Array.isArray(result.servers) ? result.servers : [];
+                root.dnsServers = (Array.isArray(result.servers) || result.servers instanceof Array) ? result.servers : [];
                 root.dnsMixed = Boolean(result.mixed);
                 root.dnsError = "";
-                if (Array.isArray(result.profiles))
+                if ((Array.isArray(result.profiles) || result.profiles instanceof Array))
                     root.savedProfiles = result.profiles;
                 if (!requestWasStatus) {
                     root.dnsNotice = result.reconnectRequired

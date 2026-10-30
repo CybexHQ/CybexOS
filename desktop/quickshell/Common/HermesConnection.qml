@@ -88,12 +88,12 @@ Singleton {
         // lose the replacement item's activation. The generation guard below
         // is sufficient to reject every late status/frame from the old attempt.
         state = "connecting";
-        socketLoader.item.active = false;
-        socketLoader.item.generation = generation;
-        socketLoader.item.url = endpoint;
+        socket.active = false;
+        socket.generation = generation;
+        socket.url = endpoint;
         connectTimeout.generation = generation;
         connectTimeout.restart();
-        socketLoader.item.active = true;
+        socket.active = true;
     }
 
     function disconnect() {
@@ -103,8 +103,8 @@ Singleton {
         const wasLive = state === "connected" || state === "connecting";
         generation++;
         state = enabled ? "offline" : "disabled";
-        if (socketLoader.item)
-            socketLoader.item.active = false;
+        if (socket)
+            socket.active = false;
         if (wasLive)
             dropped();
     }
@@ -125,8 +125,8 @@ Singleton {
         // Publish offline before deactivating the WebSocket. Its synchronous
         // Closed signal then cannot schedule a nested retry.
         state = enabled ? "offline" : "disabled";
-        if (socketLoader.item)
-            socketLoader.item.active = false;
+        if (socket)
+            socket.active = false;
         // Unattended, nobody would see another attempt: leave the timer off
         // and let Activity.resumed start it. The bridge is on loopback, so
         // the network state is no reason to wait.

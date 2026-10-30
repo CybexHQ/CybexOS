@@ -536,7 +536,7 @@ PanelWindow {
                         qr.error = result.error || "The QR code could not be generated.";
                         return;
                     }
-                    qr.matrix = Array.isArray(result.matrix) ? result.matrix : [];
+                    qr.matrix = (Array.isArray(result.matrix) || result.matrix instanceof Array) ? result.matrix : [];
                     qr.password = qr.reveal && typeof result.password === "string" ? result.password : "";
                     qr.error = qr.matrix.length > 0 ? "" : "The QR code was empty.";
                 }

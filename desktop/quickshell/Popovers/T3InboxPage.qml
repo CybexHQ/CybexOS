@@ -39,8 +39,8 @@ Item {
     function filtered(threads) {
         const query = searchText.trim().toLowerCase();
         if (query === "")
-            return Array.isArray(threads) ? threads : [];
-        return (Array.isArray(threads) ? threads : []).filter(thread =>
+            return (Array.isArray(threads) || threads instanceof Array) ? threads : [];
+        return ((Array.isArray(threads) || threads instanceof Array) ? threads : []).filter(thread =>
             [thread.title, thread.project, thread.branch, thread.sessionStatus]
                 .some(value => String(value ?? "").toLowerCase().includes(query)));
     }

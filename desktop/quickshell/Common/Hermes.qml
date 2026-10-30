@@ -199,8 +199,8 @@ Singleton {
             ? value.remoteContract : value.remote_contract
                 && typeof value.remote_contract === "object"
                 ? value.remote_contract : ({});
-        models = Array.isArray(value.models) ? value.models
-            : Array.isArray(backend.models) ? backend.models : [];
+        models = (Array.isArray(value.models) || value.models instanceof Array) ? value.models
+            : (Array.isArray(backend.models) || backend.models instanceof Array) ? backend.models : [];
         applyProviderStatus(value.providerStatus ?? value.provider_status
             ?? value.provider);
         const readyRemote = value.remoteStatus ?? value.remote_status ?? value.remote;
@@ -412,10 +412,10 @@ Singleton {
             return;
         HermesRpc.request("commands.catalog", {}, result => {
             const value = Helpers.object(result);
-            root.commandCatalog = Array.isArray(result) ? result
-                : Array.isArray(value.commands) ? value.commands
-                    : Array.isArray(value.items) ? value.items : [];
-            if (Array.isArray(value.models))
+            root.commandCatalog = (Array.isArray(result) || result instanceof Array) ? result
+                : (Array.isArray(value.commands) || value.commands instanceof Array) ? value.commands
+                    : (Array.isArray(value.items) || value.items instanceof Array) ? value.items : [];
+            if ((Array.isArray(value.models) || value.models instanceof Array))
                 root.models = value.models;
         }, () => {
             // Optional discovery: slash commands still dispatch when an older
@@ -449,7 +449,7 @@ Singleton {
         HermesRpc.request("models.catalog", {}, result => {
             settle();
             const value = Helpers.object(result);
-            root.modelGroups = Array.isArray(value.groups) ? value.groups : [];
+            root.modelGroups = (Array.isArray(value.groups) || value.groups instanceof Array) ? value.groups : [];
             root.defaultModel = Helpers.firstString(value.defaultModel,
                 value.default_model, root.providerModel);
             root.defaultModelProvider = Helpers.firstString(value.activeProvider,
@@ -460,7 +460,7 @@ Singleton {
             root.newChatModelProvider = root.defaultModelProvider;
             const flattened = [];
             for (const group of root.modelGroups)
-                for (const model of (Array.isArray(group.models) ? group.models : []))
+                for (const model of ((Array.isArray(group.models) || group.models instanceof Array) ? group.models : []))
                     flattened.push(model.id);
             root.models = flattened;
             root.loadReasoning("", true);
@@ -472,7 +472,7 @@ Singleton {
 
     function providerForModel(model) {
         for (const group of modelGroups) {
-            const rows = Array.isArray(group.models) ? group.models : [];
+            const rows = (Array.isArray(group.models) || group.models instanceof Array) ? group.models : [];
             if (rows.some(row => String(row.id ?? "") === model))
                 return String(group.providerId ?? "");
         }
@@ -506,7 +506,7 @@ Singleton {
         for (const group of modelGroups) {
             if (provider !== "" && String(group.providerId ?? "") !== provider)
                 continue;
-            const found = (Array.isArray(group.models) ? group.models : [])
+            const found = ((Array.isArray(group.models) || group.models instanceof Array) ? group.models : [])
                 .find(row => String(row.id ?? "") === model);
             if (found)
                 return Helpers.firstString(found.label, found.id, model);
@@ -545,7 +545,7 @@ Singleton {
 
     function reasoningOptions(conversationId) {
         const state = reasoningState(conversationId);
-        return (Array.isArray(state.options) ? state.options : []).map(value => ({
+        return ((Array.isArray(state.options) || state.options instanceof Array) ? state.options : []).map(value => ({
             id: String(value),
             label: value === "" ? "Default" : value === "none" ? "None"
                 : value === "xhigh" ? "XHigh"
@@ -661,12 +661,12 @@ Singleton {
 
     function attachments(conversationId) {
         const value = attachmentsByConversation[conversationId];
-        return Array.isArray(value) ? value : [];
+        return (Array.isArray(value) || value instanceof Array) ? value : [];
     }
 
     function stageAttachments(conversationId, paths) {
         const current = attachments(conversationId).slice();
-        for (const raw of (Array.isArray(paths) ? paths : [])) {
+        for (const raw of ((Array.isArray(paths) || paths instanceof Array) ? paths : [])) {
             const path = typeof raw === "string" ? raw.trim() : "";
             if (path !== "" && !current.some(item => item.path === path)
                     && current.length < 20) {
@@ -920,7 +920,7 @@ Singleton {
             session_id: conversation.sessionId
         }, raw => {
             const result = root.unwrapCommandResult(raw);
-            if (Array.isArray(result.messages))
+            if ((Array.isArray(result.messages) || result.messages instanceof Array))
                 HermesConversations.mergeHistory(conversationId, result.messages);
             const summary = Helpers.firstString(result.output, result.summary,
                 "Hermes context compressed");
@@ -1080,7 +1080,7 @@ Singleton {
 
     function respondClarifyBatch(conversationId, request, answers) {
         const conversation = HermesConversations.conversationById(conversationId);
-        const values = Array.isArray(answers) ? answers : [];
+        const values = (Array.isArray(answers) || answers instanceof Array) ? answers : [];
         if (!conversation || !request || values.length === 0)
             return "";
         const key = HermesRpc.actionKey("clarify", conversationId, request.id);
@@ -1101,7 +1101,7 @@ Singleton {
                 questionId: answer.questionId,
                 question_id: answer.questionId,
                 answer: answer.answer,
-                answers: Array.isArray(answer.answer) ? answer.answer : [answer.answer]
+                answers: (Array.isArray(answer.answer) || answer.answer instanceof Array) ? answer.answer : [answer.answer]
             }, () => sendAt(index + 1),
             reason => HermesConversations.setError(conversationId, reason), {
                 actionKey: key,

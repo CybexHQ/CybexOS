@@ -28,7 +28,7 @@ function nextChangeMs(leftMs) {
 // The soonest label change across due times given in epoch seconds, or 0
 // when nothing is still counting down.
 function soonestChangeMs(dueSecs, nowMs) {
-    var list = Array.isArray(dueSecs) ? dueSecs : [];
+    var list = (Array.isArray(dueSecs) || dueSecs instanceof Array) ? dueSecs : [];
     var wait = 0;
     for (var i = 0; i < list.length; i++) {
         var next = nextChangeMs(Number(list[i]) * 1000 - nowMs);

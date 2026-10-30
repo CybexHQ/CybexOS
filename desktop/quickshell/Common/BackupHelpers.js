@@ -91,7 +91,7 @@ function parseSnapshots(raw) {
     } catch (e) {
         return [];
     }
-    var list = data && Array.isArray(data.snapshots) ? data.snapshots : [];
+    var list = data && (Array.isArray(data.snapshots) || data.snapshots instanceof Array) ? data.snapshots : [];
     return list.filter(function(entry) {
         return entry && SNAPSHOT_PATTERN.test(text(entry.id)) && text(entry.id) !== "latest";
     }).slice(0, 200).map(function(entry) {

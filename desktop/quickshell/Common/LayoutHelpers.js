@@ -116,7 +116,7 @@ function barDropIndex(entries, centers, x) {
 }
 
 function stackedDropIndex(columns, y) {
-    if (!Array.isArray(columns) || columns.length === 0)
+    if (!(Array.isArray(columns) || columns instanceof Array) || columns.length === 0)
         return null;
     var column = columns[columns.length - 1];
     for (var i = 0; i < columns.length; i++) {
@@ -149,7 +149,7 @@ function fitBar(options) {
         right: widths.center / 2
     };
     widths.center = center.left + center.right;
-    var entries = Array.isArray(options.entries) ? options.entries : [];
+    var entries = (Array.isArray(options.entries) || options.entries instanceof Array) ? options.entries : [];
     var compact = [];
     var overflow = [];
 

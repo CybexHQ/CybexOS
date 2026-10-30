@@ -14,7 +14,7 @@ var LANGUAGES = ["en", "nl"];
 // language decides, and an unsupported language falls back to English rather
 // than to the next variable, as gettext does.
 function languageFor(values) {
-    var list = Array.isArray(values) ? values : [values];
+    var list = (Array.isArray(values) || values instanceof Array) ? values : [values];
     for (var i = 0; i < list.length; i++) {
         var value = String(list[i] || "").trim();
         if (value === "" || value === "C" || value === "POSIX"
@@ -37,7 +37,7 @@ function translate(catalog, text) {
 // Positional arguments: "%1 of %2" with ["3", "5"]. Substitution happens
 // after translation, so a translator may reorder the placeholders.
 function format(catalog, text, args) {
-    var values = Array.isArray(args) ? args : [];
+    var values = (Array.isArray(args) || args instanceof Array) ? args : [];
     return translate(catalog, text).replace(/%([1-9])/g, function(match, digit) {
         var index = Number(digit) - 1;
         return index < values.length ? String(values[index]) : match;

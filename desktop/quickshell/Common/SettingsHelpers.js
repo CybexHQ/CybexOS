@@ -140,7 +140,7 @@ var INDICATOR_ACTION_IDS = INDICATOR_ACTION_CHOICES.map(
 // of the editor, but its saved place and visibility stay, so enabling the
 // feature brings it back where it was.
 function availableIndicatorIds(ids, dictationAvailable) {
-    return (Array.isArray(ids) ? ids : []).filter(function(id) {
+    return ((Array.isArray(ids) || ids instanceof Array) ? ids : []).filter(function(id) {
         return id !== "dictation" || dictationAvailable === true;
     });
 }
@@ -149,7 +149,7 @@ function availableIndicatorIds(ids, dictationAvailable) {
 // did not show returned to its saved index.
 function mergeIndicatorOrder(shown, saved) {
     var out = shown.slice();
-    (Array.isArray(saved) ? saved : []).forEach(function(id, index) {
+    ((Array.isArray(saved) || saved instanceof Array) ? saved : []).forEach(function(id, index) {
         if (out.indexOf(id) === -1)
             out.splice(Math.min(index, out.length), 0, id);
     });
@@ -336,7 +336,7 @@ function defaultDrawerOverview() {
 // wins, ids the file has never seen are appended in default order, and
 // Overview can never be switched off.
 function normalizeDrawerTabs(raw) {
-    var list = Array.isArray(raw) ? raw : [];
+    var list = (Array.isArray(raw) || raw instanceof Array) ? raw : [];
     var seen = {};
     var next = [];
     list.forEach(function(entry) {
@@ -488,7 +488,7 @@ function defaults() {
 
 function pluginThemeOverridesIn(value) {
     var out = {};
-    if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array)) return out;
     Object.keys(value).slice(0, 256).forEach(function(key) {
         var v = value[key];
         if (!/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/.test(key)) return;
@@ -537,7 +537,7 @@ function optionalTextIn(value, maxLen) {
 }
 
 function orderedIdsIn(value, known, fallback, appendMissing) {
-    if (!Array.isArray(value))
+    if (!(Array.isArray(value) || value instanceof Array))
         return fallback.slice();
     var seen = {};
     var next = [];
@@ -559,7 +559,7 @@ function orderedIdsIn(value, known, fallback, appendMissing) {
 // Desktop entry ids in order, first occurrence kept, at most 32: the dock's
 // pinned apps. Keep the pattern in step with DockHelpers.DESKTOP_ID.
 function desktopIdsIn(value, fallback) {
-    if (!Array.isArray(value))
+    if (!(Array.isArray(value) || value instanceof Array))
         return fallback.slice();
     var seen = {};
     var next = [];
@@ -787,7 +787,7 @@ function defaultThemePalette() {
 
 function themePaletteIn(value) {
     var out = defaultThemePalette();
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return out;
     out.mode = enumIn(value.mode, ["", "dark", "light"], "");
     THEME_PALETTE_KEYS.forEach(function(key) {
@@ -902,7 +902,7 @@ var MAX_WATCHED_REPOS = 20;
 var REPO_SLUG = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/;
 
 function repoListIn(value, fallback) {
-    if (!Array.isArray(value))
+    if (!(Array.isArray(value) || value instanceof Array))
         return fallback;
     var out = [];
     var seen = {};
@@ -940,7 +940,7 @@ function normalizeMods(raw) {
     var seen = {};
     var next = { left: [], center: [], right: [] };
     ["left", "center", "right"].forEach(function(col) {
-        var list = Array.isArray(raw[col]) ? raw[col] : [];
+        var list = (Array.isArray(raw[col]) || raw[col] instanceof Array) ? raw[col] : [];
         list.forEach(function(entry) {
             var id = entry ? entry.id : undefined;
             if (MODULE_IDS.indexOf(id) === -1 || seen[id])
@@ -1157,7 +1157,7 @@ function migrateModOpts(raw, sourceVersion, rawSettings) {
     // customized list keeps the new action opt-in. Once OCR appears in the
     // stored order this block no longer runs, so explicitly hiding it sticks.
     var rawIndicators = raw && typeof raw === "object" ? raw.indicators : null;
-    if (rawIndicators && Array.isArray(rawIndicators.order)
+    if (rawIndicators && (Array.isArray(rawIndicators.order) || rawIndicators.order instanceof Array)
             && rawIndicators.order.indexOf("ocr") === -1) {
         next.indicators.order = next.indicators.order.filter(function(id) {
             return id !== "ocr";
@@ -1181,7 +1181,7 @@ function migrateMods(raw, sourceVersion, context) {
 
     var migrated = { left: [], center: [], right: [] };
     ["left", "center", "right"].forEach(function(col) {
-        var list = Array.isArray(raw[col]) ? raw[col] : [];
+        var list = (Array.isArray(raw[col]) || raw[col] instanceof Array) ? raw[col] : [];
         // Before schema 24 the old control entry was ignored and the Cybex OS
         // button always lived on the right. Replace stale historical entries
         // with that effective placement; later user moves/removals persist.
@@ -1627,8 +1627,8 @@ function overrideKeys(raw) {
 function unknownFields(original, schema) {
     if (!original || typeof original !== "object")
         return undefined;
-    if (Array.isArray(original)) {
-        if (!Array.isArray(schema))
+    if ((Array.isArray(original) || original instanceof Array)) {
+        if (!(Array.isArray(schema) || schema instanceof Array))
             return undefined;
         var entries = [];
         original.forEach(function(item) {
@@ -1662,8 +1662,8 @@ function unknownFields(original, schema) {
 }
 
 function preserveUnknown(original, replacement) {
-    if (Array.isArray(replacement)) {
-        if (!Array.isArray(original))
+    if ((Array.isArray(replacement) || replacement instanceof Array)) {
+        if (!(Array.isArray(original) || original instanceof Array))
             return clone(replacement);
         // Layout entries carry stable ids. Preserve future entries and fields
         // while retaining the current user's ordering of understood entries.
@@ -1684,7 +1684,7 @@ function preserveUnknown(original, replacement) {
     }
     if (!replacement || typeof replacement !== "object")
         return clone(replacement);
-    var out = original && typeof original === "object" && !Array.isArray(original)
+    var out = original && typeof original === "object" && !(Array.isArray(original) || original instanceof Array)
         ? clone(original) : {};
     Object.keys(replacement).forEach(function(key) {
         if (key !== "__proto__" && key !== "constructor" && key !== "prototype")
@@ -1700,7 +1700,7 @@ function rebaseDocuments(base, desired, current, path) {
     if (JSON.stringify(current) === JSON.stringify(base))
         return desired;
     if (base && desired && current && [base, desired, current].every(function(value) {
-        return typeof value === "object" && !Array.isArray(value);
+        return typeof value === "object" && !(Array.isArray(value) || value instanceof Array);
     })) {
         var out = clone(current);
         Object.keys(base).concat(Object.keys(desired)).forEach(function(key) {
@@ -1754,7 +1754,7 @@ function parse(text) {
     } catch (e) {
         return { status: "corrupt", value: null };
     }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    if (!parsed || typeof parsed !== "object" || (Array.isArray(parsed) || parsed instanceof Array))
         return { status: "corrupt", value: null };
     return { status: "ok", value: parsed };
 }

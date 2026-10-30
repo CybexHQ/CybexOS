@@ -30,7 +30,7 @@ Rectangle {
     readonly property bool hasAnswer: !needsValue || typedValue.trim() !== ""
         || selectedValue !== null || selectedValues.length > 0
     readonly property var questions: request.kind === "clarify"
-        && Array.isArray(request.questions) ? request.questions : []
+        && (Array.isArray(request.questions) || request.questions instanceof Array) ? request.questions : []
     readonly property var question: questions.length > 0
         ? questions[Math.min(questionIndex, questions.length - 1)] : null
     readonly property var currentOptions: question !== null
@@ -48,7 +48,7 @@ Rectangle {
     readonly property var approvalChoices: {
         if (request.kind !== "approval")
             return [];
-        const source = Array.isArray(request.options) && request.options.length > 0
+        const source = (Array.isArray(request.options) || request.options instanceof Array) && request.options.length > 0
             ? request.options : [
                 { value: "deny", label: I18n.tr("Deny"), description: "" },
                 { value: "allow_once", label: I18n.tr("Allow once"), description: "" }
@@ -125,7 +125,7 @@ Rectangle {
         const value = typedValue.trim() !== "" ? typedValue
             : multiSelect ? selectedValues : selectedValue;
         if (request.kind === "clarify") {
-            const wireValue = Array.isArray(value) ? JSON.stringify(value) : value;
+            const wireValue = (Array.isArray(value) || value instanceof Array) ? JSON.stringify(value) : value;
             if (questions.length === 0) {
                 responseStarted(String(request.id ?? ""));
                 Hermes.respondRequest(conversationId, request,
@@ -141,12 +141,11 @@ Rectangle {
                 focusQuestionStart();
                 return;
             }
-            const answers = questions.map(question => ({
-                questionId: question.id,
-                answer: Array.isArray(answerDrafts[question.id])
-                    ? JSON.stringify(answerDrafts[question.id])
-                    : answerDrafts[question.id]
-            }));
+            const answers = questions.map(question => {
+                const draft = answerDrafts[question.id];
+                return { questionId: question.id,
+                         answer: (Array.isArray(draft) || draft instanceof Array) ? JSON.stringify(draft) : draft };
+            });
             responseStarted(String(request.id ?? ""));
             Hermes.respondClarifyBatch(conversationId, request, answers);
         }
@@ -174,7 +173,7 @@ Rectangle {
         typedValue = typeof saved === "string" && !currentOptions.some(option =>
             option.value === saved) ? saved : "";
         if (multiSelect) {
-            selectedValues = Array.isArray(saved) ? saved : [];
+            selectedValues = (Array.isArray(saved) || saved instanceof Array) ? saved : [];
             selectedValue = null;
         } else {
             selectedValues = [];

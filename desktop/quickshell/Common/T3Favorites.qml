@@ -49,7 +49,7 @@ Singleton {
     }
 
     function sanitize(parsed) {
-        if (!Array.isArray(parsed))
+        if (!(Array.isArray(parsed) || parsed instanceof Array))
             return [];
         return parsed.filter(entry => entry && typeof entry.instanceId === "string"
             && typeof entry.model === "string" && entry.instanceId !== "" && entry.model !== "")

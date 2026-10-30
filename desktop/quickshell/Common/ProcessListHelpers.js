@@ -102,11 +102,11 @@ function parseSnapshot(text) {
 function rows(previous, current, pageSize) {
     var page = Number(pageSize) > 0 ? Number(pageSize) : 4096;
     var earlier = {};
-    if (previous && Array.isArray(previous.processes))
+    if (previous && (Array.isArray(previous.processes) || previous.processes instanceof Array))
         previous.processes.forEach(function(entry) { earlier[entry.pid] = entry; });
     var elapsed = previous && current && previous.total !== null && current.total !== null
         ? current.total - previous.total : 0;
-    return (current && Array.isArray(current.processes) ? current.processes : []).map(function(entry) {
+    return (current && (Array.isArray(current.processes) || current.processes instanceof Array) ? current.processes : []).map(function(entry) {
         var before = earlier[entry.pid];
         var cpu = null;
         if (elapsed > 0 && before && before.start === entry.start)
@@ -131,7 +131,7 @@ function rank(list, mode, limit) {
     if (max === 0)
         return [];
     function cpuOf(row) { return row.cpu === null || row.cpu === undefined ? -1 : row.cpu; }
-    var source = Array.isArray(list) ? list : [];
+    var source = (Array.isArray(list) || list instanceof Array) ? list : [];
     function compare(a, b) {
         var primary = byMemory ? b.memory - a.memory : cpuOf(b) - cpuOf(a);
         var secondary = byMemory ? cpuOf(b) - cpuOf(a) : b.memory - a.memory;
@@ -187,7 +187,7 @@ function canEnd(row, selfPid) {
 function stillRunning(list, pending) {
     if (!pending)
         return false;
-    return (Array.isArray(list) ? list : []).some(function(row) {
+    return ((Array.isArray(list) || list instanceof Array) ? list : []).some(function(row) {
         return row.pid === pending.pid && row.start === pending.start;
     });
 }

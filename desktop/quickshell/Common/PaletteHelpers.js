@@ -30,10 +30,10 @@ var ROLE_KEYS = Object.keys(ROLE_MAP);
 
 function parseObject(value) {
     if (typeof value !== "string")
-        return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+        return value && typeof value === "object" && !(Array.isArray(value) || value instanceof Array) ? value : null;
     try {
         var parsed = JSON.parse(value);
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+        return parsed && typeof parsed === "object" && !(Array.isArray(parsed) || parsed instanceof Array) ? parsed : null;
     } catch (error) {
         return null;
     }
@@ -49,7 +49,7 @@ function colorIn(value) {
 function sanitizeMatugen(value) {
     var parsed = parseObject(value);
     var colors = parsed && parsed.colors;
-    if (!colors || typeof colors !== "object" || Array.isArray(colors))
+    if (!colors || typeof colors !== "object" || (Array.isArray(colors) || colors instanceof Array))
         return null;
     var palette = { dark: {}, light: {} };
     for (var i = 0; i < ROLE_KEYS.length; i++) {
@@ -69,7 +69,7 @@ function sanitizeMatugen(value) {
 }
 
 function sanitizePalette(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array)
             || !value.dark || !value.light)
         return null;
     var out = { dark: {}, light: {} };
@@ -105,7 +105,7 @@ function fingerprint(statText) {
 
 function cacheEntries(value) {
     var parsed = parseObject(value);
-    if (!parsed || parsed.v !== CACHE_VERSION || !Array.isArray(parsed.entries))
+    if (!parsed || parsed.v !== CACHE_VERSION || !(Array.isArray(parsed.entries) || parsed.entries instanceof Array))
         return [];
     var out = [];
     for (var i = 0; i < parsed.entries.length && out.length < CACHE_LIMIT; i++) {

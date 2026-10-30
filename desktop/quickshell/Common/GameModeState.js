@@ -11,7 +11,7 @@ function isActive(text, instance) {
         return false;
     try {
         var state = JSON.parse(text);
-        return state !== null && typeof state === "object" && !Array.isArray(state)
+        return state !== null && typeof state === "object" && !(Array.isArray(state) || state instanceof Array)
             && state.active === true && state.instance === instance;
     } catch (error) {
         return false;

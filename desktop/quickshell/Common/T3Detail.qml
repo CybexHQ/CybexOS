@@ -150,12 +150,12 @@ Singleton {
     }
 
     function parseInputQuestions(payload) {
-        if (!payload || !Array.isArray(payload.questions))
+        if (!payload || !(Array.isArray(payload.questions) || payload.questions instanceof Array))
             return null;
         const questions = [];
         for (const raw of payload.questions) {
             if (!raw || typeof raw !== "object" || typeof raw.id !== "string"
-                    || typeof raw.question !== "string" || !Array.isArray(raw.options))
+                    || typeof raw.question !== "string" || !(Array.isArray(raw.options) || raw.options instanceof Array))
                 continue;
             const options = [];
             for (const rawOption of raw.options) {
@@ -331,7 +331,7 @@ Singleton {
         }
         detailLatestActivity = latestActivity;
 
-        const plans = (Array.isArray(detailProposedPlans) ? detailProposedPlans.slice() : [])
+        const plans = ((Array.isArray(detailProposedPlans) || detailProposedPlans instanceof Array) ? detailProposedPlans.slice() : [])
             .filter(plan => plan && typeof plan === "object")
             .sort((left, right) => {
                 const lm = T3Threads.parseMs(left?.updatedAt ?? left?.createdAt);
@@ -373,7 +373,7 @@ Singleton {
             // every streamed token would notify the page for nothing.
             if (checkpoint !== checkpointSummarySource) {
                 checkpointSummarySource = checkpoint;
-                const files = Array.isArray(checkpoint.files) ? checkpoint.files : [];
+                const files = (Array.isArray(checkpoint.files) || checkpoint.files instanceof Array) ? checkpoint.files : [];
                 let additions = 0, deletions = 0;
                 const filenames = [];
                 for (const file of files) {
@@ -578,7 +578,7 @@ Singleton {
                     id: payload.messageId,
                     role: payload.role ?? "system",
                     text: text,
-                    attachments: Array.isArray(payload.attachments) ? payload.attachments
+                    attachments: (Array.isArray(payload.attachments) || payload.attachments instanceof Array) ? payload.attachments
                         : (existing?.attachments ?? []),
                     turnId: payload.turnId ?? null,
                     streaming: payload.streaming === true,
@@ -605,7 +605,7 @@ Singleton {
                 checkpointTurnCount: payload.checkpointTurnCount ?? 0,
                 checkpointRef: payload.checkpointRef,
                 status: payload.status,
-                files: Array.isArray(payload.files) ? payload.files : [],
+                files: (Array.isArray(payload.files) || payload.files instanceof Array) ? payload.files : [],
                 assistantMessageId: payload.assistantMessageId ?? null,
                 completedAt: payload.completedAt ?? event.occurredAt ?? ""
             };

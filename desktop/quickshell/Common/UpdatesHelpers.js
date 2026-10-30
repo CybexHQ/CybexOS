@@ -29,7 +29,7 @@ function validDeployment(value) {
     return value && states.includes(value.state) && (value.state !== "ready"
         || (/^[a-f0-9]{32}$/.test(value.transaction || "")
             && /^[a-f0-9]{64}$/.test(value.reviewToken || "")
-            && Array.isArray(value.packageChanges) && typeof value.changes === "string"));
+            && (Array.isArray(value.packageChanges) || value.packageChanges instanceof Array) && typeof value.changes === "string"));
 }
 
 function scope(sources, selected) {
@@ -162,9 +162,9 @@ function summary(deployment) {
     const value = (deployment || {}).highlights;
     if (value && value.schema === 1)
         return {
-            components: Array.isArray(value.components) ? value.components : [],
-            apps: Array.isArray(value.apps) ? value.apps : [],
-            tools: Array.isArray(value.tools) ? value.tools : [],
+            components: (Array.isArray(value.components) || value.components instanceof Array) ? value.components : [],
+            apps: (Array.isArray(value.apps) || value.apps instanceof Array) ? value.apps : [],
+            tools: (Array.isArray(value.tools) || value.tools instanceof Array) ? value.tools : [],
             background: Number(value.background) || 0,
             sizeChange: Number(value.sizeChange) || 0
         };
@@ -222,7 +222,7 @@ function preparation(deployment) {
     const builds = progress.builds || {};
     const d = { done: count(downloads.doneBytes), expected: count(downloads.expectedBytes), active: count(downloads.active) };
     const b = { done: count(builds.done), expected: count(builds.expected), active: count(builds.active) };
-    const components = Array.isArray(progress.components) ? progress.components : [];
+    const components = (Array.isArray(progress.components) || progress.components instanceof Array) ? progress.components : [];
     const component = components.find(id => ["window-manager", "graphics-backend", "window-decorations", "desktop"].includes(id));
     const label = b.active ? PREPARATION_LABELS[component || "building"]
         : d.active ? PREPARATION_LABELS.downloading

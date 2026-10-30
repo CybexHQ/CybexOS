@@ -59,7 +59,7 @@ function sameRefresh(a, b) {
 function modeGroups(availableModes) {
     var groups = [];
     var byResolution = {};
-    var list = Array.isArray(availableModes) ? availableModes : [];
+    var list = (Array.isArray(availableModes) || availableModes instanceof Array) ? availableModes : [];
     for (var i = 0; i < list.length; i++) {
         var mode = parseMode(list[i]);
         if (!mode)
@@ -185,7 +185,7 @@ function currentMode(monitor) {
 // One editable draft per connected monitor. The live state is the truth for
 // what is on screen; the saved entry only says which values are automatic.
 function draftsFromSnapshot(monitors, document) {
-    var list = Array.isArray(monitors) ? monitors : [];
+    var list = (Array.isArray(monitors) || monitors instanceof Array) ? monitors : [];
     var drafts = [];
     for (var i = 0; i < list.length; i++) {
         var monitor = list[i];
@@ -216,7 +216,7 @@ function draftsFromSnapshot(monitors, document) {
             liveWidth: Number(monitor.width) || 1,
             liveHeight: Number(monitor.height) || 1,
             liveScale: Number(monitor.scale) || 1,
-            availableModes: Array.isArray(monitor.availableModes) ? monitor.availableModes.slice() : []
+            availableModes: (Array.isArray(monitor.availableModes) || monitor.availableModes instanceof Array) ? monitor.availableModes.slice() : []
         });
     }
     return drafts;
@@ -486,11 +486,11 @@ function validate(drafts) {
 // The saved document: the previous file with this set of monitors' entries
 // replaced. Entries for other monitors and unknown fields are kept.
 function buildDocument(previous, drafts) {
-    var document = previous && typeof previous === "object" && !Array.isArray(previous)
+    var document = previous && typeof previous === "object" && !(Array.isArray(previous) || previous instanceof Array)
         ? clone(previous) : {};
     document.v = 1;
     var monitors = document.monitors && typeof document.monitors === "object"
-        && !Array.isArray(document.monitors) ? document.monitors : {};
+        && !(Array.isArray(document.monitors) || document.monitors instanceof Array) ? document.monitors : {};
     var enabledKeys = drafts.filter(function(draft) { return draft.enabled; })
         .map(function(draft) { return draft.key; });
     for (var i = 0; i < drafts.length; i++) {

@@ -43,7 +43,7 @@ Column {
         if (typeof current === "string") { setValue(key, text); return; }
         try {
             const value = JSON.parse(text);
-            if (typeof value !== typeof current || Array.isArray(value) !== Array.isArray(current)
+            if (typeof value !== typeof current || (Array.isArray(value) || value instanceof Array) !== (Array.isArray(current) || current instanceof Array)
                     || (current === null) !== (value === null))
                 throw new Error("Keep the same value type for " + key + ".");
             setValue(key, value);

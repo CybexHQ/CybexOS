@@ -7,7 +7,7 @@ function identity(key) { return Editor.normalize(key).toLowerCase(); }
 function equal(a, b) {
     // Object member order is not a preference change; alternative-key order is.
     function stable(value) {
-        if (Array.isArray(value)) return value.map(stable);
+        if ((Array.isArray(value) || value instanceof Array)) return value.map(stable);
         if (value && typeof value === "object") {
             var out = {};
             Object.keys(value).sort().forEach(function(key) { out[key] = stable(value[key]); });
@@ -276,7 +276,7 @@ function conflicts(model, key, exceptId) {
     return result;
 }
 function checkedKeys(keys) {
-    if (!Array.isArray(keys) || keys.length > 4) throw new Error("Choose at most four keys per shortcut");
+    if (!(Array.isArray(keys) || keys instanceof Array) || keys.length > 4) throw new Error("Choose at most four keys per shortcut");
     var out = keys.map(Editor.normalize);
     if (out.some(function(key, index) {
         return !key || /mouse/i.test(key) || out.slice(0, index).some(function(other) { return Editor.same(key, other); });

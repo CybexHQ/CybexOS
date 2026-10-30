@@ -42,7 +42,7 @@ function webAppEntryId(appId, apps) {
     var match = String(appId || "").match(/^(?:brave|chrome|chromium|msedge)-(.+)$/);
     if (!match)
         return "";
-    var matches = (Array.isArray(apps) ? apps : []).filter(function(app) {
+    var matches = ((Array.isArray(apps) || apps instanceof Array) ? apps : []).filter(function(app) {
         if (!app || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(app.id))
             return false;
         var name = webAppName(app.url);
@@ -60,7 +60,7 @@ function validId(id) {
 function uniqueIds(ids) {
     var seen = {};
     var out = [];
-    (Array.isArray(ids) ? ids : []).forEach(function(id) {
+    ((Array.isArray(ids) || ids instanceof Array) ? ids : []).forEach(function(id) {
         if (validId(id) && !seen[id] && out.length < MAX_PINS) {
             seen[id] = true;
             out.push(id);
@@ -85,8 +85,8 @@ function appKey(entryId, appId, address) {
 // The window of `addresses` focused most recently, by position in `recent`
 // (most recent first); the first window when none has been seen focused.
 function mostRecent(addresses, recent) {
-    var list = Array.isArray(addresses) ? addresses : [];
-    var order = Array.isArray(recent) ? recent : [];
+    var list = (Array.isArray(addresses) || addresses instanceof Array) ? addresses : [];
+    var order = (Array.isArray(recent) || recent instanceof Array) ? recent : [];
     var best = "";
     var bestIndex = Infinity;
     list.forEach(function(address) {
@@ -115,7 +115,7 @@ function groupApps(windows, pins, recent) {
         groups[key] = { key: key, entryId: id, appId: "", pinned: true, windows: [] };
         order.push(key);
     });
-    (Array.isArray(windows) ? windows : []).forEach(function(window) {
+    ((Array.isArray(windows) || windows instanceof Array) ? windows : []).forEach(function(window) {
         if (!window || !window.address || isShellWindow(window.appId))
             return;
         var key = appKey(window.entryId, window.appId, window.address);
@@ -151,7 +151,7 @@ function groupApps(windows, pins, recent) {
 function clickAction(app, activeAddress) {
     if (!app)
         return { kind: "none" };
-    var windows = Array.isArray(app.windows) ? app.windows : [];
+    var windows = (Array.isArray(app.windows) || app.windows instanceof Array) ? app.windows : [];
     if (windows.length === 0)
         return validId(app.entryId) ? { kind: "launch" } : { kind: "none" };
     var at = windows.indexOf(activeAddress);
@@ -180,7 +180,7 @@ function isPinned(pins, id) {
 // Focus history, most recent first, bounded.
 function touchRecent(recent, address, limit) {
     var max = Math.max(1, Number(limit) || RECENT_LIMIT);
-    var list = (Array.isArray(recent) ? recent : []).filter(function(entry) {
+    var list = ((Array.isArray(recent) || recent instanceof Array) ? recent : []).filter(function(entry) {
         return entry !== address;
     });
     if (address)
@@ -262,7 +262,7 @@ function placement(options) {
 function displayKeys(apps) {
     var pinned = [];
     var others = [];
-    (Array.isArray(apps) ? apps : []).forEach(function(app) {
+    ((Array.isArray(apps) || apps instanceof Array) ? apps : []).forEach(function(app) {
         (app.pinned ? pinned : others).push(app.key);
     });
     return pinned.length > 0 && others.length > 0
@@ -275,7 +275,7 @@ function menuActions(app, pins) {
         return [];
     var out = [];
     var launchable = validId(app.entryId);
-    var count = Array.isArray(app.windows) ? app.windows.length : 0;
+    var count = (Array.isArray(app.windows) || app.windows instanceof Array) ? app.windows.length : 0;
     if (launchable)
         out.push({ id: "launch", label: "New window", glyph: "add" });
     if (launchable)

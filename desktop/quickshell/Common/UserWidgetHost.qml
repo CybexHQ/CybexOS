@@ -45,6 +45,12 @@ Item {
         }
     }
 
+    // Omarchy widgets declare `settings`; the Item type does not, so the
+    // widget arrives untyped here.
+    function bindSettings(target) {
+        target.settings = Qt.binding(() => root.descriptor.settings);
+    }
+
     function finishLoad() {
         if (!component)
             return;
@@ -65,7 +71,7 @@ Item {
             }
             widget = item;
             if (omarchy)
-                widget.settings = Qt.binding(() => root.descriptor.settings);
+                bindSettings(widget);
             widget.width = Qt.binding(() => root.width);
             widget.height = Qt.binding(() => root.height);
         }

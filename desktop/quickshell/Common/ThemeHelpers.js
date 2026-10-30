@@ -15,7 +15,7 @@ var RESET_KEYS = PATCH_KEYS.filter(function(key) { return key !== "wall"; });
 var NAME_MAX = 48;
 
 function plainObject(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
+    return !!value && typeof value === "object" && !(Array.isArray(value) || value instanceof Array);
 }
 
 // A patch held to the settings schema: only theme keys, each already a value
@@ -83,7 +83,7 @@ function entryIn(raw, normalizeKey) {
 }
 
 function catalogueIn(raw, normalizeKey) {
-    var themes = plainObject(raw) && Array.isArray(raw.themes) ? raw.themes : [];
+    var themes = plainObject(raw) && (Array.isArray(raw.themes) || raw.themes instanceof Array) ? raw.themes : [];
     var seen = {};
     var out = [];
     themes.forEach(function(item) {
@@ -149,7 +149,7 @@ function differsFromDefault(settings, defaults) {
 // once anything it set has changed; otherwise the first theme they match
 // exactly; otherwise "Custom". { value, label, modified }.
 function current(entries, settings) {
-    var list = Array.isArray(entries) ? entries : [];
+    var list = (Array.isArray(entries) || entries instanceof Array) ? entries : [];
     var named = list.find(function(entry) { return entry.id === settings.theme; });
     if (named) {
         var same = matches(named.patch, settings);
@@ -165,7 +165,7 @@ function current(entries, settings) {
 // Options for the Theme dropdown. "Custom" is listed only while it is the
 // current state, as the place the selection rests; it applies nothing.
 function choices(entries, state) {
-    var list = Array.isArray(entries) ? entries : [];
+    var list = (Array.isArray(entries) || entries instanceof Array) ? entries : [];
     var out = list.map(function(entry) {
         return { value: entry.id, label: entry.id === state.value ? state.label : entry.name };
     });

@@ -23,7 +23,7 @@ function regularIds(workspaces) {
 
 function visibleIds(slotCount, existingIds, focusedId, hideEmpty) {
     var existing = {};
-    (Array.isArray(existingIds) ? existingIds : []).forEach(function(id) {
+    ((Array.isArray(existingIds) || existingIds instanceof Array) ? existingIds : []).forEach(function(id) {
         if (Number.isInteger(id) && id > 0)
             existing[id] = true;
     });
@@ -37,7 +37,7 @@ function visibleIds(slotCount, existingIds, focusedId, hideEmpty) {
 }
 
 function indicatorBounds(ids, focusedId) {
-    var index = Array.isArray(ids) ? ids.indexOf(focusedId) : -1;
+    var index = (Array.isArray(ids) || ids instanceof Array) ? ids.indexOf(focusedId) : -1;
     if (index < 0)
         return null;
     // The classic current-workspace chip is wider than its fixed pointer cell.

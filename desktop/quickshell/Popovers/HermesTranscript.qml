@@ -517,7 +517,7 @@ Item {
                         }
 
                         Flickable {
-                            visible: Array.isArray(timelineRow.message.attachments)
+                            visible: (Array.isArray(timelineRow.message.attachments) || timelineRow.message.attachments instanceof Array)
                                 && timelineRow.message.attachments.length > 0
                             width: parent.width
                             height: visible ? 25 : 0

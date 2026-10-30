@@ -563,8 +563,8 @@ Singleton {
             reply = null;
         }
         const next = Object.assign({}, activity);
-        next[activityAccount] = reply && Array.isArray(reply.sessions)
-            ? { at: Date.now(), sessions: reply.sessions, series: Array.isArray(reply.series) ? reply.series : [], error: "" }
+        next[activityAccount] = reply && (Array.isArray(reply.sessions) || reply.sessions instanceof Array)
+            ? { at: Date.now(), sessions: reply.sessions, series: (Array.isArray(reply.series) || reply.series instanceof Array) ? reply.series : [], error: "" }
             : { at: Date.now(), sessions: [], series: [],
                 error: reply && reply.error ? reply.error : "Couldn't load sessions." };
         activity = next;

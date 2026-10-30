@@ -215,7 +215,7 @@ function collapseNumbered(rows) {
 }
 
 function groupsFromBinds(binds) {
-    if (!Array.isArray(binds))
+    if (!(Array.isArray(binds) || binds instanceof Array))
         return [];
     var groups = {};
     var groupOrder = [];
@@ -279,10 +279,10 @@ function groupsFromBinds(binds) {
 // lightest heaviest column wins. Reading order stays top-to-bottom, then
 // left-to-right, and no column is left empty while another has two groups.
 function columnsFor(groups, count) {
-    var list = Array.isArray(groups) ? groups : [];
+    var list = (Array.isArray(groups) || groups instanceof Array) ? groups : [];
     var columns = Math.max(1, Math.min(Math.floor(Number(count) || 1), list.length || 1));
     var weights = list.map(function(group) {
-        return (group && Array.isArray(group.rows) ? group.rows.length : 0) + 1.5;
+        return (group && (Array.isArray(group.rows) || group.rows instanceof Array) ? group.rows.length : 0) + 1.5;
     });
     var prefix = [0];
     weights.forEach(function(weight) { prefix.push(prefix[prefix.length - 1] + weight); });
@@ -329,7 +329,7 @@ function fromJson(text) {
     } catch (error) {
         return { groups: [], error: "Hyprland returned a binding list that could not be read." };
     }
-    if (!Array.isArray(binds))
+    if (!(Array.isArray(binds) || binds instanceof Array))
         return { groups: [], error: "Hyprland returned a binding list that could not be read." };
     return { groups: groupsFromBinds(binds), error: "" };
 }

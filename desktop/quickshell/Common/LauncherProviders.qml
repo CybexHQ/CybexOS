@@ -387,7 +387,7 @@ Singleton {
         }
         root.resetPending();
         Launcher.close();
-        if (action.user && Array.isArray(action.command)
+        if (action.user && (Array.isArray(action.command) || action.command instanceof Array)
                 && action.command.length > 0) {
             Quickshell.execDetached(action.command);
             return;
@@ -399,7 +399,7 @@ Singleton {
                 : Settings.showPanel(page));
             return;
         }
-        if (Array.isArray(action.command)) {
+        if ((Array.isArray(action.command) || action.command instanceof Array)) {
             const argv = ProviderHelpers.expandCommand(action.command, root.home, argument);
             if (argv.length === 0)
                 return;
@@ -723,7 +723,7 @@ Singleton {
                 try {
                     const parsed = JSON.parse(text);
                     root.clipboardPreviews = parsed && typeof parsed === "object"
-                        && !Array.isArray(parsed) ? parsed : {};
+                        && !(Array.isArray(parsed) || parsed instanceof Array) ? parsed : {};
                 } catch (e) {
                     root.clipboardPreviews = {};
                 }

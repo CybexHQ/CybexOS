@@ -397,13 +397,13 @@ function decodeCostPrices(raw) {
   if (typeof raw !== "string" || raw.length > 65536)
     throw new Error("Saved custom prices are invalid. Remove them to restore automatic pricing.")
   var document = JSON.parse(raw)
-  if (!document || typeof document !== "object" || Array.isArray(document))
+  if (!document || typeof document !== "object" || (Array.isArray(document) || document instanceof Array))
     throw new Error("Saved custom prices must be an object.")
   var fields = ["inputCostPerMillionTokens", "outputCostPerMillionTokens",
     "cacheReadCostPerMillionTokens", "cacheWriteCostPerMillionTokens"]
   var rows = Object.keys(document).map(function(model) {
     var prices = document[model]
-    if (!prices || typeof prices !== "object" || Array.isArray(prices)
+    if (!prices || typeof prices !== "object" || (Array.isArray(prices) || prices instanceof Array)
         || Object.keys(prices).some(function(key) { return fields.indexOf(key) < 0 }))
       throw new Error("Saved custom prices contain unsupported fields.")
     var row = { model: model }

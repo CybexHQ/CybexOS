@@ -13,7 +13,7 @@ Rectangle {
     property int queuedCount: 0
 
     readonly property bool isInput: kind === "input"
-    readonly property var questions: isInput && Array.isArray(request.questions)
+    readonly property var questions: isInput && (Array.isArray(request.questions) || request.questions instanceof Array)
         ? request.questions : []
     readonly property int storedIndex: isInput
         ? T3Code.inputQuestionIndex(threadId, request.requestId) : 0

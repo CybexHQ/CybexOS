@@ -65,7 +65,7 @@ Singleton {
             onStreamFinished: {
                 try {
                     const parsed = JSON.parse(text);
-                    root.records = Array.isArray(parsed) ? parsed : [];
+                    root.records = (Array.isArray(parsed) || parsed instanceof Array) ? parsed : [];
                     root.error = "";
                 } catch (e) {
                     root.error = "Could not read reminders";

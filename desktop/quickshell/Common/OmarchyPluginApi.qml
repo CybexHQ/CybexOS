@@ -73,7 +73,7 @@ QtObject {
     }
 
     function updateEntryInline(id, settings) {
-        if (!mayControl(id) || !settings || typeof settings !== "object" || Array.isArray(settings))
+        if (!mayControl(id) || !settings || typeof settings !== "object" || (Array.isArray(settings) || settings instanceof Array))
             return false;
         UserPlugins.mergeSettings(owns(id) ? pluginId : id, settings, owns(id) ? instanceName : "");
         return true;

@@ -147,7 +147,7 @@ function repoSlug(value) {
 function normalizeWatch(list) {
     var out = [];
     var seen = {};
-    if (!Array.isArray(list))
+    if (!(Array.isArray(list) || list instanceof Array))
         return out;
     for (var i = 0; i < list.length && out.length < MAX_WATCH; i++) {
         var slug = repoSlug(list[i]);
@@ -175,7 +175,7 @@ function parseJson(text) {
 // One projected repository. Null for anything that is not that shape, so an
 // unreadable response can never pass for a repository with no pushes.
 function repoRow(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     var slug = repoSlug(raw.n);
     if (slug === "")
@@ -197,7 +197,7 @@ function repoRow(raw) {
 
 function parseRepos(text) {
     var body = parseJson(text);
-    if (!Array.isArray(body))
+    if (!(Array.isArray(body) || body instanceof Array))
         return null;
     var out = [];
     for (var i = 0; i < body.length; i++) {
@@ -260,8 +260,8 @@ function mergeRepos(own, extra, watch) {
         };
         order.push(key);
     }
-    (Array.isArray(own) ? own : []).forEach(function (row) { take(row, true); });
-    (Array.isArray(extra) ? extra : []).forEach(function (row) { take(row, false); });
+    ((Array.isArray(own) || own instanceof Array) ? own : []).forEach(function (row) { take(row, true); });
+    ((Array.isArray(extra) || extra instanceof Array) ? extra : []).forEach(function (row) { take(row, false); });
     return sortRepos(order.map(function (key) { return byKey[key]; }));
 }
 
@@ -271,7 +271,7 @@ function mergeRepos(own, extra, watch) {
 // treated as account rows, preserving compatibility with test fixtures and
 // an in-memory feed surviving a shell update.
 function displayedRepos(rows, recentLimit) {
-    var feed = Array.isArray(rows) ? rows : [];
+    var feed = (Array.isArray(rows) || rows instanceof Array) ? rows : [];
     var limit = typeof recentLimit === "number" && isFinite(recentLimit)
         ? Math.max(0, Math.floor(recentLimit)) : 0;
     var selected = feed.filter(function (row) {
@@ -311,7 +311,7 @@ function monitoredScope(rows, recentLimit, watch) {
 function orgCount(rows, login) {
     var seen = {};
     var me = typeof login === "string" ? login.toLowerCase() : "";
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         var owner = row.owner.toLowerCase();
         if (owner !== me)
             seen[owner] = true;
@@ -327,13 +327,13 @@ function orgCount(rows, login) {
 function unreadRepos(rows, since) {
     if (typeof since !== "string" || since === "")
         return [];
-    return (Array.isArray(rows) ? rows : []).filter(function (row) {
+    return ((Array.isArray(rows) || rows instanceof Array) ? rows : []).filter(function (row) {
         return row.pushedAt !== "" && row.pushedAt > since;
     });
 }
 
 function commitRow(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     if (typeof raw.s !== "string" || raw.s === "")
         return null;
@@ -351,7 +351,7 @@ function commitRow(raw) {
 
 function parseCommits(text) {
     var body = parseJson(text);
-    if (!Array.isArray(body))
+    if (!(Array.isArray(body) || body instanceof Array))
         return null;
     var out = [];
     for (var i = 0; i < body.length; i++) {
@@ -367,7 +367,7 @@ function parseCommits(text) {
 // is a real thing GitHub reports.
 function parseCommitStats(text) {
     var body = parseJson(text);
-    if (!body || typeof body !== "object" || Array.isArray(body))
+    if (!body || typeof body !== "object" || (Array.isArray(body) || body instanceof Array))
         return null;
     if (typeof body.s !== "string" || body.s === "")
         return null;
@@ -386,7 +386,7 @@ function parseCommitStats(text) {
 function newCommits(commits, since) {
     if (typeof since !== "string" || since === "")
         return 0;
-    return (Array.isArray(commits) ? commits : []).filter(function (row) {
+    return ((Array.isArray(commits) || commits instanceof Array) ? commits : []).filter(function (row) {
         return row.date !== "" && row.date > since;
     }).length;
 }
@@ -679,7 +679,7 @@ function positiveInt(value, fallback) {
 }
 
 function runRow(raw, repo) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     var slug = repoSlug(repo);
     var runId = typeof raw.i === "number" && isFinite(raw.i)
@@ -732,7 +732,7 @@ function runRow(raw, repo) {
 
 function parseRuns(text, repo) {
     var body = parseJson(text);
-    if (!Array.isArray(body) || repoSlug(repo) === "")
+    if (!(Array.isArray(body) || body instanceof Array) || repoSlug(repo) === "")
         return null;
     var out = [];
     for (var i = 0; i < body.length; i++) {
@@ -773,7 +773,7 @@ function apiToBrowserUrl(value) {
 }
 
 function notificationRow(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     var id = typeof raw.i === "number" && isFinite(raw.i)
         ? String(Math.floor(raw.i)) : typeof raw.i === "string" ? raw.i.trim() : "";
@@ -820,7 +820,7 @@ function notificationRow(raw) {
 
 function parseNotifications(text) {
     var body = parseJson(text);
-    if (!Array.isArray(body))
+    if (!(Array.isArray(body) || body instanceof Array))
         return null;
     var out = [];
     for (var i = 0; i < body.length; i++) {
@@ -844,7 +844,7 @@ var ISSUE_ACTIONS = { opened: true, closed: true, reopened: true };
 var PULL_ACTIONS = { opened: true, closed: true, merged: true, reopened: true };
 
 function eventId(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return "";
     if (typeof raw.i === "number" && isFinite(raw.i))
         return String(Math.floor(raw.i));
@@ -890,7 +890,7 @@ function eventDetail(label, number, actor) {
 // One curated repository event. Event ids are revisions, not identities: an
 // issue being closed must replace (and wake) the earlier opened snapshot.
 function eventRow(raw, repo) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     var slug = repoSlug(repo);
     var id = eventId(raw);
@@ -1042,7 +1042,7 @@ function revisionCompare(left, right) {
 function newestEntityRows(rows) {
     var byKey = {};
     var order = [];
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (!row || typeof row.key !== "string" || row.key === "")
             return;
         if (byKey[row.key] === undefined) {
@@ -1061,7 +1061,7 @@ function newestEntityRows(rows) {
 
 function parseEvents(text, repo) {
     var body = parseJson(text);
-    if (!Array.isArray(body) || repoSlug(repo) === "")
+    if (!(Array.isArray(body) || body instanceof Array) || repoSlug(repo) === "")
         return null;
     var rows = [];
     for (var i = 0; i < body.length; i++) {
@@ -1141,7 +1141,7 @@ function includedResponseOk(response, exitCode) {
 
 function normalizeEventEtags(value) {
     var out = {};
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return out;
     Object.keys(value).slice(0, MAX_INBOX_SOURCES).forEach(function (repo) {
         var slug = repoSlug(repo);
@@ -1154,7 +1154,7 @@ function normalizeEventEtags(value) {
 
 function normalizeEventPollIntervals(value) {
     var out = {};
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return out;
     Object.keys(value).slice(0, MAX_INBOX_SOURCES).forEach(function (repo) {
         var slug = repoSlug(repo);
@@ -1296,7 +1296,7 @@ function runPollDue(nextAtMs, boostUntilMs, active, nowMs) {
 // `sinceMs` (the last runs read, less the slack).
 function runTriggerSince(rows, sinceMs) {
     var since = typeof sinceMs === "number" && isFinite(sinceMs) ? sinceMs : 0;
-    return (Array.isArray(rows) ? rows : []).some(function (row) {
+    return ((Array.isArray(rows) || rows instanceof Array) ? rows : []).some(function (row) {
         return row && RUN_TRIGGER_EVENTS[row.eventType] === true && atMs(row) > since;
     });
 }
@@ -1346,7 +1346,7 @@ function newerOrStronger(a, b) {
 function dedupeActivities(rows) {
     var byId = {};
     var order = [];
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (!row || typeof row.id !== "string" || row.id === "")
             return;
         if (byId[row.id] === undefined)
@@ -1428,8 +1428,8 @@ function prioritizeActivities(rows, limit) {
 }
 
 function combineActivities(runRows, notificationRows, since) {
-    var runs = Array.isArray(runRows) ? runRows : [];
-    var notifications = Array.isArray(notificationRows) ? notificationRows : [];
+    var runs = (Array.isArray(runRows) || runRows instanceof Array) ? runRows : [];
+    var notifications = (Array.isArray(notificationRows) || notificationRows instanceof Array) ? notificationRows : [];
     return withActivityUnread(runs.concat(notifications), since);
 }
 
@@ -1563,7 +1563,7 @@ function validInboxSource(value) {
 // the state file compact, this means an API payload can never smuggle an
 // arbitrary URL or object graph into a later shell process.
 function normalizeInboxSnapshot(raw, sourceOverride) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    if (!raw || typeof raw !== "object" || (Array.isArray(raw) || raw instanceof Array))
         return null;
     var key = cleanText(typeof raw.key === "string" ? raw.key : raw.id, 600);
     var revision = cleanText(raw.revision, 600);
@@ -1624,7 +1624,7 @@ function normalizeInboxSnapshot(raw, sourceOverride) {
 }
 
 function pruneSettledInbox(items, limit) {
-    var source = items && typeof items === "object" && !Array.isArray(items) ? items : {};
+    var source = items && typeof items === "object" && !(Array.isArray(items) || items instanceof Array) ? items : {};
     var cap = typeof limit === "number" && isFinite(limit)
         ? Math.max(0, Math.floor(limit)) : MAX_SETTLED_INBOX_ITEMS;
     var settled = Object.keys(source).filter(function (key) {
@@ -1652,7 +1652,7 @@ function pruneSettledInbox(items, limit) {
 
 function normalizeInboxItems(value) {
     var out = {};
-    if (Array.isArray(value)) {
+    if ((Array.isArray(value) || value instanceof Array)) {
         value.forEach(function (raw) {
             var row = normalizeInboxSnapshot(raw, "");
             if (row !== null)
@@ -1710,12 +1710,12 @@ function compactInboxItems(value) {
 
 function normalizeSourceRevisions(value) {
     var out = {};
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return out;
     Object.keys(value).slice(0, MAX_INBOX_SOURCES).forEach(function (rawSource) {
         var source = validInboxSource(rawSource);
         var rawMap = value[rawSource];
-        if (source === "" || !rawMap || typeof rawMap !== "object" || Array.isArray(rawMap))
+        if (source === "" || !rawMap || typeof rawMap !== "object" || (Array.isArray(rawMap) || rawMap instanceof Array))
             return;
         var revisions = {};
         Object.keys(rawMap).slice(0, MAX_SOURCE_REVISIONS).forEach(function (key) {
@@ -1756,7 +1756,7 @@ function reconcileInboxSource(itemsValue, revisionsValue, sourceValue, rows, not
     var source = validInboxSource(sourceValue);
     var items = normalizeInboxItems(itemsValue);
     var revisions = normalizeSourceRevisions(revisionsValue);
-    if (source === "" || !Array.isArray(rows))
+    if (source === "" || !(Array.isArray(rows) || rows instanceof Array))
         return { items: items, sourceRevisions: revisions, baseline: false };
     var known = Object.prototype.hasOwnProperty.call(revisions, source);
     var oldMap = known ? revisions[source] : {};
@@ -1906,7 +1906,7 @@ function inboxSort(a, b) {
 
 function inboxSections(rows) {
     var groups = { active: [], attention: [], updates: [], settled: [] };
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (!row || typeof row.key !== "string")
             return;
         if (row.lifecycle === "active")
@@ -1936,7 +1936,7 @@ function inboxSections(rows) {
 var INBOX_SECTION_IDS = ["active", "attention", "updates", "settled"];
 
 function listKey(rows, field) {
-    return JSON.stringify((Array.isArray(rows) ? rows : []).map(function (row) {
+    return JSON.stringify(((Array.isArray(rows) || rows instanceof Array) ? rows : []).map(function (row) {
         return row && typeof row[field] === "string" ? row[field] : "";
     }));
 }
@@ -1945,7 +1945,7 @@ function listKey(rows, field) {
 function listIds(key) {
     try {
         var ids = JSON.parse(key);
-        return Array.isArray(ids) ? ids.filter(function (id) {
+        return (Array.isArray(ids) || ids instanceof Array) ? ids.filter(function (id) {
             return typeof id === "string";
         }) : [];
     } catch (e) {
@@ -1955,7 +1955,7 @@ function listIds(key) {
 
 function rowIndex(rows, field) {
     var index = {};
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (row && typeof row[field] === "string" && index[row[field]] === undefined)
             index[row[field]] = row;
     });
@@ -1963,7 +1963,7 @@ function rowIndex(rows, field) {
 }
 
 function inboxSectionFor(sections, id) {
-    var list = Array.isArray(sections) ? sections : [];
+    var list = (Array.isArray(sections) || sections instanceof Array) ? sections : [];
     for (var i = 0; i < list.length; i++) {
         if (list[i] && list[i].id === id)
             return list[i];
@@ -2001,7 +2001,7 @@ function repoFor(index, slug) {
 function inboxCounts(rows) {
     var counts = { running: 0, attention: 0, updates: 0, pending: 0, settled: 0,
         unread: 0 };
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (!row)
             return;
         if (row.lifecycle === "active") {
@@ -2026,7 +2026,7 @@ function inboxCounts(rows) {
 }
 
 function inboxBadgeTone(rows) {
-    var pending = (Array.isArray(rows) ? rows : []).filter(function (row) {
+    var pending = ((Array.isArray(rows) || rows instanceof Array) ? rows : []).filter(function (row) {
         return row && row.canSettle && row.lifecycle === "unsettled";
     });
     if (pending.some(function (row) { return row.tone === "red"; }))
@@ -2045,7 +2045,7 @@ function patchRunCache(cache, repo, rows, error, at) {
     var previous = source[repo] && typeof source[repo] === "object"
         ? source[repo] : { rows: [], error: "", at: 0 };
     next[repo] = {
-        rows: Array.isArray(rows) ? rows : Array.isArray(previous.rows) ? previous.rows : [],
+        rows: (Array.isArray(rows) || rows instanceof Array) ? rows : (Array.isArray(previous.rows) || previous.rows instanceof Array) ? previous.rows : [],
         error: typeof error === "string" ? error : "",
         at: typeof at === "number" && isFinite(at) ? at : previous.at || 0
     };
@@ -2061,7 +2061,7 @@ function flattenRunCache(cache) {
     var source = cache && typeof cache === "object" ? cache : {};
     Object.keys(source).forEach(function (repo) {
         var entry = source[repo];
-        if (entry && Array.isArray(entry.rows))
+        if (entry && (Array.isArray(entry.rows) || entry.rows instanceof Array))
             out = out.concat(entry.rows);
     });
     return dedupeActivities(out);
@@ -2087,11 +2087,11 @@ function baselineState(row) {
 
 function normalizeRunBaselines(value) {
     var out = {};
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return out;
     Object.keys(value).slice(0, MAX_BASELINE_REPOS).forEach(function (repo) {
         if (repoSlug(repo) === "" || !value[repo] || typeof value[repo] !== "object"
-                || Array.isArray(value[repo]))
+                || (Array.isArray(value[repo]) || value[repo] instanceof Array))
             return;
         var attempts = {};
         Object.keys(value[repo]).slice(0, MAX_BASELINE_ATTEMPTS).forEach(function (key) {
@@ -2117,7 +2117,7 @@ function advanceRunBaselines(value, rows, silent) {
     var next = {};
     Object.keys(previous).forEach(function (repo) { next[repo] = previous[repo]; });
     var grouped = {};
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    ((Array.isArray(rows) || rows instanceof Array) ? rows : []).forEach(function (row) {
         if (!row || row.kind !== "run" || repoSlug(row.repo) === "")
             return;
         if (!grouped[row.repo])
@@ -2162,7 +2162,7 @@ function advanceRunBaselines(value, rows, silent) {
 }
 
 function coalescedFailureToast(rows) {
-    var failures = dedupeActivities(Array.isArray(rows) ? rows : [])
+    var failures = dedupeActivities((Array.isArray(rows) || rows instanceof Array) ? rows : [])
         .filter(isToastableRun).sort(activitySort);
     if (failures.length === 0)
         return null;

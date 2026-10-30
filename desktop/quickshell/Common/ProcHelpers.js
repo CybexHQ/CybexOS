@@ -80,11 +80,11 @@ function parseJson(text) {
 // entries that are not `inet`, which `-4` should have excluded anyway.
 function firstIpv4(text) {
     var links = parseJson(text);
-    if (!Array.isArray(links))
+    if (!(Array.isArray(links) || links instanceof Array))
         return "";
     for (var i = 0; i < links.length; i++) {
         var addresses = links[i] && links[i].addr_info;
-        if (!Array.isArray(addresses))
+        if (!(Array.isArray(addresses) || addresses instanceof Array))
             continue;
         for (var j = 0; j < addresses.length; j++) {
             var entry = addresses[j];
@@ -101,12 +101,12 @@ function firstIpv4(text) {
 // tailnet.
 function tailscalePeers(text) {
     var status = parseJson(text);
-    if (!status || typeof status !== "object" || Array.isArray(status))
+    if (!status || typeof status !== "object" || (Array.isArray(status) || status instanceof Array))
         return null;
     var peers = status.Peer;
     if (peers === undefined || peers === null)
         peers = {};
-    if (typeof peers !== "object" || Array.isArray(peers))
+    if (typeof peers !== "object" || (Array.isArray(peers) || peers instanceof Array))
         return null;
     var list = Object.keys(peers).map(function (key) {
         var peer = peers[key] || {};
@@ -132,12 +132,12 @@ function tailscalePeers(text) {
 // tailscaled would render identically to a deliberate `tailscale down`.
 function tailscaleSelf(text) {
     var status = parseJson(text);
-    if (!status || typeof status !== "object" || Array.isArray(status))
+    if (!status || typeof status !== "object" || (Array.isArray(status) || status instanceof Array))
         return null;
     var self = status.Self;
     if (self === undefined || self === null)
         self = {};
-    if (typeof self !== "object" || Array.isArray(self))
+    if (typeof self !== "object" || (Array.isArray(self) || self instanceof Array))
         return null;
     return {
         running: status.BackendState === "Running",

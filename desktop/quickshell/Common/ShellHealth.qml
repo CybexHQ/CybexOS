@@ -91,7 +91,7 @@ Singleton {
             serviceActive = service.active === true;
             servicePid = Number(service.pid) || 0;
             serviceUptimeSecs = Number(service.uptimeSecs) || 0;
-            recentWarnings = Array.isArray(data.warnings) ? data.warnings : [];
+            recentWarnings = (Array.isArray(data.warnings) || data.warnings instanceof Array) ? data.warnings : [];
         } catch (e) {
             serviceActive = false;
             refreshError = "Unreadable shell health response";

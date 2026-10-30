@@ -49,10 +49,7 @@ qml_import_path=$(qtpaths6 --query QT_INSTALL_QML 2>/dev/null \
 import_args=()
 [[ -d ${qml_import_path:-} ]] && import_args+=(-I "$qml_import_path")
 IFS=: read -ra nix_imports <<<"${CYBEXOS_QML_IMPORT_PATH:-}"
-for module_path in "${nix_imports[@]}"; do
-  [[ -d $module_path ]] && import_args+=(-I "$module_path")
-done
-if ((${#import_args[@]} == 0)); then
+if ((${#import_args[@]} == 0 && ${#nix_imports[@]} == 0)); then
   printf 'No Qt QML import paths; enter nix develop.\n' >&2
   exit 1
 fi
@@ -79,6 +76,25 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 mkdir -- "$work/imports" && ln -s "$shell_dir" "$work/imports/qs" || exit 1
 
+# Qt 6.12's type registrar writes a memberless `isTypeOpaque` placeholder into
+# each module's qmltypes for a type it only references (Quickshell's _Window
+# module declares QuickshellScreenInfo, PopupAnchor, ...). qmllint resolves
+# window.screen to that placeholder and reports every member missing, though
+# the defining module lists them and the runtime has them. Lint against a copy
+# without the placeholders, so references resolve to the real declarations.
+for index in "${!nix_imports[@]}"; do
+  module_path=${nix_imports[index]}
+  [[ -d $module_path ]] || continue
+  if grep -rqs --include='*.qmltypes' 'isTypeOpaque: true' "$module_path"; then
+    copy=$work/qt-imports.$index
+    cp -rL -- "$module_path" "$copy" && chmod -R u+w -- "$copy" || exit 1
+    find "$copy" -name '*.qmltypes' -exec \
+      sed -i '/^[[:space:]]*Component {[[:space:]]*isTypeOpaque: true;[^}]*}[[:space:]]*$/d' {} + || exit 1
+    module_path=$copy
+  fi
+  import_args+=(-I "$module_path")
+done
+
 # Analyze the same public-Qt module the installed shell loads. Its CTest suite
 # also checks real QML registration/provider access before linting consumers.
 native_build="$work/notification-images"
@@ -96,6 +112,15 @@ if ((${#files[@]} == 0)); then
   printf '\033[31mFAIL\033[0m  no QML files under %s\n' "$shell_dir"
   exit 1
 fi
+
+# qmllint 6.12.0 aborts on these files (exit 255, no diagnostics), and an
+# abort would discard the whole slice's results. They are linted one at a
+# time below, where an abort is reported but other findings still fail.
+aborting=(./Commons/Border.qml ./Commons/Style.qml)
+for abort in "${aborting[@]}"; do
+  files=("${files[@]/#$abort}")
+done
+mapfile -t -d '' files < <(printf '%s\0' "${files[@]}" | grep -zv '^$')
 
 # tests/run passes its own --jobs; standalone, up to eight slices.
 shards=${CYBEXOS_TESTS_RUN_JOBS:-}
@@ -136,6 +161,20 @@ for pid in "${lint_pids[@]}"; do
   wait "$pid" || status=1
 done
 lint_pids=()
+
+aborted=()
+for index in "${!aborting[@]}"; do
+  report=$work/aborting.$index.out
+  "$qmllint" -I "$native_build/qml" "${import_args[@]}" -I "$work/imports" -I . "${aborting[index]}" >"$report" 2>&1
+  code=$?
+  if ((code == 255)) && [[ ! -s $report ]]; then
+    aborted+=("${aborting[index]#./}")
+  else
+    ((code == 0)) || status=1
+    reports+=("$report")
+  fi
+done
+((${#aborted[@]})) && printf 'Note: qmllint aborted on %s; not linted with this Qt.\n' "${aborted[*]}" >&2
 output=$(cat -- "${reports[@]}")
 
 # "[category]" suffixes, most frequent first — e.g. "421 unqualified".

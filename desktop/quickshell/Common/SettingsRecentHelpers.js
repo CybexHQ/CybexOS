@@ -28,7 +28,7 @@ function rowFor(rows, key) {
 function record(entries, rows, key, before, after, now) {
     if (!rowFor(rows, key) || same(before, after))
         return entries;
-    var list = Array.isArray(entries) ? entries : [];
+    var list = (Array.isArray(entries) || entries instanceof Array) ? entries : [];
     var previous = list.filter(function(entry) { return entry.key === key; })[0];
     var rest = list.filter(function(entry) { return entry.key !== key; });
     var start = previous ? previous.before : clone(before);
@@ -45,7 +45,7 @@ function remove(entries, key) {
 function parse(text) {
     var value;
     try { value = JSON.parse(text); } catch (e) { return []; }
-    if (!value || value.version !== 1 || !Array.isArray(value.entries))
+    if (!value || value.version !== 1 || !(Array.isArray(value.entries) || value.entries instanceof Array))
         return [];
     return value.entries.filter(function(entry) {
         return entry && typeof entry.key === "string" && typeof entry.at === "number"

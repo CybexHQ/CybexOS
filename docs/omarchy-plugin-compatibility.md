@@ -282,6 +282,15 @@ retain their status indications.
 
 ## Remaining limits
 
+- Qt 6.12, which nixos-unstable ships, adds a QtQuick `Color` type that takes
+  precedence over the `Color` singleton from `qs.Commons`, even when that
+  import comes later. A plugin that writes `Color.foreground` or
+  `Color.popups.background` then reads QtQuick's object and logs TypeErrors.
+  The built-in components use a qualified import (`import qs.Commons as
+  Commons`, then `Commons.Color`); third-party plugins need the same change.
+  Qt 6.12 also passes arrays through a QML signal's `var` argument as
+  sequences, for which `Array.isArray()` is false. Accept them with
+  `Array.isArray(x) || x instanceof Array`.
 - No automatic emulation of Arch packages, Omarchy's general command suite,
   Hyprland scripts, system paths, or external backends. Plugins depending on
   those still need their dependencies installed or a NixOS-specific adapter.

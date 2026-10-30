@@ -113,7 +113,7 @@ Singleton {
         }
         try {
             const result = JSON.parse(text);
-            if (!result || result.error || !Array.isArray(result.plugins)) {
+            if (!result || result.error || !(Array.isArray(result.plugins) || result.plugins instanceof Array)) {
                 // A malformed registry must never unload the last good set.
                 discoveryError = result && result.error || "Could not read user widgets";
                 return;

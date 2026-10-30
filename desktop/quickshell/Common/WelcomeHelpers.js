@@ -4,14 +4,14 @@ var STEPS = ["hello", "connect", "wallpaper", "style", "shortcuts", "finish"];
 // The steps between Hello and Ready, which the top bar numbers.
 var MIDDLE = ["connect", "wallpaper", "style", "shortcuts"];
 var ITEMS = ["webapps", "assistant", "fingerprint", "security", "backup", "accounts"];
-function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function object(value) { return value !== null && typeof value === "object" && !(Array.isArray(value) || value instanceof Array); }
 function initial(version) {
     return {v: 1, status: "new", step: "hello", seen: [], checklist: {},
         version: String(version || ""), notified: false};
 }
 function validate(value) {
     if (!object(value) || value.v !== 1 || !["new", "open", "completed", "dismissed"].includes(value.status)
-            || !STEPS.includes(value.step) || !Array.isArray(value.seen)
+            || !STEPS.includes(value.step) || !(Array.isArray(value.seen) || value.seen instanceof Array)
             || value.seen.some(id => !STEPS.includes(id)) || new Set(value.seen).size !== value.seen.length
             || !object(value.checklist) || Object.keys(value.checklist).some(id => !ITEMS.includes(id)
                 || value.checklist[id] !== "later")

@@ -172,8 +172,8 @@ function parseItem(item) {
 // Wallhaven listing at all (an error document, HTML, a truncated body).
 function parseResults(body) {
     const data = JSON.parse(body);
-    if (!data || typeof data !== "object" || Array.isArray(data) || data.error
-            || !Array.isArray(data.data) || !data.meta || typeof data.meta !== "object")
+    if (!data || typeof data !== "object" || (Array.isArray(data) || data instanceof Array) || data.error
+            || !(Array.isArray(data.data) || data.data instanceof Array) || !data.meta || typeof data.meta !== "object")
         throw new Error("Invalid Wallhaven response");
     const items = [];
     const seen = {};
@@ -232,7 +232,7 @@ function likeQuery(id) {
 }
 
 function imageColors(colors) {
-    return Array.isArray(colors) ? colors.filter(color =>
+    return (Array.isArray(colors) || colors instanceof Array) ? colors.filter(color =>
         typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color))
         .slice(0, 10).map(color => color.toLowerCase()) : [];
 }
@@ -257,7 +257,7 @@ function parseDetails(body, expectedId) {
         throw new Error("Invalid Wallhaven details");
     return Object.assign(item, {
         uploader: plain(raw.uploader && raw.uploader.username, 64),
-        tags: Array.isArray(raw.tags) ? raw.tags.filter(tag => tag && tag.purity === "sfw")
+        tags: (Array.isArray(raw.tags) || raw.tags instanceof Array) ? raw.tags.filter(tag => tag && tag.purity === "sfw")
             .slice(0, 30).map(tag => plain(tag.name, 64)).filter(Boolean) : [],
         source: httpUrl(raw.source),
         short_url: httpUrl(raw.short_url)

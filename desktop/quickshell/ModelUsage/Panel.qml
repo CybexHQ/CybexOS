@@ -5,6 +5,7 @@ import QtQuick.Controls
 import QtQuick.Effects
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "UsageLogic.js" as UsageLogic
 
@@ -14,10 +15,10 @@ Ui.Panel {
   ipcTarget: "digitalpals.model-usage"
   manageIpc: false
 
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
+  readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
-  readonly property color surface: Color.popups.background
+  readonly property color surface: Commons.Color.popups.background
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   property bool automaticRefreshEnabled: true
 
@@ -1070,7 +1071,7 @@ Ui.Panel {
     readonly property var windows: UsageLogic.accountWindows(account, root.expandedAccountLimits)
     readonly property bool healthy: account.status === "ok"
     implicitHeight: accountContent.implicitHeight + contentTopInset + contentBottomInset
-    color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
+    color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
     borderSpec: Border.flat(root.alpha(root.foreground, 0.22), Style.spacing.hairline)
     padding: Style.spacing.xxl
     radius: root.usageCardRadius
@@ -1300,10 +1301,10 @@ Ui.Panel {
     implicitHeight: limitContent.implicitHeight + contentTopInset + contentBottomInset
     color: severity === "critical"
       ? root.alpha(root.urgent, 0.09)
-      : Style.normalFillFor(root.foreground, Color.accent, root.urgent)
+      : Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
     borderSpec: stressed
       ? Border.flat(root.alpha(root.urgent, severity === "critical" ? 0.45 : 0.28), Style.spacing.hairline)
-      : Border.controlSpec("normal", root.foreground, Color.accent, root.urgent)
+      : Border.controlSpec("normal", root.foreground, Commons.Color.accent, root.urgent)
     padding: Style.spacing.xxl
     radius: root.usageCardRadius
 
@@ -1387,8 +1388,8 @@ Ui.Panel {
       && Number(credits.limit) > 0
 
     implicitHeight: creditsContent.implicitHeight + contentTopInset + contentBottomInset
-    color: Style.normalFillFor(root.foreground, Color.accent, root.urgent)
-    borderSpec: Border.controlSpec("normal", root.foreground, Color.accent, root.urgent)
+    color: Style.normalFillFor(root.foreground, Commons.Color.accent, root.urgent)
+    borderSpec: Border.controlSpec("normal", root.foreground, Commons.Color.accent, root.urgent)
     padding: Style.spacing.xxl
     radius: root.usageCardRadius
 

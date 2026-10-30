@@ -173,7 +173,7 @@ Singleton {
         const params = message.params && typeof message.params === "object"
             ? message.params : message;
         const routedPayload = value => {
-            if (!value || typeof value !== "object" || Array.isArray(value))
+            if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
                 return value;
             // Keep routing metadata from the JSON-RPC envelope when a bridge
             // wraps the upstream payload. Payload fields remain authoritative.
@@ -210,7 +210,7 @@ Singleton {
             protocolError("Hermes bridge sent malformed JSON");
             return;
         }
-        const messages = Array.isArray(parsed) ? parsed : [parsed];
+        const messages = (Array.isArray(parsed) || parsed instanceof Array) ? parsed : [parsed];
         for (const message of messages)
             handleObject(message);
     }

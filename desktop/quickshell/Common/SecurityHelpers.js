@@ -100,7 +100,7 @@ function parseEnrolEvent(line) {
     } catch (error) {
         return null;
     }
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return null;
     var kinds = ["started", "progress", "completed", "failed", "cancelled"];
     if (kinds.indexOf(value.event) === -1)

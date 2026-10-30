@@ -64,7 +64,8 @@ Column {
         id: settingsPresentation
 
         property bool expanded: false
-        property Item activePicker: null
+        // A picker of any kind; each one has an `expanded` property.
+        property var activePicker: null
         property string activePickerGroup: ""
         readonly property bool narrow: root.width < 360
         readonly property var accessOptions: [
@@ -82,9 +83,9 @@ Column {
         // declares stays in the drawer, which now exists only for what the
         // bar cannot hold.
         readonly property var reasoningDescriptor:
-            (Array.isArray(root.traits) ? root.traits : [])
+            ((Array.isArray(root.traits) || root.traits instanceof Array) ? root.traits : [])
                 .find(candidate => root.traitLabel(candidate) === "Reasoning") ?? null
-        readonly property var extraTraits: (Array.isArray(root.traits) ? root.traits : [])
+        readonly property var extraTraits: ((Array.isArray(root.traits) || root.traits instanceof Array) ? root.traits : [])
             .filter(candidate => root.traitLabel(candidate) !== "Reasoning")
         readonly property bool reasoningInDrawer: narrow && reasoningDescriptor !== null
         readonly property bool hasDrawer: root.showInteraction || extraTraits.length > 0
@@ -94,7 +95,7 @@ Column {
                 return [];
             if (reasoningDescriptor.type === "boolean")
                 return [{ id: "true", label: I18n.tr("On") }, { id: "false", label: I18n.tr("Off") }];
-            return (Array.isArray(reasoningDescriptor.options)
+            return ((Array.isArray(reasoningDescriptor.options) || reasoningDescriptor.options instanceof Array)
                 ? reasoningDescriptor.options : [])
                 .map(option => ({ id: settingId(option), label: settingLabel(option) }));
         }
@@ -152,7 +153,7 @@ Column {
         }
 
         function selectedSettingLabel(options, value, fallback) {
-            const found = (Array.isArray(options) ? options : [])
+            const found = ((Array.isArray(options) || options instanceof Array) ? options : [])
                 .find(option => settingId(option) === value);
             return found ? settingLabel(found) : displaySettingValue(value, fallback);
         }

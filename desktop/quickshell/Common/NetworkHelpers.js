@@ -68,7 +68,7 @@ function metric(route) {
 // device with a physical NetworkManager type can match.  The deterministic
 // fallback is wired, then wireless, then interface name.
 function selectPrimaryInterface(devices, routes) {
-    var physical = (Array.isArray(devices) ? devices : []).filter(function (device) {
+    var physical = ((Array.isArray(devices) || devices instanceof Array) ? devices : []).filter(function (device) {
         return physicalType(device) !== "" && isConnected(device)
             && interfaceName(device) !== "";
     });
@@ -80,7 +80,7 @@ function selectPrimaryInterface(devices, routes) {
         byInterface[interfaceName(device)] = device;
     });
     var candidates = [];
-    (Array.isArray(routes) ? routes : []).forEach(function (route) {
+    ((Array.isArray(routes) || routes instanceof Array) ? routes : []).forEach(function (route) {
         if (!isDefaultRoute(route))
             return;
         var device = byInterface[routeInterface(route)];
@@ -145,7 +145,7 @@ function calculateRates(previous, current, timestampMs) {
 }
 
 function updatePingHistory(history, sample, limit) {
-    var next = Array.isArray(history) ? history.slice() : [];
+    var next = (Array.isArray(history) || history instanceof Array) ? history.slice() : [];
     var value = Number(sample);
     next.push(sample !== null && sample !== undefined
         && Number.isFinite(value) && value >= 0 ? value : null);
@@ -156,7 +156,7 @@ function updatePingHistory(history, sample, limit) {
 }
 
 function pingStats(history, averageWindow) {
-    var samples = Array.isArray(history) ? history : [];
+    var samples = (Array.isArray(history) || history instanceof Array) ? history : [];
     if (samples.length === 0)
         return { latency: -1, loss: 0, samples: 0 };
     var good = samples.filter(function (sample) {
@@ -277,7 +277,7 @@ function ssidOf(network) {
 function networkFrequencies(network) {
     var frequencies = [];
     var values = network && (network.frequencies || network.frequency || network.freq);
-    if (!Array.isArray(values))
+    if (!(Array.isArray(values) || values instanceof Array))
         values = values === undefined || values === null ? [] : [values];
     values.forEach(function (frequency) {
         var number = Number(frequency);
@@ -288,7 +288,7 @@ function networkFrequencies(network) {
 }
 
 function groupWifiNetworks(networks, profiles) {
-    var profileList = Array.isArray(profiles) ? profiles : [];
+    var profileList = (Array.isArray(profiles) || profiles instanceof Array) ? profiles : [];
     var bySsid = {};
     profileList.forEach(function (profile) {
         var type = physicalType(profile);
@@ -298,7 +298,7 @@ function groupWifiNetworks(networks, profiles) {
             bySsid[ssid] = profile;
     });
     var grouped = {};
-    (Array.isArray(networks) ? networks : []).forEach(function (network) {
+    ((Array.isArray(networks) || networks instanceof Array) ? networks : []).forEach(function (network) {
         var ssid = ssidOf(network);
         if (ssid === "")
             return;
@@ -345,7 +345,7 @@ function groupWifiNetworks(networks, profiles) {
             network.profileUuid = network.profileUuid || text(profile.uuid);
             network.profileName = network.profileName || text(profile.name);
             if (profile.security) {
-                var eapDetail = Array.isArray(profile.eap) ? profile.eap.join(" ") : "";
+                var eapDetail = (Array.isArray(profile.eap) || profile.eap instanceof Array) ? profile.eap.join(" ") : "";
                 if (profile.certificateEnterprise)
                     eapDetail += " TLS";
                 network.profileSecurity = profile.security + (eapDetail ? " " + eapDetail : "");
@@ -377,7 +377,7 @@ function groupWifiNetworks(networks, profiles) {
 // whatever the user is typing in one) on each poll; a string property only
 // notifies when this key really changes.
 function networkListKey(networks, limit) {
-    var list = Array.isArray(networks) ? networks : [];
+    var list = (Array.isArray(networks) || networks instanceof Array) ? networks : [];
     var count = limit === undefined
         ? list.length : Math.max(0, Math.floor(Number(limit)) || 0);
     return JSON.stringify(list.slice(0, count).map(ssidOf));
@@ -387,7 +387,7 @@ function networkListKey(networks, limit) {
 function networkListIds(key) {
     try {
         var ids = JSON.parse(key);
-        return Array.isArray(ids) ? ids.filter(function (id) {
+        return (Array.isArray(ids) || ids instanceof Array) ? ids.filter(function (id) {
             return typeof id === "string";
         }) : [];
     } catch (error) {
@@ -399,7 +399,7 @@ function networkListIds(key) {
 // the list and its key updating, so a missing SSID reads as a bare,
 // disconnected, signal-less entry rather than undefined.
 function networkBySsid(networks, ssid) {
-    var list = Array.isArray(networks) ? networks : [];
+    var list = (Array.isArray(networks) || networks instanceof Array) ? networks : [];
     for (var i = 0; i < list.length; i++) {
         if (list[i] && ssidOf(list[i]) === ssid)
             return list[i];
@@ -412,7 +412,7 @@ function networkBySsid(networks, ssid) {
 
 function availableBands(networks, activeSsid) {
     var found = {};
-    (Array.isArray(networks) ? networks : []).forEach(function (network) {
+    ((Array.isArray(networks) || networks instanceof Array) ? networks : []).forEach(function (network) {
         if (ssidOf(network) !== text(activeSsid))
             return;
         networkFrequencies(network).forEach(function (frequency) {
@@ -484,7 +484,7 @@ function isIpv6(value) {
 }
 
 function validateDnsServers(value) {
-    var values = Array.isArray(value) ? value : text(value).split(/[\s,;]+/);
+    var values = (Array.isArray(value) || value instanceof Array) ? value : text(value).split(/[\s,;]+/);
     var servers = [];
     for (var i = 0; i < values.length; i++) {
         var server = text(values[i]).trim().toLowerCase();
@@ -503,7 +503,7 @@ function validateDnsServers(value) {
 }
 
 function dnsValues(value) {
-    if (Array.isArray(value))
+    if ((Array.isArray(value) || value instanceof Array))
         return value.map(function (item) { return text(item).toLowerCase(); })
             .filter(function (item) { return item !== ""; });
     return text(value).split(/[\s,;]+/).map(function (item) { return item.toLowerCase(); })
@@ -552,7 +552,7 @@ function profileDnsState(profile) {
 }
 
 function dnsState(profiles) {
-    var targets = (Array.isArray(profiles) ? profiles : []).filter(standalonePhysicalProfile);
+    var targets = ((Array.isArray(profiles) || profiles instanceof Array) ? profiles : []).filter(standalonePhysicalProfile);
     if (targets.length === 0)
         return { provider: "Automatic", label: "Automatic", servers: [], mixed: false,
             profiles: [] };
@@ -584,7 +584,7 @@ function isVpnActive(vpn) {
 // The one VPN the drawer's compact row offers: a connected or connecting one,
 // else the most recently used, else the first by name.
 function preferredVpn(vpns) {
-    var list = (Array.isArray(vpns) ? vpns : []).filter(function (vpn) {
+    var list = ((Array.isArray(vpns) || vpns instanceof Array) ? vpns : []).filter(function (vpn) {
         return vpn && text(vpn.uuid) !== "";
     });
     if (list.length === 0)

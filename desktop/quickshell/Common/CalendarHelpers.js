@@ -56,15 +56,15 @@ function normalizeEvent(value) {
 }
 
 function normalizePayload(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value))
+    if (!value || typeof value !== "object" || (Array.isArray(value) || value instanceof Array))
         return null;
 
-    var calendars = Array.isArray(value.calendars)
+    var calendars = (Array.isArray(value.calendars) || value.calendars instanceof Array)
         ? value.calendars.map(normalizeCalendar).filter(function(item) { return item !== null; })
         : [];
     var seen = {};
     var events = [];
-    if (Array.isArray(value.events)) {
+    if ((Array.isArray(value.events) || value.events instanceof Array)) {
         value.events.forEach(function(raw) {
             var event = normalizeEvent(raw);
             if (!event)
@@ -82,7 +82,7 @@ function normalizePayload(value) {
             || a.summary.localeCompare(b.summary);
     });
 
-    var sourceErrors = Array.isArray(value.sourceErrors)
+    var sourceErrors = (Array.isArray(value.sourceErrors) || value.sourceErrors instanceof Array)
         ? value.sourceErrors.filter(function(item) {
             return item && typeof item === "object";
         }).map(function(item) {
@@ -115,7 +115,7 @@ function overlaps(event, startMs, endMs) {
 }
 
 function eventsInRange(events, startMs, endMs, limit) {
-    if (!Array.isArray(events) || !Number.isFinite(startMs)
+    if (!(Array.isArray(events) || events instanceof Array) || !Number.isFinite(startMs)
             || !Number.isFinite(endMs) || endMs <= startMs)
         return [];
     var out = [];
@@ -128,7 +128,7 @@ function eventsInRange(events, startMs, endMs, limit) {
 }
 
 function upcoming(events, nowMs, endMs, limit) {
-    if (!Array.isArray(events) || !Number.isFinite(nowMs)
+    if (!(Array.isArray(events) || events instanceof Array) || !Number.isFinite(nowMs)
             || !Number.isFinite(endMs) || endMs <= nowMs)
         return [];
     var out = events.filter(function(event) {

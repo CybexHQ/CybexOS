@@ -36,7 +36,7 @@ function compareWorkspaces(a, b) {
 // the window reachable with Super+number.
 function newWorkspaceId(ids) {
     var taken = {};
-    (Array.isArray(ids) ? ids : []).forEach(function(id) { taken[id] = true; });
+    ((Array.isArray(ids) || ids instanceof Array) ? ids : []).forEach(function(id) { taken[id] = true; });
     var candidate = 1;
     while (taken[candidate])
         candidate++;
@@ -52,7 +52,7 @@ function newWorkspaceId(ids) {
 function workspaceEntries(workspaces, windows, options) {
     var counts = {};
     var windowWorkspaces = {};
-    (Array.isArray(windows) ? windows : []).forEach(function(window) {
+    ((Array.isArray(windows) || windows instanceof Array) ? windows : []).forEach(function(window) {
         if (window && window.workspaceId !== undefined) {
             counts[window.workspaceId] = (counts[window.workspaceId] || 0) + 1;
             if (!windowWorkspaces[window.workspaceId] || window.workspaceKind === "named")
@@ -62,7 +62,7 @@ function workspaceEntries(workspaces, windows, options) {
     });
     var seen = {};
     var entries = [];
-    (Array.isArray(workspaces) ? workspaces : []).forEach(function(workspace) {
+    ((Array.isArray(workspaces) || workspaces instanceof Array) ? workspaces : []).forEach(function(workspace) {
         if (isSpecialWorkspace(workspace))
             return;
         var id = finite(workspace.id, 0);
@@ -187,7 +187,7 @@ function fitAspect(width, height, aspect) {
 }
 
 function pair(value) {
-    return Array.isArray(value) && value.length >= 2
+    return (Array.isArray(value) || value instanceof Array) && value.length >= 2
         && isFinite(Number(value[0])) && isFinite(Number(value[1]))
         ? [Number(value[0]), Number(value[1])] : null;
 }
@@ -226,7 +226,7 @@ function windowRects(windows, monitor, width, height, options) {
 
     var placed = [];
     var unplaced = [];
-    (Array.isArray(windows) ? windows : []).forEach(function(window) {
+    ((Array.isArray(windows) || windows instanceof Array) ? windows : []).forEach(function(window) {
         if (!window || !window.address)
             return;
         var at = pair(window.at);
@@ -285,7 +285,7 @@ function windowRects(windows, monitor, width, height, options) {
 // The cell under a point in grid coordinates, label line included so a drop
 // on a workspace's name lands too. -1 when the point is between cells.
 function cellAt(cells, x, y) {
-    var list = Array.isArray(cells) ? cells : [];
+    var list = (Array.isArray(cells) || cells instanceof Array) ? cells : [];
     for (var index = 0; index < list.length; index++) {
         var cell = list[index];
         if (x >= cell.x && x < cell.x + cell.width && y >= cell.y && y < cell.y + cell.height)
@@ -301,7 +301,7 @@ function cellAt(cells, x, y) {
 function filterScores(windows, query, scoreFn) {
     var out = {};
     var q = String(query || "").trim();
-    (Array.isArray(windows) ? windows : []).forEach(function(window) {
+    ((Array.isArray(windows) || windows instanceof Array) ? windows : []).forEach(function(window) {
         if (!window || !window.address)
             return;
         var score = q === "" ? 1 : scoreFn(window.title, window.appClass, q, !!window.activated);
@@ -322,7 +322,7 @@ function firstEnabled(items) {
 // top-to-bottom and left-to-right inside each — with their centres in grid
 // coordinates. `placements` holds { address, cell, rect } records.
 function selectionItems(placements, scores) {
-    var list = (Array.isArray(placements) ? placements : []).map(function(placement) {
+    var list = ((Array.isArray(placements) || placements instanceof Array) ? placements : []).map(function(placement) {
         var cell = placement.cell;
         var rect = placement.rect;
         return {
@@ -344,7 +344,7 @@ function selectionItems(placements, scores) {
 // forward. This crosses from one workspace tile into its neighbour naturally.
 // With nothing in that direction the selection stays put.
 function navigate(items, index, direction) {
-    var list = Array.isArray(items) ? items : [];
+    var list = (Array.isArray(items) || items instanceof Array) ? items : [];
     if (list.length === 0)
         return -1;
     var current = list[index];
@@ -377,7 +377,7 @@ function navigate(items, index, direction) {
 // Tab and Shift+Tab: the next or previous enabled window in reading order,
 // wrapping at the ends.
 function step(items, index, delta) {
-    var list = Array.isArray(items) ? items : [];
+    var list = (Array.isArray(items) || items instanceof Array) ? items : [];
     var count = list.length;
     if (count === 0)
         return -1;
@@ -392,7 +392,7 @@ function step(items, index, delta) {
 }
 
 function indexOfAddress(items, address) {
-    var list = Array.isArray(items) ? items : [];
+    var list = (Array.isArray(items) || items instanceof Array) ? items : [];
     for (var index = 0; index < list.length; index++)
         if (list[index].address === address)
             return index;
@@ -404,7 +404,7 @@ function indexOfAddress(items, address) {
 // best filter match when a query is typed, else the focused window, else the
 // first match. Returns an address, or "" when nothing matches.
 function reselect(items, current, scores, activeAddress, query) {
-    var list = Array.isArray(items) ? items : [];
+    var list = (Array.isArray(items) || items instanceof Array) ? items : [];
     var at = indexOfAddress(list, current);
     if (at !== -1 && list[at].enabled)
         return current;

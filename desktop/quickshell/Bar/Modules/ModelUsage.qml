@@ -30,7 +30,7 @@ BarModule {
         shell: QtObject {
             // The panel saves its whole settings object through this call.
             function updateEntryInline(id, settings) {
-                if (!settings || typeof settings !== "object" || Array.isArray(settings))
+                if (!settings || typeof settings !== "object" || (Array.isArray(settings) || settings instanceof Array))
                     return false;
                 Settings.setModuleOptions("modelusage", settings);
                 return true;

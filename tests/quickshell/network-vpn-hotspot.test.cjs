@@ -103,7 +103,7 @@ test("the drawer's VPN switch exists only for people with a VPN profile", () => 
     assert.doesNotMatch(drawer, /Repeater \{\s*model: NetworkDetails\.vpnProfiles/, "one compact row, not a list");
 
     const details = read("Common/NetworkDetails.qml");
-    assert.match(details, /readonly property var vpnProfiles: Array\.isArray\(snapshot\.vpns\) \? snapshot\.vpns : \[\]/);
+    assert.match(details, /readonly property var vpnProfiles: \(Array\.isArray\(snapshot\.vpns\) \|\| snapshot\.vpns instanceof Array\) \? snapshot\.vpns : \[\]/);
     assert.match(details, /id: vpnProc[\s\S]{0,200}?command: \["python3", root\.helper, "vpn"\]/);
     assert.match(details, /id: vpnProc[\s\S]{0,500}?onStarted: write\(JSON\.stringify\(root\.pendingVpnRequest\) \+ "\\n"\)/,
         "requests travel on stdin like every network-tool request");

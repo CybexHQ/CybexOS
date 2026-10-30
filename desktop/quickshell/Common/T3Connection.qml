@@ -213,7 +213,7 @@ Singleton {
             if (stateData.environmentLabel)
                 root.environmentLabel = stateData.environmentLabel;
             root.scopeMetadataKnown = typeof stateData.scope === "string"
-                || Array.isArray(stateData.scope);
+                || (Array.isArray(stateData.scope) || stateData.scope instanceof Array);
             root.tokenScope = root.scopeMetadataKnown ? stateData.scope : "";
             if (!socketLoader.active)
                 socketLoader.active = true;

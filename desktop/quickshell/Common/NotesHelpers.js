@@ -18,7 +18,7 @@ var TITLE_EFFORTS = {
 };
 
 function isObject(value) {
-    return value !== null && typeof value === "object" && !Array.isArray(value);
+    return value !== null && typeof value === "object" && !(Array.isArray(value) || value instanceof Array);
 }
 
 function hasOnlyKeys(value, keys) {
@@ -169,11 +169,11 @@ function compareRecords(left, right) {
 }
 
 function sortRecords(records) {
-    return (Array.isArray(records) ? records : []).map(copyRecord).sort(compareRecords);
+    return ((Array.isArray(records) || records instanceof Array) ? records : []).map(copyRecord).sort(compareRecords);
 }
 
 function validateRecords(records, legacy) {
-    if (!Array.isArray(records))
+    if (!(Array.isArray(records) || records instanceof Array))
         return { ok: false, reason: "notes is not an array" };
     var seen = Object.create(null);
     for (var i = 0; i < records.length; i++) {
@@ -242,7 +242,7 @@ function serializeState(records) {
 }
 
 function findRecord(records, id) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     for (var i = 0; i < list.length; i++) {
         if (list[i].id === id)
             return list[i];
@@ -251,7 +251,7 @@ function findRecord(records, id) {
 }
 
 function addRecord(records, body, id, now, title) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     if (isBlank(body) || !validId(id) || !validTimestamp(now)
             || findRecord(list, id) !== null)
         return { changed: false, records: sortRecords(list), record: null };
@@ -271,7 +271,7 @@ function addRecord(records, body, id, now, title) {
 }
 
 function updateRecord(records, id, body, now) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     if (isBlank(body))
         return removeRecord(list, id);
     if (!validTimestamp(now))
@@ -299,7 +299,7 @@ function updateRecord(records, id, body, now) {
 // title is represented by the generic untitled label rather than copying any
 // part of the note body into the title field.
 function updateTitleRecord(records, id, title, now) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     if (!validTimestamp(now))
         return { changed: false, records: sortRecords(list), record: null };
     var found = findRecord(list, id);
@@ -329,7 +329,7 @@ function updateTitleRecord(records, id, title, now) {
 // Model results are metadata: applying one must not make an otherwise
 // untouched note look newly edited or disturb its list position.
 function applyGeneratedTitle(records, id, title) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     var found = findRecord(list, id);
     var normalized = normalizeTitle(title);
     if (!found || normalized === "" || normalized === found.title)
@@ -375,7 +375,7 @@ function titleRequestCurrent(records, request, provider, model, effort) {
 }
 
 function removeRecord(records, id) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     var deleted = findRecord(list, id);
     if (!deleted)
         return { changed: false, records: sortRecords(list), deleted: null };
@@ -387,7 +387,7 @@ function removeRecord(records, id) {
 }
 
 function restoreDeleted(records, deleted) {
-    var list = Array.isArray(records) ? records : [];
+    var list = (Array.isArray(records) || records instanceof Array) ? records : [];
     if (!validRecord(deleted) || findRecord(list, deleted.id) !== null)
         return { changed: false, records: sortRecords(list), record: null };
     return {

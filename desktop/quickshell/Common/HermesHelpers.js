@@ -8,11 +8,11 @@ var TERMINAL_TOOL_STATES = ["completed", "complete", "done", "failed", "error",
     "cancelled", "canceled", "interrupted"];
 
 function object(value) {
-    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return value && typeof value === "object" && !(Array.isArray(value) || value instanceof Array) ? value : {};
 }
 
 function array(value) {
-    return Array.isArray(value) ? value : [];
+    return (Array.isArray(value) || value instanceof Array) ? value : [];
 }
 
 function string(value, fallback) {
@@ -179,7 +179,7 @@ function extractText(content, depth) {
         return content;
     if (typeof content === "number" || typeof content === "boolean")
         return String(content);
-    if (Array.isArray(content)) {
+    if ((Array.isArray(content) || content instanceof Array)) {
         return content.map(function(part) {
             return extractText(part, level + 1);
         }).filter(function(part) { return part.trim() !== ""; }).join("\n");
@@ -307,7 +307,7 @@ function messagePatch(raw, message) {
         patch.error = message.error;
     if (has("model", "modelName"))
         patch.model = message.model;
-    if (Array.isArray(value.attachments))
+    if ((Array.isArray(value.attachments) || value.attachments instanceof Array))
         patch.attachments = message.attachments;
     if (has("parentId", "parent_id", "parentMessageId", "parent_message_id"))
         patch.parentId = message.parentId;
@@ -378,14 +378,14 @@ function renderableMessage(message) {
 }
 
 function messageList(value) {
-    if (Array.isArray(value))
+    if ((Array.isArray(value) || value instanceof Array))
         return value;
     var data = object(value);
-    if (Array.isArray(data.messages))
+    if ((Array.isArray(data.messages) || data.messages instanceof Array))
         return data.messages;
-    if (Array.isArray(data.items))
+    if ((Array.isArray(data.items) || data.items instanceof Array))
         return data.items;
-    if (Array.isArray(data.history))
+    if ((Array.isArray(data.history) || data.history instanceof Array))
         return data.history;
     return [];
 }
@@ -487,7 +487,7 @@ function toolDetail(value) {
     }
     var text = "";
     if (parsed && typeof parsed === "object") {
-        if (!Array.isArray(parsed)) {
+        if (!(Array.isArray(parsed) || parsed instanceof Array)) {
             var preferred = firstString(parsed.summary, parsed.message,
                 parsed.result, parsed.output, parsed.error);
             if (preferred !== "")
@@ -671,7 +671,7 @@ function normalizeTodos(value) {
 function mergeSessionState(current, raw) {
     var next = Object.assign(emptySessionState(), object(current));
     var value = object(raw);
-    if (Array.isArray(value.todos))
+    if ((Array.isArray(value.todos) || value.todos instanceof Array))
         next.todos = normalizeTodos(value.todos);
     if (value.todoSummary && typeof value.todoSummary === "object")
         next.todoSummary = scalarProjection(value.todoSummary,

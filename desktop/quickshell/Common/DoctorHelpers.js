@@ -7,13 +7,13 @@ var STATES = ["ok", "suggestion", "problem", "info", "unknown"];
 // What needs the person, most important first.
 var RANK = {problem: 0, suggestion: 1};
 
-function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function object(value) { return value !== null && typeof value === "object" && !(Array.isArray(value) || value instanceof Array); }
 
 // The report, or null when it is not one this shell can read.
 function parse(text) {
     let value;
     try { value = typeof text === "string" ? JSON.parse(text) : text; } catch (_) { return null; }
-    if (!object(value) || value.version !== 1 || !Array.isArray(value.checks)
+    if (!object(value) || value.version !== 1 || !(Array.isArray(value.checks) || value.checks instanceof Array)
             || !["ok", "suggestion", "problem"].includes(value.overall))
         return null;
     const checks = value.checks.filter(check => object(check) && IDS.includes(check.id) && STATES.includes(check.state));

@@ -370,7 +370,7 @@ Singleton {
     // outgrows a box under a character.
     function handoff() {
         request("conversation.handoff", {}, (result, error) => {
-            if (error || !result || !Array.isArray(result.argv)) {
+            if (error || !result || !(Array.isArray(result.argv) || result.argv instanceof Array)) {
                 root.notice = error ? error.message : I18n.tr("Nothing to continue yet.");
                 return;
             }
@@ -412,7 +412,7 @@ Singleton {
             return false;
         Settings.set("assistantAgent", agentId);
         request("auth.login", { agent: agentId }, (result, error) => {
-            if (error || !result || !Array.isArray(result.argv)) {
+            if (error || !result || !(Array.isArray(result.argv) || result.argv instanceof Array)) {
                 root.notice = error ? error.message : I18n.tr("Sign-in could not start.");
                 return;
             }

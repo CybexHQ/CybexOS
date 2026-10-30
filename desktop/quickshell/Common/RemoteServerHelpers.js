@@ -198,18 +198,18 @@ function validSample(s) {
     return !!s && s.version === 1 && typeof s.boot === "string"
         && known(s.uptime) && (s.cpu === null || known(s.cpu))
         && s.meta && typeof s.meta.hostname === "string" && typeof s.meta.os === "string"
-        && Array.isArray(s.load) && s.load.length === 3 && s.load.every(known)
+        && (Array.isArray(s.load) || s.load instanceof Array) && s.load.length === 3 && s.load.every(known)
         && s.memory && known(s.memory.total) && (s.memory.used === null || known(s.memory.used))
         && (s.memory.available === null || known(s.memory.available))
-        && Array.isArray(s.perCore) && s.perCore.every(function(c) { return c === null || known(c); })
-        && Array.isArray(s.storage) && s.storage.every(function(d) {
+        && (Array.isArray(s.perCore) || s.perCore instanceof Array) && s.perCore.every(function(c) { return c === null || known(c); })
+        && (Array.isArray(s.storage) || s.storage instanceof Array) && s.storage.every(function(d) {
             return typeof d.mount === "string" && known(d.total) && known(d.free) && known(d.percent);
         })
-        && Array.isArray(s.network) && s.network.every(function(n) {
-            return typeof n.name === "string" && Array.isArray(n.addresses)
+        && (Array.isArray(s.network) || s.network instanceof Array) && s.network.every(function(n) {
+            return typeof n.name === "string" && (Array.isArray(n.addresses) || n.addresses instanceof Array)
                 && (n.rx === null || known(n.rx)) && (n.tx === null || known(n.tx));
         })
-        && Array.isArray(s.temperatures) && s.temperatures.every(function(t) {
+        && (Array.isArray(s.temperatures) || s.temperatures instanceof Array) && s.temperatures.every(function(t) {
             return typeof t.name === "string" && known(t.celsius);
         });
 }

@@ -36,9 +36,9 @@ function parseSnapshot(text) {
     try {
         var value = JSON.parse(text);
         if (!value || value.v !== 1 || ["shared", "per-monitor"].indexOf(value.mode) === -1
-                || !Array.isArray(value.monitors) || value.monitors.length > 32
-                || !Array.isArray(value.workspaces) || value.workspaces.length > 2048
-                || !Array.isArray(value.minimized) || value.minimized.length > 4096)
+                || !(Array.isArray(value.monitors) || value.monitors instanceof Array) || value.monitors.length > 32
+                || !(Array.isArray(value.workspaces) || value.workspaces instanceof Array) || value.workspaces.length > 2048
+                || !(Array.isArray(value.minimized) || value.minimized instanceof Array) || value.minimized.length > 4096)
             return null;
         var defaultLayout = layout(value.defaultLayout);
         var defaultLayoutManaged = value.defaultLayoutManaged !== false;
@@ -69,7 +69,7 @@ function parseSnapshot(text) {
         var names = {};
         var monitors = value.monitors.map(function(row) {
             if (!row || typeof row.name !== "string" || !row.name || row.name.length > 256
-                    || names[row.name] || !Array.isArray(row.workspaces)
+                    || names[row.name] || !(Array.isArray(row.workspaces) || row.workspaces instanceof Array)
                     || row.workspaces.some(function(id) { return !regularId(id) || !ids[id]; }))
                 throw new Error("invalid monitor");
             names[row.name] = true;

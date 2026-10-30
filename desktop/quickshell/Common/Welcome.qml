@@ -350,7 +350,7 @@ Singleton {
         onCompleted: (code, body, detail) => {
             try {
                 const rows = JSON.parse(body);
-                if (code !== 0 || !Array.isArray(rows)) throw new Error("list");
+                if (code !== 0 || !(Array.isArray(rows) || rows instanceof Array)) throw new Error("list");
                 root.webapps = rows.filter(row => row && typeof row.id === "string" && typeof row.name === "string");
                 root.webappsError = "";
             } catch (_) { root.webappsError = I18n.tr("Web apps could not be read. Open Software to manage your apps."); }

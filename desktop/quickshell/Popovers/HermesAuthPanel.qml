@@ -136,7 +136,7 @@ Item {
                 root.localErrorText = "The local provider rejected the connection.";
                 return;
             }
-            if (model === "" && Array.isArray(value.models) && value.models.length > 0)
+            if (model === "" && (Array.isArray(value.models) || value.models instanceof Array) && value.models.length > 0)
                 model = String(value.models[0]);
             if (model === "") {
                 root.localErrorText = "Enter the model ID exposed by this provider.";

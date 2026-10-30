@@ -241,7 +241,7 @@ test("closing settings releases the page after a short keep-alive", () => {
 test("plugin discovery keeps the last good state and cannot wedge", () => {
     const plugins = read("Common/UserPlugins.qml");
     const handler = functionSource(plugins, "settleDiscovery");
-    const guard = handler.indexOf("if (!result || result.error || !Array.isArray(result.plugins))");
+    const guard = handler.indexOf("if (!result || result.error || !(Array.isArray(result.plugins) || result.plugins instanceof Array))");
     assert.ok(guard > 0, "a registry error must not be applied");
     assert.ok(guard < handler.indexOf("plugins = result.plugins"));
     assert.match(plugins, /id: scanWatchdog[^]*?scanner\.running = false;/);

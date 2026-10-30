@@ -346,7 +346,7 @@ Singleton {
     }
 
     function saveBarConfig(config) {
-        if (!config || typeof config !== "object" || Array.isArray(config)) return false;
+        if (!config || typeof config !== "object" || (Array.isArray(config) || config instanceof Array)) return false;
         UserPlugins.enqueue(["python3", UserPlugins.helper, "bar-config", JSON.stringify(config)]);
         return true;
     }
@@ -354,7 +354,7 @@ Singleton {
     function placeWidget(id, placementJson, operation) {
         try {
             const placement = JSON.parse(placementJson || "{}");
-            if (!placement || typeof placement !== "object" || Array.isArray(placement)) return "invalid placement";
+            if (!placement || typeof placement !== "object" || (Array.isArray(placement) || placement instanceof Array)) return "invalid placement";
             id = resolveId(id);
             const item = UserPlugins.plugins.find(entry => entry.id === id && !entry.error);
             if (!item) return "unknown";
@@ -412,7 +412,7 @@ Singleton {
         try {
             const selector = JSON.parse(selectorJson || "{}");
             const value = JSON.parse(valueJson);
-            if (!selector || typeof selector !== "object" || Array.isArray(selector) || ["id", "__cybexosInstance"].includes(key)) return "invalid selector or key";
+            if (!selector || typeof selector !== "object" || (Array.isArray(selector) || selector instanceof Array) || ["id", "__cybexosInstance"].includes(key)) return "invalid selector or key";
             const layout = JSON.parse(JSON.stringify(barConfig.layout));
             const section = selector.fromSection || selector.section;
             const index = selector.fromIndex !== undefined ? selector.fromIndex : selector.index;

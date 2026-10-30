@@ -68,7 +68,7 @@ QtObject {
   }
 
   function isPlainObject(value) {
-    return value !== null && typeof value === "object" && !Array.isArray(value)
+    return value !== null && typeof value === "object" && !(Array.isArray(value) || value instanceof Array)
   }
 
   function canonicalWidgetId(id) {
@@ -139,7 +139,7 @@ QtObject {
   }
 
   function normalizeLayoutSection(list) {
-    if (!Array.isArray(list)) return []
+    if (!(Array.isArray(list) || list instanceof Array)) return []
     var out = []
     for (var i = 0; i < list.length; i++) {
       var e = normalizeLayoutEntry(list[i])

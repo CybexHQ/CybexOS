@@ -95,7 +95,7 @@ function liveAgentCount(activities, sessionLive) {
             return;
         agent.status = status;
     };
-    var values = Array.isArray(activities) ? activities : [];
+    var values = (Array.isArray(activities) || activities instanceof Array) ? activities : [];
     for (var i = 0; i < values.length; i++) {
         var activity = values[i];
         if (!activity || typeof activity !== "object"
@@ -191,14 +191,14 @@ function liveAgentCount(activities, sessionLive) {
 // to the small, stable shape the compact thread progress card needs.
 function taskProgress(activities, turnId) {
     var targetTurnId = typeof turnId === "string" ? turnId : "";
-    var values = Array.isArray(activities) ? activities : [];
+    var values = (Array.isArray(activities) || activities instanceof Array) ? activities : [];
     var latest = null;
     for (var i = 0; i < values.length; i++) {
         var activity = values[i];
         if (!activity || activity.kind !== "turn.plan.updated"
                 || targetTurnId !== "" && activity.turnId !== targetTurnId)
             continue;
-        var rawPlan = activity.payload && Array.isArray(activity.payload.plan)
+        var rawPlan = activity.payload && (Array.isArray(activity.payload.plan) || activity.payload.plan instanceof Array)
             ? activity.payload.plan : [];
         var items = [];
         for (var planIndex = 0; planIndex < rawPlan.length; planIndex++) {
@@ -524,7 +524,7 @@ function normalizeScopes(rawScope, metadataKnown) {
     if (known && typeof rawScope === "string") {
         values = rawScope.split(/\s+/).map(function(value) { return value.trim(); })
             .filter(function(value) { return value !== ""; });
-    } else if (known && Array.isArray(rawScope)) {
+    } else if (known && (Array.isArray(rawScope) || rawScope instanceof Array)) {
         values = rawScope.filter(function(value) { return typeof value === "string"; });
     }
     return {
@@ -560,7 +560,7 @@ function sanitizeDescriptor(raw) {
             currentValue: typeof raw.currentValue === "boolean" ? raw.currentValue : false
         };
     }
-    if (raw.type !== "select" || !Array.isArray(raw.options))
+    if (raw.type !== "select" || !(Array.isArray(raw.options) || raw.options instanceof Array))
         return null;
     var choices = raw.options.map(sanitizeChoice).filter(function(choice) { return choice !== null; });
     if (choices.length === 0)
@@ -572,7 +572,7 @@ function sanitizeDescriptor(raw) {
         type: "select",
         options: choices,
         currentValue: typeof raw.currentValue === "string" ? raw.currentValue.trim() : "",
-        promptInjectedValues: Array.isArray(raw.promptInjectedValues)
+        promptInjectedValues: (Array.isArray(raw.promptInjectedValues) || raw.promptInjectedValues instanceof Array)
             ? raw.promptInjectedValues.filter(function(value) {
                 return typeof value === "string" && value.trim() !== "";
             }).map(function(value) { return value.trim(); }) : []
@@ -582,7 +582,7 @@ function sanitizeDescriptor(raw) {
 function sanitizeModel(raw) {
     if (!raw || typeof raw.slug !== "string" || raw.slug.trim() === "")
         return null;
-    var descriptors = raw.capabilities && Array.isArray(raw.capabilities.optionDescriptors)
+    var descriptors = raw.capabilities && (Array.isArray(raw.capabilities.optionDescriptors) || raw.capabilities.optionDescriptors instanceof Array)
         ? raw.capabilities.optionDescriptors.map(sanitizeDescriptor)
             .filter(function(value) { return value !== null; }) : [];
     return {
@@ -613,13 +613,13 @@ function sanitizeServerConfig(config) {
         threadTitleRegeneration: rawCapabilities.threadTitleRegeneration === true
     };
     var providers = [];
-    var rawProviders = config && Array.isArray(config.providers) ? config.providers : [];
+    var rawProviders = config && (Array.isArray(config.providers) || config.providers instanceof Array) ? config.providers : [];
     for (var i = 0; i < rawProviders.length; i++) {
         var raw = rawProviders[i];
         if (!raw || typeof raw.instanceId !== "string" || raw.instanceId.trim() === ""
                 || typeof raw.driver !== "string" || raw.driver.trim() === "")
             continue;
-        var models = Array.isArray(raw.models) ? raw.models.map(sanitizeModel)
+        var models = (Array.isArray(raw.models) || raw.models instanceof Array) ? raw.models.map(sanitizeModel)
             .filter(function(value) { return value !== null; }) : [];
         providers.push({
             instanceId: raw.instanceId.trim(),
@@ -653,7 +653,7 @@ function sanitizeServerConfig(config) {
 }
 
 function findProvider(providers, instanceId) {
-    var list = Array.isArray(providers) ? providers : [];
+    var list = (Array.isArray(providers) || providers instanceof Array) ? providers : [];
     for (var i = 0; i < list.length; i++) {
         if (list[i].instanceId === instanceId)
             return list[i];
@@ -662,7 +662,7 @@ function findProvider(providers, instanceId) {
 }
 
 function findModel(provider, slug) {
-    if (!provider || !Array.isArray(provider.models))
+    if (!provider || !(Array.isArray(provider.models) || provider.models instanceof Array))
         return null;
     for (var i = 0; i < provider.models.length; i++) {
         if (provider.models[i].slug === slug)
@@ -736,7 +736,7 @@ function threadSelectionLabel(thread, providers) {
 }
 
 function defaultModel(provider) {
-    if (!provider || !Array.isArray(provider.models) || provider.models.length === 0)
+    if (!provider || !(Array.isArray(provider.models) || provider.models instanceof Array) || provider.models.length === 0)
         return "";
     var i;
     for (i = 0; i < provider.models.length; i++) {
@@ -752,14 +752,14 @@ function defaultModel(provider) {
 
 function selectionObject(instanceId, model, options) {
     var result = { instanceId: instanceId, model: model };
-    if (Array.isArray(options) && options.length > 0)
+    if ((Array.isArray(options) || options instanceof Array) && options.length > 0)
         result.options = options;
     return result;
 }
 
 function selectionValues(rawSelections) {
     var values = {};
-    if (Array.isArray(rawSelections)) {
+    if ((Array.isArray(rawSelections) || rawSelections instanceof Array)) {
         for (var i = 0; i < rawSelections.length; i++) {
             var selection = rawSelections[i];
             if (selection && typeof selection.id === "string"
@@ -778,7 +778,7 @@ function selectionValues(rawSelections) {
 function normalizeTraits(descriptors, rawSelections) {
     var values = selectionValues(rawSelections);
     var normalized = [];
-    var source = Array.isArray(descriptors) ? descriptors : [];
+    var source = (Array.isArray(descriptors) || descriptors instanceof Array) ? descriptors : [];
     for (var i = 0; i < source.length; i++) {
         var descriptor = sanitizeDescriptor(source[i]);
         if (!descriptor)
@@ -810,7 +810,7 @@ function normalizeTraits(descriptors, rawSelections) {
 
 function traitSelections(descriptors) {
     var result = [];
-    var source = Array.isArray(descriptors) ? descriptors : [];
+    var source = (Array.isArray(descriptors) || descriptors instanceof Array) ? descriptors : [];
     for (var i = 0; i < source.length; i++) {
         var descriptor = source[i];
         if (!descriptor || typeof descriptor.id !== "string")
@@ -879,7 +879,7 @@ function applyTraitValue(descriptors, descriptorId, rawValue, prompt) {
 }
 
 function preferredEffortSelection(model, requestedEffort) {
-    if (!model || !Array.isArray(model.optionDescriptors)
+    if (!model || !(Array.isArray(model.optionDescriptors) || model.optionDescriptors instanceof Array)
             || typeof requestedEffort !== "string" || requestedEffort === "")
         return null;
     var wanted = requestedEffort.toLowerCase();
@@ -909,8 +909,8 @@ function selectionForNewThread(project, providers, preference) {
     var fallback = selectionForProject(project, providers);
     if (!preference || typeof preference.model !== "string" || preference.model === "")
         return fallback;
-    var ready = (Array.isArray(providers) ? providers : []).filter(function(provider) {
-        return provider.ready === true && Array.isArray(provider.models)
+    var ready = ((Array.isArray(providers) || providers instanceof Array) ? providers : []).filter(function(provider) {
+        return provider.ready === true && (Array.isArray(provider.models) || provider.models instanceof Array)
             && provider.models.length > 0;
     });
     var candidates = [];
@@ -948,8 +948,8 @@ function selectionForNewThread(project, providers, preference) {
 }
 
 function selectionForProject(project, providers) {
-    var ready = (Array.isArray(providers) ? providers : []).filter(function(provider) {
-        return provider.ready === true && Array.isArray(provider.models) && provider.models.length > 0;
+    var ready = ((Array.isArray(providers) || providers instanceof Array) ? providers : []).filter(function(provider) {
+        return provider.ready === true && (Array.isArray(provider.models) || provider.models instanceof Array) && provider.models.length > 0;
     });
     var preferred = project && project.defaultModelSelection
         ? project.defaultModelSelection : null;
@@ -978,8 +978,8 @@ function selectionForProject(project, providers) {
 // model disappeared, show the provider's current default instead of leaving
 // the composer in an impossible, unsendable state.
 function selectionForThread(thread, providers) {
-    var ready = (Array.isArray(providers) ? providers : []).filter(function(provider) {
-        return provider.ready === true && Array.isArray(provider.models)
+    var ready = ((Array.isArray(providers) || providers instanceof Array) ? providers : []).filter(function(provider) {
+        return provider.ready === true && (Array.isArray(provider.models) || provider.models instanceof Array)
             && provider.models.length > 0;
     });
     if (ready.length === 0)
@@ -1028,7 +1028,7 @@ function threadStarted(thread, detailMessageCount) {
 }
 
 function selectableProvidersForThread(thread, providers, detailMessageCount) {
-    var ready = (Array.isArray(providers) ? providers : []).filter(function(provider) {
+    var ready = ((Array.isArray(providers) || providers instanceof Array) ? providers : []).filter(function(provider) {
         return provider.ready === true && provider.models.length > 0;
     });
     if (!threadStarted(thread, detailMessageCount))
@@ -1086,7 +1086,7 @@ function modelFavoriteKey(instanceId, slug) {
 
 function favoriteKeySet(favorites) {
     var keys = {};
-    var list = Array.isArray(favorites) ? favorites : [];
+    var list = (Array.isArray(favorites) || favorites instanceof Array) ? favorites : [];
     for (var i = 0; i < list.length; i++) {
         var entry = list[i];
         if (entry && typeof entry.instanceId === "string" && typeof entry.model === "string")
@@ -1098,7 +1098,7 @@ function favoriteKeySet(favorites) {
 // Rail entries are every *configured* instance, not only the working ones:
 // a provider that needs a login should be visible and say so, not vanish.
 function providerRailEntries(providers) {
-    var list = Array.isArray(providers) ? providers : [];
+    var list = (Array.isArray(providers) || providers instanceof Array) ? providers : [];
     var entries = [];
     for (var i = 0; i < list.length; i++) {
         var provider = list[i];
@@ -1208,7 +1208,7 @@ function pickerModelRow(provider, model, favorites) {
 // rejects still appears, but carries the reason it cannot be chosen, because
 // a silently missing option looks like a bug in the server.
 function pickerModelRows(providers, favorites, allow) {
-    var list = Array.isArray(providers) ? providers : [];
+    var list = (Array.isArray(providers) || providers instanceof Array) ? providers : [];
     var keys = favoriteKeySet(favorites);
     var rows = [];
     for (var i = 0; i < list.length; i++) {
@@ -1299,7 +1299,7 @@ function modelPickerRows(options) {
 // be chosen, so a disabled model does not consume a digit.
 function assignPickerShortcuts(rows) {
     var next = 1;
-    var list = Array.isArray(rows) ? rows : [];
+    var list = (Array.isArray(rows) || rows instanceof Array) ? rows : [];
     for (var i = 0; i < list.length; i++) {
         var usable = list[i].kind === "model" && !list[i].disabledReason;
         list[i].shortcut = usable && next <= 9 ? String(next) : "";
@@ -1312,8 +1312,8 @@ function assignPickerShortcuts(rows) {
 function sameSelection(left, right) {
     if (!left || !right || left.instanceId !== right.instanceId || left.model !== right.model)
         return false;
-    var leftOptions = Array.isArray(left.options) ? left.options : [];
-    var rightOptions = Array.isArray(right.options) ? right.options : [];
+    var leftOptions = (Array.isArray(left.options) || left.options instanceof Array) ? left.options : [];
+    var rightOptions = (Array.isArray(right.options) || right.options instanceof Array) ? right.options : [];
     return JSON.stringify(leftOptions) === JSON.stringify(rightOptions);
 }
 
@@ -1503,7 +1503,7 @@ function snoozeWakeLabel(snoozedUntil, nowMs) {
 }
 
 function historyPage(messages, visibleCount) {
-    var source = Array.isArray(messages) ? messages : [];
+    var source = (Array.isArray(messages) || messages instanceof Array) ? messages : [];
     var count = Math.max(10, Math.floor(visibleCount || 10));
     var start = Math.max(0, source.length - count);
     return { items: source.slice(start), hasEarlier: start > 0, hiddenCount: start };
@@ -1543,7 +1543,7 @@ function compareHistory(left, right) {
 
 // A sorted copy. Keys are computed once per entry; ties keep input order.
 function sortHistory(values) {
-    var source = Array.isArray(values) ? values : [];
+    var source = (Array.isArray(values) || values instanceof Array) ? values : [];
     var decorated = [];
     for (var i = 0; i < source.length; i++)
         decorated.push({ key: historySortKey(source[i]), value: source[i], at: i });
@@ -1562,7 +1562,7 @@ function sortHistory(values) {
 // costs one comparison with each neighbour; anything else is a binary insert
 // after its equals, which is where a push followed by a stable sort puts it.
 function upsertHistory(values, value, idField) {
-    var next = Array.isArray(values) ? values.slice() : [];
+    var next = (Array.isArray(values) || values instanceof Array) ? values.slice() : [];
     if (!value)
         return next;
     var key = value[idField];
@@ -1635,7 +1635,7 @@ var HISTORY_ROW_FIELDS = ["speakerRole", "body", "streaming", "timestamp", "long
 // One flat, consistently typed ListModel row per message. `continuation`
 // marks a message whose speaker matches the one before it on this page.
 function historyRows(items) {
-    var source = Array.isArray(items) ? items : [];
+    var source = (Array.isArray(items) || items instanceof Array) ? items : [];
     var rows = [];
     var previousRole = null;
     for (var i = 0; i < source.length; i++) {
@@ -1665,8 +1665,8 @@ function historyRows(items) {
 // { op: "remove", index, count }, { op: "insert", index, row } and
 // { op: "set", index, changes } with only the fields that differ.
 function keyedRowOps(current, next, keyField, fields) {
-    var work = Array.isArray(current) ? current.slice() : [];
-    var wanted = Array.isArray(next) ? next : [];
+    var work = (Array.isArray(current) || current instanceof Array) ? current.slice() : [];
+    var wanted = (Array.isArray(next) || next instanceof Array) ? next : [];
     var ops = [];
     for (var n = 0; n < wanted.length; n++) {
         var row = wanted[n];
@@ -1721,7 +1721,7 @@ function applyShellItems(threadMap, projectMap, items) {
         dirty: false, ready: false, threadsChanged: false, projectsChanged: false,
         events: []
     };
-    var source = Array.isArray(items) ? items : [];
+    var source = (Array.isArray(items) || items instanceof Array) ? items : [];
     for (var i = 0; i < source.length; i++) {
         var item = source[i];
         if (!item || typeof item !== "object")
@@ -1732,8 +1732,8 @@ function applyShellItems(threadMap, projectMap, items) {
             threads = {};
             projects = {};
             ownThreads = ownProjects = true;
-            var snapshotProjects = Array.isArray(snapshot.projects) ? snapshot.projects : [];
-            var snapshotThreads = Array.isArray(snapshot.threads) ? snapshot.threads : [];
+            var snapshotProjects = (Array.isArray(snapshot.projects) || snapshot.projects instanceof Array) ? snapshot.projects : [];
+            var snapshotThreads = (Array.isArray(snapshot.threads) || snapshot.threads instanceof Array) ? snapshot.threads : [];
             for (var p = 0; p < snapshotProjects.length; p++)
                 projects[snapshotProjects[p].id] = snapshotProjects[p];
             for (var t = 0; t < snapshotThreads.length; t++)
@@ -1894,7 +1894,7 @@ function findErrorText(value, depth) {
     if (typeof value !== "object")
         return "";
     var found;
-    if (Array.isArray(value)) {
+    if ((Array.isArray(value) || value instanceof Array)) {
         for (var i = 0; i < value.length; i++) {
             found = findErrorText(value[i], depth + 1);
             if (found !== "" && found !== "Failure")
@@ -2049,7 +2049,7 @@ function sanitizeVcsStatus(raw) {
         refName: typeof raw.refName === "string" ? raw.refName : "",
         isDefaultRef: raw.isDefaultRef === true,
         hasWorkingTreeChanges: raw.hasWorkingTreeChanges === true,
-        fileCount: Array.isArray(workingTree.files) ? workingTree.files.length : 0,
+        fileCount: (Array.isArray(workingTree.files) || workingTree.files instanceof Array) ? workingTree.files.length : 0,
         insertions: count(workingTree.insertions),
         deletions: count(workingTree.deletions),
         hasPrimaryRemote: raw.hasPrimaryRemote === true,

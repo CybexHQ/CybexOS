@@ -128,7 +128,7 @@ Singleton {
             return rejectAction(key, "This pairing is read-only", opts.awaitResolution);
         if (T3Connection.state !== "connected")
             return rejectAction(key, "Not connected", opts.awaitResolution);
-        if (!Array.isArray(commands) || commands.length === 0)
+        if (!(Array.isArray(commands) || commands instanceof Array) || commands.length === 0)
             return rejectAction(key, "Nothing to send", opts.awaitResolution);
 
         const firstId = commands[0].commandId ?? T3Rpc.genId();
@@ -190,7 +190,7 @@ Singleton {
         const key = actionKey("input", threadId, requestId);
         const normalized = {};
         let answerCount = 0;
-        if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
+        if (!answers || typeof answers !== "object" || (Array.isArray(answers) || answers instanceof Array)) {
             putActionState(key, { pending: false, error: "Every question needs an answer",
                 commandId: "", awaitResolution: true, startedAt: Date.now() });
             return "";
@@ -203,7 +203,7 @@ Singleton {
                     continue;
                 normalized[questionId] = answer;
                 answerCount++;
-            } else if (Array.isArray(value)) {
+            } else if ((Array.isArray(value) || value instanceof Array)) {
                 const labels = value.filter(label => typeof label === "string")
                     .map(label => label.trim()).filter(label => label !== "");
                 if (labels.length === 0)
@@ -261,7 +261,7 @@ Singleton {
         const key = actionKey("bulk-settle", "", "");
         if (!supportsSettlement)
             return rejectAction(key, "Settlement is not supported by this server", false);
-        const ids = Array.isArray(threadIds) ? threadIds.filter(id =>
+        const ids = (Array.isArray(threadIds) || threadIds instanceof Array) ? threadIds.filter(id =>
             Helpers.canOperateLifecycle(T3Threads.threadMap[id], Date.now())) : [];
         const commands = ids.map(id => ({
             type: "thread.settle", commandId: T3Rpc.genId(), threadId: id

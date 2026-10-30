@@ -68,7 +68,7 @@ Singleton {
     property var providerConfigurations: []
     readonly property bool hasReadyProvider: configReady
         && providerConfigurations.some(provider => provider.ready === true
-            && Array.isArray(provider.models) && provider.models.length > 0)
+            && (Array.isArray(provider.models) || provider.models instanceof Array) && provider.models.length > 0)
     readonly property bool supportsSettlement: T3Rpc.supportsSettlement
     readonly property bool supportsSnooze: T3Rpc.supportsSnooze
     readonly property bool supportsTitleRegeneration: T3Rpc.supportsTitleRegeneration
@@ -271,7 +271,7 @@ Singleton {
         } catch (e) {
             return;
         }
-        if (!Array.isArray(msgs))
+        if (!(Array.isArray(msgs) || msgs instanceof Array))
             msgs = [msgs];
         let dirty = false;
         for (const msg of msgs) {
@@ -286,7 +286,7 @@ Singleton {
                     if (!wasReady && T3Threads.shellReady)
                         T3Connection.markHealthy();
                 } else if (T3Rpc.rpcHandlers[reqId]) {
-                    for (const item of (Array.isArray(msg.values) ? msg.values : []))
+                    for (const item of ((Array.isArray(msg.values) || msg.values instanceof Array) ? msg.values : []))
                         T3Rpc.rpcHandlers[reqId].item?.(item);
                 }
             } else if (msg._tag === "Exit") {

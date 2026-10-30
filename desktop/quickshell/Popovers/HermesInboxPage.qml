@@ -140,7 +140,7 @@ Item {
     }
 
     function priorityConversations() {
-        const conversations = Array.isArray(Hermes.conversations)
+        const conversations = (Array.isArray(Hermes.conversations) || Hermes.conversations instanceof Array)
             ? Hermes.conversations : [];
         const ordered = [];
         for (const priority of ["attention", "error", "working", "unread"])

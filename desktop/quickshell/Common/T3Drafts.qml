@@ -63,7 +63,7 @@ Singleton {
     }
 
     function canonicalOptions(raw) {
-        if (Array.isArray(raw))
+        if ((Array.isArray(raw) || raw instanceof Array))
             return raw.filter(option => option && typeof option.id === "string"
                 && (typeof option.value === "string" || typeof option.value === "boolean"))
                 .map(option => ({ id: option.id, value: option.value }));
@@ -395,7 +395,7 @@ Singleton {
             prompt: typeof prompt === "string" ? prompt : "",
             instanceId: selection ? selection.instanceId : "",
             model: selection ? selection.model : "",
-            options: selection && Array.isArray(selection.options) ? selection.options : [],
+            options: selection && (Array.isArray(selection.options) || selection.options instanceof Array) ? selection.options : [],
             runtimeMode: "full-access",
             interactionMode: "default",
             sourceProposedPlan: sourceProposedPlan ?? null,
@@ -653,7 +653,7 @@ Singleton {
 
     function inputSelectedLabels(threadId, requestId, questionId) {
         const selected = inputDraft(threadId, requestId, questionId).selected;
-        return Array.isArray(selected) ? selected : [];
+        return (Array.isArray(selected) || selected instanceof Array) ? selected : [];
     }
 
     function inputCustomAnswer(threadId, requestId, questionId) {
@@ -666,7 +666,7 @@ Singleton {
             return;
         const key = inputDraftKey(threadId, requestId, questionId);
         const current = inputDraft(threadId, requestId, questionId);
-        let selected = Array.isArray(current.selected) ? current.selected.slice() : [];
+        let selected = (Array.isArray(current.selected) || current.selected instanceof Array) ? current.selected.slice() : [];
         if (multiSelect === true) {
             const at = selected.indexOf(label);
             if (at >= 0)
@@ -688,7 +688,7 @@ Singleton {
         const next = Object.assign({}, userInputDrafts);
         next[key] = {
             selected: custom.trim() !== "" ? []
-                : (Array.isArray(current.selected) ? current.selected : []),
+                : ((Array.isArray(current.selected) || current.selected instanceof Array) ? current.selected : []),
             custom: custom
         };
         userInputDrafts = next;
@@ -712,7 +712,7 @@ Singleton {
         const custom = typeof draft.custom === "string" ? draft.custom.trim() : "";
         if (custom !== "")
             return custom;
-        const selected = Array.isArray(draft.selected)
+        const selected = (Array.isArray(draft.selected) || draft.selected instanceof Array)
             ? draft.selected.filter(label => typeof label === "string" && label.trim() !== "") : [];
         if (question.multiSelect === true)
             return selected.length > 0 ? selected : null;
@@ -724,7 +724,7 @@ Singleton {
     }
 
     function buildInputAnswers(threadId, pendingInput) {
-        if (!pendingInput || !Array.isArray(pendingInput.questions)
+        if (!pendingInput || !(Array.isArray(pendingInput.questions) || pendingInput.questions instanceof Array)
                 || pendingInput.questions.length === 0)
             return null;
         const answers = {};

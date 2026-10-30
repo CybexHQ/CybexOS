@@ -28,7 +28,7 @@ function optionLabel(value) {
 }
 
 function normalizeOptions(options) {
-    if (!Array.isArray(options))
+    if (!(Array.isArray(options) || options instanceof Array))
         return [];
     var seen = {};
     var result = [];
@@ -62,7 +62,7 @@ function fits(field, value) {
     case "enum":
         return hasOption(field.options, value);
     case "multiselect":
-        return Array.isArray(value) && value.every(function(item) {
+        return (Array.isArray(value) || value instanceof Array) && value.every(function(item) {
             return hasOption(field.options, item);
         });
     case "integer":
@@ -87,7 +87,7 @@ function same(a, b) {
 // own `defaultValue` wins over it.
 function fields(manifest, settings, defaults) {
     var widget = manifest && manifest.barWidget;
-    var schema = widget && Array.isArray(widget.schema) ? widget.schema : [];
+    var schema = widget && (Array.isArray(widget.schema) || widget.schema instanceof Array) ? widget.schema : [];
     var saved = settings && typeof settings === "object" ? settings : {};
     var fallback = defaults && typeof defaults === "object" ? defaults : {};
     var taken = {};
@@ -141,7 +141,7 @@ function fields(manifest, settings, defaults) {
 
 // A multiselect after toggling one option, kept in the schema's option order.
 function toggled(field, current, value) {
-    var chosen = Array.isArray(current) ? current : [];
+    var chosen = (Array.isArray(current) || current instanceof Array) ? current : [];
     var on = chosen.indexOf(value) >= 0;
     return field.options.map(function(option) { return option.value; })
         .filter(function(item) { return item === value ? !on : chosen.indexOf(item) >= 0; });

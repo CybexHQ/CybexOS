@@ -32,13 +32,13 @@ Item {
     }
 
     function selectedLabel() {
-        const found = (Array.isArray(options) ? options : [])
+        const found = ((Array.isArray(options) || options instanceof Array) ? options : [])
             .find(option => optionId(option) === value);
         return found ? optionLabel(found) : text;
     }
 
     function move(delta) {
-        const choices = (Array.isArray(options) ? options : [])
+        const choices = ((Array.isArray(options) || options instanceof Array) ? options : [])
             .filter(option => option.disabled !== true);
         if (choices.length === 0)
             return;

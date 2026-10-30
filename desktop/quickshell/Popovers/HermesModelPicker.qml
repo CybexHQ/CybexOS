@@ -31,7 +31,7 @@ Item {
     z: expanded ? 100 : 0
 
     function configuredModelGroup() {
-        const source = Array.isArray(groups) ? groups : [];
+        const source = (Array.isArray(groups) || groups instanceof Array) ? groups : [];
         const configured = String(Hermes.defaultModelProvider ?? "");
         return source.find(group =>
             String(group.providerId ?? "") === configured) ?? source[0] ?? null;
@@ -44,7 +44,7 @@ Item {
         if (!group)
             return result;
         const providerId = String(group.providerId ?? "");
-        for (const candidate of (Array.isArray(group.models) ? group.models : [])) {
+        for (const candidate of ((Array.isArray(group.models) || group.models instanceof Array) ? group.models : [])) {
             const id = String(candidate.id ?? "");
             const name = String(candidate.label ?? id);
             if (needle !== "" && (id + " " + name).toLowerCase()

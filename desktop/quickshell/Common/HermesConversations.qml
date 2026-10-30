@@ -107,7 +107,7 @@ Singleton {
 
     function messagesFor(conversationId) {
         const value = messagesByConversation[conversationId];
-        return Array.isArray(value) ? value : [];
+        return (Array.isArray(value) || value instanceof Array) ? value : [];
     }
 
     function storeMessages(conversationId, value) {
@@ -156,7 +156,7 @@ Singleton {
 
     function toolsFor(conversationId) {
         const value = toolsByConversation[conversationId];
-        return Array.isArray(value) ? value : [];
+        return (Array.isArray(value) || value instanceof Array) ? value : [];
     }
 
     function sessionStateFor(conversationId) {
@@ -198,7 +198,7 @@ Singleton {
 
     function requestsFor(conversationId) {
         const value = requestsByConversation[conversationId];
-        return Array.isArray(value) ? value : [];
+        return (Array.isArray(value) || value instanceof Array) ? value : [];
     }
 
     function draft(conversationId) {
@@ -289,10 +289,10 @@ Singleton {
     }
 
     function normalizedConversations(value) {
-        const source = Array.isArray(value) ? value
-            : value && Array.isArray(value.conversations) ? value.conversations
-                : value && Array.isArray(value.sessions) ? value.sessions
-                    : value && Array.isArray(value.items) ? value.items : [];
+        const source = (Array.isArray(value) || value instanceof Array) ? value
+            : value && (Array.isArray(value.conversations) || value.conversations instanceof Array) ? value.conversations
+                : value && (Array.isArray(value.sessions) || value.sessions instanceof Array) ? value.sessions
+                    : value && (Array.isArray(value.items) || value.items instanceof Array) ? value.items : [];
         return source.map((conversation, index) =>
             Helpers.normalizeConversation(conversation, index));
     }
