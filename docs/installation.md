@@ -383,8 +383,13 @@ guide leaves Hyprland's layer list) and the keyboard shortcuts
 key, a complete error-free `keybindings-state.json`, the xkbcli keymap, a remap
 and website shortcut applied and reset through the shipped Settings
 `keybindings` service with `user.lua` unchanged, Settings opened on
-**Keyboard shortcuts**, and no onboarding QML errors in the shell's journal. `--applications minimal` explicitly selects fewer optional
-groups; it does not qualify the standard application selection. VM files are
+**Keyboard shortcuts**, and no onboarding QML errors in the shell's journal.
+Proprietary applications are on by default (`proprietaryApplications`): the
+reviewed plan keeps them, 1Password is installed, the open guide's Connect
+step offers it, and `cybex software check` rates every unfree catalogue app
+as a vendor download that compiles nothing. `--applications minimal`
+explicitly selects fewer optional groups, without proprietary applications,
+and checks the reverse; it does not qualify the standard application selection. VM files are
 removed when the tool exits. Screenshots and JSON evidence are retained only
 when requested. `--serial-console` is an installer option for this isolated test;
 normal interactive installations do not enable a serial console.

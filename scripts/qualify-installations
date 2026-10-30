@@ -520,6 +520,46 @@ if path.exists():
 print('Bibata desktop/session cursor, local discovery, firewall, and saved widget defaults passed')
 QA_DEFAULTS''', timeout=60)
 
+    def proprietary_applications(self, expected):
+        """Proprietary applications are on by default: 1Password is installed,
+        the open guide's Connect step offers it, and Software adds every unfree
+        catalogue app as a vendor download that compiles nothing. Without them
+        (the minimal selection) neither 1Password nor those apps are offered."""
+        # The guide finds 1Password among the desktop entries once they load.
+        deadline = time.monotonic() + 30
+        while True:
+            welcome = json.loads(self.welcome('status'))
+            if (welcome['connect']['password'] != 'unavailable') == expected or time.monotonic() >= deadline:
+                break
+            time.sleep(1)
+        found = json.loads(self.command(r'''python3 - <<'QA_PROPRIETARY'
+import json, pathlib, re, subprocess
+entries = [path.name for path in pathlib.Path('/run/current-system/sw/share/applications').iterdir()]
+catalogue = json.loads(pathlib.Path('/run/current-system/sw/share/cybexos/software/catalogue.json').read_text())
+unfree = sorted(app['attribute'] for app in catalogue['apps'] if not app['free'])
+check = json.loads(subprocess.check_output(['runuser', '-u', 'cybexqa', '--', 'env', 'HOME=/home/cybexqa',
+                                            'cybex', 'software', 'check', *unfree], text=True))
+print(json.dumps({'onePassword': any(re.fullmatch(r'(com\.onepassword\.onepassword|1password)\.desktop', name, re.I) for name in entries),
+                  'packages': {attribute: {key: row[key] for key in ('state', 'reason', 'vendor')}
+                               for attribute, row in check['packages'].items()}}))
+QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
+        card = welcome['connect']['password']
+        problems = []
+        if found['onePassword'] != expected:
+            problems.append('1Password is ' + ('missing' if expected else 'installed'))
+        if (card != 'unavailable') != expected or (expected and 'connect' not in welcome['steps']):
+            problems.append(f'the Connect step shows 1Password as {card!r} (steps {welcome["steps"]})')
+        for attribute, row in found['packages'].items():
+            if not ((row['state'] == 'prebuilt' and row['vendor']) if expected
+                    else (row['state'] == 'unavailable' and row['reason'] == 'unfree')):
+                problems.append(f'Software rates {attribute} as {json.dumps(row)}')
+        if not found['packages']:
+            problems.append('the catalogue has no unfree apps to check')
+        if problems:
+            raise RuntimeError('Proprietary applications: ' + '; '.join(problems))
+        return {'result': 'passed', 'proprietary': expected, 'onePassword': found['onePassword'], 'connectCard': card,
+                'vendorApps': sorted(found['packages'])}
+
     def authorize(self, command, *, payload=None, approve=True):
         """Run the desktop's unprivileged path and answer its real Polkit UI.
 
@@ -816,6 +856,9 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': '/dev/vda'}
         if {key: plan.get(key) for key in expected} != expected:
             raise RuntimeError('Reviewed plan differs from the screen input: ' + json.dumps(plan))
+        # Proprietary applications (1Password, vendor apps) are on by default.
+        if applications == 'standard' and (plan.get('features') or {}).get('proprietary') is False:
+            raise RuntimeError('The default plan turned proprietary applications off: ' + json.dumps(plan.get('features')))
         evidence['reviewedPlan'] = {key: plan.get(key) for key in ('username', 'fullName', 'hostname', 'timezone', 'keyboard', 'encrypted', 'autoLogin', 'features', 'software')}
         shot('review.png')
         install_started = time.monotonic()
@@ -1344,6 +1387,11 @@ QA_SOURCE''').strip())
                 raise RuntimeError('Welcome did not open at first login: ' + json.dumps(welcome))
             time.sleep(0.5)
         hello = vm.hello_services()
+        # A failure here fails the case after the remaining checks have run.
+        try:
+            milestones['proprietaryApplications'] = vm.proprietary_applications(applications == 'standard')
+        except (RuntimeError, ValueError, KeyError) as error:
+            milestones['proprietaryApplications'] = {'result': 'failed', 'error': str(error)[-4000:]}
         vm.wait_welcome_layers(['qs-welcome'])
         if screenshots:
             vm.screenshot(screenshots / 'welcome-first-login.png')
@@ -1389,6 +1437,8 @@ QA_SOURCE''').strip())
                                + json.dumps(milestones['welcomeFirstLogin']['helloSummaryServices']))
         if milestones['keyboardShortcutsRuntime']['result'] != 'passed':
             raise RuntimeError('Keyboard shortcuts runtime check failed: ' + milestones['keyboardShortcutsRuntime']['error'][-2000:])
+        if milestones['proprietaryApplications']['result'] != 'passed':
+            raise RuntimeError(milestones['proprietaryApplications']['error'][-2000:])
         if not lifecycle:
             evidence.update(result='passed', scope='actual ISO install, installed boot/login, encryption; no update application')
         else:
