@@ -229,10 +229,18 @@ assert builtins.length inputSources == builtins.length (nixpkgs.lib.unique input
 assert builtins.all (path: builtins.elem path installer.system.extraDependencies) inputSources;
 assert builtins.fromJSON installer.environment.etc."cybexos/installer-inputs.json".text == inputSources;
 # The medium's splash is the installed theme's variant that shows its boot
-# progress, drawn on the firmware framebuffer until the GPU driver loads.
+# progress. It waits for the native display driver, which stage 1 carries on
+# the medium and installed systems alike; nouveau's firmware stays off the
+# medium's initrd. Plymouth picks up the new device in either stage.
 assert installer.boot.plymouth.theme == "cybexos-installer";
 assert map toString installer.boot.plymouth.themePackages == installed.bootBrand.packages;
-assert lib.elem "plymouth.use-simpledrm" installer.boot.kernelParams;
+assert !(lib.elem "plymouth.use-simpledrm" installer.boot.kernelParams);
+assert lib.all (c: lib.all (name: builtins.elem name c.boot.initrd.availableKernelModules)
+  [ "amdgpu" "radeon" "i915" "xe" "virtio_gpu" ]) [ installer payload generic ];
+assert !(builtins.elem "nouveau" installer.boot.initrd.availableKernelModules);
+assert builtins.elem "nouveau" payload.boot.initrd.availableKernelModules;
+assert lib.all (rules: lib.hasInfix "trigger --action=change --subsystem-match=drm" rules)
+  [ installer.services.udev.extraRules installer.boot.initrd.services.udev.rules ];
 # The installed menu has the medium's own theme and is selected by exact system.
 assert installed.bootBrand.menu.theme == toString installer.isoImage.grubTheme;
 assert installed.bootBrand.menu.enable && installed.bootBrand.menu.efiSupport;

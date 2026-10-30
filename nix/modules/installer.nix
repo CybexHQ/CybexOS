@@ -28,6 +28,10 @@ let
     (lib.unique (builtins.attrNames payload.config.users.users ++ builtins.attrNames payload.config.users.groups)));
   text = lib.getExe' updater "cybexos-install";
   plymouth = lib.getExe' config.boot.plymouth.package "plymouth";
+  # A change event on the DRM devices once a driver's framebuffer console is added.
+  probeDisplays = systemd: ''
+    ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="${systemd}/bin/udevadm trigger --action=change --subsystem-match=drm --property-match=DEVTYPE=drm_minor"
+  '';
 in {
   imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ./iso-boot.nix ];
 
@@ -273,20 +277,22 @@ in {
       "asix" "ax88179_178a" "cdc_ether" "cdc_ncm" "rndis_host"
     ];
     # Keep serial diagnostics, but send /dev/console prompts to the local screen.
-    # The medium's initrd has no native display driver, so the splash draws on
-    # the firmware framebuffer (simpledrm) from the start; Plymouth would
-    # otherwise wait eight seconds for another device, with the screen dark.
-    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" "plymouth.use-simpledrm" ];
+    # The splash waits for the native display driver, which stage 1 carries for
+    # AMD, Intel and virtual GPUs (default.nix). It is not drawn on the firmware
+    # framebuffer first: on the Minisforum X1 Pro 370 (Radeon 890M) that
+    # framebuffer showed garbled text and no splash. Other GPUs (NVIDIA, until
+    # nouveau loads in stage 2) get the firmware framebuffer after Plymouth's
+    # eight-second device timeout.
+    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" ];
     # The splash's variant with the medium's boot progress (nix/packages/plymouth.nix).
     boot.plymouth.theme = "cybexos-installer";
-    # When stage two loads the native driver, Plymouth opens its new device at
-    # once. Not being its DRM master, it gets a read-only probe, and before the
-    # kernel's first probe every output reads as disconnected; Plymouth gives
-    # up on the device until a change event. The driver adds its framebuffer
-    # console after that probe, so report a change on the DRM devices then.
-    services.udev.extraRules = ''
-      ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="${config.systemd.package}/bin/udevadm trigger --action=change --subsystem-match=drm --property-match=DEVTYPE=drm_minor"
-    '';
+    # When a native driver loads, Plymouth opens its new device at once. Not
+    # being its DRM master, it gets a read-only probe, and before the kernel's
+    # first probe every output reads as disconnected; Plymouth gives up on the
+    # device until a change event. The driver adds its framebuffer console after
+    # that probe, so report a change on the DRM devices then, in either stage.
+    services.udev.extraRules = probeDisplays config.systemd.package;
+    boot.initrd.services.udev.rules = probeDisplays config.boot.initrd.systemd.package;
     # The medium supports ZFS but never boots from a pool: take NixOS's
     # forthcoming default rather than forcibly importing a root pool.
     boot.zfs.forceImportRoot = false;

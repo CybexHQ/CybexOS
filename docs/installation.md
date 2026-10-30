@@ -31,11 +31,17 @@ The installed system's boot menu uses the same theme (see
 systems boot quietly behind the Plymouth splash, whose logo stays where the
 menu drew it. The medium's splash (the `cybexos-installer` variant) also shows
 a progress bar from the start of stage one until the installer screen has
-drawn. It draws on the firmware framebuffer (`plymouth.use-simpledrm`) until
-stage two loads the native display driver. Plymouth tries the new device before
-the kernel has probed its outputs and finds none connected; a udev rule reports
-a change on the DRM devices once the driver's framebuffer console is added, and
-Plymouth then takes it over. The bar follows the medium's own milestones:
+drawn. Stage one carries the native display drivers for AMD, Intel and virtual
+GPUs (amdgpu, radeon, i915, xe, virtio-gpu), as installed systems do, so the
+splash and the console use the native driver from the start. The splash is not
+drawn on the firmware framebuffer first: on a Minisforum X1 Pro 370 (Radeon
+890M) that framebuffer showed garbled text and no splash. Other GPUs, such as
+NVIDIA until nouveau loads in stage two, get the firmware framebuffer after
+Plymouth's eight-second device timeout; nouveau's firmware would make the
+medium's initrd 1.4 GB instead of about 110 MB. Plymouth tries a new device
+before the kernel has probed its outputs and finds none connected; a udev rule
+in both stages reports a change on the DRM devices once the driver's
+framebuffer console is added, and Plymouth then takes it over. The bar follows the medium's own milestones:
 finding the medium, mounting its store, the started system, the network, the
 installer service and the screen. Between milestones it eases on without
 reaching the next. PXE uses the same ISO and shows the same menu. The medium

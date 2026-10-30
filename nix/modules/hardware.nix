@@ -27,11 +27,10 @@ in {
   config = lib.mkIf cfg.enable (lib.mkMerge [ {
     hardware.enableRedistributableFirmware = lib.mkDefault true;
     hardware.graphics = { enable = true; enable32Bit = cfg.features.steam; };
-    # Native KMS must also work before root/media mounting and disk unlock.
-    # Available modules are selected by udev for the actual hardware, rather
-    # than forcing every GPU driver to probe on every machine.
-    boot.initrd.availableKernelModules = [ "amdgpu" "radeon" "i915" "xe" "virtio_gpu" ]
-      ++ lib.optional (!cfg.hardware.nvidia) "nouveau";
+    # The other native KMS drivers start in stage 1 on the medium too
+    # (default.nix). Nouveau's firmware would make the medium's initrd 1.4 GB
+    # instead of about 110 MB, so only installed machines carry it there.
+    boot.initrd.availableKernelModules = lib.optional (!cfg.hardware.nvidia) "nouveau";
     boot.initrd.kernelModules = lib.optionals cfg.hardware.nvidia [
       "nvidia" "nvidia_modeset" "nvidia_drm"
     ];
