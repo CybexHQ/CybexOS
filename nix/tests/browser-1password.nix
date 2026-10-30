@@ -13,10 +13,11 @@
 # there are none before a sign-in, so it shows no tick. With 1Password
 # stopped, the check then adds an account row, and the card must show one.
 #
-# Leaving the guide then closes what Connect opened: a 1Password window left
-# open, and the assistant sign-in's terminal and the Brave window it opened,
-# while a window the person opened stays. The guide stays up until they are
-# gone.
+# Coming back to the guide from 1Password closes 1Password's window, so it
+# does not cover the assistant sign-in that follows. That sign-in runs in the
+# background and opens only Brave, no terminal. Leaving the guide then closes
+# what Connect opened, while a window the person opened stays. The guide stays
+# up until they are gone.
 #
 # Test-only settings: SDDM signs the user in directly, Brave does not fetch
 # the store extension (the VM has no network), and the probe carries the
@@ -189,21 +190,23 @@ in pkgs.testers.runNixOSTest {
     retry(lambda _: welcome()["connect"]["password"] == "ready", timeout_seconds=30)
     machine.screenshot("connect-signed-in")
 
-    # 1Password again, left open: the person resumes from the pill instead.
+    # 1Password again, left open: coming back to the guide closes it.
     assert user("cybexos-runtime ipc welcome connect password").strip() == "ok"
     run("${passwordWindow}")
     retry(lambda _: "1Password" in classes(), timeout_seconds=60)
     assert user("cybexos-runtime ipc welcome open connect").strip() == "ok"
     retry(lambda _: not welcome()["aside"], timeout_seconds=15)
+    retry(lambda _: "1Password" not in classes(), timeout_seconds=15)
     # A window the person opens while the guide shows is theirs.
     run("${ownWindow}")
     retry(lambda _: "cxo-own" in classes(), timeout_seconds=60)
     assert user("cybexos-runtime ipc welcome open connect").strip() == "ok"
     retry(lambda _: not welcome()["aside"], timeout_seconds=15)
 
-    # The sign-in opens the default terminal and, from there, Brave Origin.
+    # The sign-in runs in the background and opens Brave Origin, no terminal.
     retry(lambda _: user("cybexos-runtime ipc welcome connect claude").strip() == "ok", timeout_seconds=60)
-    retry(lambda _: {"kitty", "brave"} <= classes(), timeout_seconds=120)
+    retry(lambda _: "brave" in classes(), timeout_seconds=120)
+    assert "kitty" not in classes(), clients()
     assert welcome()["aside"] and welcome()["connect"]["assistant"] == "signing-in", welcome()
     machine.screenshot("sign-in")
     user("touch /home/tester/claude-sign-in/approved")
@@ -215,8 +218,7 @@ in pkgs.testers.runNixOSTest {
     # id, the dialog saying the made-up account stops it from starting. The
     # keyring prompt Brave raises is this VM's: its sign-in leaves the
     # keyring locked.
-    assert {"1Password", "brave", "kitty"} <= set(kinds(opened, windows)) \
-        <= {"1Password", "1password", "brave", "kitty", "gcr-prompter"}, (opened, windows)
+    assert {"brave"} <= set(kinds(opened, windows)) <= {"1password", "brave", "gcr-prompter"}, (opened, windows)
 
     # Leaving closes them before the desktop shows; the person's own stays.
     user("cybexos-runtime ipc welcome close")

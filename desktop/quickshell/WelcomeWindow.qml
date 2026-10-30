@@ -13,7 +13,7 @@ import "Welcome" as Guide
 // and zoomed by the installer's rule. While the person uses something the
 // guide opened, or any window or shell surface appears, the guide steps
 // aside and leaves a resume pill at the bottom of the screen. Closing the
-// 1Password window the Connect step opened brings it back.
+// 1Password window the Connect step opened brings it back; Resume closes it.
 //
 // Leaving for the desktop closes the windows the Connect step's sign-ins
 // opened, as their close buttons would. The guide stays up until they are

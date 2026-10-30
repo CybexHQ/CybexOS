@@ -55,6 +55,7 @@ signed_out = home / 'signed-out-claude'
 if args == ['auth', 'status']:
     sys.exit(int(signed_out.exists()))
 if args == ['auth', 'login']:
+    (home / 'login-argv.json').write_text(json.dumps(sys.argv))
     signed_out.unlink(missing_ok=True)
     sys.exit(0)
 
@@ -217,9 +218,10 @@ class Session:
         fake.chmod(0o700)
         launchers = base / 'bin'
         launchers.mkdir()
+        # A terminal, which the sign-in must not open.
         terminal = launchers / 'cybexos-apps'
         terminal.write_text(f'#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n'
-            'Path(os.environ["HOME"]).joinpath("login-argv.json").write_text(json.dumps(sys.argv[1:]))\n'
+            'Path(os.environ["HOME"]).joinpath("terminal-argv.json").write_text(json.dumps(sys.argv[1:]))\n'
             'command=sys.argv[sys.argv.index("--")+1:]\nos.execv(command[0], command)\n')
         terminal.chmod(0o700)
         self.env = {**os.environ, "HOME": str(self.home), "XDG_RUNTIME_DIR": str(self.runtime),
@@ -436,7 +438,8 @@ def main():
             session.wait(lambda: session.shell_state().get('agentReady') and session.shell_state().get('hasDraft'),
                          'automatic sign-in detection with the saved question')
             argv = json.loads((session.home / 'login-argv.json').read_text())
-            assert argv[-3:] == [str(session.base / 'claude'), 'auth', 'login'], argv
+            assert argv == [str(session.base / 'claude'), 'auth', 'login'], argv
+            assert not (session.home / 'terminal-argv.json').exists(), 'the sign-in opened a terminal'
 
             # Send real compositor pointer events. Repeated movement must cover
             # the full distance despite the character's scale/rotation/mask.

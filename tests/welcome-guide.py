@@ -68,7 +68,8 @@ else:
 '''
 # Claude Code as the assistant service sees it: signed out until its own
 # login command runs and the test approves it, as the person does in the
-# browser, then a stream-json session that records each question.
+# browser, then a stream-json session that records each question. The login
+# records how it was run and talks on stdout, as the real one does.
 FAKE_CLAUDE = r'''
 import json, os, sys, time
 from pathlib import Path
@@ -78,6 +79,10 @@ args = sys.argv[1:]
 if args == ["auth", "status"]:
     sys.exit(int(signed_out.exists()))
 if args == ["auth", "login"]:
+    run = {"program": sys.argv[0], "args": args, "cwd": os.getcwd(), "pid": os.getpid(),
+           "stdio": [os.readlink(f"/proc/self/fd/{fd}") for fd in (0, 1, 2)]}
+    (home / "login-run.json").write_text(json.dumps(run))
+    print("Opening browser to sign in…", flush=True)
     deadline = time.monotonic() + 60
     while not (home / "approve-sign-in").exists():
         if time.monotonic() > deadline:
@@ -109,7 +114,7 @@ if sys.argv[1:] == ["doctor", "--json"]:
     sys.exit(0)
 sys.exit(127)
 '''
-# The terminal a sign-in opens: record it and run the agent's login command.
+# A terminal, which a sign-in must no longer open: record it and run the command.
 FAKE_APPS = r'''
 import json, os, sys
 from pathlib import Path
@@ -212,6 +217,8 @@ TEST_IPC = '''
             item.clicked();
             return "true";
         }
+        // The resume pill's Resume, which is in a window of its own.
+        function resume(): void { Welcome.resume(); }
         // Hyprland's window events, which this compositor does not send.
         function windowEvent(name: string, data: string): void {
             if (name === "openwindow") Welcome.windowOpened(data);
@@ -673,29 +680,48 @@ def main():
             session.wait(lambda: session.state()['connect']['password'] == 'ready', '1Password signed in', timeout=15)
             onepassword.close()
             session.capture(shots, 'welcome-connect-signed-in-en.png')
-            # Back to the guide with 1Password still open: its window is the
-            # guide's to close on the way out; one the person opened is not.
+            # Back to the guide by Resume with 1Password still open: Resume
+            # closes its window, so it cannot cover the sign-in that follows,
+            # but not one the person opened.
             assert session.call('welcome-test', 'press', 'connectPassword') == 'true'
             session.wait(lambda: session.state().get('aside'), 'the guide steps aside for 1Password again')
             session.call('welcome-test', 'windowEvent', 'openwindow', 'c5d6,1,1Password,1Password')
             session.call('welcome-test', 'windowEvent', 'openwindow', 'e7f8,1,org.gnome.Nautilus,Files')
-            session.ipc('open', 'connect')
+            session.call('welcome-test', 'resume')
             session.wait(lambda: not session.state().get('aside'), 'Resume')
-            assert session.state()['connectWindows'] == ['c5d6'], session.state()
-            # The assistant: its own login command runs in a terminal, and the
-            # guide returns by itself once the service reports the sign-in.
+            assert session.probe()['closed'] == ['c5d6'], session.probe()
+            assert session.state()['connectWindows'] == [], session.state()
+            # The assistant: its own login command runs in the background, with
+            # no terminal and its output discarded.
+            def login_run():
+                path = session.home / 'login-run.json'
+                return path.exists() and json.loads(path.read_text())
             assert session.call('welcome-test', 'press', 'connectAgent-claude') == 'true'
             session.wait(lambda: session.state().get('aside'), 'the guide steps aside for the sign-in')
-            session.wait(lambda: (session.home / 'terminal-argv.json').exists(), 'the sign-in terminal')
-            argv = json.loads((session.home / 'terminal-argv.json').read_text())
-            assert argv[0] == 'terminal' and argv[-3:] == [str(base / 'bin/claude'), 'auth', 'login'], argv
+            login = session.wait(login_run, 'the login command')
+            assert login['program'] == str(base / 'bin/claude') and login['args'] == ['auth', 'login'], login
+            assert login['cwd'] == str(session.home) and login['stdio'] == ['/dev/null'] * 3, login
+            assert not (session.home / 'terminal-argv.json').exists(), 'the sign-in opened a terminal'
+            # Cancel sign-in, back in the guide, stops the command still waiting.
+            session.call('welcome-test', 'resume')
+            session.wait(lambda: not session.state().get('aside'), 'Resume while signing in')
+            assert session.state()['connect']['assistant'] == 'signing-in', session.state()
+            session.capture(shots, 'welcome-connect-signing-in-en.png')
+            assert session.call('welcome-test', 'press', 'connectCancelSignIn') == 'true'
+            session.wait(lambda: session.state()['connect']['assistant'] == 'required', 'Cancel sign-in')
+            session.wait(lambda: not Path(f"/proc/{login['pid']}").exists(), 'the cancelled login command ends')
+            (session.home / 'login-run.json').unlink()
+            # Signed in on the next try: the guide returns by itself once the
+            # service reports the sign-in.
+            assert session.call('welcome-test', 'press', 'connectAgent-claude') == 'true'
+            session.wait(lambda: session.state().get('aside'), 'the guide steps aside for the sign-in again')
+            session.wait(login_run, 'the login command again')
             # Every window the sign-in opens is the guide's to close.
-            session.call('welcome-test', 'windowEvent', 'openwindow', '0a1b,1,kitty,claude auth login')
             session.call('welcome-test', 'windowEvent', 'openwindow', '2c3d,1,brave-browser,Claude')
             session.call('welcome-test', 'windowEvent', 'openwindow', '4e5f,1,1password,Unlock 1Password')
             assert session.state()['connect']['assistant'] == 'signing-in', session.state()
             assert session.probe()['wiz']['connect']['pose'] == 'listening', session.probe()['wiz']
-            # The 1Password window left open closing does not bring the guide
+            # 1Password's closewindow arriving late does not bring the guide
             # back over the sign-in page: it stands aside for the sign-in now.
             session.call('welcome-test', 'windowEvent', 'closewindow', 'c5d6')
             time.sleep(.5)
@@ -704,7 +730,7 @@ def main():
             session.wait(lambda: not session.state().get('aside') and session.state()['connect']['assistant'] == 'ready',
                          'the guide comes back once the assistant is signed in', timeout=40)
             assert session.state()['step'] == 'connect'
-            assert session.state()['connectWindows'] == ['0a1b', '2c3d', '4e5f'], session.state()
+            assert session.state()['connectWindows'] == ['2c3d', '4e5f'], session.state()
             # Signed in, he wakes up happy.
             session.wait(lambda: session.probe()['wiz']['connect']['pose'] == 'happy', 'Wiz awake')
             session.capture(shots, 'welcome-connect-ready-en.png')
@@ -780,7 +806,7 @@ def main():
             landed_diff = region_difference(landed, Image.new('RGB', Image.open(landed).size, '#101116'), wiz_box)
             assert landed_diff > 5, f'the assistant Wiz shows in his corner (difference {landed_diff:.2f})'
             # Leaving for the desktop closes what Connect opened, and only that.
-            assert session.probe()['closed'] == ['0a1b', '2c3d', '4e5f'], session.probe()
+            assert session.probe()['closed'] == ['c5d6', '2c3d', '4e5f'], session.probe()
             assert session.state()['connectWindows'] == [], session.state()
             session.wait(lambda: session.probe().get('watchers') == 0, 'Keybindings claim released on close')
             session.ipc('open', '')

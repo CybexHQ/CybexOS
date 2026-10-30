@@ -55,8 +55,10 @@ Singleton {
     // ---- Connect ---------------------------------------------------------------
     // 1Password, when the proprietary applications are installed. While the
     // guide stands aside for it, its window tells the guide when the person
-    // is done: closing it brings the guide back. Once the guide is back, or
-    // stands aside for a sign-in, 1Password's windows no longer count.
+    // is done: closing it brings the guide back, and coming back by Resume
+    // (or by opening the guide again) closes it, so it does not cover the
+    // sign-in that follows. Once the guide is back, or stands aside for a
+    // sign-in, 1Password's windows no longer count.
     readonly property var passwordEntry: DesktopEntries.applications.values.find(entry => entry.id === "1password") ?? null
     readonly property bool passwordAvailable: passwordEntry !== null
     property bool passwordOpened: false
@@ -128,6 +130,7 @@ Singleton {
         refreshPassword();
         const wasOpen = open;
         if (!wasOpen || !aside) screenName = Screens.focused ? Screens.focused.name : "";
+        if (passwordAside) closePasswordWindows();
         changed(next);
         aside = false;
         open = true;
@@ -164,6 +167,7 @@ Singleton {
     }
     function resume() {
         if (!open || !aside) return;
+        if (passwordAside) closePasswordWindows();
         aside = false;
         asideTransient = false;
         refreshPassword();
@@ -227,6 +231,11 @@ Singleton {
     function closeConnectWindows(close) {
         const addresses = close ? Helpers.windowsToClose(connectWindows, signInPending) : [];
         connectWindows = [];
+        if (addresses.length > 0) closeWindows(addresses);
+    }
+    function closePasswordWindows() {
+        const addresses = Helpers.passwordWindows(connectWindows);
+        connectWindows = connectWindows.filter(window => window.signIn);
         if (addresses.length > 0) closeWindows(addresses);
     }
     function dismiss() {

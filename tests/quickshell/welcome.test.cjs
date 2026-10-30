@@ -67,6 +67,11 @@ test('leaving closes the Connect windows, but not a sign-in still waiting', () =
     assert.deepEqual(W.windowsToClose(windows, true), ['c3']);
     assert.deepEqual(W.windowsToClose(undefined, false), []);
 });
+test('resuming from 1Password closes its windows, not a sign-in\'s', () => {
+    const windows = [{address: 'c3', signIn: false}, {address: 'a1', signIn: true}, {address: 'c4', signIn: false}];
+    assert.deepEqual(W.passwordWindows(windows), ['c3', 'c4']);
+    assert.deepEqual(W.passwordWindows(undefined), []);
+});
 test('checklist derives actual readiness independently of Later or opening Settings', () => {
     const facts = {reader: false, backupKnown: false, accountsKnown: false};
     let rows = W.checklist(facts, {backup: 'later'});

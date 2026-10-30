@@ -272,7 +272,7 @@ Item {
             status: !Assistant.connected ? I18n.tr("The assistant service is not running.")
                 : root.installed.length === 0 ? I18n.tr("Claude Code and Codex are not installed. Add one in Software.")
                 : Assistant.agentReady ? I18n.format("Connected with %1.", [Assistant.agentLabel])
-                : root.signingIn ? I18n.tr("Finish signing in in the terminal and browser. The guide comes back by itself.")
+                : root.signingIn ? I18n.tr("Finish signing in in your browser. The guide comes back by itself.")
                 : root.authUnknown ? I18n.tr("Sign-in status could not be checked.")
                 : ""
             statusTone: Assistant.connected && Assistant.agentReady ? "accent" : root.signingIn ? "fog" : "amber"
@@ -315,12 +315,22 @@ Item {
                     }
                 }
             }
+            // A sign-in waiting in the background is checked every few
+            // seconds, so Check gives way to Cancel: a page closed in the
+            // browser would otherwise hold the buttons for five minutes.
             KioskButton {
-                visible: Assistant.connected && (root.signingIn || root.authUnknown)
+                visible: Assistant.connected && root.authUnknown && !root.signingIn
                 small: true
                 text: Assistant.authChecking ? I18n.tr("Checking sign-in…") : I18n.tr("Check sign-in")
                 enabled: !Assistant.authChecking
                 onClicked: Assistant.refreshAuth()
+            }
+            KioskButton {
+                objectName: "connectCancelSignIn"
+                visible: Assistant.connected && root.signingIn
+                small: true
+                text: I18n.tr("Cancel sign-in")
+                onClicked: Assistant.cancelSignIn()
             }
         }
     }

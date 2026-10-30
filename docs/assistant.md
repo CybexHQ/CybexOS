@@ -213,8 +213,11 @@ the shortcut and the service; nothing in `shell.json` is lost.
   - `server.py` — the socket and the session state.
   - `auth.py` — bounded, output-discarding `claude auth status` and
     `codex login status` checks. No prompt or model request checks sign-in.
-    Login runs `claude auth login` or `codex login` in a terminal;
-    credentials remain with the provider CLI, outside the assistant and store.
+    Login runs `claude auth login` or `codex login` in the background, with
+    no terminal: each opens the browser and waits for it on localhost. The
+    shell discards their output, which can name the account, and offers
+    **Cancel sign-in** while one waits. Credentials remain with the provider
+    CLI, outside the assistant and store.
   - `claude.py` — Claude Code over `--input-format stream-json` with
     `--permission-prompt-tool stdio`: every permission prompt arrives as a
     `can_use_tool` control request and is answered automatically by default,
@@ -248,7 +251,7 @@ Requests:
 | --- | --- | --- |
 | `hello` | `{client, protocol: 1}` | `{protocol, agents, turn, conversation, speech}` |
 | `auth.status` | `{}` | `{agents}` — refresh installation/sign-in status |
-| `auth.login` | `{agent: "claude" \| "codex"}` | `{argv, cwd}` — the agent's own login command for a terminal |
+| `auth.login` | `{agent: "claude" \| "codex"}` | `{argv, cwd}` — the agent's own login command, which the shell runs in the background |
 | `turn.start` | `{text, agent, model?, screenshot?, context?}` | `{turn}`; error `-32001` while a turn runs |
 | `turn.stop` | `{}` | `{stopped}` |
 | `approval.respond` | `{id, decision: "allow" \| "always" \| "deny"}` | `{ok}` |

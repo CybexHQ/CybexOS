@@ -75,8 +75,9 @@ component TopBar inherits Rectangle {
     property <bool> locked: Store.screen == "installing";
     width: 1280px;
     height: 72px;
+    // On the screens' left content edge.
     Image {
-        x: 40px;
+        x: 64px;
         width: 165px;
         height: 39px;
         source: @image-url("../assets/logo.svg");

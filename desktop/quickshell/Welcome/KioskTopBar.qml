@@ -18,8 +18,9 @@ Item {
     Claim { active: root.visible; onClaimed: SystemSettings.region.acquire(); onReleased: SystemSettings.region.release() }
     Claim { active: root.visible; onClaimed: SystemSettings.input.acquire(); onReleased: SystemSettings.input.release() }
     Claim { active: root.visible; onClaimed: EthernetState.acquire(); onReleased: EthernetState.release() }
+    // On the steps' left content edge, as in the installer.
     Image {
-        x: Kiosk.px(40)
+        x: Kiosk.px(64)
         anchors.verticalCenter: parent.verticalCenter
         height: Kiosk.px(39)
         width: height * 198 / 46.6
