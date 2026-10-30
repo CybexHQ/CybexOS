@@ -124,7 +124,7 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         for directory in (etc, run, binary):
             directory.mkdir()
         (etc / 'installer').write_text('fresh-install-only\n')
-        (etc / 'installer-defaults.json').write_text(json.dumps({key: True for key, _, _ in daemon.APPLICATIONS}))
+        (etc / 'installer-defaults.json').write_text(json.dumps({key: True for key in daemon.FEATURES}))
         (etc / 'installer-layout.json').write_text(json.dumps({'minimumDiskGiB': 64, 'espGiB': 16}))
         (etc / 'installer-reserved-names.json').write_text(json.dumps(['messagebus', 'nobody']))
         (etc / 'installer-region.json').write_text(json.dumps({'timezone': 'UTC', 'locale': 'en_US.UTF-8', 'desktopKeyboard': 'us'}))
@@ -291,13 +291,15 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
             self.service.update(message='Downloading the system…')
             await self.until(lambda m: m['type'] == 'state' and m['message'] == 'Downloading the system…')
             replace.assert_not_called()
-            await self.send(action='draft', values={'apps': {'assistant': False}})
-            await self.until(lambda m: m['type'] == 'state' and m['draft']['apps'].get('assistant') is False)
+            await self.send(action='draft', values={'features': {'tailscale': False}, 'profiles': ['development', 'graphics'],
+                                                    'appsOff': ['gimp']})
+            await self.until(lambda m: m['type'] == 'state' and m['draft']['features'].get('tailscale') is False)
             replace.assert_called_once()
         saved = json.loads((self.root / 'run/draft.json').read_text())
-        self.assertIs(saved['draft']['apps']['assistant'], False)
+        self.assertIs(saved['draft']['features']['tailscale'], False)
         restarted = daemon.Daemon([], network_helper='')
-        self.assertEqual(restarted.draft['apps'], saved['draft']['apps'])
+        for key in ('features', 'profiles', 'appsOff'):
+            self.assertEqual(restarted.draft[key], saved['draft'][key])
 
     async def test_a_failed_draft_write_is_retried_on_the_next_state(self):
         await self.setup_phase()
@@ -378,7 +380,10 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         # Unlocking an encrypted disk signs the owner in.
         self.assertTrue(plan['autoLogin'])
         self.assertTrue(plan['encrypted'])
-        self.assertEqual(set(plan['features']), {key for key, _, _ in daemon.APPLICATIONS})
+        self.assertEqual(set(plan['features']), set(daemon.FEATURES))
+        # The recommended profile: Development's tools, containers and apps.
+        self.assertEqual(plan['software'], {'packages': ['bruno', 'dbeaver-bin', 'meld', 'zed-editor']})
+        self.assertEqual(review['review']['software'], plan['software'])
         self.assertEqual(review['review']['serial'], 'QA-DISK')
         self.assertIs(review['review']['autoLogin'], True)
 
@@ -404,6 +409,181 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         # The password reaches only the worker: never a snapshot or the saved draft.
         self.assertFalse(any(PASSWORD in line for line in self.received))
         self.assertNotIn(PASSWORD, (self.root / 'run/draft.json').read_text())
+
+    async def test_software_step_follows_the_account_and_review_returns_to_it(self):
+        await self.setup_phase()
+        await self.send(action='draft', values={'username': 'ada', 'screen': 'software'})
+        state = await self.until(lambda m: m['type'] == 'state' and m['draft']['screen'] == 'software')
+        self.assertEqual(state['phase'], 'setup')
+        await self.send(action='review', password=PASSWORD, confirm=PASSWORD)
+        await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'review')
+        await self.send(action='back')
+        state = await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'setup')
+        self.assertEqual(state['draft']['screen'], 'software', 'Back from review returns to the Software step')
+        await self.send(action='draft', values={'screen': 'nowhere'})
+        await self.send(action='hello')
+        self.assertEqual((await self.until(lambda m: m['type'] == 'state'))['draft']['screen'], 'software')
+
+    async def test_profiles_choose_apps_and_their_system_features(self):
+        await self.setup_phase()
+        service = self.service
+        service.state['network']['connected'] = True
+        draft = service.draft
+        # The catalogue's default profile, with the features it brings.
+        self.assertEqual(draft['profiles'], ['development'])
+        self.assertEqual(draft['appsOff'], [])
+        self.assertEqual(draft['features'], {key: True for key, _, _ in daemon.SYSTEM_FEATURES})
+        chosen = service.software()
+        self.assertEqual(chosen['packages'], ['bruno', 'dbeaver-bin', 'meld', 'zed-editor'])
+        self.assertEqual(chosen['features'], {key: key != 'steam' for key in daemon.FEATURES})
+        self.assertEqual(chosen['summary']['downloadBytes'], 0, 'Development is on the medium')
+
+        service.change_draft({'profiles': ['development', 'graphics', 'gaming']})
+        chosen = service.software()
+        self.assertEqual(chosen['packages'], ['blender', 'bruno', 'darktable', 'dbeaver-bin', 'gimp', 'heroic', 'inkscape',
+                                              'krita', 'meld', 'prismlauncher', 'scribus', 'zed-editor'])
+        self.assertTrue(chosen['features']['steam'])
+        graphics = next(p for p in service.catalogue['profiles'] if p['id'] == 'graphics')
+        gaming = next(p for p in service.catalogue['profiles'] if p['id'] == 'gaming')
+        self.assertEqual(chosen['summary']['downloadBytes'], graphics['downloadBytes'] + gaming['downloadBytes'])
+        self.assertEqual(chosen['summary']['vendor'], 1, 'Steam comes from its vendor')
+
+        # Turning an app off removes it and scales its profile's estimate.
+        service.change_draft({'appsOff': ['blender']})
+        chosen = service.software()
+        self.assertNotIn('blender', chosen['packages'])
+        self.assertEqual(chosen['summary']['appsOff'], 1)
+        self.assertLess(chosen['summary']['downloadBytes'], graphics['downloadBytes'] + gaming['downloadBytes'])
+        self.assertGreater(chosen['summary']['downloadBytes'], gaming['downloadBytes'])
+
+        # Development's system features follow it out and back in; a switch
+        # flipped meanwhile is the user's and stays.
+        service.change_draft({'profiles': ['graphics', 'gaming']})
+        self.assertEqual((draft['features']['docker'], draft['features']['podman']), (False, False))
+        self.assertFalse(service.software()['features']['developer'])
+        service.change_draft({'features': {'podman': True}})
+        service.change_draft({'profiles': ['graphics']})
+        self.assertTrue(draft['features']['podman'])
+        service.change_draft({'profiles': ['graphics', 'development']})
+        self.assertEqual((draft['features']['docker'], draft['features']['podman']), (True, True))
+        service.change_draft({'features': {'docker': False}})
+        service.change_draft({'profiles': ['graphics', 'development', 'office']})
+        self.assertFalse(draft['features']['docker'])
+        self.assertEqual(draft['profiles'], ['development', 'office', 'graphics'], 'catalogue order')
+
+    async def test_without_proprietary_applications_unfree_apps_and_steam_stay_out(self):
+        await self.setup_phase()
+        service = self.service
+        service.state['network']['connected'] = True
+        service.change_draft({'profiles': ['chat', 'gaming']})
+        chosen = service.software()
+        self.assertEqual(chosen['packages'], ['discord', 'heroic', 'prismlauncher', 'signal-desktop', 'slack',
+                                              'telegram-desktop', 'zoom-us'])
+        self.assertEqual(chosen['summary']['vendor'], 4)
+        service.change_draft({'features': {'proprietary': False}, 'appsOff': ['slack']})
+        chosen = service.software()
+        self.assertEqual(chosen['packages'], ['heroic', 'prismlauncher', 'signal-desktop', 'telegram-desktop'])
+        self.assertEqual((chosen['features']['proprietary'], chosen['features']['steam']), (False, False))
+        self.assertTrue(chosen['features']['assistant'], 'Codex comes with the assistant, free or not')
+        self.assertEqual((chosen['summary']['withheld'], chosen['summary']['appsOff'], chosen['summary']['vendor']), (2, 1, 0))
+
+    async def test_offline_only_the_profiles_on_this_medium_install(self):
+        await self.setup_phase()
+        service = self.service
+        service.change_draft({'profiles': ['development', 'graphics']})
+        service.state['network']['connected'] = False
+        chosen = service.software()
+        self.assertEqual(chosen['summary']['profiles'], ['development'])
+        self.assertEqual(chosen['summary']['downloadBytes'], 0)
+        self.assertNotIn('gimp', chosen['packages'])
+        self.assertEqual(service.draft['profiles'], ['development', 'graphics'], 'the choice returns with the network')
+        service.state['network']['connected'] = True
+        self.assertIn('gimp', service.software()['packages'])
+        self.assertEqual(service.snapshot()['software']['profiles'], ['development', 'graphics'])
+
+    async def test_a_connection_change_reviews_the_software_again(self):
+        await self.setup_phase()
+        helper = self.root / 'network.py'
+        online = self.root / 'online'
+        helper.write_text('import json, pathlib\n'
+                          f'up = pathlib.Path({str(online)!r}).exists()\n'
+                          'print(json.dumps({"success": True, "wifi": {}, "devices": [{"type": "ethernet", "interface": "enp1",'
+                          ' "connected": up, "stateCode": 100 if up else 20}]}))\n')
+        online.touch()
+        self.service.network_helper = str(helper)
+        if self.service.network_task:
+            await self.service.network_task
+        await self.service.run_network('snapshot', None)
+        self.assertTrue(self.service.state['network']['connected'])
+        await self.send(action='draft', values={'username': 'ada', 'screen': 'software', 'profiles': ['development', 'graphics']})
+        await self.send(action='review', password=PASSWORD, confirm=PASSWORD)
+        await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'review' and not m['reviewPending'])
+        self.assertIn('gimp', self.requests()[-1]['plan']['software']['packages'])
+        online.unlink()
+        await self.service.run_network('snapshot', None)
+        await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'review' and not m['reviewPending']
+                         and not m['software']['online'])
+        reviews = [r for r in self.requests() if r['action'] == 'review']
+        self.assertEqual(len(reviews), 2)
+        self.assertNotIn('gimp', reviews[-1]['plan']['software']['packages'])
+        # An unchanged connection does not review again.
+        await self.service.run_network('snapshot', None)
+        await asyncio.sleep(0.05)
+        self.assertEqual(len([r for r in self.requests() if r['action'] == 'review']), 2)
+
+    async def test_invalid_software_draft_values_are_ignored(self):
+        await self.setup_phase()
+        service = self.service
+        before = json.loads(json.dumps(service.draft))
+        for values in ({'profiles': ['development', 'nonexistent']}, {'profiles': 'graphics'}, {'profiles': [1]},
+                       {'appsOff': ['gimp', 'not-an-app']}, {'appsOff': [None]}, {'appsOff': 'gimp'},
+                       {'features': {'docker': 'no', 'unknown': False, 'developer': False, 'steam': True}},
+                       {'features': ['docker']}, {'apps': {'docker': False}}):
+            with self.subTest(values=values):
+                service.change_draft(values)
+                self.assertEqual(service.draft, before)
+
+    def test_catalogue_entries_the_installer_cannot_offer_are_left_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'icons').mkdir()
+            (root / 'icons/good.png').write_bytes(b'png')
+            (root / 'catalogue.json').write_text(json.dumps({'schema': 1, 'apps': [
+                {'id': 'good', 'attribute': 'kdePackages.good', 'name': 'Good', 'free': True, 'downloadBytes': 10},
+                {'id': 'vendor', 'attribute': 'vendor-bin', 'name': 'Vendor', 'free': False, 'downloadBytes': None},
+                {'id': 'evil', 'attribute': 'pkgs.${x}', 'name': 'Evil', 'free': True},
+                {'id': '../escape', 'attribute': 'escape', 'name': 'Escape', 'free': True}],
+                'profiles': [
+                    {'id': 'mine', 'name': 'Mine', 'short': 'Mine', 'icon': 'code', 'default': True, 'includes': ['Tool', 3],
+                     'features': {'developer': True, 'steam': True, 'unknown': True, 'docker': 'yes'},
+                     'apps': ['good', 'vendor', 'evil', 'missing', 'good'], 'downloadBytes': 99},
+                    {'id': 'Bad Id', 'apps': ['good']}, 'not a profile']}))
+            catalogue = daemon.software_catalogue(root)
+        self.assertEqual(sorted(catalogue['apps']), ['good', 'vendor'])
+        self.assertEqual(catalogue['apps']['good']['icon'], str(root / 'icons/good.png'))
+        self.assertEqual(catalogue['apps']['vendor']['icon'], '')
+        self.assertEqual(catalogue['apps']['vendor']['downloadBytes'], 0)
+        [profile] = catalogue['profiles']
+        self.assertEqual(profile['apps'], ['good', 'vendor'])
+        self.assertEqual(profile['features'], ['developer', 'steam'])
+        self.assertEqual(profile['includes'], ['Tool'])
+        self.assertTrue(profile['onMedium'])
+        self.assertEqual(profile['vendor'], 2, 'the vendor app and Steam')
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(daemon.software_catalogue(directory), {'profiles': [], 'apps': {}})
+
+    async def test_static_software_lists_the_profiles_and_their_apps_only(self):
+        static = await self.until(lambda m: m['type'] == 'static')
+        software = static['software']
+        self.assertEqual([p['id'] for p in software['profiles']],
+                         ['development', 'office', 'graphics', 'media', 'gaming', 'chat'])
+        self.assertEqual({p['id'] for p in software['profiles'] if p['onMedium']}, {'development'})
+        listed = {app for profile in software['profiles'] for app in profile['apps']}
+        self.assertEqual(set(software['apps']), listed)
+        self.assertTrue(all(Path(app['icon']).is_file() for app in software['apps'].values()))
+        self.assertNotIn('attribute', software['apps']['gimp'])
+        self.assertEqual([entry[0] for entry in static['features']],
+                         ['docker', 'podman', 'tailscale', 'localNetworkServices', 'connectedWidgets', 'proprietary'])
 
     async def test_password_confirmation_and_reserved_names_stop_before_review(self):
         await self.setup_phase()

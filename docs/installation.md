@@ -29,9 +29,12 @@ installing.
 The installed system's boot menu uses the same theme (see
 [recovery](recovery.md)); the firmware lists it as **CybexOS**. Installed
 systems boot quietly behind the Plymouth splash, whose logo stays where the
-menu drew it. PXE uses the same ISO and shows the same menu. iVentoy's NixOS hook
-needs the upstream scripted live initrd; installed machines use systemd stage
-one. A successful virtual-CD boot does not establish a successful iVentoy boot.
+menu drew it. PXE uses the same ISO and shows the same menu. The medium boots
+with systemd stage one like installed machines. iVentoy's NixOS hook was
+written for the removed scripted initrd; the medium runs that hook itself when
+iVentoy injected it (`cybexos-network-medium` in the initrd), with iVentoy's
+DHCP client on its path. A successful virtual-CD boot does not establish a
+successful iVentoy boot.
 
 ## The installer screen
 
@@ -55,7 +58,7 @@ screen restart, whether for a keyboard change, a crash or Ctrl+Alt+Backspace
 unit uses `KillMode=process`, and the worker keeps installing if its output is
 lost, so a restarted screen or service never interrupts an installation.
 
-The flow is **Welcome → Disk → You → Review → Installing → Done**:
+The flow is **Welcome → Disk → You → Software → Review → Installing → Done**:
 
 - **Welcome** sets the language and keyboard and shows the system check:
   firmware (UEFI, Secure Boot), network, release verification, disks, graphics
@@ -67,10 +70,16 @@ The flow is **Welcome → Disk → You → Review → Installing → Done**:
   disks that cannot be used, with the reason. Encryption (LUKS2) is on by
   default; the layout (16 GiB ESP, 64 GiB minimum) is the shared module contract.
 - **You** asks for an optional name, a username, the password twice, the time
-  zone and the computer name. Names follow the rules below.
+  zone and the computer name. Names follow the rules below. The passwords stay
+  on the screen until the Software step's **Continue** asks for the review.
+- **Software** asks what the computer is for: six software profiles from the
+  release catalogue (see [Software profiles](#software-profiles)), any number of
+  them. Software Development is chosen and recommended by default. **Customize
+  apps** turns single apps and the system features on or off.
 - **Review** names the disk and what is on it, and summarizes every choice with
-  **Change** or **Customize** (application groups, and the NVIDIA driver when an
-  NVIDIA GPU is detected). Changes made here are reviewed again automatically.
+  **Change** or **Customize** (the NVIDIA driver when an NVIDIA GPU is
+  detected). **Change** on the Software row, Back and Escape return to the
+  Software step. Changes made here are reviewed again automatically.
   Only clicking **Erase … & install** authorizes erasure; Enter never does, and
   there is no serial or ERASE typing. The worker binds that click to the reviewed
   plan with a fresh token and rechecks the disk's identity before writing.
@@ -87,8 +96,8 @@ Before building the desktop, the installer explicitly copies already-built
 dependencies from the medium into the fresh machine's Nix store. This also
 reuses outputs such as shell completions that prohibit cache substitution and
 would otherwise be rebuilt by `nixos-install`. The dependency graph comes from
-the reviewed machine configuration, so an application group is not copied just
-because it is bundled on the medium. Nix verifies the transferred contents;
+the reviewed machine configuration, so a profile's apps are not copied just
+because they are bundled on the medium. Nix verifies the transferred contents;
 only this trusted local copy waives signatures, as with the installer’s existing
 source transfer. Remote cache verification remains enabled. Hardware and account
 configuration still build through the normal NixOS installer. The installation
@@ -101,6 +110,36 @@ off), a legacy BIOS boot, an unauthenticated medium or a missing network. A
 failure after the disk was changed says so and opens the log. The menu (⋯) has
 the installation log, a recovery shell on tty2 (Alt+F1 returns), the text
 installer, restart into firmware settings, restart and power off.
+
+### Software profiles
+
+The profiles come from `desktop/software/catalogue.json` (see
+`desktop/software/README.md`): Software Development, Office & Productivity,
+Graphics & Design, Audio & Video, Gaming, and Chat & Meetings. Each card shows
+up to five of its apps and what it brings besides them, whether it is on this
+USB stick or roughly how much it downloads, and how many of its apps come from
+their vendors under proprietary licenses. Every app is prebuilt: by NixOS in
+cache.nixos.org, or by its vendor. Nothing compiles on the computer.
+
+The service turns the choice into the plan. Its `features` switch on what the
+chosen profiles bring (Development: `developer`, `docker`, `podman`; Gaming:
+`steam`) plus the system features from **Customize apps**: Docker, Podman,
+Tailscale, local network discovery, connected desktop widgets and proprietary
+applications. Docker and Podman follow Development in and out; a switch flipped
+afterwards is kept. The assistant is always included. Its `software.packages`
+are the chosen profiles' app attributes, minus the apps turned off and, without
+proprietary applications, minus the unfree apps and Steam. Claude Code, Brave
+and 1Password are then not installed either; Codex still is. The worker
+validates the packages like Software does (Nixpkgs attribute paths, at most 512,
+distinct) and writes them to the machine's `local/software.json`. Software lists
+them as added by you, and they can be removed there.
+
+The medium carries the default profiles' free apps, so the recommended choice
+needs no download. Without a network only those profiles can be chosen: the
+others are dimmed with **Needs internet**, a choice made earlier returns with
+the connection, and a review shown when the connection changes is reviewed
+again. The text installer asks the same profiles and the proprietary question,
+and the system features on request.
 
 ### Names and passwords
 
@@ -191,9 +230,10 @@ can run at a time.
 
 The medium carries the free part of the default desktop as a store payload:
 the system profile, `/etc`, kernel modules, firmware, systemd and the boot loader
-installer of a representative installation. `nixos-install` copies those paths
+installer of a representative installation, including the free apps of the
+default software profiles. `nixos-install` copies those paths
 from the medium instead of downloading them. The machine-specific initrd and
-configuration are built during installation; the unfree application groups
+configuration are built during installation; the other profiles, unfree apps
 (proprietary applications, Steam) and NVIDIA drivers still download. Release
 authentication always needs the internet.
 
@@ -217,8 +257,8 @@ the installed desktop, GTK/Qt/XWayland and SDDM; user cursor preferences remain
 overrides.
 
 The ISO retains its tested flake input sources. A fresh machine's first lock
-starts with that exact Nixpkgs revision and content hash, retaining the selected
-stable branch as its upstream update source. Installation never resolves a newer
+starts with that exact Nixpkgs revision and content hash, retaining
+nixos-unstable as its upstream update source. Installation never resolves a newer
 branch head implicitly. Later upstream-only updates advance this machine-owned
 input independently of Cybex OS. This does not make installation fully offline:
 release authentication and packages not bundled on the medium require internet.
@@ -237,7 +277,7 @@ Its layout and minimum disk size come from the shared Nix module contract.
 
 `nixos-generate-config` records actual hardware and filesystems. DMI/PCI/ACPI/
 EDID detection selects narrowly scoped XPS/NVIDIA declarations. The machine
-flake follows the stable Nixpkgs input and pins the authenticated Cybex OS exact
+flake follows the nixos-unstable Nixpkgs input and pins the authenticated Cybex OS exact
 revision/NAR identity. The complete target is built and installed through the
 shared modules. First login installs missing vendor-skill discovery symlinks
 and never overwrites a pre-existing personal skill.
@@ -270,8 +310,9 @@ before erasure. See [hardware blockers](hardware-security.md).
 
 Automated isolated installation accepts a non-secret JSON plan with `disk`,
 `serial`, `hostname`, `username`, `timezone`, `locale`, `keyboard`, `encrypted`,
-`autoLogin`, `secureBoot`, `nvidiaOpen`, optionally `fullName`, `features` and
-`desktopKeyboard`, plus `{"password":"…"}` JSON through `--secrets-fd`. Stop
+`autoLogin`, `secureBoot`, `nvidiaOpen`, optionally `fullName`, `features`,
+`software` (`{"packages": [...]}`, Nixpkgs attributes for `local/software.json`)
+and `desktopKeyboard`, plus `{"password":"…"}` JSON through `--secrets-fd`. Stop
 `cybexos-installer-ui.service` and `cybexos-installerd.service` first; stopping the
 service cancels its idle worker and releases the installer lock. The same
 validation and disk-erasure guard run in every mode. No installer reboots

@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
-import { Store, Choice, ZoneRow, WifiRow, AppRow, UsbRow } from "store.slint";
+import { Store, Choice, ZoneRow, WifiRow, CustomRow, UsbRow } from "store.slint";
 import { Icon, SlotIcon, Kicker, Btn, LinkButton, Card, Field, Toggle, Row, Help, ScrollHint } from "widgets.slint";
 
 component SheetTitle inherits Rectangle {
@@ -39,14 +39,17 @@ component SheetTitle inherits Rectangle {
 }
 
 // A side panel over a dimmed screen. Escape or a click outside closes it.
+// `centered` shows a dialog of panel-width × panel-height in the middle.
 component Panel inherits Rectangle {
     callback key(KeyEvent) -> EventResult;
     in property <bool> wide;
+    in property <bool> centered;
     in property <length> panel-width: 460px;
+    in property <length> panel-height: 704px;
     // Children of a sheet resolve `parent` to the sheet itself, so they use
     // these explicit content sizes instead.
     out property <length> inner-width: (root.wide ? 1232px : root.panel-width) - 52px;
-    out property <length> inner-height: (root.wide ? 752px : 704px) - 48px;
+    out property <length> inner-height: (root.wide ? 752px : root.panel-height) - 48px;
     width: 1280px;
     height: 800px;
     TouchArea {
@@ -56,10 +59,10 @@ component Panel inherits Rectangle {
         background: Theme.scrim;
     }
     frame := Rectangle {
-        x: root.wide ? 24px : 1280px - 24px - root.panel-width;
-        y: root.wide ? 24px : 72px;
+        x: root.wide ? 24px : root.centered ? (1280px - root.panel-width) / 2 : 1280px - 24px - root.panel-width;
+        y: root.wide ? 24px : root.centered ? (800px - root.panel-height) / 2 : 72px;
         width: root.wide ? 1232px : root.panel-width;
-        height: root.wide ? 752px : 704px;
+        height: root.wide ? 752px : root.panel-height;
         background: Theme.card;
         border-width: 1px;
         border-color: Theme.line-2;
@@ -538,54 +541,170 @@ export component LogSheet inherits Panel {
     init => { log.to-end(); }
 }
 
-// ── applications and graphics ────────────────────────────────────────────────
+// ── software and graphics ────────────────────────────────────────────────────
 
-export component AppsSheet inherits Panel {
-    VerticalLayout {
-        alignment: start;
-        spacing: 12px;
-        SheetTitle {
-            title: "Applications";
-            subtitle: "Everything is included by default. You can change any of these after installation too.";
+component CustomLine inherits Rectangle {
+    in property <CustomRow> data;
+    in property <bool> odd;
+    out property <bool> focused: row.has-focus;
+    callback toggled;
+    if root.data.kind == 0: HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 14px;
+        padding-top: 14px;
+        Kicker {
+            text: root.data.title;
+            font-size: 11.5px;
+            vertical-alignment: center;
         }
-        ListArea {
-            height: 560px;
-            content-height: 64px * Store.apps.length;
-            VerticalLayout {
-                alignment: start;
-                spacing: 2px;
-                for app in Store.apps: Row {
-                    in-sheet: true;
-                    row-height: 62px;
-                    clicked => { Store.toggle-app(app.id); }
-                    HorizontalLayout {
-                        padding-left: 14px;
-                        padding-right: 14px;
-                        spacing: 12px;
-                        VerticalLayout {
-                            alignment: center;
-                            Text {
-                                text: app.name;
-                                font-weight: 700;
-                                color: Theme.ink;
-                            }
-                            Text {
-                                text: app.detail;
-                                font-size: 12.5px;
-                                color: Theme.faint;
-                            }
-                        }
-                        Rectangle {
-                            width: 48px;
-                            Toggle {
-                                in-sheet: true;
-                                keyboard-focus: false;
-                                on: app.on;
-                                toggled => { Store.toggle-app(app.id); }
-                            }
-                        }
+        Text {
+            text: root.data.aux;
+            font-size: 12.5px;
+            color: Theme.faint;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+    if root.data.kind == 3: HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 14px;
+        spacing: 10px;
+        SlotIcon {
+            d: Icons.info;
+            size: 16px;
+            tint: root.data.warn ? Theme.amber : Theme.faint;
+        }
+        Text {
+            text: root.data.title;
+            font-size: 12.5px;
+            color: root.data.warn ? Theme.amber : Theme.faint;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+    row := Row {
+        visible: root.data.kind == 1 || root.data.kind == 2;
+        enabled: self.visible && root.data.enabled;
+        in-sheet: true;
+        row-height: root.height;
+        background: self.selected ? Theme.accent-soft : root.odd ? #ffffff04 : transparent;
+        clicked => { root.toggled(); }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 12px;
+            spacing: 12px;
+            opacity: root.data.enabled ? 1 : 0.5;
+            Rectangle {
+                width: 28px;
+                if root.data.symbol == "" && root.data.mono == "": Image {
+                    width: 28px;
+                    height: 28px;
+                    source: root.data.icon;
+                    image-fit: contain;
+                }
+                if root.data.mono != "": Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 7px;
+                    background: #2b2d33;
+                    border-width: 1px;
+                    border-color: Theme.line-2;
+                    Text {
+                        text: root.data.mono;
+                        font-family: Theme.mono;
+                        font-weight: 700;
+                        font-size: 10px;
+                        color: Theme.ink;
                     }
                 }
+                if root.data.symbol != "": Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 7px;
+                    background: Theme.card-2;
+                    Icon {
+                        d: Icons.tabler(root.data.symbol);
+                        size: 17px;
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 1px;
+                Text {
+                    text: root.data.title;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: Theme.ink;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.data.detail;
+                    font-size: 12.5px;
+                    color: root.data.warn ? Theme.amber : Theme.faint;
+                    overflow: elide;
+                }
+            }
+            Rectangle {
+                width: 48px;
+                Toggle {
+                    in-sheet: true;
+                    keyboard-focus: false;
+                    enabled: root.data.enabled && (root.data.kind == 1 || root.data.kind == 2);
+                    on: root.data.on;
+                    toggled => { root.toggled(); }
+                }
+            }
+        }
+    }
+}
+
+// The Software step's Customize sheet: each chosen profile's apps, then the
+// system features. Every switch is a draft change; Done only closes.
+export component AppsSheet inherits Panel {
+    centered: true;
+    panel-width: 760px;
+    panel-height: 640px;
+    VerticalLayout {
+        alignment: start;
+        spacing: 10px;
+        SheetTitle {
+            title: "Customize apps";
+            subtitle: "Turn single apps on or off. Each one stays editable later in Software.";
+        }
+        list := ListArea {
+            height: root.inner-height - 70px - 64px;
+            content-height: Store.custom-height;
+            VerticalLayout {
+                alignment: start;
+                for line[i] in Store.custom-rows: CustomLine {
+                    height: line.kind == 0 ? 40px : line.kind == 3 ? 46px : 52px;
+                    data: line;
+                    odd: Math.mod(i, 2) == 1;
+                    toggled => {
+                        if (line.kind == 1) { Store.toggle-app(line.id); }
+                        if (line.kind == 2) { Store.toggle-feature(line.id); }
+                    }
+                    changed focused => {
+                        if (self.focused) { list.show(self.y, self.y + self.height); }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 52px;
+            Rectangle {
+                y: 0;
+                height: 1px;
+                background: Theme.line;
+            }
+            Btn {
+                in-sheet: true;
+                x: parent.width - self.width;
+                y: 12px;
+                kind: "primary";
+                text: "Done";
+                clicked => { Store.close-sheet(); }
             }
         }
     }

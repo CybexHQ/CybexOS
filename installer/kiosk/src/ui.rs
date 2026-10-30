@@ -16,8 +16,9 @@ use crate::client::{Client, Event};
 use crate::map::{LandMask, Marker};
 use crate::names;
 use crate::protocol::{human_size, Details, Message, State, Static, Usb};
+use crate::software;
 use crate::zones::{Hit, ZoneDb};
-use crate::{AppRow, Check, Choice, DiskRow, Filtered, InstallerWindow, StageRow, Store, SummaryRow, UsbRow, WifiRow, ZoneRow};
+use crate::{AppTile, Check, Choice, CustomRow, DiskRow, Filtered, InstallerWindow, ProfileCard, StageRow, Store, SummaryRow, UsbRow, WifiRow, ZoneRow};
 
 const STAGES: [(&str, &str); 6] = [
     ("Preparing the selected disk", "A GPT layout with the EFI system partition and the Cybex OS root"),
@@ -108,6 +109,10 @@ pub struct App {
     details_pending: bool,
     timers: Vec<Timer>,
     preview_now: Option<i64>,
+    /// App icons by path, and each profile's card tiles, built once per
+    /// static message so unchanged cards keep comparing equal.
+    icons: HashMap<String, Image>,
+    tiles: HashMap<String, ModelRc<AppTile>>,
 }
 
 pub type Shared = Rc<RefCell<App>>;
@@ -137,6 +142,8 @@ impl App {
             details_pending: false,
             timers: Vec::new(),
             preview_now: None,
+            icons: HashMap::new(),
+            tiles: HashMap::new(),
         }));
         bind(&app, window);
         let timer = Timer::default();
@@ -211,6 +218,7 @@ impl App {
         self.statics = statics;
         self.mini_key.clear();
         self.big_key.clear();
+        self.load_software();
         let Some(window) = self.window() else { return };
         let store = window.global::<Store>();
         store.set_version(s(&self.statics.version));
@@ -241,7 +249,7 @@ impl App {
         // Routing: the worker's phase decides, the draft picks the setup step.
         let screen = match state.phase.as_str() {
             "setup" => match draft.screen.as_str() {
-                "disk" | "account" => draft.screen.clone(),
+                "disk" | "account" | "software" => draft.screen.clone(),
                 _ => "welcome".into(),
             },
             "review" => "review".into(),
@@ -290,6 +298,7 @@ impl App {
         self.apply_welcome(&store, &state);
         self.apply_disks(&store, &state);
         self.apply_account(&store, &state);
+        self.apply_software(&store, &state);
         self.apply_review(&store, &state);
         self.apply_progress(&store, &state);
         self.apply_network(&store, &state);
@@ -471,7 +480,7 @@ impl App {
             (host_note.replace("names are lowercase", "computer names are lowercase"), 3)
         } else if !host_valid {
             ("Lowercase letters, digits and hyphens. Starts with a letter.".to_string(), if hostname.is_empty() { 0 } else { 2 })
-        } else if self.state.as_ref().and_then(|st| st.draft.apps.get("localNetworkServices").copied()).unwrap_or(true) {
+        } else if self.state.as_ref().is_none_or(|st| st.draft.feature("localNetworkServices")) {
             (format!("Visible on your network as {hostname}.local"), 0)
         } else {
             (String::new(), 0)
@@ -510,6 +519,130 @@ impl App {
         );
     }
 
+    // ── software ─────────────────────────────────────────────────────────────
+
+    fn load_software(&mut self) {
+        let software = &self.statics.software;
+        let mut icons = HashMap::new();
+        for app in software.apps.values() {
+            if app.icon.starts_with('/') && app.icon.ends_with(".png") {
+                if let Ok(image) = Image::load_from_path(std::path::Path::new(&app.icon)) {
+                    icons.insert(app.icon.clone(), image);
+                }
+            }
+        }
+        self.icons = icons;
+        self.tiles = software
+            .profiles
+            .iter()
+            .map(|profile| {
+                let tiles: Vec<AppTile> = software::tiles(profile, software)
+                    .into_iter()
+                    .map(|tile| {
+                        let icon = self.icons.get(tile.icon).cloned();
+                        AppTile {
+                            name: s(tile.name),
+                            mono: s(if tile.mono || icon.is_none() { software::monogram(tile.name) } else { String::new() }),
+                            icon: icon.unwrap_or_default(),
+                        }
+                    })
+                    .collect();
+                (profile.id.clone(), ModelRc::new(VecModel::from(tiles)))
+            })
+            .collect();
+    }
+
+    fn apply_software(&self, store: &Store, state: &State) {
+        let draft = &state.draft;
+        let software = &self.statics.software;
+        let online = state.network.connected;
+        let proprietary = draft.feature("proprietary");
+        let cards: Vec<ProfileCard> = software
+            .profiles
+            .iter()
+            .map(|profile| {
+                let available = profile.on_medium || online;
+                let (size, tone) = software::size_tag(profile, online);
+                ProfileCard {
+                    id: s(&profile.id),
+                    name: s(&profile.name),
+                    summary: s(&profile.summary),
+                    icon: s(&profile.icon),
+                    selected: available && draft.profiles.contains(&profile.id),
+                    available,
+                    recommended: profile.default,
+                    size: s(size),
+                    size_tone: s(tone),
+                    vendor: s(software::vendor_tag(profile, online, proprietary)),
+                    apps: self.tiles.get(&profile.id).cloned().unwrap_or_default(),
+                }
+            })
+            .collect();
+        store.set_profiles(model(store.get_profiles(), cards));
+        store.set_always_included(s(software::always_included(proprietary)));
+        let (strong, note, icon) = software::footer(software, &state.software);
+        store.set_software_note_strong(s(strong));
+        store.set_software_note(s(note));
+        store.set_software_note_icon(s(icon));
+        store.set_software_error(s(if state.phase == "setup" && draft.screen == "software" { state.error.as_str() } else { "" }));
+
+        // The Customize sheet: each chosen profile's apps, then the switches.
+        let row = |kind: i32, id: &str, title: String, detail: String| CustomRow {
+            kind,
+            id: s(id),
+            title: s(title),
+            detail: s(detail),
+            enabled: true,
+            ..CustomRow::default()
+        };
+        let mut rows = Vec::new();
+        let chosen = software::customized(software, draft, online);
+        if chosen.is_empty() {
+            rows.push(row(3, "", "No profile is chosen: only the essentials are installed. Choose one on the Software step.".into(), String::new()));
+        }
+        for profile in chosen {
+            let mut heading = row(0, &profile.id, profile.name.to_uppercase(), String::new());
+            heading.aux = s(format!("{} app{}", profile.apps.len(), if profile.apps.len() == 1 { "" } else { "s" }));
+            rows.push(heading);
+            for id in &profile.apps {
+                let Some(app) = software.apps.get(id) else { continue };
+                let allowed = app.free || proprietary;
+                let detail = match (app.free, proprietary) {
+                    (true, _) => "Prebuilt by NixOS",
+                    (false, true) => "Downloaded from the vendor · proprietary license",
+                    (false, false) => "Proprietary license · needs proprietary applications",
+                };
+                let icon = self.icons.get(&app.icon).cloned();
+                rows.push(CustomRow {
+                    mono: s(if icon.is_none() { software::monogram(&app.name) } else { String::new() }),
+                    icon: icon.unwrap_or_default(),
+                    on: allowed && !draft.apps_off.contains(id),
+                    enabled: allowed,
+                    ..row(1, id, app.name.clone(), detail.into())
+                });
+            }
+            if !profile.includes.is_empty() {
+                rows.push(row(3, "", format!("Also includes {}.", profile.includes.join(" · ")), String::new()));
+            }
+        }
+        rows.push(row(0, "", "SYSTEM FEATURES".into(), String::new()));
+        for (key, name, detail) in &self.statics.features {
+            rows.push(CustomRow {
+                symbol: s(software::feature_icon(key)),
+                on: draft.feature(key),
+                ..row(2, key, name.clone(), detail.clone())
+            });
+            if key == "proprietary" && !proprietary {
+                let mut note = row(3, "", "Off: unfree apps and Steam are left out, and Claude Code, Brave and 1Password aren't installed. Codex still is.".into(), String::new());
+                note.warn = true;
+                rows.push(note);
+            }
+        }
+        let height: f32 = rows.iter().map(|r| match r.kind { 0 => 40.0, 3 => 46.0, _ => 52.0 }).sum();
+        store.set_custom_height(height);
+        store.set_custom_rows(model(store.get_custom_rows(), rows));
+    }
+
     fn apply_review(&self, store: &Store, state: &State) {
         let draft = &state.draft;
         let Some(disk) = state.disks.iter().find(|d| d.path == draft.disk) else { return };
@@ -536,14 +669,6 @@ impl App {
         let layout = self.statics.layouts.iter().find(|l| l.0 == draft.layout);
         let console = layout.map_or(draft.layout.clone(), |l| l.2.clone());
         let hostname = if draft.host_edited && !draft.hostname.is_empty() { draft.hostname.clone() } else { names::hostname_for(&draft.username) };
-        let off: Vec<&str> = self
-            .statics
-            .applications
-            .iter()
-            .filter(|(id, _, _)| !draft.apps.get(id).copied().unwrap_or(true))
-            .map(|(_, name, _)| name.as_str())
-            .collect();
-        let total = self.statics.applications.len();
         let row = |label: &str, value: String, detail: String, action: &str, action_label: &str, warn: bool, mono: bool| SummaryRow {
             label: s(label),
             value: s(value),
@@ -589,15 +714,10 @@ impl App {
         let right = vec![
             row("Computer", hostname, String::new(), "account", "Change", false, true),
             row("Language", format!("{language} · keyboard {}", layout.map_or(draft.layout.as_str(), |l| l.1.as_str())), format!("locale {} · disk unlock keymap {console}", draft.locale), "language", "Change", false, false),
-            row(
-                "Applications",
-                if off.is_empty() { "Everything included".into() } else { format!("{} of {total} groups", total - off.len()) },
-                if off.is_empty() { format!("all {total} groups · change any time later") } else { format!("off: {}", off.join(", ")) },
-                "apps",
-                "Customize",
-                false,
-                false,
-            ),
+            {
+                let (value, detail) = software::review(&self.statics.software, &state.software, draft.feature("proprietary"));
+                row("Software", value, detail, "software", "Change", false, false)
+            },
             row(
                 "Release",
                 format!("Cybex OS {}", self.statics.version),
@@ -611,13 +731,6 @@ impl App {
         store.set_summary_left(model(store.get_summary_left(), left));
         store.set_summary_right(model(store.get_summary_right(), right));
         store.set_review_error(s(if state.phase == "review" { state.error.as_str() } else { "" }));
-        store.set_apps(model(store.get_apps(),
-            self.statics
-                .applications
-                .iter()
-                .map(|(id, name, detail)| AppRow { id: s(id), name: s(name), detail: s(detail), on: draft.apps.get(id).copied().unwrap_or(true) })
-                .collect(),
-        ));
         store.set_nvidia(state.nvidia());
         store.set_nvidia_open(draft.nvidia_open);
         store.set_gpu_names(s(if state.graphics.is_empty() { "NVIDIA graphics".into() } else { state.graphics.join(" + ") }));
@@ -1113,6 +1226,18 @@ fn bind(app: &Shared, window: &InstallerWindow) {
         if !store.get_can_review() {
             return;
         }
+        // The passwords stay here until the Software step's Continue.
+        store.set_screen(s("software"));
+        this.draft(json!({"screen": "software"}));
+    });
+    on!(on_continue_software, |this, store| {
+        this.update_account(&store, "", "");
+        if !store.get_can_review() {
+            // A restarted screen (a keyboard change) has no password yet.
+            store.set_screen(s("account"));
+            this.draft(json!({"screen": "account"}));
+            return;
+        }
         store.set_review_busy(true);
         let request = json!({
             "action": "review",
@@ -1120,6 +1245,28 @@ fn bind(app: &Shared, window: &InstallerWindow) {
             "confirm": store.get_confirm().as_str(),
         });
         this.send(request);
+    });
+    on!(on_toggle_profile, |this, store, id: SharedString| {
+        let _ = &store;
+        let Some(state) = this.state.as_ref() else { return };
+        let available = this.statics.software.profiles.iter().any(|p| p.id == id.as_str() && (p.on_medium || state.network.connected));
+        if !available {
+            return;
+        }
+        let mut profiles = state.draft.profiles.clone();
+        if let Some(position) = profiles.iter().position(|p| p == id.as_str()) {
+            profiles.remove(position);
+        } else {
+            profiles.push(id.to_string());
+        }
+        this.draft(json!({"profiles": profiles}));
+    });
+    on!(on_toggle_feature, |this, store, key: SharedString| {
+        let _ = &store;
+        let on = this.state.as_ref().is_none_or(|s| s.draft.feature(key.as_str()));
+        let mut features = HashMap::new();
+        features.insert(key.to_string(), !on);
+        this.draft(json!({"features": features}));
     });
     on!(on_tz_query_edited, |this, store, _text: SharedString| {
         this.refresh_picker(&store);
@@ -1184,7 +1331,7 @@ fn bind(app: &Shared, window: &InstallerWindow) {
         let id = zones.zones[this.tz_hits[next].index].id.clone();
         this.pick(&store, &id);
     });
-    on!(on_back_to_account, |this, store| {
+    on!(on_back_to_software, |this, store| {
         let _ = &store;
         this.send(json!({"action": "back"}));
     });
@@ -1194,10 +1341,11 @@ fn bind(app: &Shared, window: &InstallerWindow) {
     });
     on!(on_change, |this, store, action: SharedString| {
         match action.as_str() {
-            "account" => this.send(json!({"action": "back"})),
-            "disk" => {
+            // Back from the review returns to the Software step.
+            "software" => this.send(json!({"action": "back"})),
+            "account" | "disk" => {
                 this.send(json!({"action": "back"}));
-                this.draft(json!({"screen": "disk"}));
+                this.draft(json!({"screen": action.as_str()}));
             }
             "timezone" => {
                 this.open_picker(&store);
@@ -1208,10 +1356,14 @@ fn bind(app: &Shared, window: &InstallerWindow) {
     });
     on!(on_toggle_app, |this, store, id: SharedString| {
         let _ = &store;
-        let on = this.state.as_ref().and_then(|s| s.draft.apps.get(id.as_str()).copied()).unwrap_or(true);
-        let mut apps = HashMap::new();
-        apps.insert(id.to_string(), !on);
-        this.draft(json!({"apps": apps}));
+        let Some(state) = this.state.as_ref() else { return };
+        let mut off = state.draft.apps_off.clone();
+        if let Some(position) = off.iter().position(|a| a == id.as_str()) {
+            off.remove(position);
+        } else {
+            off.push(id.to_string());
+        }
+        this.draft(json!({"appsOff": off}));
     });
     on!(on_set_nvidia_open, |this, store, open: bool| {
         let _ = &store;

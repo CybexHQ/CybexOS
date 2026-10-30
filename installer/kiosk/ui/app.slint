@@ -13,18 +13,18 @@ import "../assets/fonts/JetBrainsMono-Bold.ttf";
 
 import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
-import { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppRow, UsbRow, Filtered } from "store.slint";
+import { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered } from "store.slint";
 import { Icon, SlotIcon, Chip, Kicker } from "widgets.slint";
-import { WelcomeScreen, DiskScreen, AccountScreen, ReviewScreen, InstallingScreen, DoneScreen, StoppedScreen, FailedScreen } from "screens.slint";
+import { WelcomeScreen, DiskScreen, AccountScreen, SoftwareScreen, ReviewScreen, InstallingScreen, DoneScreen, StoppedScreen, FailedScreen } from "screens.slint";
 import { WifiSheet, KeyboardSheet, LanguageSheet, ToolsMenu, LogSheet, AppsSheet, GpuSheet, TimezoneSheet } from "sheets.slint";
 
-export { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppRow, UsbRow, Filtered }
+export { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered }
 
 component Steps inherits HorizontalLayout {
     in property <int> current;
     spacing: 10px;
     alignment: center;
-    for name[i] in ["Disk", "You", "Review"]: HorizontalLayout {
+    for name[i] in ["Disk", "You", "Software", "Review"]: HorizontalLayout {
         spacing: 10px;
         if i > 0: Rectangle {
             width: 40px;
@@ -70,7 +70,7 @@ component Steps inherits HorizontalLayout {
 }
 
 component TopBar inherits Rectangle {
-    property <int> step: Store.screen == "disk" ? 1 : Store.screen == "account" ? 2 : Store.screen == "review" ? 3 : 0;
+    property <int> step: Store.screen == "disk" ? 1 : Store.screen == "account" ? 2 : Store.screen == "software" ? 3 : Store.screen == "review" ? 4 : 0;
     property <bool> locked: Store.screen == "installing";
     width: 1280px;
     height: 72px;
@@ -152,6 +152,7 @@ export component InstallerWindow inherits Window {
             if Store.screen == "welcome": WelcomeScreen { }
             if Store.screen == "disk": DiskScreen { }
             if Store.screen == "account": AccountScreen { }
+            if Store.screen == "software": SoftwareScreen { }
             if Store.screen == "review": ReviewScreen { }
             if Store.screen == "installing": InstallingScreen { }
             if Store.screen == "done": DoneScreen { }

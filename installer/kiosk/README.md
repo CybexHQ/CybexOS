@@ -19,13 +19,14 @@ libseat backend through logind rather than direct device access as root.
 | Path | Role |
 |---|---|
 | `ui/app.slint` | window, 1280×800 canvas, top bar, screen and sheet routing |
-| `ui/screens.slint` | welcome and system check, disk, account, review, installing, done, stop and failure screens |
-| `ui/sheets.slint` | Wi-Fi, keyboard, language, menu, log and USB save, applications, NVIDIA driver, time zone picker |
+| `ui/screens.slint` | welcome and system check, disk, account, software, review, installing, done, stop and failure screens |
+| `ui/sheets.slint` | Wi-Fi, keyboard, language, menu, log and USB save, Customize apps, NVIDIA driver, time zone picker |
 | `ui/store.slint` | the `Store` global: every property the screens show and every request they make |
 | `ui/widgets.slint`, `ui/theme.slint` | controls and brand tokens |
-| `ui/icons.slint` | generated Tabler icon paths; the names are in `assets/tabler/icons.json` |
+| `ui/icons.slint` | generated Tabler icon paths, and `Icons.tabler(name)` for names that arrive as data; the names are in `assets/tabler/icons.json` |
 | `src/ui.rs` | daemon snapshots → `Store`, requests → daemon |
 | `src/names.rs` | the username and computer-name filter (`[a-z][a-z0-9-]{0,30}`) |
+| `src/software.rs` | the Software step's wording: card tiles and tags, the footer note, the review summary |
 | `src/zones.rs` | time zone search, live local time and the next clock change from TZif data |
 | `src/map.rs` | the dot-matrix world map with day and night shading |
 | `src/protocol.rs`, `src/client.rs` | `cybexos.installer-state.v1` messages and the socket client |
@@ -59,6 +60,10 @@ reference's icon table.
 
 ## Runtime contract
 
+- Software: the static message carries the catalogue's profiles and their apps,
+  each with the absolute path of its 128 px icon in the installer package
+  (`share/cybexos-installer/software`). The screen loads those PNGs once; the
+  service decides what installs and summarizes it in each snapshot's `software`.
 - Socket: `CYBEXOS_INSTALLER_SOCKET`, default `/run/cybexos-installer/control.sock`.
   On every connection the screen sends `{"action":"hello","client":"screen"}`;
   snapshots count the attached screens in `screens`, which automation waits for.
@@ -107,6 +112,8 @@ reference's icon table.
 | `assets/landmask.txt` | Derived from [Natural Earth](https://www.naturalearthdata.com/) 1:110m land (`ne_110m_land.geojson`), sampled at 2° cell centres | Public domain |
 | `ui/icons.slint` | Generated from [`@tabler/icons` 3.48.0](https://www.npmjs.com/package/@tabler/icons/v/3.48.0) `tabler-nodes-outline.json`; archive SHA-256 `28447dcf6f0bb2b8d92c59a1b3d30900a180de2e97d7db4d267e6320dc68f449` | MIT, `assets/tabler/LICENSE` |
 | `assets/logo.svg`, `assets/symbol.svg` | Copies of `assets/brand/logo/svg/cybexos-logo-on-dark.svg` and `assets/brand/symbol/svg/cybexos-symbol-on-dark.svg` | Repository MIT licence |
+| `assets/wiz-listening.svg` | Wiz's listening pose from the Wiz assistant work (`assets/wiz/listening.svg`), shown statically until the animated Wiz component replaces it | Repository MIT licence |
+| App icons (runtime) | `desktop/software/icons`, from Flathub (see `desktop/software/README.md`) | Their projects' trademarks |
 
 Font SHA-256 at import: SpaceGrotesk-Regular
 `5ede28c4425f3fe4830c8f4754b39e9a87a93d0c3baa5e0a9924532aaa8a98bd`, Medium

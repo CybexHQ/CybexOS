@@ -125,6 +125,12 @@ impl Client {
         Client::default()
     }
 
+    /// A client that keeps its requests for inspection instead (tests).
+    pub fn recording() -> (Self, Recorder) {
+        let (sender, receiver) = mpsc::channel();
+        (Client { outgoing: Some(sender), generation: Arc::default() }, Recorder(receiver))
+    }
+
     pub fn send(&self, request: Value) {
         let mut text = request.to_string();
         text.push('\n');
@@ -132,6 +138,16 @@ impl Client {
         if let Some(sender) = &self.outgoing {
             let _ = sender.send((self.generation.load(Ordering::SeqCst), line));
         }
+    }
+}
+
+/// The requests a recording client was asked to send.
+pub struct Recorder(mpsc::Receiver<(u64, SecretLine)>);
+
+impl Recorder {
+    /// The requests sent since the last call, oldest first.
+    pub fn take(&self) -> Vec<Value> {
+        self.0.try_iter().filter_map(|(_, line)| serde_json::from_str(line.0.trim_end()).ok()).collect()
     }
 }
 

@@ -780,8 +780,10 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
             evidence['developmentConsent'] = 'Enter on the screen'
         shot('welcome-ready.png')
         if applications == 'minimal':
-            self.installer_request({'action': 'draft', 'values': {'apps': {
-                'developer': False, 'proprietary': False, 'steam': False, 'docker': False, 'connectedWidgets': False}}})
+            # No software profile: the same features as the former minimal
+            # application groups (no developer tools, Steam, Docker, widgets).
+            self.installer_request({'action': 'draft', 'values': {'profiles': [], 'features': {
+                'proprietary': False, 'docker': False, 'connectedWidgets': False}}})
         self.press('ret')
         state = self.wait_installer(lambda s: s['draft']['screen'] == 'disk', 'the disk step')
         if len([d for d in state['disks'] if d['available']]) == 1 and not state['draft']['disk']:
@@ -806,12 +808,15 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         self.type_text(PASSWORD)
         shot('account.png')
         self.press('ret')
+        state = self.wait_installer(lambda s: s['draft']['screen'] == 'software', 'the software step')
+        shot('software.png')
+        self.press('ret')
         state = self.wait_installer(lambda s: s.get('phase') == 'review' and not s.get('reviewPending'), 'the review')
         plan = state['review']
         expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': '/dev/vda'}
         if {key: plan.get(key) for key in expected} != expected:
             raise RuntimeError('Reviewed plan differs from the screen input: ' + json.dumps(plan))
-        evidence['reviewedPlan'] = {key: plan.get(key) for key in ('username', 'fullName', 'hostname', 'timezone', 'keyboard', 'encrypted', 'autoLogin', 'features')}
+        evidence['reviewedPlan'] = {key: plan.get(key) for key in ('username', 'fullName', 'hostname', 'timezone', 'keyboard', 'encrypted', 'autoLogin', 'features', 'software')}
         shot('review.png')
         install_started = time.monotonic()
         self.click(1024, 755, size)

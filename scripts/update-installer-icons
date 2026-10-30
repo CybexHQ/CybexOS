@@ -91,6 +91,13 @@ def main():
     slint += "export global Icons {\n"
     for name, parts in paths.items():
         slint += f'    out property <string> {name}: "{" ".join(parts)}";\n'
+    # Names that arrive as data (software profiles, system features) are
+    # Tabler's own; anything not listed in icons.json draws nothing.
+    slint += "    // The path for a Tabler icon name, or \"\" when icons.json does not list it.\n"
+    slint += "    public pure function tabler(name: string) -> string {\n"
+    for name, tabler in sorted(names.items(), key=lambda item: item[1]):
+        slint += f'        if (name == "{tabler}") {{ return Icons.{name}; }}\n'
+    slint += '        return "";\n    }\n'
     (KIOSK / "ui/icons.slint").write_text(slint + "}\n")
 
     entries = ",\n".join(

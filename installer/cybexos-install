@@ -23,6 +23,7 @@ from cybexos.common import CommandFailure, Failure, Runner, atomic, parse, read
 from cybexos.engine import copy_config
 from cybexos.credentials import validate_password
 from cybexos.installer_network import ensure_internet, retry_download
+from cybexos.software import packages as software_packages
 from cybexos.trust import REPO, Fetcher, validate_release, verify, version
 
 ETC = Path('/etc/cybexos')
@@ -222,7 +223,7 @@ def authenticate_media(fetch, etc, recover_network=None):
     return release, policy['channel']
 
 
-NIXPKGS_BRANCH = 'nixos-26.05'
+NIXPKGS_BRANCH = 'nixos-unstable'
 
 
 def vendor_nixpkgs(source):
@@ -251,7 +252,7 @@ def vendor_nixpkgs(source):
                 or ('lastModified' in locked and (type(locked['lastModified']) is not int or locked['lastModified'] < 1))):
             raise Failure('unsupported Nixpkgs lock node')
     except (Failure, OSError, AttributeError, KeyError, TypeError) as error:
-        raise Failure('Installation source has no exact tested stable Nixpkgs lock. No disk has been erased.') from error
+        raise Failure('Installation source has no exact tested Nixpkgs lock. No disk has been erased.') from error
     return {'original': dict(original), 'locked': dict(locked)}
 
 
@@ -402,7 +403,7 @@ def validate_full_name(value):
 
 def validate(plan):
     required = {'disk', 'serial', 'hostname', 'username', 'timezone', 'locale', 'keyboard', 'encrypted', 'autoLogin', 'secureBoot', 'nvidiaOpen'}
-    if not isinstance(plan, dict) or not required.issubset(plan) or set(plan) - required - {'features', 'serialConsole', 'desktopKeyboard', 'fullName'}:
+    if not isinstance(plan, dict) or not required.issubset(plan) or set(plan) - required - {'features', 'software', 'serialConsole', 'desktopKeyboard', 'fullName'}:
         raise Failure('Installation plan has missing or unknown fields')
     if 'fullName' in plan:
         validate_full_name(plan['fullName'])
@@ -415,8 +416,14 @@ def validate(plan):
     for key in ('encrypted', 'autoLogin', 'secureBoot', 'nvidiaOpen'):
         if type(plan[key]) is not bool:
             raise Failure('Invalid boolean installation choice')
-    if not isinstance(plan.get('features', {}), dict) or any(k not in ('developer','proprietary','steam','docker','podman','tailscale','connectedWidgets','assistant','localNetworkServices') or type(v) is not bool for k,v in plan.get('features', {}).items()):
+    if not isinstance(plan.get('features', {}), dict) or any(k not in FEATURES or type(v) is not bool for k,v in plan.get('features', {}).items()):
         raise Failure('Invalid optional application group choices')
+    # The apps chosen in the Software step become the machine's own package
+    # choices, exactly as Software accepts and records them later.
+    software = plan.get('software', {'packages': []})
+    if not isinstance(software, dict) or set(software) != {'packages'}:
+        raise Failure('Invalid software choices')
+    software_packages(software['packages'])
     if type(plan.get('serialConsole', False)) is not bool:
         raise Failure('Invalid serial console choice')
     if plan['autoLogin'] and not plan['encrypted']:
@@ -470,13 +477,52 @@ def disk_guard(plan):
         raise Failure('Selected disk contains active swap. Nothing has been erased.')
 
 
-APPLICATION_GROUPS = (
-    ('developer', 'Development tools'), ('proprietary', 'Proprietary applications'),
-    ('steam', 'Steam and gaming'), ('docker', 'Docker'), ('podman', 'Podman'),
-    ('tailscale', 'Tailscale'), ('connectedWidgets', 'Connected desktop widgets'),
-    ('assistant', 'Cybex OS Assistant'),
+FEATURES = ('developer', 'proprietary', 'steam', 'docker', 'podman', 'tailscale', 'connectedWidgets',
+            'assistant', 'localNetworkServices')
+# Software profiles switch on developer and steam; the assistant is always
+# included. These are asked individually, as on the screen's Customize sheet.
+SYSTEM_FEATURES = (
+    ('docker', 'Docker'), ('podman', 'Podman'), ('tailscale', 'Tailscale'),
     ('localNetworkServices', 'Local network discovery services'),
+    ('connectedWidgets', 'Connected desktop widgets'),
 )
+UNFREE_FEATURES = ('steam',)
+
+
+def software_catalogue():
+    """The release's software profiles and apps (desktop/software/catalogue.json)."""
+    directory = os.environ.get('CYBEXOS_INSTALLER_SOFTWARE')
+    path = Path(directory) if directory else Path(os.environ['CYBEXOS_UPDATER_SHARE']) / 'source/desktop/software'
+    catalogue = read(path / 'catalogue.json')
+    if (not isinstance(catalogue, dict) or not isinstance(catalogue.get('profiles'), list)
+            or not isinstance(catalogue.get('apps'), list)
+            or any(not isinstance(app, dict) or not isinstance(app.get('id'), str) or not isinstance(app.get('attribute'), str)
+                   for app in catalogue['apps'])
+            or any(not isinstance(profile, dict) or not isinstance(profile.get('id'), str)
+                   or not isinstance(profile.get('apps', []), list) or not isinstance(profile.get('features', {}), dict)
+                   for profile in catalogue['profiles'])):
+        raise Failure('Installation medium is missing its software catalogue. Nothing has been erased')
+    return catalogue
+
+
+def software_choice(catalogue, profiles, features, defaults):
+    """Packages and features for chosen profiles, as the graphical installer computes them.
+
+    `features` holds the proprietary switch and any system features chosen
+    individually; the profiles switch on their own features and the rest keep
+    the medium's defaults.
+    """
+    apps = {app['id']: app for app in catalogue['apps']}
+    chosen = [profile for profile in catalogue['profiles'] if profile['id'] in profiles]
+    provided = {key for profile in chosen for key, value in profile.get('features', {}).items() if value is True}
+    offered = {key for profile in catalogue['profiles'] for key, value in profile.get('features', {}).items() if value is True}
+    proprietary = features['proprietary']
+    result = {key: features[key] if key in features else key in provided if key in offered else defaults[key] for key in FEATURES}
+    for key in UNFREE_FEATURES:
+        result[key] = result[key] and proprietary
+    members = dict.fromkeys(app for profile in chosen for app in profile.get('apps', []) if app in apps)
+    packages = sorted(apps[app]['attribute'] for app in members if apps[app].get('free') is not False or proprietary)
+    return result, {'packages': packages}
 
 
 def interactive(release):
@@ -484,15 +530,20 @@ def interactive(release):
     print('\033[2J\033[H\033[1;38;2;96;165;250mCybex OS\033[0m  •  A desktop that stays yours\n')
     logo = Path(os.environ['CYBEXOS_UPDATER_SHARE']) / 'brand/ascii/cybexos-compact.fastfetch.txt'
     print(logo.read_text().replace('$1', '\033[38;2;243;242;236m').replace('$2', '\033[38;2;96;165;250m') + '\033[0m')
-    print('Fresh installation • UEFI • NixOS 26.05\n' + release)
+    media = read(ETC / 'release.json', {})
+    nixos = media.get('nixos', '') if isinstance(media, dict) and isinstance(media.get('nixos'), str) else ''
+    print(f'Fresh installation • UEFI • NixOS {nixos}'.rstrip() + '\n' + release)
     print('\nConnect to the internet and power before continuing. Back up the target disk.')
     print('You will review all settings before anything is erased. Ctrl+C cancels.\n')
     defaults = read(ETC / 'installer-defaults.json')
-    if not isinstance(defaults, dict) or any(type(defaults.get(key)) is not bool for key, _ in APPLICATION_GROUPS):
+    if not isinstance(defaults, dict) or any(type(defaults.get(key)) is not bool for key in FEATURES):
         raise Failure('Installation medium is missing its shared application defaults. Nothing has been erased')
+    catalogue = software_catalogue()
     hardware = detect()
     plan = {'hostname': 'cybexos', 'timezone': 'UTC', 'locale': 'en_US.UTF-8', 'keyboard': 'us',
-            'encrypted': True, 'autoLogin': True, 'secureBoot': False, 'nvidiaOpen': True, 'features': {}}
+            'encrypted': True, 'autoLogin': True, 'secureBoot': False, 'nvidiaOpen': True}
+    profiles = [profile['id'] for profile in catalogue['profiles'] if profile.get('default') is True]
+    choices = {'proprietary': defaults['proprietary']}
     while True:
         print('\n1 of 5 · Choose a disk\n')
         available = [disk for disk in disks() if disk['type'] == 'disk' and re.fullmatch(DISK_PATTERN, disk['path'])]
@@ -525,14 +576,21 @@ def interactive(release):
         desktop_default = {'uk': 'gb', 'de-latin1': 'de', 'fr-latin9': 'fr'}.get(plan['keyboard'], plan['keyboard'])
         plan['desktopKeyboard'] = ask('Desktop keyboard layout', plan.get('desktopKeyboard', desktop_default),
                                       lambda value: validate_field('desktopKeyboard', value))
-        print('\n3 of 5 · Applications\n')
-        print('Standard desktop defaults:')
-        for key, label in APPLICATION_GROUPS:
-            print(f"  {label}: {'included' if defaults[key] else 'off'}")
-        if yes_no('Choose application groups individually?', bool(plan['features'])):
-            plan['features'] = {key: yes_no(label, plan['features'].get(key, defaults[key])) for key, label in APPLICATION_GROUPS}
-        else:
-            plan['features'] = {}
+        print('\n3 of 5 · Software\n')
+        print('What will you use this computer for? Choose as many as you like. Every app is')
+        print('prebuilt, so nothing compiles here. Add or remove apps later in Software.')
+        print('Always included: Firefox, Files, LocalSend, Codex, the Wiz assistant and terminal')
+        print('tools, plus Brave, 1Password and Claude Code with proprietary applications.\n')
+        profiles = [profile['id'] for profile in catalogue['profiles']
+                    if yes_no(f"{profile.get('name', profile['id'])} ({profile.get('summary', '')})?", profile['id'] in profiles)]
+        print('\nProprietary applications come from their vendors under their own licenses: Brave,')
+        print('1Password, Claude Code, Steam and apps such as Slack or Zoom.')
+        previous = choices
+        choices = {'proprietary': yes_no('Include proprietary applications?', previous['proprietary'])}
+        if yes_no('Choose system features individually?', any(key in previous for key, _ in SYSTEM_FEATURES)):
+            features, _ = software_choice(catalogue, profiles, choices, defaults)
+            choices.update({key: yes_no(label, previous.get(key, features[key])) for key, label in SYSTEM_FEATURES})
+        plan['features'], plan['software'] = software_choice(catalogue, profiles, choices, defaults)
         if hardware['nvidia']:
             plan['nvidiaOpen'] = yes_no('Use the open NVIDIA kernel driver?', plan['nvidiaOpen'])
         print('\n4 of 5 · Protect your desktop\n')
@@ -552,8 +610,11 @@ def interactive(release):
         print(f"  Desktop login: {'automatic after disk unlock' if plan['autoLogin'] else 'password required'}")
         if hardware['nvidia']:
             print(f"  NVIDIA driver: {'open' if plan['nvidiaOpen'] else 'proprietary'}")
-        for key, label in APPLICATION_GROUPS:
-            print(f"  {label}: {'included' if plan['features'].get(key, defaults[key]) else 'off'}")
+        names = [profile.get('short', profile['id']) for profile in catalogue['profiles'] if profile['id'] in profiles]
+        count = len(plan['software']['packages'])
+        print(f"  Software: {', '.join(names) or 'essentials only'}" + (f" · {count} app{'s' if count != 1 else ''}" if count else ''))
+        for key, label in (('proprietary', 'Proprietary applications'), *SYSTEM_FEATURES):
+            print(f"  {label}: {'included' if plan['features'][key] else 'off'}")
         action = choose('Continue, change settings, or cancel', ('continue', 'change', 'cancel'), 'continue')
         if action == 'cancel':
             raise Cancelled()
@@ -647,6 +708,10 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
             for directory in (target / 'var', target / 'var/lib', target / 'var/lib/cybexos', config.parent):
                 directory.chmod(0o755)
             copy_config(Path(os.environ['CYBEXOS_UPDATER_SHARE']) / 'machine', config)
+            # The Software step's apps are the machine's own package choices,
+            # listed as added by you in Software and removable there.
+            atomic(config / 'local/software.json', {'schema': 1, 'packages': software_packages(
+                plan.get('software', {'packages': []})['packages'])}, 0o644)
             stage(3, 'Recording hardware and your machine configuration…')
             flake = (config / 'flake.nix').read_text().replace('github:DigitalPals/CybexOS/REPLACE_WITH_AUTHENTICATED_REVISION', source)
             atomic(config / 'flake.nix', flake.encode(), 0o644)
@@ -858,7 +923,7 @@ def graphical_session(args, runner):
             if ui_request().get('action') != 'retry':
                 raise Cancelled()
     defaults = read(ETC / 'installer-defaults.json')
-    if not isinstance(defaults, dict) or any(type(defaults.get(key)) is not bool for key, _ in APPLICATION_GROUPS):
+    if not isinstance(defaults, dict) or any(type(defaults.get(key)) is not bool for key in FEATURES):
         raise Failure('Installation medium is missing its shared application defaults')
     regions = read(ETC / 'installer-region.json', {})
     reviewed, token = None, None
@@ -877,7 +942,6 @@ def graphical_session(args, runner):
                 'available': not reason, 'reason': reason,
                 'filesystems': sorted({node.get('fstype') for node in disk.get('children', []) if node.get('fstype')})})
         event('ready', disks=choices, defaults=defaults, region=regions, layout=layout(),
-              applications=[{'id': key, 'name': label} for key, label in APPLICATION_GROUPS],
               release=label, development=bool(args.development_source), hardware=detect())
 
     snapshot()

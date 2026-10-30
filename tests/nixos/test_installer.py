@@ -71,6 +71,19 @@ class PlanTests(unittest.TestCase):
         with self.assertRaises(installer.Failure):
             installer.validate([])
 
+    def test_software_choices_are_valid_distinct_package_attributes(self):
+        choice = plan(); choice['software'] = {'packages': ['zed-editor', 'kdePackages.okular', 'python3Packages.black']}
+        self.assertEqual(installer.validate(choice)['software']['packages'], ['zed-editor', 'kdePackages.okular', 'python3Packages.black'])
+        invalid = [[], {'packages': 'gimp'}, {'packages': ['gimp', 'gimp']}, {'packages': ['gimp'], 'profiles': ['graphics']},
+                   {'packages': ['../gimp']}, {'packages': ['pkgs.${evil}']}, {'packages': ['gimp; rm']}, {'packages': ['.gimp']},
+                   {'packages': ['gimp.']}, {'packages': [1]}, {'packages': ['a' * 201]}, {'packages': [f'p{i}' for i in range(513)]}, {}]
+        for software in invalid:
+            choice = plan(); choice['software'] = software
+            with self.subTest(software=str(software)[:60]), self.assertRaises(installer.Failure):
+                installer.validate(choice)
+        choice = plan(); choice['software'] = {'packages': [f'p{i}' for i in range(512)]}
+        installer.validate(choice)
+
     def test_independent_console_and_desktop_layout(self):
         choice = plan(); choice.update(keyboard='uk', desktopKeyboard='gb')
         self.assertEqual(installer.validate(choice)['desktopKeyboard'], 'gb')
@@ -155,7 +168,7 @@ class InteractiveTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix='cybexos-installer-interactive-')
         self.addCleanup(directory.cleanup)
         self.etc = Path(directory.name)
-        self.defaults = {key: True for key, _ in installer.APPLICATION_GROUPS}
+        self.defaults = {key: True for key in installer.FEATURES}
         (self.etc / 'installer-defaults.json').write_text(json.dumps(self.defaults))
         (self.etc / 'installer-layout.json').write_text(json.dumps({'minimumDiskGiB': 64, 'espGiB': 16}))
         disk = {'path': '/dev/vda', 'type': 'disk', 'size': 80 * 1024**3, 'model': 'QA disk', 'serial': 'QA-DISK'}
@@ -163,7 +176,8 @@ class InteractiveTests(unittest.TestCase):
                         patch.object(installer, 'detect', return_value={'nvidia': False}),
                         patch.object(installer, 'disks', return_value=[{'path':'/dev/zram0', 'type':'disk'}, disk]), patch.object(installer, 'disk_guard'),
                         patch.object(installer, 'known_timezone', side_effect=lambda value: value == 'UTC'),
-                        patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE': str(ROOT / 'assets')})):
+                        patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE': str(ROOT / 'assets'),
+                                                'CYBEXOS_INSTALLER_SOFTWARE': str(ROOT / 'desktop/software')})):
             fixture.start(); self.addCleanup(fixture.stop)
 
     def run_flow(self, answers, passwords):
@@ -174,15 +188,18 @@ class InteractiveTests(unittest.TestCase):
         return result, output.getvalue()
 
     def test_correctable_answers_passwords_and_independent_keyboard(self):
-        # The empty answer after the keymap skips the optional full name.
+        # The empty answer after the keymap skips the optional full name. Then
+        # the six profiles and the proprietary question keep their defaults.
         answers = ['/dev/vda1', '1', 'Bad Name', 'cybexqa', '', 'Unknown/Place', 'UTC', '', 'uk', 'Ada: admin', '', '',
-                   'perhaps', 'n', 'no', 'continue', 'yes']
+                   'perhaps', *[''] * 7, 'n', 'no', 'continue', 'yes']
         secret = 'private-qualification-password'
         (choice, secrets), output = self.run_flow(answers, ['short', secret])
         self.assertEqual(choice['disk'], '/dev/vda')
         self.assertNotIn('/dev/zram0', output)
         self.assertEqual(choice['desktopKeyboard'], 'gb')
-        self.assertEqual(choice['features'], {})
+        # The recommended Development profile: its tools, containers and apps.
+        self.assertEqual(choice['features'], {key: key != 'steam' for key in installer.FEATURES})
+        self.assertEqual(choice['software'], {'packages': ['bruno', 'dbeaver-bin', 'meld', 'zed-editor']})
         self.assertFalse(choice['encrypted'])
         self.assertFalse(choice['autoLogin'])
         self.assertEqual(secrets, {'password': secret})
@@ -192,33 +209,65 @@ class InteractiveTests(unittest.TestCase):
         self.assertIn('Your name may not contain', output)
         self.assertNotIn('fullName', choice)
         self.assertIn('Review your installation', output)
+        self.assertIn('Software: Development · 4 apps', output)
         self.assertIn('Local network discovery services: included', output)
 
     def test_review_changes_preserve_choices_and_encryption_gate(self):
-        answers = ['1', 'cybexqa', '', '', '', '', 'Ada Lovelace', '', 'n', 'n', 'change',
-                   '', '', 'new-name', '', '', '', '', '', 'y',
-                   'n', 'n', 'n', 'n', 'y', 'y', 'n', 'y', 'n',
+        answers = ['1', 'cybexqa', '', '', '', '', 'Ada Lovelace', '', *[''] * 7, 'n', 'n', 'change',
+                   '', '', 'new-name', '', '', '', '', '',
+                   # Development off; Graphics and Gaming on; no proprietary apps.
+                   'n', '', 'y', '', 'y', '', 'n', 'y',
+                   # Docker keeps Development's (now off) state; Podman is chosen alone.
+                   '', 'y', '', 'n', '',
                    'yes', 'yes', 'continue', 'yes']
         (choice, _), output = self.run_flow(answers, ['private-password-123'] * 4)
         self.assertEqual(choice['username'], 'cybexqa')
         self.assertEqual(choice['hostname'], 'new-name')
         # Changing settings keeps the optional name, like every other answer.
         self.assertEqual(choice['fullName'], 'Ada Lovelace')
-        self.assertEqual(choice['features']['developer'], False)
-        self.assertEqual(choice['features']['podman'], True)
-        # The assistant is its own group, independent of developer tooling.
-        self.assertEqual(choice['features']['assistant'], True)
+        features = choice['features']
+        self.assertEqual((features['developer'], features['docker'], features['podman']), (False, False, True))
+        self.assertEqual((features['tailscale'], features['localNetworkServices'], features['connectedWidgets']), (True, False, True))
+        # Steam is unfree: Gaming without proprietary applications leaves it out.
+        self.assertEqual((features['proprietary'], features['steam']), (False, False))
+        # The assistant is always included, independent of developer tooling.
+        self.assertTrue(features['assistant'])
+        self.assertEqual(choice['software']['packages'],
+                         ['blender', 'darktable', 'gimp', 'heroic', 'inkscape', 'krita', 'prismlauncher', 'scribus'])
         self.assertTrue(choice['encrypted'])
         self.assertTrue(choice['autoLogin'])
         self.assertEqual(output.count('Review your installation'), 2)
+        self.assertIn('Software: Graphics, Gaming · 8 apps', output)
+
+    def test_unfree_profile_apps_need_proprietary_applications(self):
+        catalogue = installer.software_catalogue()
+        defaults = {key: True for key in installer.FEATURES}
+        features, software = installer.software_choice(catalogue, ['chat', 'office'], {'proprietary': True}, defaults)
+        self.assertEqual(software['packages'], ['discord', 'foliate', 'kdePackages.okular', 'libreoffice', 'obsidian',
+                                                'signal-desktop', 'slack', 'telegram-desktop', 'xournalpp', 'zoom-us'])
+        # No profile with developer or Docker: those stay off, the rest keep the medium defaults.
+        self.assertEqual({key for key, value in features.items() if not value}, {'developer', 'docker', 'podman', 'steam'})
+        features, software = installer.software_choice(catalogue, ['chat', 'office', 'gaming'], {'proprietary': False}, defaults)
+        self.assertEqual(software['packages'], ['foliate', 'heroic', 'kdePackages.okular', 'libreoffice', 'prismlauncher',
+                                                'signal-desktop', 'telegram-desktop', 'xournalpp'])
+        self.assertFalse(features['steam'])
+        features, software = installer.software_choice(catalogue, [], {'proprietary': True}, defaults)
+        self.assertEqual(software['packages'], [])
+        self.assertFalse(features['developer'])
+
+    def test_missing_software_catalogue_stops_before_disk_selection(self):
+        with patch.dict(os.environ, {'CYBEXOS_INSTALLER_SOFTWARE': str(self.etc)}), \
+                patch.object(installer, 'disks') as disks, self.assertRaisesRegex(installer.Failure, 'software catalogue'):
+            self.run_flow([], [])
+        disks.assert_not_called()
 
     def test_review_cancellation_does_not_request_secrets(self):
         with self.assertRaises(installer.Cancelled):
-            self.run_flow(['1', 'cybexqa', '', '', '', '', '', '', 'n', 'n', 'cancel'], [])
+            self.run_flow(['1', 'cybexqa', '', '', '', '', '', '', *[''] * 7, 'n', 'n', 'cancel'], [])
 
     def test_erasure_requires_explicit_confirmation(self):
         with self.assertRaises(installer.Cancelled):
-            self.run_flow(['1', 'cybexqa', '', '', '', '', '', '', 'n', 'n', 'continue', 'no'],
+            self.run_flow(['1', 'cybexqa', '', '', '', '', '', '', *[''] * 7, 'n', 'n', 'continue', 'no'],
                           ['private-password-123'] * 2)
 
 
@@ -227,7 +276,7 @@ class GraphicalProtocolTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix='cybexos-ui-protocol-')
         self.addCleanup(directory.cleanup)
         etc = Path(directory.name)
-        (etc / 'installer-defaults.json').write_text(json.dumps({key: True for key, _ in installer.APPLICATION_GROUPS}))
+        (etc / 'installer-defaults.json').write_text(json.dumps({key: True for key in installer.FEATURES}))
         (etc / 'installer-layout.json').write_text(json.dumps({'minimumDiskGiB': 64, 'espGiB': 16}))
         disk = {'path': '/dev/vda', 'serial': 'QA-DISK', 'type': 'disk', 'model': 'QA', 'size': 80 * 1024**3}
         def guard(candidate):
@@ -255,7 +304,7 @@ class GraphicalProtocolTests(unittest.TestCase):
 
     def test_final_confirmation_binds_review_and_never_echoes_password(self):
         # An encrypted plan signs in automatically after disk unlock.
-        candidate = plan()
+        candidate = plan(); candidate['software'] = {'packages': ['gimp', 'zed-editor']}
         events = self.run_protocol([{'action': 'review', 'plan': candidate},
             {'action': 'install', 'confirmed': True, 'token': 'review-token', 'secrets': {'password': 'Cybexos8!'}}])
         self.assertEqual(events[-1]['event'], 'complete')
@@ -272,7 +321,7 @@ class GraphicalProtocolTests(unittest.TestCase):
             self.assertEqual(self.installs, [])
 
     def test_changed_disk_or_unencrypted_autologin_rejects_review(self):
-        for key, value in (('serial', 'OTHER'), ('encrypted', False)):
+        for key, value in (('serial', 'OTHER'), ('encrypted', False), ('software', {'packages': ['gimp', 'gimp']})):
             candidate = plan(); candidate[key] = value
             with self.subTest(key=key), self.assertRaises(installer.Cancelled):
                 self.run_protocol([{'action': 'review', 'plan': candidate}, {'action': 'cancel'}])
@@ -604,6 +653,52 @@ class FullNameMachineTests(DiskSafetyTests):
         self.assertIn('  users.users."tester".description = "José García";\n', machine[0])
 
 
+class SoftwareMachineTests(DiskSafetyTests):
+    def machine_files(self, choice):
+        efi = Mock(); efi.exists.return_value = True
+        variables = Mock(); variables.glob.return_value = []
+        real_path = Path
+        def path(value, *args):
+            return {'/sys/firmware/efi':efi, '/sys/firmware/efi/efivars':variables}.get(value, real_path(value, *args))
+        hardware = {'camera':False, 'nvidia':False, 'nvidiaPrime':{'enable':False}, 'xps':False}
+        seen = {}
+        def run(*args, **kwargs):
+            if args[0] == 'nixos-generate-config':
+                (real_path(args[-1]) / 'hardware-configuration.nix').write_text('{}')
+            elif args[:3] == ('nix', 'flake', 'lock'):
+                nix_lock(real_path(str(args[-1]).removeprefix('path:')))
+            elif args[0] == 'nixos-install':
+                config = real_path(args[2]) / 'var/lib/cybexos/working/initial'
+                seen['machine'] = (config / 'machine.nix').read_text()
+                seen['software'] = config / 'local/software.json'
+                seen['json'] = json.loads(seen['software'].read_text())
+                seen['mode'] = seen['software'].stat().st_mode & 0o777
+                from cybexos import software
+                seen['document'] = software.document(config)
+                raise installer.Failure('stop before fixture system build')
+            return 'unused-credential-hash'
+        with self.trusted_install_directory(), patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE':str(ROOT / 'templates')}), patch.object(installer, 'disk_guard'), patch.object(installer, 'detect', return_value=hardware), patch.object(installer, 'Path', side_effect=path), patch('cybexos.inputs.validate_machine'), patch('cybexos.inputs.identity', return_value={}), self.assertRaisesRegex(installer.Failure, 'stop before fixture system build'):
+            installer.install(choice, {'password':'qualification-password-123'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')
+        return seen
+
+    def test_chosen_apps_become_the_machine_software_declaration(self):
+        choice = plan(); choice.update(encrypted=False, autoLogin=False,
+                                       features={'developer': True, 'steam': False, 'docker': True},
+                                       software={'packages': ['zed-editor', 'gimp', 'kdePackages.okular']})
+        seen = self.machine_files(choice)
+        # Software's own format, sorted as it records choices; the template's
+        # software.nix turns it into cybexos.software.packages.
+        self.assertEqual(seen['json'], {'schema': 1, 'packages': ['gimp', 'kdePackages.okular', 'zed-editor']})
+        self.assertEqual(seen['mode'], 0o644)
+        self.assertEqual(seen['document']['packages'], ['gimp', 'kdePackages.okular', 'zed-editor'])
+        self.assertIn('    features.developer = true;\n', seen['machine'])
+        self.assertIn('    features.steam = false;\n', seen['machine'])
+
+    def test_a_plan_without_software_keeps_an_empty_declaration(self):
+        choice = plan(); choice.update(encrypted=False, autoLogin=False)
+        self.assertEqual(self.machine_files(choice)['json'], {'schema': 1, 'packages': []})
+
+
 class TestedNixpkgsTests(unittest.TestCase):
     def setUp(self):
         prebuilt = patch.object(installer, 'seed_prebuilt', return_value={'paths': 12, 'seconds': 0.1})
@@ -625,7 +720,7 @@ class TestedNixpkgsTests(unittest.TestCase):
     def test_vendor_lock_supplies_exact_tested_nixpkgs_and_branch(self):
         node = installer.vendor_nixpkgs(ROOT)
         self.assertEqual(node, {'original': TESTED_NIXPKGS['original'], 'locked': TESTED_NIXPKGS['locked']})
-        self.assertEqual(node['original'], {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'ref': 'nixos-26.05'})
+        self.assertEqual(node['original'], {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'ref': 'nixos-unstable'})
         self.assertRegex(node['locked']['rev'], '^[0-9a-f]{40}$')
 
     def test_malformed_or_moving_vendor_nixpkgs_is_rejected(self):
@@ -638,11 +733,11 @@ class TestedNixpkgsTests(unittest.TestCase):
             'version': changed(lambda lock, node: lock.update(version=6)),
             'follows': changed(lambda lock, node: lock['nodes'][lock['root']]['inputs'].update(nixpkgs=['other'])),
             'no root input': changed(lambda lock, node: lock['nodes'][lock['root']]['inputs'].pop('nixpkgs')),
-            'unstable branch': changed(lambda lock, node: node['original'].update(ref='nixos-unstable')),
+            'stable branch': changed(lambda lock, node: node['original'].update(ref='nixos-26.05')),
             'no branch': changed(lambda lock, node: node['original'].pop('ref')),
             'pinned selector': changed(lambda lock, node: node['original'].update(rev='a' * 40)),
             'fork': changed(lambda lock, node: node['locked'].update(owner='someone')),
-            'moving rev': changed(lambda lock, node: node['locked'].update(rev='nixos-26.05')),
+            'moving rev': changed(lambda lock, node: node['locked'].update(rev='nixos-unstable')),
             'no content identity': changed(lambda lock, node: node['locked'].pop('narHash')),
             'bad content identity': changed(lambda lock, node: node['locked'].update(narHash='sha256:abc')),
             'path source': changed(lambda lock, node: node['locked'].update(type='path')),
@@ -656,7 +751,7 @@ class TestedNixpkgsTests(unittest.TestCase):
                     source = self.base / 'empty'; source.mkdir(exist_ok=True)
                 else:
                     source = self.source(raw=lock if isinstance(lock, str) else json.dumps(lock))
-                with self.assertRaisesRegex(installer.Failure, 'exact tested stable Nixpkgs lock'):
+                with self.assertRaisesRegex(installer.Failure, 'exact tested Nixpkgs lock'):
                     installer.vendor_nixpkgs(source)
 
     def efi(self):
@@ -669,7 +764,7 @@ class TestedNixpkgsTests(unittest.TestCase):
 
     def test_unusable_vendor_nixpkgs_stops_before_disk_work(self):
         lock = copy.deepcopy(VENDOR_LOCK)
-        lock['nodes']['nixpkgs']['original']['ref'] = 'nixos-unstable'
+        lock['nodes']['nixpkgs']['original']['ref'] = 'nixos-26.05'
         source = self.source(lock)
         choice = plan(); choice.update(encrypted=False, autoLogin=False)
         run = Mock()
@@ -706,7 +801,7 @@ class TestedNixpkgsTests(unittest.TestCase):
             self.assertEqual(seen['seed'], {'version': 7, 'root': 'root', 'nodes': {
                 'root': {'inputs': {'nixpkgs': 'nixpkgs'}},
                 'nixpkgs': {'original': TESTED_NIXPKGS['original'], 'locked': TESTED_NIXPKGS['locked']}}})
-            self.assertIn('nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";', seen['flake'])
+            self.assertIn('nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";', seen['flake'])
             if result is None:
                 self.assertIn('stop before fixture system build', str(raised.exception))
             else:
@@ -721,7 +816,7 @@ RELEASES = 'https://github.com/DigitalPals/CybexOS/releases/download/'
 
 def manifest(version='1.0.0-beta.1', **changes):
     release = {'schema':1, 'version':version, 'revision':REVISION, 'narHash':NAR,
-               'architectures':['x86_64-linux'], 'nixos':['26.05'], 'configurationApi':1, 'pluginApi':1,
+               'architectures':['x86_64-linux'], 'nixos':['unstable'], 'configurationApi':1, 'pluginApi':1,
                'minUpdater':1, 'notes':'Qualified medium', 'vendorInputs':['lanzaboote'],
                'assets':[{'name':f'cybexos-{version}-x86_64-linux.iso', 'url':f'{RELEASES}v{version}/cybexos-{version}-x86_64-linux.iso',
                           'sha256':'f' * 64, 'bytes':1}]}
@@ -765,10 +860,10 @@ class MediaAuthenticationTests(unittest.TestCase):
 
     def medium(self, channel='beta', **changes):
         release = {'version':'1.0.0-beta.1', 'revision':REVISION, 'narHash':NAR, 'configurationApi':1, 'pluginApi':1,
-                   'updaterApi':1, 'nixos':'26.05', 'architecture':'x86_64-linux'}
+                   'updaterApi':1, 'nixos':'unstable', 'architecture':'x86_64-linux'}
         release.update(changes)
         (self.etc / 'release.json').write_text(json.dumps(release))
-        (self.etc / 'update.json').write_text(json.dumps({'schema':1, 'channel':channel, 'branch':'nixos-26.05'}))
+        (self.etc / 'update.json').write_text(json.dumps({'schema':1, 'channel':channel, 'branch':'nixos-unstable'}))
         (self.etc / 'trust.json').write_text(json.dumps(self.trust))
 
     def sign(self, body, key='publisher', key_id='publisher'):

@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
-import { Store, Check, DiskRow, SummaryRow, StageRow } from "store.slint";
+import { Store, Check, DiskRow, SummaryRow, StageRow, AppTile, ProfileCard } from "store.slint";
 import { Icon, SlotIcon, Kicker, Heading, Lead, Btn, LinkButton, Card, Field, Toggle, Row, Mark, Tag, Help, FieldLabel } from "widgets.slint";
 
 // ── shared pieces ────────────────────────────────────────────────────────────
@@ -806,10 +806,10 @@ export component AccountScreen inherits Rectangle {
             x: 1216px - self.width;
             y: 18px;
             kind: "primary";
-            text: Store.review-busy ? "Checking…" : "Continue";
+            text: "Continue";
             icon: Icons.right;
             icon-right: true;
-            enabled: Store.can-review && !Store.review-busy;
+            enabled: Store.can-review;
             clicked => { Store.continue-account(); }
         }
     }
@@ -820,6 +820,333 @@ export component AccountScreen inherits Rectangle {
             password-field.focus-input();
         }
     }
+}
+
+// ── software ─────────────────────────────────────────────────────────────────
+
+component AppTileView inherits VerticalLayout {
+    in property <AppTile> data;
+    width: 62px;
+    spacing: 5px;
+    Rectangle {
+        height: 34px;
+        if root.data.mono == "": Image {
+            width: 34px;
+            height: 34px;
+            source: root.data.icon;
+            image-fit: contain;
+        }
+        if root.data.mono != "": Rectangle {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: #2b2d33;
+            border-width: 1px;
+            border-color: Theme.line-2;
+            Text {
+                text: root.data.mono;
+                font-family: Theme.mono;
+                font-weight: 700;
+                font-size: 11px;
+                color: Theme.ink;
+            }
+        }
+    }
+    Text {
+        text: root.data.name;
+        font-size: 11px;
+        color: Theme.fog;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+}
+
+component ProfileTile inherits Rectangle {
+    in property <ProfileCard> data;
+    callback clicked;
+    height: 196px;
+    border-radius: 18px;
+    background: Theme.card;
+    opacity: root.data.available ? 1 : 0.45;
+    if root.data.selected: Rectangle {
+        border-radius: parent.border-radius;
+        background: @linear-gradient(180deg, #60a5fa12 0%, #60a5fa05 100%);
+    }
+    Rectangle {
+        border-radius: parent.border-radius;
+        border-width: 1.5px;
+        border-color: root.data.selected ? Theme.accent : (touch.has-hover || card-focus.has-focus) && root.data.available ? Theme.line-2 : Theme.line;
+    }
+    Rectangle {
+        x: 18px;
+        y: 16px;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: root.data.selected ? #60a5fa24 : Theme.card-2;
+        Icon {
+            d: Icons.tabler(root.data.icon);
+            tint: root.data.selected ? Theme.accent : Theme.fog;
+            size: 22px;
+        }
+    }
+    VerticalLayout {
+        x: 72px;
+        y: 15px;
+        width: parent.width - 72px - 52px;
+        height: 62px;
+        alignment: start;
+        spacing: 1px;
+        Text {
+            text: root.data.name;
+            font-size: 18px;
+            font-weight: 700;
+            color: Theme.ink;
+            overflow: elide;
+        }
+        // Up to two lines; the apps row below keeps its place.
+        Text {
+            text: root.data.summary;
+            font-size: 13.5px;
+            color: Theme.faint;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+    }
+    Rectangle {
+        x: parent.width - 18px - 26px;
+        y: 16px;
+        width: 26px;
+        height: 26px;
+        border-radius: 13px;
+        border-width: root.data.selected ? 0px : 1.5px;
+        border-color: Theme.line-2;
+        background: root.data.selected ? Theme.accent : transparent;
+        if root.data.selected: Icon {
+            d: Icons.check;
+            tint: Theme.accent-ink;
+            size: 15px;
+        }
+    }
+    HorizontalLayout {
+        x: 18px;
+        y: 84px;
+        width: parent.width - 36px;
+        height: 54px;
+        spacing: 6px;
+        alignment: start;
+        for tile in root.data.apps: AppTileView { data: tile; }
+    }
+    HorizontalLayout {
+        x: 18px;
+        y: parent.height - 14px - 22px;
+        width: parent.width - 36px;
+        height: 22px;
+        spacing: 6px;
+        alignment: start;
+        if root.data.recommended: Tag {
+            text: "Recommended";
+            tone: "accent";
+        }
+        Tag {
+            text: root.data.size;
+            tone: root.data.size-tone;
+        }
+        if root.data.vendor != "": Tag { text: root.data.vendor; }
+    }
+    if card-focus.has-focus: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: 20px;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+    card-focus := FocusScope {
+        enabled: root.data.available && Store.sheet == "";
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " ") {
+                if (!event.repeat) { root.clicked(); }
+                return accept;
+            }
+            return reject;
+        }
+    }
+    touch := TouchArea {
+        enabled: root.data.available && Store.sheet == "";
+        mouse-cursor: pointer;
+        clicked => { card-focus.focus(); root.clicked(); }
+    }
+}
+
+export component SoftwareScreen inherits Rectangle {
+    width: 1280px;
+    height: 800px;
+    keys := FocusScope {
+        enabled: Store.sheet == "";
+        focus-on-tab-navigation: false;
+        key-pressed(event) => {
+            if (Store.sheet != "") { return reject; }
+            if (!event.repeat && event.text == Key.Return && !Store.review-busy) {
+                Store.continue-software();
+                return accept;
+            }
+            if (event.text == Key.Escape) {
+                Store.navigate("account");
+                return accept;
+            }
+            return reject;
+        }
+        // Wiz, the assistant, listens while you choose. A static pose until
+        // the animated Wiz component replaces this single image.
+        wiz-listening := Image {
+            x: 1090px;
+            y: 78px;
+            width: 120px;
+            height: 117px;
+            source: @image-url("../assets/wiz-listening.svg");
+            image-fit: contain;
+        }
+        Kicker {
+            x: 64px;
+            y: 96px;
+            text: "STEP 3 · SOFTWARE";
+            color: Theme.accent;
+        }
+        Text {
+            x: 64px;
+            y: 116px;
+            text: "What will you use this computer for?";
+            font-size: 38px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            color: Theme.ink;
+        }
+        Text {
+            x: 64px;
+            y: 166px;
+            width: 820px;
+            text: "Pick as many as you like. Every app is prebuilt, so nothing compiles on this computer. You can add or remove any app later in Software.";
+            font-size: 17px;
+            color: Theme.fog;
+            wrap: word-wrap;
+        }
+        for card[i] in Store.profiles: ProfileTile {
+            x: 64px + Math.mod(i, 3) * (self.width + 14px);
+            y: 222px + Math.floor(i / 3) * (self.height + 14px);
+            width: (1152px - 28px) / 3;
+            data: card;
+            clicked => { Store.toggle-profile(card.id); }
+        }
+        Rectangle {
+            x: 64px;
+            y: 642px;
+            width: 1152px;
+            height: 44px;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: Theme.line-2;
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 6px;
+                padding-top: 7px;
+                padding-bottom: 7px;
+                spacing: 10px;
+                Kicker {
+                    text: "ALWAYS INCLUDED";
+                    font-size: 11px;
+                    letter-spacing: 0.9px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: Store.always-included;
+                    font-size: 12px;
+                    color: Theme.faint;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                customize := Row {
+                    row-height: 30px;
+                    width: customize-row.preferred-width + 12px;
+                    clicked => { Store.open-sheet("apps"); }
+                    customize-row := HorizontalLayout {
+                        x: 6px;
+                        spacing: 4px;
+                        Text {
+                            text: "Customize apps";
+                            color: Theme.accent;
+                            font-size: 14px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                        SlotIcon {
+                            d: Icons.right;
+                            tint: Theme.accent;
+                            size: 15px;
+                        }
+                    }
+                }
+            }
+        }
+        if Store.software-error != "": Text {
+            x: 64px;
+            y: 692px;
+            width: 1152px;
+            text: Store.software-error;
+            color: Theme.red;
+            font-size: 13.5px;
+            overflow: elide;
+        }
+        Footer {
+            back => { Store.navigate("account"); }
+            HorizontalLayout {
+                x: 190px;
+                y: 0;
+                width: 1216px - 190px - 190px;
+                height: parent.height;
+                spacing: 8px;
+                alignment: start;
+                SlotIcon {
+                    d: Icons.tabler(Store.software-note-icon);
+                    size: 18px;
+                    tint: Theme.fog;
+                }
+                // The bold part, then the rest after a word space.
+                HorizontalLayout {
+                    spacing: 4px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: Store.software-note-strong;
+                        color: Theme.ink;
+                        font-size: 14px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: Store.software-note;
+                        color: Theme.fog;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+            Btn {
+                x: 1216px - self.width;
+                y: 18px;
+                kind: "primary";
+                text: Store.review-busy ? "Checking…" : "Continue";
+                icon: Icons.right;
+                icon-right: true;
+                enabled: !Store.review-busy;
+                clicked => { Store.continue-software(); }
+            }
+        }
+    }
+    init => { keys.focus(); }
 }
 
 // ── review ───────────────────────────────────────────────────────────────────
@@ -878,7 +1205,7 @@ export component ReviewScreen inherits Rectangle {
         key-pressed(event) => {
             // Enter never erases: the button must be chosen explicitly.
             if (event.text == Key.Escape && Store.sheet == "") {
-                Store.back-to-account();
+                Store.back-to-software();
                 return accept;
             }
             return reject;
@@ -959,7 +1286,7 @@ export component ReviewScreen inherits Rectangle {
         Footer {
             note: Store.review-busy ? "Updating the review…" : "The disk's identity is checked again just before it is erased.";
             note-icon: Icons.shield;
-            back => { Store.back-to-account(); }
+            back => { Store.back-to-software(); }
             Btn {
                 x: 1216px - self.width;
                 y: 18px;

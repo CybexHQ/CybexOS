@@ -422,6 +422,7 @@ export component Row inherits Rectangle {
     in property <bool> keyboard-focus: true;
     in property <bool> selected;
     in property <length> row-height: 54px;
+    out property <bool> has-focus: focus.has-focus;
     callback clicked;
     height: root.row-height;
     border-radius: 12px;

@@ -9,14 +9,22 @@ export struct ZoneRow { id: string, title: string, sub: string, note: string, ti
 export struct SummaryRow { label: string, value: string, detail: string, action: string, action-label: string, warn: bool, mono: bool }
 export struct StageRow { title: string, detail: string, state: int }               // 0 done, 1 current, 2 queued
 export struct WifiRow { ssid: string, bars: int, secure: bool, enterprise: bool, connected: bool }
-export struct AppRow { id: string, name: string, detail: string, on: bool }
+// An app in a software profile: its icon, or a monogram for software without one.
+export struct AppTile { name: string, icon: image, mono: string }
+export struct ProfileCard {
+    id: string, name: string, summary: string, icon: string,   // icon: a Tabler name
+    selected: bool, available: bool, recommended: bool,
+    size: string, size-tone: string, vendor: string, apps: [AppTile],
+}
+// A Customize sheet row. kind: 0 group heading, 1 app, 2 system feature, 3 note.
+export struct CustomRow { kind: int, id: string, title: string, detail: string, aux: string, icon: image, symbol: string, mono: string, on: bool, enabled: bool, warn: bool }
 export struct UsbRow { device: string, label: string, size: string }
 export struct Filtered { text: string, caret: int, note: string }
 
 export global Store {
     // Connection and routing.
     in-out property <bool> connected;
-    in-out property <string> screen: "welcome";   // welcome disk account review installing done stopped failed
+    in-out property <string> screen: "welcome";   // welcome disk account software review installing done stopped failed
     in-out property <string> sheet;              // "", wifi, keyboard, language, tools, log, apps, gpu, timezone
     in-out property <string> toast;
     in-out property <int> tick;                  // a 1 Hz activity counter while something runs
@@ -69,6 +77,17 @@ export global Store {
     in-out property <string> account-error;
     in-out property <string> home-note;
     in-out property <string> unlock-note;
+
+    // Software. Profiles are cards; the Customize sheet lists their apps and
+    // the system features. The note sits in the footer, its first part bold.
+    in-out property <[ProfileCard]> profiles;
+    in-out property <string> always-included;
+    in-out property <string> software-note-strong;
+    in-out property <string> software-note;
+    in-out property <string> software-note-icon;
+    in-out property <string> software-error;
+    in-out property <[CustomRow]> custom-rows;
+    in-out property <length> custom-height;
 
     // Time zone card and picker.
     in-out property <string> tz-clock;
@@ -138,14 +157,12 @@ export global Store {
     in-out property <[WifiRow]> wifi;
     in-out property <int> wifi-selected: -1;
 
-    // Details, USB, applications and graphics.
+    // Details, USB and graphics.
     in-out property <string> details;
     in-out property <string> details-note;
     in-out property <string> details-error;
     in-out property <[UsbRow]> usb;
     in-out property <string> usb-message;
-    in-out property <[AppRow]> apps;
-    in-out property <string> apps-summary;
     in-out property <bool> nvidia;
     in-out property <bool> nvidia-open: true;
     in-out property <string> gpu-names;
@@ -177,10 +194,13 @@ export global Store {
     callback tz-map-click(float, float);
     callback tz-map-hover(float, float);
     callback tz-key(string);
-    callback back-to-account();
+    callback toggle-profile(string);
+    callback toggle-app(string);
+    callback toggle-feature(string);
+    callback continue-software();
+    callback back-to-software();
     callback install();
     callback change(string);
-    callback toggle-app(string);
     callback set-nvidia-open(bool);
     callback wifi-select(int);
     callback wifi-connect(int, string, string);

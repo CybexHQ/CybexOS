@@ -6,6 +6,9 @@
 # cybexos-installerd: the root service that owns the draft plan, Wi-Fi, time
 #   zone detection and diagnostics, and drives the unchanged cybexos-install
 #   worker over its private JSON protocol.
+# share/cybexos-installer/software: the release's software catalogue and app
+#   icons for the Software step. The service reads the catalogue and gives
+#   the screen each icon's path.
 { lib, stdenvNoCC, rustPlatform, source, python3, makeWrapper, callPackage, pkg-config,
   fontconfig, libinput, libxkbcommon, udev, seatd, networkmanager, coreutils, iproute2, iw,
   kbd, util-linux, systemd, pciutils, tzdata, makeFontsConf, dejavu_fonts }:
@@ -59,14 +62,16 @@ in stdenvNoCC.mkDerivation {
   inherit version;
   src = import ../package-source.nix {
     inherit lib source;
-    paths = [ "installer/cybexos-installerd" "desktop/quickshell/scripts/network-tool.py" ];
+    paths = [ "installer/cybexos-installerd" "desktop/quickshell/scripts/network-tool.py"
+              "desktop/software/catalogue.json" "desktop/software/icons" ];
   };
   nativeBuildInputs = [ makeWrapper ];
   dontBuild = true;
   installPhase = ''
-    mkdir -p $out/bin $out/libexec
+    mkdir -p $out/bin $out/libexec $out/share/cybexos-installer/software
     cp installer/cybexos-installerd $out/libexec/cybexos-installerd
     cp desktop/quickshell/scripts/network-tool.py $out/libexec/network-tool.py
+    cp -r desktop/software/catalogue.json desktop/software/icons $out/share/cybexos-installer/software/
     patchShebangs $out/libexec
     makeWrapper ${screen}/bin/cybexos-installer $out/bin/cybexos-installer \
       --set-default FONTCONFIG_FILE ${fonts} \
@@ -77,7 +82,8 @@ in stdenvNoCC.mkDerivation {
       --prefix PATH : ${lib.makeBinPath [ updater networkmanager coreutils iproute2 iw kbd util-linux systemd pciutils ]} \
       --set PYTHONDONTWRITEBYTECODE 1 \
       --set TZDIR ${tzdata}/share/zoneinfo \
-      --set CYBEXOS_NETWORK_HELPER $out/libexec/network-tool.py
+      --set CYBEXOS_NETWORK_HELPER $out/libexec/network-tool.py \
+      --set CYBEXOS_INSTALLER_SOFTWARE $out/share/cybexos-installer/software
   '';
   passthru = { inherit screen updater; };
   meta = {

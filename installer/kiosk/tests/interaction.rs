@@ -34,7 +34,7 @@ fn setup() -> (
             ("de_DE.UTF-8".into(), "German".into()),
         ],
         layouts: vec![("us".into(), "US".into(), "us".into())],
-        applications: vec![("developer".into(), "Development".into(), "Tools".into())],
+        features: vec![("docker".into(), "Docker".into(), "Container engine".into())],
         ..Static::default()
     });
     app.borrow_mut().apply_state(State {
@@ -342,4 +342,179 @@ fn wifi_refresh_preserves_credentials_but_reordering_clears_selection() {
         -1,
         "credentials could move to another SSID"
     );
+}
+
+const SOFTWARE: &str = r#"{"type":"static","schema":"cybexos.installer-state.v1",
+    "layouts":[["us","US","us"]],"languages":[["en_US.UTF-8","English"]],
+    "features":[["docker","Docker","Container engine"],["proprietary","Proprietary applications","Vendor apps"]],
+    "software":{"profiles":[
+        {"id":"development","name":"Software Development","short":"Development","icon":"code","default":true,"onMedium":true,
+         "includes":["Docker"],"apps":["zed"],"features":["developer","docker"],"downloadBytes":0,"vendor":0},
+        {"id":"office","name":"Office & Productivity","short":"Office","icon":"briefcase","apps":["writer"],"downloadBytes":90000000,"vendor":0},
+        {"id":"chat","name":"Chat & Meetings","short":"Chat","icon":"messages","apps":["slack"],"downloadBytes":5,"vendor":1}],
+     "apps":{"zed":{"name":"Zed","free":true,"icon":"","downloadBytes":1},
+             "writer":{"name":"Writer","free":true,"icon":"","downloadBytes":1},
+             "slack":{"name":"Slack","free":false,"icon":"","downloadBytes":0}}}}"#;
+
+/// A recording controller on the Software step with the given draft and network.
+fn software_setup(
+    draft: serde_json::Value,
+    online: bool,
+) -> (InstallerWindow, cybexos_installer::ui::Shared, Rc<MinimalSoftwareWindow>, cybexos_installer::client::Recorder) {
+    use cybexos_installer::protocol::{parse, Message};
+    let surface = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+    slint::platform::set_platform(Box::new(Headless(surface.clone()))).unwrap();
+    surface.set_size(PhysicalSize::new(1280, 800));
+    let ui = InstallerWindow::new().unwrap();
+    ui.show().unwrap();
+    let (client, recorder) = Client::recording();
+    let app = App::new(&ui, client);
+    let Some(Message::Static(statics)) = parse(SOFTWARE) else { panic!("static fixture") };
+    app.borrow_mut().apply_static(*statics);
+    let mut state = serde_json::json!({"type": "state", "schema": "cybexos.installer-state.v1", "phase": "setup",
+        "network": {"connected": online}, "draft": {"screen": "software", "profiles": ["development"]},
+        "software": {"profiles": ["development"], "online": online}});
+    for (key, value) in draft.as_object().unwrap() {
+        state["draft"][key] = value.clone();
+    }
+    app.borrow_mut().apply_state(state_from(state));
+    draw(&surface);
+    recorder.take();
+    (ui, app, surface, recorder)
+}
+
+fn state_from(value: serde_json::Value) -> State {
+    use cybexos_installer::protocol::{parse, Message};
+    let Some(Message::State(state)) = parse(&value.to_string()) else { panic!("state fixture") };
+    *state
+}
+
+fn click(ui: &InstallerWindow, surface: &MinimalSoftwareWindow, x: f32, y: f32) {
+    let position = slint::LogicalPosition::new(x, y);
+    for event in [
+        WindowEvent::PointerPressed { position, button: slint::platform::PointerEventButton::Left },
+        WindowEvent::PointerReleased { position, button: slint::platform::PointerEventButton::Left },
+    ] {
+        ui.window().dispatch_event(event);
+    }
+    draw(surface);
+}
+
+#[test]
+fn the_software_step_holds_the_password_until_its_continue() {
+    let (ui, _app, surface, sent) = software_setup(serde_json::json!({"screen": "account", "username": "ada"}), true);
+    let store = ui.global::<Store>();
+    store.set_screen("account".into());
+    store.set_username("ada".into());
+    store.set_password("correct horse battery".into());
+    store.set_confirm("correct horse battery".into());
+    store.invoke_passwords_edited();
+    store.invoke_continue_account();
+    assert_eq!(store.get_screen(), "software");
+    let requests = sent.take();
+    assert_eq!(requests, [serde_json::json!({"action": "draft", "values": {"screen": "software"}})],
+               "the account step sends no password");
+    draw(&surface);
+    // Enter on the Software step asks for the review with the held password.
+    key(&ui, &surface, Key::Return);
+    let requests = sent.take();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0]["action"], "review");
+    assert_eq!(requests[0]["password"], "correct horse battery");
+    // A restarted screen (a new keyboard layout) lost the password: back to You.
+    store.set_password("".into());
+    store.set_confirm("".into());
+    store.set_review_busy(false);
+    store.invoke_continue_software();
+    assert_eq!(store.get_screen(), "account");
+    assert_eq!(sent.take(), [serde_json::json!({"action": "draft", "values": {"screen": "account"}})]);
+}
+
+#[test]
+fn profile_cards_toggle_and_need_the_internet_unless_on_the_medium() {
+    let (ui, app, surface, sent) = software_setup(serde_json::json!({}), true);
+    let store = ui.global::<Store>();
+    let cards = store.get_profiles();
+    assert_eq!(cards.row_count(), 3);
+    let development = cards.row_data(0).unwrap();
+    assert!(development.selected && development.recommended);
+    assert_eq!(development.size, "On this USB stick");
+    assert_eq!(cards.row_data(2).unwrap().vendor, "1 from vendor");
+    assert_eq!(store.get_software_note_strong(), "Development");
+    // The second card, Office & Productivity.
+    click(&ui, &surface, 640.0, 300.0);
+    assert_eq!(sent.take(), [serde_json::json!({"action": "draft", "values": {"profiles": ["development", "office"]}})]);
+    click(&ui, &surface, 250.0, 300.0);
+    assert_eq!(sent.take(), [serde_json::json!({"action": "draft", "values": {"profiles": []}})]);
+
+    // Offline, the profiles the medium does not carry are dimmed and inert.
+    let offline = serde_json::json!({"type": "state", "schema": "cybexos.installer-state.v1", "phase": "setup",
+        "network": {"connected": false}, "draft": {"screen": "software", "profiles": ["development", "office"]},
+        "software": {"profiles": ["development"], "online": false}});
+    app.borrow_mut().apply_state(state_from(offline));
+    draw(&surface);
+    let office = store.get_profiles().row_data(1).unwrap();
+    assert!(!office.available && !office.selected);
+    assert_eq!(office.size, "Needs internet");
+    assert_eq!(store.get_software_note_strong(), "Offline:");
+    click(&ui, &surface, 640.0, 300.0);
+    store.invoke_toggle_profile("office".into());
+    assert!(sent.take().is_empty(), "an offline-only card was toggled");
+}
+
+#[test]
+fn customize_switches_apps_and_system_features_from_the_keyboard() {
+    let (ui, app, surface, sent) = software_setup(serde_json::json!({"profiles": ["development", "chat"]}), true);
+    let store = ui.global::<Store>();
+    store.invoke_open_sheet("apps".into());
+    draw(&surface);
+    let rows: Vec<_> = (0..store.get_custom_rows().row_count()).map(|i| store.get_custom_rows().row_data(i).unwrap()).collect();
+    let titles: Vec<&str> = rows.iter().map(|r| r.title.as_str()).collect();
+    assert_eq!(titles, ["SOFTWARE DEVELOPMENT", "Zed", "Also includes Docker.", "CHAT & MEETINGS", "Slack",
+                        "SYSTEM FEATURES", "Docker", "Proprietary applications"]);
+    key(&ui, &surface, Key::Tab); // Close
+    key(&ui, &surface, Key::Tab); // Zed
+    key(&ui, &surface, " ");
+    assert_eq!(sent.take(), [serde_json::json!({"action": "draft", "values": {"appsOff": ["zed"]}})]);
+    store.invoke_toggle_feature("proprietary".into());
+    assert_eq!(sent.take(), [serde_json::json!({"action": "draft", "values": {"features": {"proprietary": false}}})]);
+
+    // Without proprietary applications, unfree apps cannot be switched on.
+    let state = serde_json::json!({"type": "state", "schema": "cybexos.installer-state.v1", "phase": "setup",
+        "network": {"connected": true}, "draft": {"screen": "software", "profiles": ["development", "chat"],
+        "appsOff": ["zed"], "features": {"proprietary": false}},
+        "software": {"profiles": ["development", "chat"], "online": true, "withheld": 1}});
+    app.borrow_mut().apply_state(state_from(state));
+    draw(&surface);
+    let rows: Vec<_> = (0..store.get_custom_rows().row_count()).map(|i| store.get_custom_rows().row_data(i).unwrap()).collect();
+    let zed = rows.iter().find(|r| r.title == "Zed").unwrap();
+    assert!(zed.enabled && !zed.on);
+    let slack = rows.iter().find(|r| r.title == "Slack").unwrap();
+    assert!(!slack.enabled && !slack.on);
+    assert!(rows.iter().any(|r| r.kind == 3 && r.warn && r.title.contains("Codex still is")));
+    assert!(!store.get_always_included().contains("Claude Code"));
+    key(&ui, &surface, Key::Escape);
+    assert_eq!(store.get_sheet(), "");
+}
+
+#[test]
+fn review_back_and_change_return_to_the_software_step() {
+    let (ui, app, surface, sent) = software_setup(serde_json::json!({}), true);
+    let store = ui.global::<Store>();
+    let review = serde_json::json!({"type": "state", "schema": "cybexos.installer-state.v1", "phase": "review",
+        "network": {"connected": true}, "draft": {"screen": "software", "profiles": ["development"], "disk": "/dev/vda"},
+        "disks": [{"path": "/dev/vda", "size": 85899345920u64, "available": true, "model": "QA"}],
+        "software": {"profiles": ["development"], "online": true}});
+    app.borrow_mut().apply_state(state_from(review));
+    draw(&surface);
+    assert_eq!(store.get_screen(), "review");
+    let rows = store.get_summary_right();
+    let software = (0..rows.row_count()).map(|i| rows.row_data(i).unwrap()).find(|r| r.label == "Software").unwrap();
+    assert_eq!((software.value.as_str(), software.action.as_str()), ("Development", "software"));
+    key(&ui, &surface, Key::Escape);
+    assert_eq!(sent.take(), [serde_json::json!({"action": "back"})]);
+    store.invoke_change("software".into());
+    assert_eq!(sent.take(), [serde_json::json!({"action": "back"})]);
+    store.invoke_change("account".into());
+    assert_eq!(sent.take(), [serde_json::json!({"action": "back"}), serde_json::json!({"action": "draft", "values": {"screen": "account"}})]);
 }

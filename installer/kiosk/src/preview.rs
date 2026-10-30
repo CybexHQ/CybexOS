@@ -62,8 +62,10 @@ fn base_state() -> Value {
         "draft": {"screen": "welcome", "disk": "/dev/nvme0n1", "encrypted": true, "fullName": "Ada Lovelace", "username": "ada",
                   "userEdited": false, "hostname": "", "hostEdited": false, "timezone": "Europe/Amsterdam", "tzSource": "detected",
                   "locale": "en_US.UTF-8", "layout": "us", "nvidiaOpen": true,
-                  "apps": {"developer": true, "proprietary": true, "steam": true, "docker": true, "podman": true, "tailscale": true,
-                           "connectedWidgets": true, "assistant": true, "localNetworkServices": true}}
+                  "profiles": ["development"], "appsOff": [],
+                  "features": {"docker": true, "podman": true, "tailscale": true, "localNetworkServices": true,
+                               "connectedWidgets": true, "proprietary": true}},
+        "software": {"profiles": ["development"], "packages": 4, "downloadBytes": 0, "appsOff": 0, "withheld": 0, "vendor": 0, "online": true}
     })
 }
 
@@ -89,6 +91,16 @@ fn state(patch: Value) -> Message {
 }
 
 type Setup = fn(&Store);
+
+/// Development, Graphics and Gaming, with Blender and DBeaver turned off.
+fn several(mut patch: Value) -> Value {
+    merge(&mut patch, json!({
+        "draft": {"profiles": ["development", "graphics", "gaming"], "appsOff": ["blender", "dbeaver"]},
+        "software": {"profiles": ["development", "graphics", "gaming"], "packages": 10, "downloadBytes": 1_855_843_000u64,
+                     "appsOff": 2, "vendor": 1}
+    }));
+    patch
+}
 
 fn scenarios() -> Vec<(&'static str, Value, Setup)> {
     let none: Setup = |_| {};
@@ -123,7 +135,22 @@ fn scenarios() -> Vec<(&'static str, Value, Setup)> {
         ("10-timezone", json!({"draft": {"screen": "account"}}), |store| {
             store.invoke_open_sheet(SharedString::from("timezone"));
         }),
-        ("11-review", json!({"phase": "review", "draft": {"screen": "account"}}), none),
+        ("10a-software-development", json!({"draft": {"screen": "software"}}), none),
+        ("10b-software-none", json!({"draft": {"screen": "software", "profiles": []},
+            "software": {"profiles": [], "packages": 0}}), none),
+        ("10c-software-several", several(json!({"draft": {"screen": "software"}})), none),
+        ("10d-software-offline", json!({"draft": {"screen": "software", "profiles": ["development", "graphics"]},
+            "network": {"connected": false, "kind": "", "address": ""}, "software": {"online": false}}), none),
+        ("10e-software-customize", several(json!({"draft": {"screen": "software"}})), |store| {
+            store.invoke_open_sheet(SharedString::from("apps"));
+        }),
+        ("10f-software-no-proprietary-scrolled", json!({"draft": {"screen": "software", "profiles": ["chat"],
+            "features": {"proprietary": false}}, "software": {"profiles": ["chat"], "packages": 2, "downloadBytes": 283_620_042u64,
+            "withheld": 3}}), |store| {
+            store.invoke_open_sheet(SharedString::from("apps"));
+        }),
+        ("11-review", json!({"phase": "review", "draft": {"screen": "software"}}), none),
+        ("11a-review-software", several(json!({"phase": "review", "draft": {"screen": "software"}})), none),
         ("12-installing", json!({"phase": "installing", "stage": 4, "elapsed": 754, "diskTouched": true,
             "message": "Building and downloading packages"}), none),
         ("13-done", json!({"phase": "complete", "stage": 6, "diskTouched": true,
@@ -145,7 +172,6 @@ fn scenarios() -> Vec<(&'static str, Value, Setup)> {
             ));
             store.set_details_note(SharedString::from("Private log /run/cybexos-installer.log. Passwords never appear here."));
         }),
-        ("20-apps", json!({"phase": "review"}), |store| store.invoke_open_sheet(SharedString::from("apps"))),
         ("21-reconnecting", json!({}), |store| store.set_connected(false)),
     ]
 }
@@ -187,6 +213,15 @@ fn main() {
         App::message(&app, state(patch));
         store.set_connected(true);
         setup(&store);
+        if name.ends_with("-scrolled") {
+            // Show the end of a long sheet, as the mouse wheel would.
+            render(&window, width, height, &out.join(format!("{name}.png")));
+            window.dispatch_event(WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(640.0, 400.0),
+                delta_x: 0.0,
+                delta_y: -2000.0,
+            });
+        }
         render(&window, width, height, &out.join(format!("{name}.png")));
     }
 }
