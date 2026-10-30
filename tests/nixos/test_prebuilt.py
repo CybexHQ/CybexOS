@@ -13,6 +13,7 @@ from unittest.mock import patch
 import test_lifecycle as lifecycle
 from cybexos import prebuilt
 from cybexos.common import atomic, read
+from cybexos.common import Failure
 from cybexos.engine import NotPrebuilt
 
 
@@ -75,6 +76,26 @@ class Parsing(unittest.TestCase):
 
 
 class Classification(unittest.TestCase):
+    def test_versioned_nix_metadata_cannot_hide_an_uncached_dependency(self):
+        # Captured installed Nix format: version 4 wraps the graph, uses
+        # store basenames, and moves inputDrvs to inputs.drvs.
+        graph = {}
+        for path, info in GRAPH.items():
+            value = dict(info)
+            value['inputs'] = {'drvs': {Path(key).name: {'outputs': ['out'], 'dynamicOutputs': {}}
+                                       for key in value.pop('inputDrvs')}}
+            value['outputs'] = {'out': {'path': Path(info['outputs']['out']['path']).name}}
+            graph[Path(path).name] = value
+        def run(*args, **kwargs):
+            return json.dumps({'version': 4, 'derivations': graph})
+        self.assertEqual(prebuilt.compiles(run, list(GRAPH), root=ROOT, expected=[VENDOR]), ['hello-2.12'])
+        self.assertEqual(prebuilt.show(run, [ROOT])[ROOT]['outputs']['out']['path'], store('o', 'out'))
+
+    def test_missing_or_malformed_metadata_never_passes_as_prebuilt(self):
+        for data in ({}, {'version': 4, 'derivations': []}, {ROOT: {}}, []):
+            with self.subTest(data=data), self.assertRaises(Failure):
+                prebuilt.compiles(lambda *args, **kwargs: json.dumps(data), [ROOT], root=ROOT)
+
     def test_compiles_below_configuration_but_not_below_expected_builds(self):
         found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR])
         self.assertEqual(found, ['hello-2.12'])

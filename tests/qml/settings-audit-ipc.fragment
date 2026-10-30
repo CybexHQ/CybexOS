@@ -33,6 +33,7 @@
         const page = shell.auditPage();
         if (page && page.revealFocus) page.revealFocus(row);
         if (/^CornerPickerRow_/.test(String(row))) { row.pick(value); return true; }
+        if (row.settingKey === "barColorMode") { row.commit(value); return true; }
         const control = shell.auditControl(row);
         if (!control) throw new Error("Missing control: " + String(row));
         if (!control.enabled) throw new Error("Disabled control: " + String(control));
@@ -64,7 +65,11 @@
             for (let owner = item; owner; owner = owner.parent) {
                 if (owner.moduleId !== undefined) { info.module = owner.moduleId; break; }
             }
-            if (/^CornerPickerRow_/.test(String(item))) {
+            if (item.settingKey === "barColorMode") {
+                info.control = "BarColorChoices";
+                info.choices = Settings.barColorChoices.map(choice => ({value: choice.id}));
+                info.value = Settings.barColorMode;
+            } else if (/^CornerPickerRow_/.test(String(item))) {
                 info.control = "CornerPickerRow";
                 info.choices = item.corners.map(value => ({value: value}));
                 info.value = item.current;

@@ -80,15 +80,49 @@ def kind(info):
     return 'compile'
 
 
+def derivation_graph(data):
+    """Normalize Nix's derivation JSON, including its versioned wire format."""
+    if not isinstance(data, dict):
+        raise Failure('Nix returned invalid derivation metadata.')
+    if 'derivations' in data:
+        data = data['derivations']
+    if not isinstance(data, dict):
+        raise Failure('Nix returned invalid derivation metadata.')
+    graph = {}
+    for key, value in data.items():
+        path = key if key.startswith('/nix/store/') else '/nix/store/' + key
+        if not STORE.fullmatch(path) or not path.endswith('.drv') or not isinstance(value, dict):
+            raise Failure('Nix returned invalid derivation metadata.')
+        info = dict(value)
+        wire_inputs = info.get('inputs', {})
+        if not isinstance(wire_inputs, dict):
+            raise Failure('Nix returned invalid derivation metadata.')
+        inputs = info.get('inputDrvs', wire_inputs.get('drvs'))
+        if not isinstance(inputs, dict) or not isinstance(info.get('env'), dict) or not isinstance(info.get('outputs'), dict):
+            raise Failure('Nix returned invalid derivation metadata.')
+        info['inputDrvs'] = {key if key.startswith('/nix/store/') else '/nix/store/' + key: value
+                             for key, value in inputs.items()}
+        if any(not STORE.fullmatch(key) or not key.endswith('.drv') for key in info['inputDrvs']):
+            raise Failure('Nix returned invalid derivation metadata.')
+        if any(not isinstance(value, dict) or ('path' in value and not isinstance(value['path'], str))
+               for value in info['outputs'].values()):
+            raise Failure('Nix returned invalid derivation metadata.')
+        info['outputs'] = {key: dict(value, path=value['path'] if value['path'].startswith('/nix/store/')
+                                    else '/nix/store/' + value['path']) if value.get('path') else value
+                           for key, value in info['outputs'].items()}
+        graph[path] = info
+    return graph
+
+
 def show(run, derivations):
     """`nix derivation show` for the given .drv paths, keyed by full path."""
     if not derivations:
         return {}
     data = parse(run('nix', 'derivation', 'show', *derivations, timeout=600, sensitive=True))
-    if not isinstance(data, dict):
-        raise Failure('Nix returned invalid derivation metadata.')
-    return {key if key.startswith('/nix/store/') else '/nix/store/' + key: value
-            for key, value in data.items() if isinstance(value, dict)}
+    graph = derivation_graph(data)
+    if set(derivations) - graph.keys():
+        raise Failure('Nix omitted requested derivation metadata.')
+    return graph
 
 
 def compiles(run, derivations, *, root=None, expected=()):

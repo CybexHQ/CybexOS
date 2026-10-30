@@ -21,7 +21,7 @@ class Audit:
     def __init__(self, report):
         assert os.geteuid() == 0, 'The disposable guest audit must run as root'
         assert Path('/run/cybexos-settings-audit').exists(), 'Disposable guest marker is required'
-        assert Path('/etc/hostname').read_text().strip() == 'cybexos-qa'
+        assert Path('/etc/hostname').read_text().strip() in ('cybexos-qa', 'cybexqa-cybexos')
         assert 'QEMU' in Path('/sys/class/dmi/id/sys_vendor').read_text()
         self.report_path = report
         self.report = {'scope': 'installed NixOS VM; test-only shell introspection; real controls and helpers',
@@ -151,6 +151,7 @@ class Audit:
         if page == 'bar':
             self.edit('custom', label='Height')
             self.edit('floating', key='barStyle')
+            self.evaluate('shell.auditRow("", "barColorMode").commit("custom")')
         if page == 'appearance':
             self.edit('fixed', key='paletteMode')
             self.edit('custom', key='surfaceBorderMode')
@@ -235,7 +236,7 @@ class Audit:
         self.edit(not baseline['workspaceSwipe'], label='Swipe between workspaces')
         self.edit(sensitivity, label='Pointer sensitivity')
         self.action('Apply')
-        self.wait('!SystemSettings.input.busy && !shell.auditPage().editState.dirty')
+        self.wait('!SystemSettings.input.busy && !!shell.auditPage()?.editState && !shell.auditPage().editState.dirty')
         assert not self.evaluate('SystemSettings.input.error'), self.evaluate('SystemSettings.input.error')
         self.wait('!SystemSettings.input.loading')
         actual = self.evaluate('SystemSettings.input.snapshot.touchpad')
@@ -245,7 +246,7 @@ class Audit:
         assert document['touchpad']['tap'] == actual['tap']
         self.evaluate('shell.auditPage().editState.draft='+json.dumps(baseline))
         self.action('Apply')
-        self.wait('!SystemSettings.input.busy && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
+        self.wait('!SystemSettings.input.busy && !!shell.auditPage()?.editState && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
         assert not self.evaluate('SystemSettings.input.error')
         return {'liveTouchpadOptions':actual, 'discard':True, 'navigationPersistence':True, 'restored':True}
 
@@ -255,27 +256,30 @@ class Audit:
         baseline = self.evaluate('shell.auditPage().editState.draft')
         self.action('Add layout')
         assert len(self.evaluate('shell.auditPage().editState.draft.layouts')) == len(baseline['layouts'])+1
-        self.evaluate('shell.auditPage().editLayouts([{layout:"us",variant:"intl"},{layout:"nl",variant:""}])')
+        layouts = [{'layout':'us','variant':'intl'}, {'layout':'nl','variant':''}]
+        if baseline['layouts'] == layouts:
+            layouts = [{'layout':'us','variant':''}, {'layout':'de','variant':''}]
+        self.evaluate('shell.auditPage().editLayouts('+json.dumps(layouts)+')')
         for shortcut in ['', 'grp:alt_shift_toggle', 'grp:ctrl_shift_toggle', 'grp:caps_toggle']:
             self.edit(shortcut, label='Shortcut')
             assert self.evaluate('shell.auditPage().editState.draft.shortcut') == shortcut
         self.edit('grp:alt_shift_toggle', label='Shortcut')
         self.action('Apply')
-        self.wait('!SystemSettings.input.busy && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
+        self.wait('!SystemSettings.input.busy && !!shell.auditPage()?.editState && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
         assert not self.evaluate('SystemSettings.input.error'), self.evaluate('SystemSettings.input.error')
         actual = self.evaluate('SystemSettings.input.snapshot.keyboard')
-        assert actual['layouts'] == [{'layout':'us','variant':'intl'}, {'layout':'nl','variant':''}], actual
+        assert actual['layouts'] == layouts, actual
         self.action('Next layout')
         self.wait('!SystemSettings.input.busy && !SystemSettings.input.loading')
         assert not self.evaluate('SystemSettings.input.error')
         changed = self.evaluate('SystemSettings.input.snapshot.keyboard.active')
         assert changed != actual['active'], (actual, changed)
         self.action('Move up')
-        assert self.evaluate('shell.auditPage().editState.draft.layouts[0].layout') == 'nl'
+        assert self.evaluate('shell.auditPage().editState.draft.layouts[0].layout') == layouts[1]['layout']
         self.action('Discard')
         self.evaluate('shell.auditPage().editState.draft='+json.dumps(baseline))
         self.action('Apply')
-        self.wait('!SystemSettings.input.busy && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
+        self.wait('!SystemSettings.input.busy && !!shell.auditPage()?.editState && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
         return {'layouts':actual['layouts'], 'switch':changed, 'reorderAndDiscard':True, 'restored':True}
 
     def workspaces(self):
@@ -427,6 +431,9 @@ class Audit:
 
     def idle_and_night_light(self):
         self.page('power')
+        original_lock = self.evaluate('Settings.idleLockMins')
+        self.edit(10,key='idleLockMins')
+        self.saved()
         self.wait('SysInfo.idleTimeoutsApplied === SysInfo.idleTimeoutsKey(Settings)')
         assert not self.evaluate('SysInfo.idleTimeoutsError'),self.evaluate('SysInfo.idleTimeoutsError')
         assert self.user(['systemctl','--user','is-active','hypridle.service'])=='active'
@@ -444,7 +451,27 @@ class Audit:
         self.edit(False,key='nightLight')
         self.wait('!SysInfo.nightLightPending && !SysInfo.nightLightEffective')
         assert not self.evaluate('SysInfo.nightLightError')
+        self.evaluate('Settings.set("idleLockMins",'+json.dumps(original_lock)+')')
+        self.saved()
         return {'stayAwakeModes':['30m','1h','always','off'],'realHyprsunsetStartStop':True}
+
+    def idle_restart_burst(self):
+        self.page('power')
+        before = self.evaluate('Settings.snapshot()')
+        pids = []
+        try:
+            for value in [5,10]*4:
+                self.edit(value,key='idleLockMins')
+                self.saved()
+                self.wait('SysInfo.idleTimeoutsApplied === SysInfo.idleTimeoutsKey(Settings)')
+                assert not self.evaluate('SysInfo.idleTimeoutsError')
+                assert self.user(['systemctl','--user','is-active','hypridle.service']) == 'active'
+                pids.append(self.user(['systemctl','--user','show','hypridle.service','-p','MainPID','--value']))
+            assert len(set(pids)) >= 7, pids
+            return {'rapidSavedTimeoutChanges':8,'idleLockServiceStayedActive':True,'servicePIDs':pids}
+        finally:
+            self.evaluate('Settings.applyValues('+json.dumps(before)+',"Audit restore","")')
+            self.saved()
 
     def notifications(self):
         self.page('notifications')
@@ -600,7 +627,7 @@ class Audit:
             folder.mkdir(parents=True,exist_ok=True)
             os.chown(folder,1000,100)
             for name in ['first.png','second.png']:
-                shutil.copyfile(self.evaluate('Wallpaper.defaultPath'),folder/name)
+                shutil.copyfile(Path(__file__).resolve().parents[1]/'assets/brand/favicon/icon-512.png',folder/name)
                 os.chown(folder/name,1000,100)
             self.evaluate('Wallpaper.requestDirectory('+json.dumps(str(folder))+')')
             self.wait('!Wallpaper.loading && Wallpaper.files.length === 2')
@@ -651,7 +678,7 @@ class Audit:
             self.wait('!Themes.busy && Themes.entries.some(e => e.name === "Settings audit theme")')
             assert not self.evaluate('Themes.error'),self.evaluate('Themes.error')
             entry=self.evaluate('Themes.entries.find(e => e.name === "Settings audit theme")')
-            self.edit(entry['id'],key='theme')
+            self.evaluate('shell.auditItems().find(item => item.Accessible?.name === '+json.dumps(entry['name'])+').Accessible.pressAction()')
             self.wait('!Themes.busy')
             return {'accentPresets':True,'hueBounds':True,'borderOpacityBounds':True,'customThemeSaveApply':True}
         finally:
@@ -749,6 +776,28 @@ class Audit:
             return {'presets':3,'eachBuiltinMembership':len(entries),'saved':True}
         finally:
             self.evaluate('Settings.applyValues('+json.dumps(before)+',"Audit restore","")')
+            self.saved()
+
+    def bar_background(self):
+        self.page('bar')
+        baseline = self.evaluate('Settings.snapshot()')
+        try:
+            choices = self.evaluate('Settings.barColorChoices')
+            for choice in choices:
+                self.evaluate('shell.auditRow("", "barColorMode").commit('+json.dumps(choice['id'])+')')
+                self.wait('Settings.barColorMode === '+json.dumps(choice['id']))
+                assert self.saved()['barColorMode'] == choice['id']
+            self.evaluate('shell.auditRow("", "barColorMode").commit("custom")')
+            for key, values in [('barCustomHue',[0,120,359]),
+                                ('barCustomSaturation',[0,50,100]),
+                                ('barCustomLightness',[0,50,100])]:
+                for value in values:
+                    self.edit(value,key=key)
+                    assert self.saved()[key] == value
+                    assert re.fullmatch(r'#[a-fA-F0-9]{6}',self.evaluate('Settings.effectiveBarColor'))
+            return {'backgroundChoices':len(choices),'customHueSaturationLightnessBounds':True}
+        finally:
+            self.evaluate('Settings.applyValues('+json.dumps(baseline)+',"Audit restore","")')
             self.saved()
 
     def vpn(self):
@@ -1067,8 +1116,8 @@ class Audit:
 
 EXTENDED = ['input_preferences','keyboard_preferences','workspaces','default_applications',
             'display_trial','display_formats','network_trial','network_addresses','vpn',
-            'idle_and_night_light','notifications','audio','wallpaper','appearance_extras',
-            'bar_layout','widget_options','plugin_lifecycle','persistence_and_reset','backup']
+            'idle_and_night_light','idle_restart_burst','notifications','audio','wallpaper','appearance_extras',
+            'bar_layout','bar_background','widget_options','plugin_lifecycle','persistence_and_reset','backup']
 EXTENDED += ['control_center','hotspot','multiple_displays','administration']
 
 

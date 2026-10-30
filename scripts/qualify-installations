@@ -277,7 +277,8 @@ class VM:
 
         Do not inject another command after a broken serial transport, during
         login, or into an installer still running. No credential files, full
-        process environments or build logs are collected.
+        process environments are collected. Failed-updater log tails stay in
+        the private qualification evidence.
         """
         if not self.command_ready or self.process is None or not self.process.isalive():
             return {'state': 'unavailable', 'reason': 'No authenticated idle serial command transport'}
@@ -302,7 +303,13 @@ def run(label, args):
     except Exception as error:
         output[label] = {'error': str(error)}
         return ''
-run('updaterStatus', ['cybex', 'update', 'status'])
+status_body = run('updaterStatus', ['cybex', 'update', 'status'])
+try:
+    status = json.loads(status_body)
+except (ValueError, TypeError):
+    status = {}
+if status.get('state') in ('failed', 'interrupted', 'recovery-failed') and status.get('transaction'):
+    run('updaterLog', ['cybex', 'update', 'log', status['transaction']])
 prefix = ['runuser', '-u', pwd.getpwuid(1000).pw_name, '--', 'env', 'XDG_RUNTIME_DIR=/run/user/1000', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
 run('welcomeIpc', prefix + ['HOME=/home/cybexqa', 'cybexos-runtime', 'ipc', 'welcome', 'status'])
 run('polkitIpc', prefix + ['HOME=/home/cybexqa', 'cybexos-runtime', 'ipc', 'polkit', 'status'])
@@ -951,6 +958,13 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
     def stop(self):
         if self.process is not None:
             if self.process.isalive():
+                if self.command_ready:
+                    try:
+                        # Keep diagnostics and cloned stores intact when a
+                        # failed case tears down a still-running guest.
+                        self.command('sync', timeout=60)
+                    except Exception:
+                        pass
                 self.process.terminate(force=True)
             self.process.close()
             self.log.close()

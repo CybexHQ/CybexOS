@@ -152,7 +152,13 @@ in {
     };
     systemd.user.services.hypridle = {
       partOf = [ "hyprland-session.target" ]; wantedBy = [ "hyprland-session.target" ];
-      serviceConfig = { ExecStart = "${cfg.desktopPackage}/bin/cybexos-runtime exec hypridle"; Restart = "on-failure"; };
+      # Each saved timeout change restarts the service. Legitimate rapid edits
+      # must not trip systemd's start limit and leave idle locking stopped.
+      startLimitIntervalSec = 0;
+      serviceConfig = {
+        ExecStart = "${cfg.desktopPackage}/bin/cybexos-runtime exec hypridle";
+        Restart = "on-failure"; RestartSec = 2;
+      };
     };
     systemd.user.services.cybexos-backup = {
       description = "Encrypted personal backup and overdue reminder";

@@ -210,10 +210,12 @@ def main():
     process_guard()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     processes = []
-    with tempfile.TemporaryDirectory(prefix='private-', dir=OUTPUT) as temporary:
+    with tempfile.TemporaryDirectory(prefix='private-', dir=OUTPUT) as temporary, \
+            tempfile.TemporaryDirectory(prefix='cxk-', dir='/tmp') as runtime_directory:
         base = Path(temporary)
-        runtime, home = base / 'run', base / 'home'
-        runtime.mkdir(mode=0o700)
+        # Quickshell adds its own directories and ipc.sock below this path.
+        # Nix's TMPDIR plus the evidence directory can exceed AF_UNIX's limit.
+        runtime, home = Path(runtime_directory), base / 'home'
         (runtime / 'cybexos').mkdir()
         (home / '.config/cybexos/hypr').mkdir(parents=True)
         (home / '.config/cybexos/shell.json').write_text(json.dumps({'v': 30, 'wall': '', 'assistantShown': False}))

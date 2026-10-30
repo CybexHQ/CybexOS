@@ -16,7 +16,7 @@ def main():
     if not shutil.which('qs') or subprocess.run(['pgrep', '-x', 'qs'], stdout=subprocess.DEVNULL).returncode == 0:
         print('Model Usage popup test deferred to isolated CI')
         return
-    with tempfile.TemporaryDirectory(prefix='cybexos-model-popup-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='cxm-', dir='/tmp') as temporary:
         base = Path(temporary)
         runtime = base / 'run'
         runtime.mkdir(mode=0o700)
@@ -29,7 +29,7 @@ def main():
         for name in ('DISPLAY', 'WAYLAND_DISPLAY'):
             env.pop(name, None)
         binary = base / 'sway'
-        shutil.copyfile(shutil.which('sway'), binary)
+        shutil.copyfile(os.environ.get('CYBEXOS_SWAY_BINARY') or shutil.which('sway'), binary)
         binary.chmod(0o700)
         config = base / 'sway.conf'
         config.write_text('output HEADLESS-1 mode 1280x720\n')
@@ -50,7 +50,10 @@ def main():
                     log.seek(0)
                     raise AssertionError(log.read())
                 env['WAYLAND_DISPLAY'] = sockets[0].name
-                process = subprocess.Popen(['dbus-run-session', '--', 'qs', '--no-color', '-p', str(shell)],
+                bus = ['dbus-run-session']
+                if os.environ.get('CYBEXOS_DBUS_SESSION_CONFIG'):
+                    bus += ['--config-file', os.environ['CYBEXOS_DBUS_SESSION_CONFIG']]
+                process = subprocess.Popen([*bus, '--', 'qs', '--no-color', '-p', str(shell)],
                                            env=env, text=True, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT, start_new_session=True)
                 try:

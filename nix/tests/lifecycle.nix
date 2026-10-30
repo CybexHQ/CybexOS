@@ -40,7 +40,10 @@ in pkgs.testers.runNixOSTest {
   nodes.machine = { lib, ... }: {
     imports = [ module ];
     cybexos = { enable = true; primaryUser = "tester"; features = { proprietary = false; steam = false; docker = false; }; };
-    virtualisation = { memorySize = 4096; cores = 4; graphics = true; diskSize = 4096; };
+    virtualisation = {
+      memorySize = 4096; cores = 4; graphics = true; diskSize = 4096;
+      qemu.options = [ "-no-user-config" ];
+    };
     networking.hostName = "machine";
     users.users.tester.initialPassword = "qualification-only";
     # Retain the complete candidate and its exact input sources. Staging must

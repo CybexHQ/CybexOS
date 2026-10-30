@@ -56,7 +56,9 @@ SettingsPage {
                 delegate: RowCluster {
                     id: entry
                     required property int index
-                    readonly property var layout: page.draft.layouts[index]
+                    // A shrinking repeater can evaluate a retiring delegate
+                    // once before Qt destroys it.
+                    readonly property var layout: page.draft.layouts[index] || ({layout: "", variant: ""})
                     width: parent.width
                     SelectRow {
                         width: parent.width

@@ -35,7 +35,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'lifecycle'))
-from cybexos.prebuilt import kind, name  # noqa: E402
+from cybexos.prebuilt import derivation_graph, kind, name  # noqa: E402
 
 NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
 
@@ -80,8 +80,7 @@ def cached(path):
 
 
 def walk(root, expected):
-    graph = json.loads(nix('derivation', 'show', '-r', root))
-    graph = {k if k.startswith('/nix/store/') else '/nix/store/' + k: v for k, v in graph.items()}
+    graph = derivation_graph(json.loads(nix('derivation', 'show', '-r', root)))
     expected, seen, frontier, found, configured, local = set(expected), set(), [root], set(), set(), 0
     with ThreadPoolExecutor(32) as pool:
         while frontier:

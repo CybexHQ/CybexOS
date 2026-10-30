@@ -288,18 +288,6 @@ class Session(welcome.Session):
         text = text.replace('    SoftwareWindow {}\n',
             '    SoftwareWindow { id: softwareWindow; Component.onCompleted: shell.softwareTestWindow = softwareWindow }\n')
         entry.write_text(text)
-        # Toolchain workaround, private copy only: with the nixos-unstable Qt,
-        # arrays passed through JsonCommand's `var` signal fail Array.isArray,
-        # so UpdatesHelpers.validDeployment() rejects every prepared status.
-        # Updates.qml should read `poll.result` (as Software.qml does); until
-        # that lands this test reads it the same way. A no-op once fixed.
-        updates_qml = self.source / 'desktop/quickshell/Common/Updates.qml'
-        source = updates_qml.read_text()
-        before = '        id: poll\n        onCompleted: value => {\n'
-        if before in source:
-            updates_qml.write_text(source.replace(before, '        id: poll\n        onCompleted: () => {\n'
-                                                  '            const value = poll.result;\n', 1))
-            print('note: Updates.qml poll handler reads poll.result in this private copy (toolchain workaround)')
 
     def state(self):
         return self.json_call('software-test', 'state')
