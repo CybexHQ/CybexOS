@@ -138,6 +138,9 @@ def check(iso, flake, staging=None):
       installerSourceFile = toString c.environment.etc."cybexos/installer-source".source;
       installerInputs = builtins.fromJSON c.environment.etc."cybexos/installer-inputs.json".text;
       installerInputsFile = toString c.environment.etc."cybexos/installer-inputs.json".source;
+      hardwareCatalogue = toString c.environment.etc."cybexos/hardware-drivers.json".source;
+      microcode = c.boot.initrd.prepend;
+      earlyNetworkDrivers = c.boot.initrd.availableKernelModules;
       release = builtins.fromJSON c.environment.etc."cybexos/release.json".text;
       bootProfiles = let profile = value: {
         system = toString value.system.build.toplevel;
@@ -155,7 +158,7 @@ def check(iso, flake, staging=None):
     # independently resolved exact source identity.
     paths = {'source': expected['installerSource'].strip()} | {name: expected[name] for name in
               ('desktop', 'updater', 'installerUi', 'installerScreen', 'payloadSystemPath', 'payloadEtc', 'system', 'etc',
-               'releaseFile', 'installerSourceFile', 'installerInputsFile')}
+               'releaseFile', 'installerSourceFile', 'installerInputsFile', 'hardwareCatalogue')}
     if not expected['installerInputs'] or len(set(expected['installerInputs'])) != len(expected['installerInputs']):
         raise ParityFailure('ISO input source declaration is empty or contains duplicates')
     paths.update({'inputSource:' + str(index): value for index, value in enumerate(expected['installerInputs'])})
@@ -194,6 +197,9 @@ def check(iso, flake, staging=None):
             raise ParityFailure('ISO installer refers to a different source snapshot')
         if json.loads(selected['installerInputsFile'].read_bytes()) != expected['installerInputs']:
             raise ParityFailure('ISO retained input sources differ from the tested inputs')
+        hardware = json.loads(selected['hardwareCatalogue'].read_bytes())
+        if hardware.get('schema') != 1 or not all(hardware.get('nvidia', {}).get(branch, {}).get('devices') for branch in ('open', 'closed')):
+            raise ParityFailure('ISO hardware catalogue has no supported driver identities')
         runtime = selected['desktop'] / 'share/cybexos/runtime'
         for label, relative, installed in (
             ('quickshell', 'desktop/quickshell', runtime / 'quickshell'),
@@ -232,6 +238,7 @@ def check(iso, flake, staging=None):
     return {'kind': 'image-source-parity-evidence', 'result': 'passed', 'isoSha256': digest,
             'sourceNarHash': identity, 'sourceRevision': expected['release']['revision'],
             'release': expected['release'], 'checks': checks,
+            'hardwareConfiguration': {'microcode': expected['microcode'], 'earlyNetworkDrivers': expected['earlyNetworkDrivers']},
             'scope': 'static source/image/package identity, installer screen/service and offline payload parity; no installation/runtime qualification'}
 
 

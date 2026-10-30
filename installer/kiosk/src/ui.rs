@@ -333,17 +333,19 @@ impl App {
         };
         checks.push(firmware);
         let net = &state.network;
+        let network_issue = state.hardware.get("networkIssues").and_then(Value::as_array)
+            .and_then(|issues| issues.first()).and_then(Value::as_str).unwrap_or("");
         checks.push(if net.connected {
             let kind = if net.kind == "wifi" { format!("Wi-Fi · {}", net.name) } else { format!("Ethernet · {}", net.interface) };
             let address = if net.address.is_empty() { String::new() } else { format!(" · {}", net.address) };
-            Check { label: s("Network"), value: s(format!("{kind}{address}")), detail: s(""), state: 0 }
+            Check { label: s("Network"), value: s(format!("{kind}{address}")), detail: s(network_issue), state: if network_issue.is_empty() { 0 } else { 3 } }
         } else if net.busy && net.wifi.interface.is_empty() && !net.ethernet_cable {
             Check { label: s("Network"), value: s("Looking for a connection…"), detail: s(""), state: 1 }
         } else {
             Check {
                 label: s("Network"),
                 value: s(if net.ethernet_cable { "Cable connected, no address yet" } else { "Not connected" }),
-                detail: s("Needed to verify the release and download parts of your desktop"),
+                detail: s(if network_issue.is_empty() { "Needed to verify the release and download parts of your desktop" } else { network_issue }),
                 state: 3,
             }
         });
@@ -368,11 +370,15 @@ impl App {
             Check { label: s("Disks"), value: s(format!("{} found · {available} can be used", state.disks.len())), detail: s(""), state: 0 }
         });
         let graphics = if state.graphics.is_empty() { "Firmware framebuffer".to_string() } else { state.graphics.join(" + ") };
+        let graphics_blocker = state.hardware.get("blockers").and_then(Value::as_array)
+            .and_then(|items| items.first()).and_then(Value::as_str).unwrap_or("");
+        let graphics_detail = state.hardware.get("graphicsDetail").and_then(Value::as_str)
+            .unwrap_or("Desktop compatibility has not been verified on this computer");
         checks.push(Check {
             label: s("Graphics"),
             value: s(graphics),
-            detail: s(if state.nvidia() { "NVIDIA driver choice on the review page" } else { "" }),
-            state: 0,
+            detail: s(if graphics_blocker.is_empty() { graphics_detail } else { graphics_blocker }),
+            state: if graphics_blocker.is_empty() { 2 } else { 4 },
         });
         let gib = state.memory as f64 / 1_073_741_824.0;
         checks.push(Check {
@@ -390,7 +396,7 @@ impl App {
         store.set_checks(model(store.get_checks(), checks));
         store.set_check_summary(s(if running { "checking…" } else if ok { "all good" } else if !net.connected { "needs a network" } else { "" }));
         store.set_busy(running);
-        store.set_can_start(phase == "setup");
+        store.set_can_start(phase == "setup" && graphics_blocker.is_empty());
         store.set_offline(!net.connected);
         store.set_development(phase == "development");
         store.set_development_message(s(if state.message.is_empty() { "This is an unreleased development build." } else { state.message.as_str() }));
@@ -710,7 +716,7 @@ impl App {
             left.push(row(
                 "Graphics",
                 format!("NVIDIA · {}", if draft.nvidia_open { "open kernel driver" } else { "proprietary legacy driver" }),
-                if draft.nvidia_open { "Turing or newer (GTX 16, RTX 20 and up)".into() } else { "Maxwell, Pascal or Volta".into() },
+                "Selected for the detected GPU device IDs".into(),
                 "gpu",
                 "Customize",
                 false,
@@ -739,6 +745,9 @@ impl App {
         store.set_review_error(s(if state.phase == "review" { state.error.as_str() } else { "" }));
         store.set_nvidia(state.nvidia());
         store.set_nvidia_open(draft.nvidia_open);
+        let selection = state.hardware.get("nvidiaSelection");
+        store.set_nvidia_open_available(selection.and_then(|s| s.get("open")).and_then(Value::as_bool).unwrap_or(true));
+        store.set_nvidia_closed_available(selection.and_then(|s| s.get("closed")).and_then(Value::as_bool).unwrap_or(true));
         store.set_gpu_names(s(if state.graphics.is_empty() { "NVIDIA graphics".into() } else { state.graphics.join(" + ") }));
     }
 
@@ -798,8 +807,8 @@ impl App {
                 "This installer isn't signed for Secure Boot yet, and it never turns Secure Boot off for you. None of your disks have been touched.".to_string(),
                 "Secure Boot",
                 "Enabled".to_string(),
-                vec!["Restart into your firmware settings with the button below.", "Turn Secure Boot off, then save and exit.", "Start the Cybex OS installer again."],
-                "firmware",
+                vec!["Keep Secure Boot enabled.", "This computer needs signed installation media and a qualified key enrollment path.", "Use a qualified signed installer when one is available."],
+                "",
                 "needs-input",
             )
         } else {
@@ -1381,7 +1390,9 @@ fn bind(app: &Shared, window: &InstallerWindow) {
         this.draft(json!({"appsOff": off}));
     });
     on!(on_set_nvidia_open, |this, store, open: bool| {
-        let _ = &store;
+        if (open && !store.get_nvidia_open_available()) || (!open && !store.get_nvidia_closed_available()) {
+            return;
+        }
         this.draft(json!({"nvidiaOpen": open}));
     });
     on!(on_wifi_select, |this, store, index: i32| {

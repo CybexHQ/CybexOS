@@ -748,17 +748,19 @@ export component GpuSheet inherits Panel {
         spacing: 12px;
         SheetTitle {
             title: "NVIDIA driver";
-            subtitle: "Detected: " + Store.gpu-names + ". Hybrid laptops get PRIME offload automatically.";
+            subtitle: "Detected: " + Store.gpu-names + ". A supported driver is selected automatically.";
         }
         Option {
             title: "Open kernel driver";
-            body: "Recommended for Turing and newer (GTX 16, RTX 20 and up).";
+            body: Store.nvidia-open-available ? "Supports the detected GPUs. Recommended." : "Does not support all detected GPUs.";
+            enabled: Store.nvidia-open-available;
             chosen: Store.nvidia-open;
             clicked => { Store.set-nvidia-open(true); }
         }
         Option {
             title: "Proprietary legacy driver";
-            body: "For Maxwell, Pascal or Volta cards (legacy_580).";
+            body: Store.nvidia-closed-available ? "Supports the detected GPUs, including older cards (legacy_580)." : "Does not support all detected GPUs.";
+            enabled: Store.nvidia-closed-available;
             chosen: !Store.nvidia-open;
             clicked => { Store.set-nvidia-open(false); }
         }

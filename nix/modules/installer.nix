@@ -268,8 +268,9 @@ in {
     # RTL8125 (10ec:8125) uses r8169.
     boot.initrd.availableKernelModules = [
       "af_packet" "nbd"
-      "r8169" "r8152" "igc" "igb" "e1000e" "e1000" "ixgbe"
-      "tg3" "bnx2" "atlantic" "ax88179_178a" "cdc_ether" "cdc_ncm"
+      "r8169" "r8152" "igc" "igb" "e1000e" "e1000" "ixgbe" "i40e" "ice"
+      "tg3" "bnx2" "bnx2x" "atlantic" "mlx4_en" "mlx5_core"
+      "asix" "ax88179_178a" "cdc_ether" "cdc_ncm" "rndis_host"
     ];
     # Keep serial diagnostics, but send /dev/console prompts to the local screen.
     # The medium's initrd has no native display driver, so the splash draws on

@@ -26,8 +26,6 @@ in {
   };
   config = lib.mkIf cfg.enable (lib.mkMerge [ {
     hardware.enableRedistributableFirmware = lib.mkDefault true;
-    hardware.cpu.intel.updateMicrocode = lib.mkDefault true;
-    hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
     hardware.graphics = { enable = true; enable32Bit = cfg.features.steam; };
     # Native KMS must also work before root/media mounting and disk unlock.
     # Available modules are selected by udev for the actual hardware, rather

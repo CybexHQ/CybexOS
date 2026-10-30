@@ -22,6 +22,7 @@ from urllib.parse import urlencode
 from cybexos.common import CommandFailure, Failure, Runner, atomic, parse, read
 from cybexos.engine import copy_config
 from cybexos.credentials import validate_password
+from cybexos.hardware import detect, validate_hardware
 from cybexos.installer_network import ensure_internet, retry_download
 from cybexos.software import packages as software_packages
 from cybexos.trust import REPO, Fetcher, validate_release, verify, version
@@ -310,51 +311,6 @@ def seed_prebuilt(config, target, run):
     return {'paths': len(paths), 'seconds': elapsed}
 
 
-def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo')):
-    def text(path):
-        try:
-            return (sysroot / path).read_text().strip()
-        except OSError:
-            return ''
-    vendor = text('class/dmi/id/sys_vendor')
-    product = text('class/dmi/id/product_name')
-    sku = text('class/dmi/id/product_sku')
-    cpu = cpuinfo.read_text()
-    xps = 'Dell' in vendor and any(s in product for s in ('XPS 14', 'XPS 16', 'DA14260', 'DA16260')) and sku in ('0DB9', '0DBA') and ('Panther' in cpu or 'Ultra' in cpu)
-    pci, graphics = [], []
-    for device in sorted((sysroot / 'bus/pci/devices').glob('*')):
-        try:
-            vendor_id = (device / 'vendor').read_text().strip()
-            pci.append(vendor_id + ':' + (device / 'device').read_text().strip())
-            display_class = (device / 'class').read_text().strip().startswith('0x03')
-            domain, bus, slot, function = re.fullmatch(r'([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-7])', device.name).groups()
-            # PRIME's ordinary PCI:b:d:f identifiers are unambiguous only in
-            # domain zero. Leave unusual multi-domain hardware for an explicit
-            # administrator choice instead of guessing a different GPU.
-            if display_class and int(domain, 16) == 0:
-                graphics.append((vendor_id, f'PCI:{int(bus, 16)}:{int(slot, 16)}:{int(function, 16)}'))
-        except (OSError, AttributeError):
-            continue
-    nvidia = [bus for vendor_id, bus in graphics if vendor_id == '0x10de']
-    intel = [bus for vendor_id, bus in graphics if vendor_id == '0x8086']
-    amd = [bus for vendor_id, bus in graphics if vendor_id == '0x1002']
-    prime = {'enable': len(nvidia) == 1 and len(intel) + len(amd) == 1,
-             'nvidiaBusId': nvidia[0] if len(nvidia) == 1 else '',
-             'intelBusId': intel[0] if len(intel) == 1 else '',
-             'amdgpuBusId': amd[0] if len(amd) == 1 else ''}
-    acpi = any('OVTI08F4' in p.name for p in (sysroot / 'bus/acpi/devices').glob('*'))
-    panel = ''
-    for p in (sysroot / 'class/drm').glob('*eDP-*/edid'):
-        try:
-            data = p.read_bytes()
-            if len(data) >= 12:
-                panel = data[8:12].hex()
-        except OSError:
-            pass
-    return {'nvidia': any(s.startswith('0x10de:') for s in pci), 'nvidiaPrime': prime, 'xps': xps, 'sku': sku, 'panel': panel,
-            'camera': xps and acpi and '0x8086:0xb05d' in pci}
-
-
 def known_timezone(value):
     roots = [Path('/etc/zoneinfo'), Path('/usr/share/zoneinfo')]
     if os.environ.get('TZDIR'):
@@ -540,8 +496,12 @@ def interactive(release):
         raise Failure('Installation medium is missing its shared application defaults. Nothing has been erased')
     catalogue = software_catalogue()
     hardware = detect()
+    validate_hardware(hardware, hardware.get('nvidiaOpen') is not False)
+    for issue in hardware.get('networkIssues', []):
+        print('  ' + issue)
     plan = {'hostname': 'cybexos', 'timezone': 'UTC', 'locale': 'en_US.UTF-8', 'keyboard': 'us',
-            'encrypted': True, 'autoLogin': True, 'secureBoot': False, 'nvidiaOpen': True}
+            'encrypted': True, 'autoLogin': True, 'secureBoot': False,
+            'nvidiaOpen': hardware.get('nvidiaOpen') is not False}
     profiles = [profile['id'] for profile in catalogue['profiles'] if profile.get('default') is True]
     choices = {'proprietary': defaults['proprietary']}
     while True:
@@ -592,7 +552,11 @@ def interactive(release):
             choices.update({key: yes_no(label, previous.get(key, features[key])) for key, label in SYSTEM_FEATURES})
         plan['features'], plan['software'] = software_choice(catalogue, profiles, choices, defaults)
         if hardware['nvidia']:
-            plan['nvidiaOpen'] = yes_no('Use the open NVIDIA kernel driver?', plan['nvidiaOpen'])
+            selection = hardware.get('nvidiaSelection', {})
+            if selection.get('open') and selection.get('closed'):
+                plan['nvidiaOpen'] = yes_no('Use the open NVIDIA kernel driver? (recommended)', plan['nvidiaOpen'])
+            else:
+                print('  NVIDIA driver selected for this GPU: ' + ('open' if plan['nvidiaOpen'] else 'proprietary legacy'))
         print('\n4 of 5 · Protect your desktop\n')
         print('Encryption protects your files when the computer is off. Keep its passphrase safe.')
         plan['encrypted'] = yes_no('Encrypt this disk? (recommended)', plan['encrypted'])
@@ -634,6 +598,7 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
         raise Failure('Installation requires a supported release channel. No disk has been erased.')
     check_platform(plan['secureBoot'])
     hardware = detect()
+    validate_hardware(hardware, plan['nvidiaOpen'])
     # A hardware stack is never silently omitted to permit an install.
     if hardware['camera']:
         print('Detected IPU7 camera: its complete native stack will be built; build failures stop installation.')
@@ -954,6 +919,7 @@ def graphical_session(args, runner):
         elif request.get('action') == 'review':
             try:
                 candidate = validate(request.get('plan'))
+                validate_hardware(detect(), candidate['nvidiaOpen'])
                 disk_guard(candidate)
                 reviewed, token = candidate, random_secrets.token_urlsafe(24)
                 event('review', plan=reviewed, token=token)

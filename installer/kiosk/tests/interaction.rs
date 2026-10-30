@@ -298,6 +298,49 @@ fn frames_over(surface: &MinimalSoftwareWindow, ms: u64) -> usize {
 }
 
 #[test]
+fn hardware_preflight_distinguishes_detection_and_blocks_unsupported_graphics() {
+    let (ui, app, surface) = setup();
+    let store = ui.global::<Store>();
+    let mut ready = State {
+        phase: "setup".into(),
+        memory: 16 << 30,
+        hardware: serde_json::json!({
+            "nvidia": true, "nvidiaSelection": {"open": false, "closed": true},
+            "graphicsDetail": "Driver selected for the detected IDs",
+            "networkIssues": ["Network adapter 14e4:43a0 has no active driver"], "blockers": []
+        }),
+        ..State::default()
+    };
+    ready.firmware.uefi = true;
+    ready.network.connected = true;
+    ready.draft.nvidia_open = false;
+    app.borrow_mut().apply_state(ready.clone());
+    draw(&surface);
+    let graphics = store.get_checks().iter().find(|c| c.label == "Graphics").unwrap();
+    assert_eq!(graphics.state, 2, "detected graphics are not a desktop qualification pass");
+    let network = store.get_checks().iter().find(|c| c.label == "Network").unwrap();
+    assert_eq!(network.state, 3, "a second broken adapter must remain visible when connected");
+    assert!(network.detail.contains("14e4:43a0"));
+    assert!(!store.get_nvidia_open_available());
+    assert!(store.get_nvidia_closed_available());
+    assert!(store.get_can_start());
+
+    ready.hardware["blockers"] = serde_json::json!(["No packaged NVIDIA driver supports all detected GPUs"]);
+    app.borrow_mut().apply_state(ready.clone());
+    assert!(!store.get_can_start());
+    let graphics = store.get_checks().iter().find(|c| c.label == "Graphics").unwrap();
+    assert_eq!(graphics.state, 4);
+    assert!(graphics.detail.contains("No packaged NVIDIA driver"));
+
+    ready.phase = "preflight".into();
+    ready.firmware.secure_boot = true;
+    ready.error = "Secure Boot is enabled".into();
+    app.borrow_mut().apply_state(ready);
+    assert!(store.get_stop_steps().iter().any(|step| step == "Keep Secure Boot enabled."));
+    assert!(store.get_stop_action().is_empty());
+}
+
+#[test]
 fn wiz_moves_only_while_he_checks_or_works_and_never_under_a_sheet() {
     use cybexos_installer::protocol::Disk;
     let (ui, app, surface) = setup();

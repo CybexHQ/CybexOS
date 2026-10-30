@@ -30,6 +30,7 @@ import urllib.request
 
 from cybexos.common import Failure
 from cybexos.credentials import validate_password
+from cybexos.hardware import detect, validate_hardware
 
 SCHEMA = 'cybexos.installer-state.v1'
 ETC = Path(os.environ.get('CYBEXOS_INSTALLER_ETC', '/etc/cybexos'))
@@ -296,6 +297,7 @@ class Daemon:
         layout = region.get('desktopKeyboard') if region.get('desktopKeyboard') in {l[0] for l in LAYOUTS} else 'us'
         locale = region.get('locale') if region.get('locale') in {l[0] for l in LANGUAGES} else 'en_US.UTF-8'
         saved = read_json(RUNTIME / 'draft.json', {}) or {}
+        self.nvidia_edited = saved.get('nvidiaEdited') is True
         self.draft = {'screen': 'welcome', 'disk': '', 'encrypted': True, 'fullName': '', 'username': '',
                       'userEdited': False, 'hostname': '', 'hostEdited': False,
                       'timezone': canonical_zone(region.get('timezone', 'UTC'), self.static) or 'UTC',
@@ -309,7 +311,7 @@ class Daemon:
             self.apply_draft_value(key, value)
         self.state = {'phase': 'loading', 'message': 'Checking this installation medium…', 'error': '',
                       'stage': 0, 'stages': STAGES, 'elapsed': 0, 'release': '', 'development': False,
-                      'disks': [], 'hardware': {}, 'network': {'busy': False, 'error': '', 'message': ''},
+                      'disks': [], 'hardware': detect(), 'network': {'busy': False, 'error': '', 'message': ''},
                       'region': {'busy': False, 'message': '', 'detected': ''},
                       'firmware': firmware_facts(), 'memory': memory_bytes(), 'graphics': graphics_names(),
                       'review': None, 'result': None, 'diskTouched': False}
@@ -361,7 +363,7 @@ class Daemon:
     def flush(self):
         self.pending_push = None
         self.send_all(self.snapshot())
-        draft = json.dumps({'draft': self.draft})
+        draft = json.dumps({'draft': self.draft, 'nvidiaEdited': self.nvidia_edited})
         if draft == self.persisted_draft:
             return
         with contextlib.suppress(OSError):
@@ -449,6 +451,9 @@ class Daemon:
             disks = [self.disk_view(disk) for disk in value.get('disks', []) if isinstance(disk, dict)]
             self.state.update(disks=disks, hardware=value.get('hardware') or {}, release=str(value.get('release', ''))[:300],
                               development=bool(value.get('development')))
+            recommended = self.state['hardware'].get('nvidiaOpen')
+            if not self.nvidia_edited and type(recommended) is bool:
+                self.draft['nvidiaOpen'] = recommended
             available = [disk['path'] for disk in disks if disk['available']]
             if self.draft['disk'] not in available:
                 self.draft['disk'] = available[0] if len(available) == 1 else ''
@@ -567,6 +572,7 @@ class Daemon:
     # ── plan ─────────────────────────────────────────────────────────────────
     def plan(self):
         draft = self.draft
+        validate_hardware(self.state['hardware'], draft['nvidiaOpen'])
         disk = next((d for d in self.state['disks'] if d['path'] == draft['disk']), None)
         if disk is None or not disk['available']:
             raise Failure('Choose an available installation disk.')
@@ -642,6 +648,8 @@ class Daemon:
     def change_draft(self, values):
         before = self.provided(self.draft['profiles'])
         changed = [key for key, value in values.items() if self.apply_draft_value(key, value)]
+        if 'nvidiaOpen' in changed:
+            self.nvidia_edited = True
         if 'profiles' in changed and 'features' not in values:
             # A profile's system features follow it in and out (Development
             # brings Docker and Podman); a switch flipped later is kept, and

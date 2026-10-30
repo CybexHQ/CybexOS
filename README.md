@@ -32,6 +32,7 @@ file; personal modules and persistent data are separate from vendor releases.
 - [Recovery, persistence and garbage collection](docs/recovery.md)
 - [System check (`cybex doctor`)](docs/system-check.md)
 - [Hardware and security](docs/hardware-security.md)
+- [Hardware support and qualification](docs/hardware-support.md)
 - [Validation status](docs/validation.md)
 
 Upstream packages and Cybex OS are independently selectable:

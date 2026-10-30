@@ -104,6 +104,12 @@ in {
     i18n.defaultLocale = lib.mkOverride 1100 "en_US.UTF-8";
     console.keyMap = mkDefault "us";
     hardware.enableRedistributableFirmware = mkDefault true;
+    # Installation needs the same early CPU errata fixes as the installed OS.
+    hardware.cpu.intel.updateMicrocode = mkDefault true;
+    hardware.cpu.amd.updateMicrocode = mkDefault true;
+    environment.etc."cybexos/hardware-drivers.json".source = pkgs.callPackage ../packages/hardware-catalogue.nix {
+      inherit (config.boot.kernelPackages) nvidiaPackages;
+    };
     # The installer and every installed hardware profile share the current
     # kernel from the machine's Nixpkgs, including its module packages.
     boot.kernelPackages = mkDefault (import ../kernel-packages.nix { inherit pkgs; });

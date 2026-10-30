@@ -410,6 +410,17 @@ class HardwareTests(unittest.TestCase):
 
 
 class DiskSafetyTests(unittest.TestCase):
+    def test_unsupported_hardware_stops_before_disk_inspection_or_writes(self):
+        for hardware in ({'blockers': ['No packaged NVIDIA driver supports this GPU']},
+                         {'nvidia': True, 'nvidiaSelection': {'open': False, 'closed': True}}):
+            run = Mock()
+            with self.subTest(hardware=hardware), patch.object(installer, 'check_platform'), \
+                    patch.object(installer, 'detect', return_value=hardware), \
+                    patch.object(installer, 'disk_guard') as guard, patch.object(installer, 'vendor_nixpkgs') as source, \
+                    self.assertRaises(installer.Failure):
+                installer.install(plan(), {'password': 'Cybexos8!'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')
+            guard.assert_not_called(); source.assert_not_called(); run.assert_not_called()
+
     def trusted_install_directory(self):
         # Exercise the installer with ordinary fixture storage while requiring
         # the real invocation to select /run, never world-writable /tmp.

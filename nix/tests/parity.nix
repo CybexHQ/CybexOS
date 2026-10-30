@@ -170,6 +170,16 @@ assert lib.all (c: c.boot.kernelPackages.kernel == pkgs.linuxPackages_latest.ker
 assert installer.boot.supportedFilesystems.zfs;
 assert !installer.boot.kernelPackages.zfs_2_4.meta.broken;
 assert builtins.isString installer.boot.kernelPackages.zfs_2_4.drvPath;
+# Both CPU vendors receive early updates on the live medium and installed OS.
+assert lib.all (c: c.hardware.cpu.intel.updateMicrocode && c.hardware.cpu.amd.updateMicrocode
+  && builtins.length c.boot.initrd.prepend >= 2) [ installer payload generic ];
+assert installer.environment.etc."cybexos/hardware-drivers.json".source
+  == payload.environment.etc."cybexos/hardware-drivers.json".source;
+# PXE needs these drivers before the live system's full module tree is mounted.
+assert lib.all (name: builtins.elem name installer.boot.initrd.availableKernelModules)
+  [ "r8169" "r8152" "igc" "igb" "e1000e" "e1000" "ixgbe" "i40e" "ice"
+    "tg3" "bnx2" "bnx2x" "atlantic" "mlx4_en" "mlx5_core"
+    "asix" "ax88179_178a" "cdc_ether" "cdc_ncm" "rndis_host" ];
 # A machine-owned kernel selection still wins over the vendor default.
 assert (regional [ { boot.kernelPackages = pkgs.linuxPackages; } ]).boot.kernelPackages.kernel
   == pkgs.linuxPackages.kernel;

@@ -1251,6 +1251,16 @@ def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=
             raise RuntimeError('ISO release identity differs from its installer source NAR')
         evidence['isoReleaseIdentity'] = identity
         milestones['isoSourceIdentity'] = {'result': 'passed'}
+        live_hardware = json.loads(vm.command('cybex hardware').strip())
+        if live_hardware['release'] != {key: identity[key] for key in ('version', 'revision', 'narHash', 'nixos') if key in identity}:
+            raise RuntimeError('Hardware inventory has a different ISO source identity')
+        if live_hardware['assessment']['blockers'] or not any(d.get('driver') and d['interfaces'] for d in live_hardware['assessment']['networkDevices']):
+            raise RuntimeError('Live hardware assessment did not recognize the VM network driver')
+        if set(live_hardware['qualification'].values()) != {'not-run'}:
+            raise RuntimeError('An inventory must never mark physical qualification passed')
+        milestones['liveHardwareInventory'] = {'result': 'passed', 'kernel': live_hardware['kernel'],
+            'networkDrivers': sorted({d['driver'] for d in live_hardware['assessment']['networkDevices'] if d.get('driver')}),
+            'scope': 'virtual devices only; no physical qualification'}
         milestones['installerKernelAndZfs'] = qualify_installer_kernel(vm)
         vm.command(f'printf %s {plan64} | base64 -d > /run/qa-plan.json')
         try:
@@ -1311,6 +1321,11 @@ lock = json.loads(Path('/etc/nixos/flake.lock').read_text())
 print(json.dumps(lock['nodes'][lock['nodes'][lock['root']]['inputs']['cybexos']]['locked']))
 QA_SOURCE''').strip())
         milestones['installedSourceIdentity'] = check_installed_identity(identity, installed_identity, installed_source)
+        installed_hardware = json.loads(vm.command('cybex hardware').strip())
+        if installed_hardware['release'] != live_hardware['release'] or installed_hardware['assessment']['blockers']:
+            raise RuntimeError('Installed hardware inventory differs from the ISO source or has blockers')
+        milestones['installedHardwareInventory'] = {'result': 'passed', 'kernel': installed_hardware['kernel'],
+            'scope': 'virtual devices only; no physical qualification'}
         vm.command('cybexos-verify-encryption' if encrypted else '! cybexos-verify-encryption')
         milestones['runtimeEncryption'] = {'result': 'passed', 'encrypted': encrypted}
         vm.command('cybexos-desktop-check')

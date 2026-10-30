@@ -144,6 +144,7 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
             patch.object(daemon, 'geoip_zone', return_value='Europe/Amsterdam'),
             patch.object(daemon, 'run_quiet', side_effect=quiet),
             patch.object(daemon, 'graphics_names', return_value=['QA GPU']),
+            patch.object(daemon, 'detect', return_value={'nvidia': False}),
             patch.dict(os.environ, {'PATH': f'{binary}{os.pathsep}{os.environ.get("PATH", "")}',
                                     'FAKE_WORKER_LOG': str(self.log), 'TZDIR': str(zoneinfo(self.root / 'zoneinfo')),
                                     'CYBEXOS_INSTALLER_GROUP': 'nonexistent-group'}),
@@ -310,6 +311,28 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         await self.until(lambda m: m['type'] == 'state' and m['message'] == 'Retrying draft persistence')
         saved = json.loads((self.root / 'run/draft.json').read_text())
         self.assertEqual(saved['draft']['username'], 'retry-save')
+
+    async def test_driver_recommendation_and_explicit_choice_survive_rescan_and_restart(self):
+        await self.setup_phase()
+        ready = {'event': 'ready', 'hardware': {'nvidia': True, 'nvidiaOpen': False,
+                  'nvidiaSelection': {'open': False, 'closed': True}}}
+        self.service.handle_event(ready)
+        self.assertIs(self.service.draft['nvidiaOpen'], False)
+        # Preserve a manually requested branch, but reject an incompatible plan.
+        self.service.change_draft({'nvidiaOpen': True})
+        self.service.handle_event(ready)
+        self.assertIs(self.service.draft['nvidiaOpen'], True)
+        with self.assertRaisesRegex(daemon.Failure, 'selected NVIDIA driver'):
+            self.service.plan()
+        self.service.flush()
+        restarted = daemon.Daemon([], network_helper='')
+        restarted.handle_event(ready)
+        self.assertTrue(restarted.nvidia_edited)
+        self.assertIs(restarted.draft['nvidiaOpen'], True)
+        if restarted.pending_push:
+            restarted.pending_push.cancel()
+        if restarted.region_task:
+            restarted.region_task.cancel()
 
     async def test_broadcast_encodes_once_and_a_failed_client_does_not_block_others(self):
         await self.setup_phase()
