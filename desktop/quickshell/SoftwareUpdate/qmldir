@@ -2,9 +2,12 @@
 # the menubar indicator, Control Center and the launcher.
 AppTile AppTile.qml
 ChangeRow ChangeRow.qml
+ComponentChanges ComponentChanges.qml
 ReadyPage ReadyPage.qml
+SectionTitle SectionTitle.qml
 StatusPage StatusPage.qml
 TechnicalDetails TechnicalDetails.qml
 UpdateButton UpdateButton.qml
 UpdateView UpdateView.qml
 VersionPair VersionPair.qml
+WhatsNewPage WhatsNewPage.qml

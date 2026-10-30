@@ -1,13 +1,18 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import "../Common"
+import "../Assistant" as Character
 
-// Ready, as the installer's done screen: the mark, the headline, three
-// numbered cards that recap the choices, what the system check found, and
-// the optional extras as pills. Each extra opens its Settings page and the
-// guide steps aside; a tick shows what the live backends report as done.
+// Ready, as the installer's done screen: the headline, three numbered cards
+// that recap the choices, what the system check found, and the optional
+// extras as pills. Each extra opens its Settings page and the guide steps
+// aside; a tick shows what the live backends report as done. Wiz sits on
+// the system check, in the room the installer's mark had above the
+// headline, and shows how it went; finishing hands him over to the
+// assistant's corner (WelcomeWindow).
 Item {
     id: root
+    readonly property Character.Wiz perch: wiz
     readonly property var labels: ({webapps: I18n.tr("Web apps"),
         fingerprint: I18n.tr("Fingerprint"), security: I18n.tr("Security keys"), backup: I18n.tr("Backups"),
         accounts: I18n.tr("Online accounts")})
@@ -59,15 +64,6 @@ Item {
         y: Kiosk.px(40)
         width: Kiosk.px(1000)
         spacing: 0
-        Image {
-            anchors.horizontalCenter: parent.horizontalCenter
-            height: Kiosk.px(52)
-            width: height
-            source: "../assets/cybexos.svg"
-            sourceSize.height: Math.ceil(height * 2)
-            fillMode: Image.PreserveAspectFit
-        }
-        Item { width: 1; height: Kiosk.px(22) }
         KioskText {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
@@ -145,7 +141,8 @@ Item {
                 KioskKeycap { text: "K" } // i18n: untranslated (key name)
             }
         }
-        Item { width: 1; height: Kiosk.px(14) }
+        // Room for Wiz, who stands on the system check.
+        Item { width: 1; height: Kiosk.px(110) }
         // What the system check found, in the shell's own words, so it reads
         // the same without an AI account. The assistant explains it and
         // offers fixes; the guide steps aside while it works.
@@ -158,6 +155,22 @@ Item {
             height: Kiosk.px(80)
             Accessible.role: Accessible.Grouping
             Accessible.name: I18n.tr("System check")
+            // On the card's top edge, his feet on it. He thinks while the
+            // check runs, is sorry when it could not, happy when all is well
+            // and waits for you when there is something to look at.
+            Character.Wiz {
+                id: wiz
+                objectName: "readyWiz"
+                width: Kiosk.px(118)
+                height: width
+                x: parent.width - Kiosk.px(104) - width / 2
+                y: -height * wiz.layout.ground[1] / 120
+                z: 1
+                // The hand-off's Wiz takes his place.
+                visible: Welcome.handOff === ""
+                pose: check.waiting ? "thinking" : Doctor.report === null ? "sorry"
+                    : check.count === 0 ? "happy" : "needs-input"
+            }
             Rectangle {
                 id: checkMark
                 x: Kiosk.px(22)
@@ -286,7 +299,7 @@ Item {
             tone: "faint"
             wrapMode: Text.WordWrap
         }
-        Item { width: 1; height: Kiosk.px(28) }
+        Item { width: 1; height: Kiosk.px(22) }
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: Kiosk.px(14)

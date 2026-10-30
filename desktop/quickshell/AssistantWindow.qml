@@ -26,9 +26,10 @@ PanelWindow {
     // The bar's band at the top, kept clear by the default place and the box.
     readonly property real topReserve: Settings.position === "top"
         ? Theme.barHeight + Theme.barTopMargin : 0
-    readonly property var resting: AssistantHelpers.placement(
-        { x: Settings.assistantX, y: Settings.assistantY },
-        { width: root.width, height: root.height }, root.size, root.topReserve)
+    readonly property var resting: Assistant.restingPlace(root.width, root.height)
+    // One Wiz at a time: while the welcome guide covers the screen, its own
+    // Wiz stands in for this one, which is hidden and takes no input.
+    readonly property bool covered: Welcome.coversAssistant
 
     property bool dragging: false
     // A button went down on the character and has not come up yet.
@@ -50,6 +51,7 @@ PanelWindow {
     readonly property bool showReply: Assistant.replyOpen && !Assistant.composing && !Assistant.busy
     readonly property bool showComposer: Assistant.composing && !Assistant.busy
     readonly property bool boxOpen: (showComposer || showWorking || showReply) && !Assistant.capturing
+        && !covered
     // The box steps out of the way while the character is dragged.
     readonly property bool dockShown: boxOpen && !dragging
 
@@ -57,7 +59,7 @@ PanelWindow {
     // first, so the compositor hands it over without a click; then OnDemand
     // under a focus grab, so a click anywhere else takes it back (the
     // launcher's arrangement, LauncherWindow.qml).
-    readonly property bool keyboardWanted: Assistant.focusRequested
+    readonly property bool keyboardWanted: Assistant.focusRequested && !covered
         && (showComposer || (showWorking && Assistant.waiting))
     readonly property bool keyboardActive: root.contentItem.Window.active
     property bool grabReady: false
@@ -103,6 +105,11 @@ PanelWindow {
         Region {
             item: pressMask
         }
+
+        // Nothing at all while covered: an empty region intersected last.
+        Region {
+            intersection: root.covered ? Intersection.Intersect : Intersection.Combine
+        }
     }
 
     HyprlandFocusGrab {
@@ -113,6 +120,15 @@ PanelWindow {
             root.grabReady = false;
             Assistant.focusRequested = false;
             Assistant.hoverEnded();
+        }
+    }
+
+    // The welcome guide's Wiz hopped here and hands over: this one lands.
+    // Later, once showing him has made him live.
+    Connections {
+        target: Welcome
+        function onAssistantArrived() {
+            Qt.callLater(character.arrive);
         }
     }
 
@@ -151,16 +167,15 @@ PanelWindow {
         anchors.fill: parent
         // Hidden for the screenshot it is about to take.
         opacity: Assistant.capturing ? 0 : 1
+        visible: !root.covered
 
         // ---- the character ------------------------------------------------------
-        AssistantCharacter {
+        Wiz {
             id: character
             x: root.bubbleX
             y: root.bubbleY
             width: root.size
             height: root.size
-            wiz: Settings.assistantCharacter !== "mark"
-            mood: Assistant.mood
             pose: Assistant.pose
             level: composer.level
             recording: Assistant.listening
@@ -170,9 +185,6 @@ PanelWindow {
             scale: dragArea.pressed && !root.dragging ? 0.94 : root.dragging ? 1.06 : 1
             dragPoint: root.dragPoint
             grab: Qt.point(root.pressWindow.x - root.pressBubble.x, root.pressWindow.y - root.pressBubble.y)
-            // Wiz swings from where he is held himself; the mark only tilts.
-            rotation: root.dragging && !Theme.reducedMotion && !character.wiz
-                ? AssistantHelpers.clamp((root.dragX - root.pressBubble.x) / 40, -8, 8) : 0
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Cybex OS Assistant")
             Accessible.description: Assistant.busy ? I18n.tr("Working. Click to tuck the box away.")

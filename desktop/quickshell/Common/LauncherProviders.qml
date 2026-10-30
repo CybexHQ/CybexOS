@@ -76,6 +76,8 @@ Singleton {
     property string webAppsError: ""
     // argv of the catalogue command waiting for the launcher to fade out.
     property var pendingCommand: []
+    // The question for Wiz waiting for the same.
+    property string pendingQuestion: ""
 
     readonly property var appRows: {
         if (root.activeProviderId !== "apps")
@@ -212,10 +214,15 @@ Singleton {
         case "actions":
             return ProviderHelpers.actionRows(root.actions,
                 root.term, root.actions.length);
-        default:
+        default: {
             // A typed query also offers up to three matching actions after
-            // the apps, so Super+Space is the one palette.
-            return ProviderHelpers.blendRows(root.appRows, root.actions, root.term);
+            // the apps, so Super+Space is the one palette. One that matches
+            // nothing is offered to Wiz as a question; the assistant's state
+            // is read only then, so it never rebuilds a list of matches.
+            const matches = ProviderHelpers.blendRows(root.appRows, root.actions, root.term);
+            return matches.length > 0 ? matches
+                : ProviderHelpers.askRows(root.term, root.assistantState());
+        }
         }
     }
 
@@ -353,6 +360,9 @@ Singleton {
             break;
         case "actions":
             root.runAction(row.action);
+            break;
+        case "assistant":
+            root.askAssistant(row.question);
             break;
         }
     }
@@ -807,6 +817,49 @@ Singleton {
             if (root.pendingCommand.length > 0)
                 Quickshell.execDetached(root.pendingCommand);
             root.pendingCommand = [];
+        }
+    }
+
+    // ---- Ask Wiz ----------------------------------------------------------
+    // What the assistant can take now (ProviderHelpers.askRows, askHandoff).
+    function assistantState() {
+        return {
+            available: Assistant.available,
+            connected: Assistant.connected,
+            busy: Assistant.busy,
+            away: GameMode.active,
+            screenAttached: Assistant.screenAttached,
+            capturing: Assistant.capturing
+        };
+    }
+
+    // The launcher closes first and the question follows once it has faded
+    // out, so a box that wants the keyboard (sign-in, a kept draft) takes it
+    // from no one. Nothing about the screen goes with it.
+    function askAssistant(question): void {
+        const text = String(question || "").trim();
+        if (text === "")
+            return;
+        root.pendingQuestion = text;
+        Launcher.close();
+        askTimer.restart();
+    }
+
+    Timer {
+        id: askTimer
+        interval: Theme.launcherFadeOutDuration + 40
+        onTriggered: {
+            const handoff = ProviderHelpers.askHandoff(root.pendingQuestion,
+                root.assistantState());
+            root.pendingQuestion = "";
+            if (handoff.mode === "send") {
+                // What `cybexos-runtime ipc assistant ask` does.
+                Assistant.openComposer(false);
+                Assistant.send(handoff.text);
+            } else if (handoff.mode === "draft") {
+                Assistant.draft = handoff.text;
+                Assistant.openComposer(true);
+            }
         }
     }
 

@@ -8,7 +8,7 @@
   wf-recorder, ffmpeg, libva-utils, jq, procps, findutils, gnugrep, gnused, gawk,
   xdg-utils, xdg-terminal-exec, curl, nodejs, iw, iproute2, brightnessctl, playerctl, bluez, upower,
   power-profiles-daemon, gnome-keyring, restic, openssh, age, gnutar, zstd, util-linux, kitty, libxkbcommon, xkeyboard-config,
-  pciutils,
+  pciutils, librsvg,
   fetchFromGitHub }:
 let
   lazyvimStarter = fetchFromGitHub {
@@ -46,13 +46,13 @@ in stdenv.mkDerivation {
     inherit lib source;
     paths = [
       "desktop/quickshell" "desktop/hypr" "desktop/defaults" "desktop/fastfetch"
-      "desktop/icons/hicolor" "desktop/bin" "assets/brand"
+      "desktop/icons/hicolor" "desktop/bin" "assets/brand" "assets/wiz"
       "assets/EDM115-newline2.omp.json" "assets/scripts" "agent-skills/cybexos"
       "nix/tests/desktop-runtime.py"
     ] ++ map (name: "desktop/${name}")
       (builtins.filter (lib.hasSuffix ".desktop") (builtins.attrNames (builtins.readDir (source + /desktop))));
   };
-  nativeBuildInputs = [ makeWrapper gobject-introspection wrapGAppsNoGuiHook ];
+  nativeBuildInputs = [ makeWrapper gobject-introspection wrapGAppsNoGuiHook librsvg imagemagick ];
   buildInputs = [ python glib networkmanager libsecret gnome-online-accounts
     evolution-data-server libical fwupd glib-networking gsettings-desktop-schemas adwaita-icon-theme ];
   dontWrapGApps = true;
@@ -69,6 +69,15 @@ in stdenv.mkDerivation {
     cp desktop/*.desktop $out/share/applications/
     substituteInPlace $out/share/cybexos/defaults/fastfetch.jsonc \
       --replace-fail @CYBEXOS_FASTFETCH@ $out/share/cybexos/fastfetch/cybexos-large.fastfetch.txt
+    # Wiz's poses at rest (assets/wiz): asleep beside the lock screen's field,
+    # in the poses' shared box at twice the 84 pixels it draws there
+    # (desktop/hypr/hyprlock.conf), and idle for fastfetch in kitty, cropped
+    # to him and large enough for fastfetch to scale down to 9 rows at any
+    # font size (desktop/defaults/fish-config.fish).
+    mkdir -p $out/share/cybexos/wiz/lock $out/share/cybexos/wiz/terminal
+    rsvg-convert --height 168 --output $out/share/cybexos/wiz/lock/asleep.png assets/wiz/asleep.svg
+    rsvg-convert --height 640 assets/wiz/idle.svg \
+      | magick png:- -trim +repage $out/share/cybexos/wiz/terminal/idle.png
     cp -r ${lazyvimStarter} $out/share/cybexos/defaults/nvim
     cp assets/EDM115-newline2.omp.json $out/share/cybexos/defaults/prompt.json
     cp -r agent-skills/cybexos $out/share/cybexos/skills/

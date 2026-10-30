@@ -33,9 +33,14 @@ FloatingWindow {
         }
     }
 
+    // Escape steps back from What's New first, then closes.
     SoftwareUpdateUi.UpdateView {
+        objectName: "updateView"
         anchors.fill: parent
         focus: true
-        Keys.onEscapePressed: Updates.close()
+        Keys.onEscapePressed: {
+            if (Updates.whatsNew !== null) Updates.closeWhatsNew();
+            else Updates.close();
+        }
     }
 }

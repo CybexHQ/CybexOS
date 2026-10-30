@@ -36,6 +36,16 @@ HIGHLIGHTS = {'schema': 1,
     'apps': [{'name': 'firefox', 'title': 'Firefox', 'icon': 'firefox', 'kind': 'updated', 'before': '143.0.4', 'after': '144.0.1'}],
     'tools': [{'name': 'hello', 'kind': 'updated', 'before': '1', 'after': '2'}],
     'background': 213, 'sizeChange': 40000000}
+# A kept Cybex OS release as the worker's completed record keeps it.
+NOTES = ('## Highlights\n- **Wiz** now shows how an update is going.\n'
+         '- Software Update opens [What\'s New](https://example.com/notes) after an update is kept.\n'
+         '![screenshot](https://example.com/never-fetched.png)\n\n'
+         '## Fixes\n- The menubar clock no longer skips a minute.')
+def release(before, after, transaction):
+    return {'transaction': transaction, 'scope': 'both', 'changeKind': 'update', 'notes': NOTES,
+            'installedVersion': before, 'availableVersion': after,
+            'highlights': {'schema': 1, 'components': [{'id': 'cybexos', 'before': before, 'after': after}]
+                + HIGHLIGHTS['components'][:2], 'apps': [], 'tools': [], 'background': 12, 'sizeChange': 0}}
 
 FAKE = r'''#!/usr/bin/env python3
 import json, os, sys, time
@@ -46,6 +56,7 @@ if args[:1] != ['update']:
     sys.exit(1)
 fixture = json.loads((root / 'fixture.json').read_text())
 if args[1:] == ['check']:
+    time.sleep(fixture.get('checkDelay', 0))
     print(json.dumps(fixture['sources']))
 elif args[1:] == ['status']:
     print((root / 'status.json').read_text())
@@ -94,6 +105,23 @@ if '--user' in args:
     os.execv(REAL, [REAL] + args)
 with (Path(os.environ['XDG_RUNTIME_DIR']) / 'units.jsonl').open('a') as stream:
     stream.write(json.dumps(args) + '\n')
+'''
+# Toasts are recorded. One with actions waits, as notify-send does, until the
+# test answers with the action the person chose (or two minutes: dismissed).
+NOTIFY_SEND = r'''#!/usr/bin/env python3
+import json, os, sys, time
+from pathlib import Path
+root = Path(os.environ['XDG_RUNTIME_DIR'])
+with (root / 'notify.jsonl').open('a') as stream:
+    stream.write(json.dumps(sys.argv[1:]) + '\n')
+if any(arg.startswith('--action=') for arg in sys.argv[1:]):
+    answer = root / 'notify-answer'
+    for _ in range(600):
+        if answer.exists():
+            print(answer.read_text().strip(), flush=True)
+            answer.unlink()
+            break
+        time.sleep(.2)
 '''
 SESSION_ACTION = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -145,6 +173,9 @@ IPC = '''
             const activity = shell.updateItem("updateActivity");
             const elapsed = shell.updateItem("updateElapsed");
             const progress = shell.updateItem("updateProgress");
+            const view = shell.updateItem("updateView");
+            const wiz = shell.updateItem("updateWiz");
+            const notes = shell.updateItem("updateReleaseNotes");
             const chip = shell.updateItem("updateTestIndicator");
             const rect = chip ? chip.mapToItem(null, 0, 0) : null;
             const content = updateTestWindow && updateTestWindow.visible ? updateTestWindow.contentItem : null;
@@ -156,7 +187,11 @@ IPC = '''
                 popout: Popouts.open, panel: Popouts.currentName,
                 title: title ? {text: title.text, color: title.color.toString(), expected: Theme.textHi.toString(),
                     dark: Theme.dark} : null,
-                primary: primary ? {label: primary.text, enabled: primary.enabled} : null,
+                primary: primary ? {label: primary.text, enabled: primary.enabled, amber: primary.attention} : null,
+                wiz: wiz ? {pose: wiz.pose, unread: wiz.unread} : null,
+                stance: view ? view.wiz.pose : null, celebrated: view ? view.celebrated : null,
+                whatsNew: Updates.whatsNew ? Updates.whatsNew.version : null, announced: Updates.announced,
+                notes: notes ? notes.text : null, back: !!shell.updateItem("updateBack"),
                 failureText: failure ? failure.text : null,
                 activity: activity ? activity.text : null, elapsed: elapsed ? elapsed.text : null,
                 progress: progress ? progress.Accessible.description : null,
@@ -223,6 +258,13 @@ class Session(welcome.Session):
     def units(self):
         return self.records('units.jsonl')
 
+    def toasts(self):
+        return self.records('notify.jsonl')
+
+    def pose(self):
+        wiz = self.state().get('wiz') or {}
+        return wiz.get('pose'), wiz.get('unread')
+
 
 def process_guard(runtime=None):
     main = subprocess.run(['systemctl','--user','show','quickshell.service','-p','MainPID','--value'], capture_output=True, text=True).stdout.strip()
@@ -258,7 +300,7 @@ def main():
         session.env.update(CYBEXOS_WELCOME='0', CYBEXOS_ASSISTANT='0')
         session.patch_settings(drawerOverview={'updates':True,'processes':False,'media':False})
         for name, body in (('cybex', FAKE), ('systemctl', SYSTEMCTL.replace('REAL', repr(shutil.which('systemctl')))),
-                           ('cybexos-session-action', SESSION_ACTION)):
+                           ('cybexos-session-action', SESSION_ACTION), ('notify-send', NOTIFY_SEND)):
             (base/'bin'/name).write_text(body)
             (base/'bin'/name).chmod(0o700)
         sources = {'installedIdentity':'installed-lock', 'upstream':{'state':'available','available':'new-revision'},
@@ -299,6 +341,18 @@ def main():
                     and title['dark'] == (mode == 'dark') and title['color'] == title['expected'],
                     mode + ' readable title')
                 shot('software-update-available-' + mode + '.png')
+            # Something new: Wiz idles with the unread pip; the accent button.
+            assert session.pose()==('idle',True) and not session.state()['primary']['amber'], session.state()
+
+            # Checking: Wiz thinks while the sources are checked.
+            session.fixture(checkDelay=8)
+            session.status(state='idle', installedIdentity='moved-lock')
+            session.wait(lambda:session.state().get('page')=='checking','checking for updates')
+            assert session.pose()==('thinking',False), session.state()
+            shot('software-update-checking.png')
+            session.fixture(checkDelay=0)
+            session.status(state='idle')
+            session.wait(lambda:session.state().get('page')=='available' and session.state().get('loaded'),'checked again')
 
             # Control Center's Review closes the drawer and opens the same app.
             session.call('updates','close')
@@ -333,6 +387,7 @@ def main():
             session.status(state='building',transaction='a'*32,elapsedSeconds=294,progress=telemetry)
             session.wait(lambda:session.state().get('activity')=='Compiling window manager','compilation progress')
             assert session.state()['elapsed']=='Elapsed: 4:54', session.state()
+            assert session.pose()==('working',False), session.state()
             assert session.state()['progress']=='In progress' and session.state()['buildLog'], session.state()
             session.call('updates','close')
             session.wait(lambda:not session.state().get('window'),'preparing app closed')
@@ -355,6 +410,7 @@ def main():
             assert state['title']['text'] == 'An update is ready to install', state
             assert session.calls()[-1]==['stage','upstream'], session.calls()
             assert not state['details'], 'technical details start collapsed'
+            assert state['wiz'] is None, 'the review of what changes has no character'
             shot('software-update-ready.png')
             session.trigger('updatePrimary')
             session.trigger('updatePrimary')
@@ -363,17 +419,19 @@ def main():
             assert session.calls()[-1]==['apply','a'*32,'b'*64], session.calls()
             assert session.state()['primary']['label']=='Restart Now', session.state()
             assert not session.state()['indicator']
+            assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
             # Activation restarts the shell with its changed user unit. The app
             # reopens in the replacement shell and follows the update to its result.
             session.status(state='activating',transaction='a'*32,phase='Activating under supervision')
             session.wait(lambda:session.state().get('page')=='installing','installing')
+            assert session.pose()==('working',False), session.state()
             shot('software-update-installing.png')
             session.start_shell('qs-activation.log')
             session.wait(lambda:session.state().get('window') and session.state().get('page')=='installing',
                 'app reopened during activation')
             session.status(state='awaiting-boot',transaction='a'*32)
             session.wait(lambda:session.state().get('page')=='restart','result after the shell restart')
-            assert session.state()['primary']=={'label':'Restart Now','enabled':True}, session.state()
+            assert session.state()['primary']=={'label':'Restart Now','enabled':True,'amber':True}, session.state()
             shot('software-update-restart.png')
             session.trigger('updatePrimary')
             session.wait(lambda:session.records('session.jsonl')==[['reboot']],'restart requested through the session action')
@@ -381,12 +439,14 @@ def main():
             # After the restart the signed-in desktop confirms automatically.
             session.status(state='awaiting-login',transaction='a'*32)
             session.wait(lambda:session.state().get('page')=='finishing','automatic confirmation')
+            assert session.pose()==('thinking',False), session.state()
             session.wait(lambda:['--no-ask-password','start','--no-block','cybexos-update-confirm.service'] in session.units(),
                 'confirmation unit started', timeout=40)
             failed = {'id':'d'*32,'action':'confirm','state':'failed','error':'Hyprland health failed'}
             session.status(state='awaiting-login',transaction='a'*32,request=failed)
             session.wait(lambda:session.state().get('page')=='confirm','failed confirmation asks')
             assert session.state()['primary']['label']=='Keep This Version', session.state()
+            assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
             shot('software-update-confirm.png')
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('state')=='done','manual confirmation')
@@ -394,12 +454,82 @@ def main():
             assert session.units().count(['--no-ask-password','start','--no-block','cybexos-update-confirm.service'])==1
             session.status(state='awaiting-login',transaction='a'*32,automatic={'prepare':False,'confirm':False})
             session.wait(lambda:session.state().get('page')=='confirm','manual confirmation policy')
+            assert session.pose()==('listening',False) and not session.state()['primary']['amber'], session.state()
+            shot('software-update-confirm-ask.png')
+            # A kept change without a new Cybex OS version reports itself with
+            # the plain completion toast.
+            assert [toast for toast in session.toasts() if toast[-1]=='Everything passed its checks after the restart.'
+                and not any(arg.startswith('--action=') for arg in toast)], session.toasts()
+
+            # Kept with the app open: the up-to-date page names the release and
+            # offers What's New. Wiz celebrates once, then settles. No toast.
+            current = {'upstream':{'state':'current'},'cybexos':{'state':'current'}}
+            session.fixture(sources=current)
+            toasts = len(session.toasts())
+            kept = release('1.0.0-beta.20', '1.0.0-beta.21', 'e'*32)
+            session.status(state='awaiting-login', automatic={'prepare':False,'confirm':False}, **kept)
+            session.wait(lambda:session.state().get('page')=='confirm' and not session.state().get('hasUpdates'),
+                'asked to keep the release')
+            session.trigger('updatePrimary')
+            session.wait(lambda:session.state().get('page')=='current'
+                and (session.state().get('title') or {}).get('text')=="You're on Cybex OS 1.0.0-beta.21", 'kept release')
+            state = session.state()
+            assert state['primary']=={'label':"What's New",'enabled':True,'amber':False}, state
+            assert state['stance']=='finished', state
+            session.wait(lambda:session.state().get('celebrated')=='kept 1.0.0-beta.21','Wiz celebrates the kept release')
+            session.wait(lambda:session.pose()==('happy',False),'Wiz settles into happy')
+            assert len(session.toasts())==toasts, ('an open app shows the kept release, not a toast', session.toasts()[toasts:])
+            record = session.home/'.local/state/cybexos/software-update.json'
+            assert json.loads(record.read_text())=={'schema':1,'announced':'1.0.0-beta.21'}, record.read_text()
+            shot('software-update-kept.png')
+
+            # What's New: the release notes and important changes, in the app.
+            session.trigger('updatePrimary')
+            session.wait(lambda:session.state().get('whatsNew')=='1.0.0-beta.21' and session.state().get('components')==3,
+                "What's New")
+            state = session.state()
+            assert state['title']['text']=="What's new in Cybex OS 1.0.0-beta.21" and state['back'], state
+            assert state['stance']=='finished' and 'Wiz' in state['notes'] and 'https://example.com/notes' in state['notes'], state
+            assert 'never-fetched' not in state['notes'], 'release notes never load images'
+            session.wait(lambda:session.state().get('celebrated')=='whats-new 1.0.0-beta.21' and session.pose()==('happy',False),
+                "Wiz celebrates What's New")
+            shot('software-update-whats-new.png')
+            session.trigger('updateBack')
+            session.wait(lambda:not session.state().get('whatsNew') and session.state().get('page')=='current',
+                "back from What's New")
+            assert session.state()['primary']['label']=="What's New", session.state()
+
+            # Kept while the app is closed: one plain toast, whose action opens
+            # What's New. The release is never announced again.
+            session.call('updates','close')
+            session.wait(lambda:not session.state().get('window'),'closed app')
+            later = release('1.0.0-beta.21', '1.0.0-beta.22', 'f'*32)
+            session.status(state='awaiting-login', **later)
+            session.wait(lambda:session.state().get('state')=='awaiting-login','trial boot of the next release')
+            session.status(state='done', **later)
+            ready = ['--app-name=Software Update','--icon=cybexos',"--action=default=What's New",
+                "--action=whats-new=What's New",'Cybex OS 1.0.0-beta.22 is ready',"See what's new."]
+            session.wait(lambda:ready in session.toasts(),'one toast for the kept release')
+            assert session.toasts()[toasts:]==[ready], session.toasts()[toasts:]
+            assert not session.state()['window'], 'the toast does not open the app by itself'
+            (session.runtime/'notify-answer').write_text('whats-new\n')
+            session.wait(lambda:session.state().get('window') and session.state().get('whatsNew')=='1.0.0-beta.22'
+                and session.state().get('components')==3, "the toast's action opens What's New")
+            session.start_shell('qs-announced.log')
+            session.wait(lambda:session.state().get('loaded') and session.state().get('announced')=='1.0.0-beta.22'
+                and session.state().get('page')=='current', 'announcement remembered across a shell restart')
+            time.sleep(2)
+            assert session.toasts()[toasts:]==[ready], session.toasts()[toasts:]
 
             # Up to date: the automatic download choice is a machine policy.
             session.fixture(sources={'upstream':{'state':'current'},'cybexos':{'state':'current'}})
-            session.status(state='done',changeKind='update')
-            session.wait(lambda:session.state().get('page')=='current' and not session.state().get('hasUpdates'),'up to date')
+            session.status(state='done',changeKind='update',scope='upstream',transaction='a'*32,
+                installedVersion='1.0.0-beta.22',availableVersion='1.0.0-beta.22',notes='')
+            session.wait(lambda:session.state().get('page')=='current' and not session.state().get('hasUpdates')
+                and (session.state().get('title') or {}).get('text')=='Your system is up to date','up to date')
             assert not session.state()['indicator'] and session.state()['automaticToggle'], session.state()
+            assert session.state()['primary'] is None, 'NixOS packages alone have no What\'s New'
+            assert session.pose()==('happy',False) and session.state()['stance']=='happy', session.state()
             shot('software-update-current.png')
             session.call('update-test','toggle','updateAutomatic','true')
             session.wait(lambda:session.state().get('automatic',{}).get('prepare') is True,'automatic downloads chosen')
@@ -425,16 +555,29 @@ def main():
             session.wait(lambda:session.state().get('page')=='problem' and 'offline' in session.state().get('error',''),'discovery error')
             assert not session.state()['indicator']
             assert session.state()['title']['text']=="Couldn't check for updates", session.state()
+            assert session.pose()==('sorry',False), session.state()
             session.status(state='recovery-failed',transaction='a'*32,error='Recovery interrupted')
             session.wait(lambda:session.state().get('state')=='recovery-failed','recovery action')
             assert session.state()['primary']['label']=='Try Restoring Again', session.state()
+            assert session.pose()==('sorry',False) and session.state()['primary']['amber'], session.state()
             session.status(state='rolled-back',transaction='a'*32,error='Trial boot failed system health')
             session.wait(lambda:session.state().get('state')=='rolled-back','rolled back')
             assert session.state()['primary']['label']=='OK', session.state()
+            assert session.pose()==('sorry',False) and session.state()['primary']['amber'], session.state()
             shot('software-update-rolled-back.png')
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('state')=='idle','dismissed')
             assert session.calls()[-1]==['discard','a'*32], session.calls()
+            # An interrupted or outdated preparation waits for the person.
+            for name in ('stale', 'interrupted'):
+                session.status(state=name, transaction='a'*32)
+                session.wait(lambda:session.state().get('state')==name and session.state().get('primary'), name)
+                assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
+            shot('software-update-interrupted.png')
+            session.status(state='unavailable', available=False)
+            session.wait(lambda:session.state().get('page')=='unavailable','updates after installation')
+            assert session.pose()==('asleep',False), session.state()
+            shot('software-update-unavailable.png')
 
             # Firmware uses the same review/install flow, including when the
             # Nix sources are current. Device actions stay inside the app.
@@ -457,6 +600,7 @@ def main():
                 'percent':42, 'requests':[{'id':'bios','kind':'immediate','message':'Reconnect the device.'}]})
             session.wait(lambda:session.state().get('page')=='installing' and session.state().get('firmwareRequests')==1
                 and session.state().get('progress')=='42%', 'firmware progress and instructions inside the app')
+            assert session.pose()==('working',False), session.state()
             session.start_shell('qs-firmware.log')
             session.wait(lambda:session.state().get('window') and session.state().get('firmwareRequests')==1,
                 'firmware instructions survive shell restart')
@@ -464,6 +608,7 @@ def main():
             session.wait(lambda:session.state().get('page')=='restart' and session.state().get('primary',{}).get('label')=='Shut Down Now',
                 'firmware full shutdown requirement')
             assert not session.state()['indicator'], session.state()
+            assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
 
             # Closing the app forgets it: neither a later shell restart nor
             # another session's marker reopens it.
@@ -485,7 +630,9 @@ def main():
                     assert not errors, '\n'.join(errors)
             print('PASS: menubar and Control Center open the app, authorization cancellation, durable worker errors, '
                   'shell restart, readable review, install once, reopening after the activation restart, restart, '
-                  'automatic and manual confirmation, '
+                  'automatic and manual confirmation, Wiz\'s pose on every status page, a kept release with Wiz '
+                  'celebrating and What\'s New, one toast whose action opens What\'s New and is never repeated, '
+                  'NixOS packages alone just up to date, '
                   'automatic download policy and single background request, discovery error, recovery, dismissal '
                   'firmware-only review, graphical device progress, instructions and shutdown requirement, '
                   'and no reopening once closed or in another session')

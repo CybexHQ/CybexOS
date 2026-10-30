@@ -142,49 +142,31 @@ function finished(turn) {
     return !!turn && FINISHED_STATUSES.indexOf(turn.status) !== -1;
 }
 
-// What the character's face and ring show, in priority order.
-function mood(state) {
+// Wiz's pose (Assistant/Wiz.qml), the most urgent state first: being
+// dragged, no service, the microphone, a question waiting, a turn at work (a
+// tool's step is work, the service's own step is thinking), a finished turn's
+// celebration or another happy moment, a failed reply, and an open box, which
+// he listens to.
+function characterPose(state) {
+    if (state.dragging)
+        return "carried";
     if (!state.connected)
         return "asleep";
     if (state.listening)
         return "listening";
     if (state.waiting)
-        return "alert";
+        return "needs-input";
     if (state.busy || state.transcribing)
-        return "thinking";
-    if (state.dragging || state.speaking || state.celebrating)
+        return state.busy && state.step && state.step !== THINKING_STEP ? "working" : "thinking";
+    if (state.celebrating)
+        return "finished";
+    if (state.speaking)
         return "happy";
     if (state.failed)
         return "sorry";
     if (state.composing)
-        return "attentive";
-    return "idle";
-}
-
-// Wiz's pose (Assistant/Wiz.qml) for the same state: being dragged comes
-// first, a running turn shows whether a tool is at work, a finished turn's
-// celebration is told apart from other happy moments, and an open box is
-// listened to.
-function characterPose(state) {
-    if (state.dragging)
-        return "carried";
-    var current = mood(state);
-    switch (current) {
-    case "asleep":
-    case "sorry":
-        return current;
-    case "listening":
-    case "attentive":
         return "listening";
-    case "alert":
-        return "needs-input";
-    case "thinking":
-        return state.busy && state.step && state.step !== THINKING_STEP ? "working" : "thinking";
-    case "happy":
-        return state.celebrating ? "finished" : "happy";
-    default:
-        return "idle";
-    }
+    return "idle";
 }
 
 // "8 s", "1 min 05 s", "12 min": the worker pill's elapsed time.
@@ -260,7 +242,6 @@ var exported = {
     modelFor: modelFor,
     active: active,
     finished: finished,
-    mood: mood,
     characterPose: characterPose,
     elapsedLabel: elapsedLabel,
     displayPath: displayPath,

@@ -9,7 +9,12 @@ the same on every screen size.
 
 **Hello** greets you by name and lists what the installer already set:
 language, keyboard layout, time zone, network, account and computer name.
-Nothing is asked twice. **Change** opens a sheet from the right for the
+Nothing is asked twice. Wiz, the assistant's character
+([assistant](assistant.md)), stands on that card, lifts his hat for a moment
+and says hello in a speech bubble: the only place he speaks. With the
+assistant on the system he adds that he lives in the corner of the screen
+afterwards, and names its key as your keybindings have it (Super + I by
+default); without it he only offers to walk you through the rest. **Change** opens a sheet from the right for the
 language, keyboard or time zone, as in the installer; the network opens
 Settings. The pills in the top bar show the network, keyboard layout and
 language, and the last one closes the guide.
@@ -26,7 +31,10 @@ windows, so the guide steps aside while you use them:
 - **The AI assistant** (recommended) signs in to Claude Code or Codex with that
   agent's own sign-in, in a terminal and your browser. The guide comes back by
   itself once the agent reports you are signed in. Your sign-in stays with the
-  agent; Cybex OS never stores it.
+  agent; Cybex OS never stores it. Wiz stands in the card's corner: asleep,
+  with two small z's (none with reduced motion), while the service is not
+  running or no agent is signed in; attentive while you sign in; happy once
+  you have; sorry when the sign-in could not be checked.
 
 When you leave the guide, it closes the windows these sign-ins opened, as
 their close buttons would: a 1Password window still open, and the
@@ -61,7 +69,9 @@ from the same data as Settings, including changes made there or in
 **Ready** sums up your choices and shows what the [system check](system-check.md)
 found. It runs `cybex doctor` while you go through the guide: drivers,
 services, sound, Secure Boot, firmware updates, storage, battery, the clock
-and the desktop. Nothing leaves the computer for that. With the assistant
+and the desktop. Nothing leaves the computer for that. Wiz sits on the check:
+thinking while it runs, sorry when it could not run, happy when it found
+nothing and waiting for you when there is something to look at. With the assistant
 signed in, **Ask the assistant** hands the check to it: the guide steps
 aside, and the assistant explains what it found and proposes fixes, which
 change nothing until you agree. Without it, **Connect the assistant** goes
@@ -77,6 +87,20 @@ return. While you type in the Wallhaven search field, Space types a space.
 The guide covers the screen, so it steps aside when you open Settings, an
 app or a shortcut, and leaves a **Resume** pill at the bottom of the screen.
 After the launcher or the overview it comes back by itself.
+
+There is one Wiz at a time. While the guide covers the screen, the
+assistant's own Wiz is hidden, also from the pointer, and the guide's stands
+in for him; he is back while the guide stands aside, and while you hold Space
+to look at the desktop. Super+I opens the assistant's box over the guide like
+the launcher: the guide steps aside and comes back when the box closes,
+unless the assistant is still working on a question you asked there.
+**Start using Cybex OS** hands him over: the assistant comes out (on the
+guide's display, unless he already has a place), and Wiz shrinks and hops
+from Ready to his resting place while the guide fades, where the assistant's
+Wiz lands, his hat a beat late. On another display or with reduced motion
+there is no flight; the guide closes and the assistant's Wiz appears in his
+corner. Closed any other way, the guide leaves the assistant as it was, and
+his Wiz simply reappears.
 
 Use Tab and Enter to operate controls, and Ctrl+PageUp / Ctrl+PageDown to move
 between steps. Every step is optional. Escape, the close button and **Not
@@ -95,7 +119,7 @@ The shell exposes:
 ```sh
 cybexos-runtime ipc welcome open ''         # resume, or Hello after completion
 cybexos-runtime ipc welcome open wallpaper # open a particular step
-cybexos-runtime ipc welcome status          # JSON: open/status/step/steps/checklist/connect/doctor
+cybexos-runtime ipc welcome status          # JSON: open/status/step/steps/checklist/connect/doctor, coversAssistant/handOff
 cybexos-runtime ipc welcome close           # dismiss, preserving progress
 cybexos-runtime ipc welcome reset           # delete only welcome.json
 cybexos-runtime ipc welcome connect password # Connect's buttons: password, claude or codex
@@ -115,8 +139,18 @@ every Settings link steps aside first.
 `tests/welcome-guide.py --screenshots DIR` runs the real
 shell under a private headless Sway from a private git copy of the checkout
 with a test-only IPC target. Shortcut state is served by a fake `hyprctl`
-(remapped launcher, disabled Close window). It runs through `nix develop` and checks:
+(remapped launcher and assistant keys, disabled Close window). It runs through
+`nix develop` and checks:
 
+- Wiz: Hello's greeting, then idle, and its bubble naming the remapped
+  assistant key; the assistant's own Wiz hidden and still while the guide
+  covers the screen, back while it stands aside, for the box Super+I opens
+  and after a dismissal; his poses on Connect (asleep signed out, listening
+  while signing in, happy after) and on Ready (needs-input for the fixture's
+  findings); and the hand-off on Finish, its states in order, the flight
+  ending on the assistant's resting place at his size and his Wiz drawn
+  there, with a frame taken mid-flight (`welcome-handoff-en.png`), and no
+  flight with reduced motion;
 - the full-screen canvas at the installer's zoom, centred, on 1440×900,
   1280×800, 1920×1080 and 1024×600 outputs, with no binding-loop warning;
 - the fresh-install default wallpaper behind the guide when it steps aside,

@@ -61,6 +61,19 @@ finishing after the restart, and a problem page. Worker state wins over
 discovery, so a prepared or restarting update is shown even when a source
 cannot be checked.
 
+Wiz, the assistant's character, heads every status page in the pose language
+he uses everywhere ([the assistant](assistant.md)); `UpdatesHelpers.statusPose`
+maps the page to it. He thinks while checking and while finishing after the
+restart, works while preparing, installing or restoring, and waits with his
+amber pip when the next step is the person's: a restart or shutdown, a
+confirmation that failed, an interrupted or outdated preparation. He listens
+when the app asks whether everything works, is happy when the system is up to
+date, is sorry after a failure, a rollback or an unreachable source, and
+sleeps in the live session. An available update shows him idle with the
+unread pip. He never speaks, and stays out of the review of what changes, the
+menubar icon and notifications. The page's primary button carries its tone:
+amber after a warning or failure, when the next step is the person's.
+
 Preparation downloads and builds a candidate without activating it. The ready
 page then lists what people recognise first:
 
@@ -90,6 +103,31 @@ preview and requires preparation again. Finished failures (failed, interrupted
 or rolled back) can be dismissed; dismissal, like discarding a preview,
 preserves files and logs. Recovery that still needs attention cannot be
 dismissed.
+
+### What's new after an update
+
+When a confirmed update, kept by the person or by automatic confirmation,
+moved Cybex OS to a new version, the up-to-date page reads **You're on Cybex OS
+VERSION**. Wiz nods and sparkles once as the page comes into view and settles
+into happy, and **What's New** opens a page in the same window with that
+release's notes and its important changes (component versions, old to new).
+**Back** or Escape returns. Notes render as Markdown without images or raw
+HTML, so the page fetches nothing; only web links open, in the browser.
+
+The data is the worker's completed record: after confirmation, `cybex update
+status` still carries the reviewed transaction's `scope`, `installedVersion`,
+`availableVersion`, `notes` and `highlights` until the next preparation
+replaces them, so no other state is kept. Only a `cybexos` or `both` scope
+counts, because those set both versions afresh. An update of NixOS packages
+alone keeps the installed Cybex OS version and shows the ordinary up-to-date
+page.
+
+Each kept release is announced once per person. With Software Update closed,
+one notification, **Cybex OS VERSION is ready** (*See what's new.*), takes the
+place of **Update complete**, and its action opens What's New. With the app
+open, the page itself is the announcement. The announced version is
+remembered in `$XDG_STATE_HOME/cybexos/software-update.json`, so neither a
+shell restart nor a new login repeats it.
 
 ## Automatic preparation and confirmation
 
@@ -125,7 +163,8 @@ checks still decide: the system services, Hyprland, exactly one managed
 Quickshell and its journal must pass. If confirmation fails, or the policy is
 off, the app asks the person to keep the version or go back to the previous
 one. Restarting without keeping it returns to the previous generation, as
-before. A notification reports a completed update.
+before. A notification reports a completed update; a new Cybex OS release is
+announced with its What's New instead.
 
 Both units take no input. They read the policy and the updater's own state as
 root. A polkit rule lets an active local session of a `wheel` member start

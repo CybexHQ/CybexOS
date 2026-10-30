@@ -16,9 +16,10 @@
 //   var ops = rig.ops({ frame: "free" | "disc", unread, effects })   // draw list
 //   WizRig.toSVG(ops, size, viewBox)                        // still SVG
 //   WizRig.layerSVG(name)                                   // one layer at rest
+//   WizRig.stillSVG(state, { without, unread })             // a whole pose at rest
 //
 // States: idle | listening | thinking | working | finished | needs-input |
-//         happy | sorry | asleep | carried
+//         happy | greeting | sorry | asleep | carried
 
 var WizRig = (function () {
   var C = {
@@ -31,7 +32,7 @@ var WizRig = (function () {
     magic: "#4FA3F7", magicHi: "#9BD3FF", spellCore: "#E4F4FF", particle: "#BFE3FF", spark: "#D6EEFF",
     amber: "#F5B83D"
   };
-  var STATES = ["idle", "listening", "thinking", "working", "finished", "needs-input", "happy", "sorry", "asleep", "carried"];
+  var STATES = ["idle", "listening", "thinking", "working", "finished", "needs-input", "happy", "greeting", "sorry", "asleep", "carried"];
   var BASE = { lean: 0, sc: 1, sy: 1, bodyY: 0, hatY: 0, hatRot: 0, hatLift: 0, eyeOpen: 1, eyeX: 0, eyeY: 0,
     happy: 0, spell: 0, runes: 0, amber: 0, bob: 1, sway: 1, tip: 0, voice: 0, glow: 1, feet: 0 };
   function pose(o) { var p = {}, k; for (k in BASE) p[k] = BASE[k]; for (k in o) p[k] = o[k]; return p; }
@@ -44,6 +45,8 @@ var WizRig = (function () {
     "needs-input": pose({ sy: 0.95, bodyY: 2, hatY: 9, hatLift: -10, eyeOpen: 1.15, eyeX: 3.2, eyeY: -1.2, amber: 1, bob: 0.4, sway: 0.6, tip: -2 }),
     // A happy moment that is not a finished turn: no sparkle, no nod.
     "happy": pose({ happy: 1, eyeY: 0.4, bob: 0.8 }),
+    // Hello: he lifts his hat off his head and tips it, eyes smiling.
+    "greeting": pose({ lean: 1.5, hatY: -9, hatRot: -16, hatLift: -4, happy: 1, eyeY: 0.2, bob: 0.9, tip: -2 }),
     // The reply failed: hat tipped down, eyes lowered.
     "sorry": pose({ lean: -1.5, sc: 0.98, sy: 0.98, bodyY: 1, hatY: 2.5, hatRot: -7, eyeOpen: 0.72, eyeX: -1.2, eyeY: 2.2, bob: 0.3, sway: 0.4, tip: 2 }),
     // The assistant service is not there: hat down, eyes closed and dim.
@@ -474,6 +477,21 @@ var WizRig = (function () {
     return toSVG(ops, null, [at[0] + b[0], at[1] + b[1], b[2], b[3]]) + "\n";
   }
 
+  // A whole pose at rest as one picture: what the boot splash, the lock
+  // screen, the terminal and the installer show (scripts/export-wiz). Every
+  // still shares one box, so poses swapped in place line up. `without` leaves
+  // out layers, which the installer moves on its own.
+  var STILL_BOX = [-8, -12, 136, 132];
+  function stillSVG(state, opts) {
+    opts = opts || {};
+    var rig = new Rig(0), skip = opts.without || [];
+    rig.update(0, state, { reducedMotion: true });
+    var ops = rig.ops({ unread: !!opts.unread }).filter(function (o) {
+      return (o.k !== "path" && o.k !== "radial") || skip.indexOf(o.layer) === -1;
+    });
+    return toSVG(ops, null, opts.box || STILL_BOX) + "\n";
+  }
+
   // ---- still SVG ----------------------------------------------------------
   function num(n) { return Math.round(n * 100) / 100; }
   function dStr(d) {
@@ -534,6 +552,8 @@ var WizRig = (function () {
     toSVG: toSVG,
     layerOps: layerOps,
     layerSVG: layerSVG,
+    stillSVG: stillSVG,
+    STILL_BOX: STILL_BOX,
     STATES: STATES,
     POSES: POSES,
     LAYOUT: LAYOUT,

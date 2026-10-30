@@ -969,31 +969,29 @@ test("schema-30 adds the assistant's button before the right side's notification
 test("assistant preferences are validated and runtime placement is bounded", () => {
     const d = H.defaults();
     assert.deepEqual([d.assistantAgent, d.assistantClaudeModel, d.assistantCodexModel,
-        d.assistantSpeak, d.assistantScreenContext, d.assistantCharacter, d.assistantShown,
+        d.assistantSpeak, d.assistantScreenContext, d.assistantShown,
         d.assistantScreen, d.assistantX, d.assistantY],
-        ["auto", "default", "default", false, false, "wiz", false, "", -1, -1]);
+        ["auto", "default", "default", false, false, false, "", -1, -1]);
     const merged = H.merge({ v: 30, assistantAgent: "codex", assistantClaudeModel: "sonnet",
         assistantCodexModel: "gpt-5.6-sol", assistantSpeak: true, assistantScreenContext: true,
-        assistantCharacter: "mark", assistantShown: true, assistantScreen: "DP-1",
+        assistantShown: true, assistantScreen: "DP-1",
         assistantX: 812.4, assistantY: 64 });
     assert.equal(merged.assistantAgent, "codex");
     assert.equal(merged.assistantClaudeModel, "sonnet");
     assert.equal(merged.assistantCodexModel, "gpt-5.6-sol");
     assert.equal(merged.assistantSpeak, true);
     assert.equal(merged.assistantScreenContext, true);
-    assert.equal(merged.assistantCharacter, "mark");
     assert.equal(merged.assistantShown, true);
     assert.equal(merged.assistantScreen, "DP-1");
     assert.equal(merged.assistantX, 812);
     assert.equal(merged.assistantY, 64);
     const invalid = H.merge({ v: 30, assistantAgent: "gemini", assistantClaudeModel: "gpt-5.6-sol",
-        assistantCharacter: "clippy", assistantScreenContext: "yes", assistantScreen: "a\nb",
+        assistantScreenContext: "yes", assistantScreen: "a\nb",
         assistantX: -50, assistantY: 1e9 });
     assert.equal(invalid.assistantAgent, "auto");
     assert.equal(invalid.assistantClaudeModel, "default", "each agent takes only its own models");
-    assert.equal(invalid.assistantCharacter, "wiz");
-    assert.equal(H.merge({ v: 30, assistantCharacter: "mascot" }).assistantCharacter, "wiz",
-        "the retired animated logo falls back to the default character");
+    assert.ok(!("assistantCharacter" in H.merge({ v: 30, assistantCharacter: "mark" })),
+        "Wiz is the only character; a saved choice is ignored");
     assert.equal(invalid.assistantScreenContext, false, "screen context needs an explicit true");
     assert.equal(invalid.assistantScreen, "");
     assert.equal(invalid.assistantX, -1);

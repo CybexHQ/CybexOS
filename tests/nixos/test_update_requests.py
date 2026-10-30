@@ -140,6 +140,34 @@ class UpdateRequests(unittest.TestCase):
         self.assertEqual(result['packageChanges'], [])
         self.assertEqual(result['phase'], 'Checking sources')
 
+    prepare_confirmation = lifecycle.EngineTests.prepare_confirmation
+
+    def test_kept_release_retains_its_notes_and_highlights_for_whats_new(self):
+        # Software Update's What's New page reads a kept Cybex OS release
+        # from the completed status; nothing else retains its notes.
+        record = self.prepare_confirmation()
+        self.engine.confirm()
+        self.engine.recover()  # a later boot leaves a completed update alone
+        status = self.status()
+        self.assertEqual((status['state'], status['changeKind'], status['scope'], status['transaction']),
+                         ('done', 'update', 'cybexos', record['id']))
+        self.assertEqual((status['installedVersion'], status['availableVersion']), ('1.0.0', '1.1.0'))
+        self.assertEqual(status['notes'], 'A qualified release')
+        self.assertEqual(status['highlights']['components'],
+                         [{'id': 'kernel', 'before': '6.12.55', 'after': '6.12.58'}])
+
+    def test_kept_nixos_update_keeps_the_installed_cybexos_version(self):
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        self.engine.boot_id = lambda: 'different-boot'
+        for link in (self.system, self.booted):
+            link.unlink(); link.symlink_to(lifecycle.NEW_SYSTEM)
+        self.engine.recover()
+        self.engine.confirm()
+        status = self.status()
+        self.assertEqual((status['state'], status['scope']), ('done', 'upstream'))
+        self.assertEqual((status['installedVersion'], status['availableVersion'], status['notes']), ('1.0.0', '1.0.0', ''))
+
     def test_elapsed_freezes_after_preparation_and_restarts_for_activation(self):
         with patch('cybexos.engine.time.time', return_value=100):
             self.engine.status(transaction='a' * 32, state='building')

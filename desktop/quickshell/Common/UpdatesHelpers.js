@@ -143,6 +143,77 @@ function problem(m) {
     return "check";
 }
 
+// Wiz on a status page, in the pose language every surface shares
+// (docs/assistant.md): checking thinks, changing things works, your move
+// waits with the amber pip, a question listens, good news is happy, a
+// failure is sorry and nothing to do sleeps; something new is idle with the
+// unread pip. A kept release is finished. The review of a prepared update
+// ("ready") has no character, so it gets none here either.
+function statusPose(page, problem, confirmFailed, kept) {
+    const still = pose => ({ pose: pose, unread: false });
+    switch (page) {
+    case "checking":
+    case "finishing":
+        return still("thinking");
+    case "current":
+        return still(kept ? "finished" : "happy");
+    case "whats-new":
+        return still("finished");
+    case "available":
+        return { pose: "idle", unread: true };
+    case "preparing":
+    case "installing":
+    case "recovering":
+        return still("working");
+    case "restart":
+        return still("needs-input");
+    case "confirm":
+        return still(confirmFailed ? "needs-input" : "listening");
+    case "unavailable":
+        return still("asleep");
+    case "problem":
+        return still(["interrupted", "stale"].includes(problem) ? "needs-input" : "sorry");
+    }
+    return still("idle");
+}
+
+// The Cybex OS release a person has kept: a confirmed update that moved
+// Cybex OS to a new version. The worker's completed record still holds what
+// its review showed (release notes and highlights) until the next change
+// replaces it. Only a Cybex OS scope sets both versions afresh, so a later
+// firmware-only update never reads as that release again, and an update of
+// NixOS packages alone keeps the installed version.
+function keptRelease(deployment) {
+    const value = deployment || {};
+    const version = typeof value.availableVersion === "string" ? value.availableVersion.trim() : "";
+    if (value.state !== "done" || value.changeKind !== "update" || !["cybexos", "both"].includes(value.scope)
+            || version === "" || version === String(value.installedVersion || "").trim())
+        return null;
+    return { version: version, previous: String(value.installedVersion || ""),
+        notes: typeof value.notes === "string" ? value.notes : "",
+        components: summary(value).components, transaction: value.transaction || "" };
+}
+
+// A kept release is announced once per person; the version is remembered.
+function announce(kept, announced) {
+    return !!kept && kept.version !== announced;
+}
+
+// Release notes as the What's New page renders them, Markdown that never
+// fetches anything: images and raw HTML are dropped (an autolink stays a
+// link) before the view styles the links the way the shell's other Markdown
+// does (NotesHelpers.styleMarkdownLinks). Headings become level 4, which Qt
+// draws bold at the text's own size, under the page's heading.
+function releaseNotes(text) {
+    return String(text || "")
+        .replace(/^ {0,3}#{1,6}(?=[ \t]|$)/gm, "####")
+        .replace(/!\[[^\]\n]*\]\([^)\n]*\)/g, "")
+        .replace(/!\[[^\]\n]*\]\[[^\]\n]*\]/g, "")
+        .replace(/<((?:https?:\/\/|mailto:)[^<>\s]+)>/gi, "[$1]($1)")
+        .replace(/<\/?[A-Za-z!][^>]*>/g, "")
+        .trim();
+}
+
 // A version split into what people read: NixOS's release and build date,
 // date-stamped firmware, and unstable snapshots. Views format the date.
 function versionParts(id, value) {
@@ -247,6 +318,7 @@ function downloadSize(bytes) {
 
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, scope, scopeLabel, capabilities, firmwareRestart,
-    overviewVisible, indicator, COMPONENTS, component, page, confirmFailed, problem, versionParts,
+    overviewVisible, indicator, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
+    announce, releaseNotes, versionParts,
     summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize
 };

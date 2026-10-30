@@ -226,3 +226,96 @@ test("release notes, sizes and labels stay short and honest", () => {
     assert.equal(H.sizeChange(-2.04e9), "\u22122.0 GB");
     assert.equal(H.sizeChange(1000), "", "a rounding error is not a size change");
 });
+
+test("Wiz shows each status page in the pose language every surface shares", () => {
+    const pose = (page, problem = "check", confirmFailed = false, kept = false) =>
+        H.statusPose(page, problem, confirmFailed, kept).pose;
+    assert.equal(pose("checking"), "thinking");
+    assert.equal(pose("current"), "happy");
+    assert.equal(pose("current", "check", false, true), "finished", "a kept release celebrates");
+    assert.equal(pose("whats-new"), "finished");
+    assert.deepEqual(H.statusPose("available", "check", false, false), { pose: "idle", unread: true },
+        "something new is idle with the unread pip");
+    for (const page of ["preparing", "installing", "recovering"])
+        assert.equal(pose(page), "working", page);
+    assert.equal(pose("restart"), "needs-input", "restart and shut down are the person's move");
+    assert.equal(pose("finishing"), "thinking");
+    assert.equal(pose("confirm"), "listening", "Does everything work? asks");
+    assert.equal(pose("confirm", "check", true), "needs-input", "a failed confirmation waits for a decision");
+    for (const problem of ["rolled-back", "failed", "recovery-failed", "check", "status"])
+        assert.equal(pose("problem", problem), "sorry", problem);
+    for (const problem of ["interrupted", "stale"])
+        assert.equal(pose("problem", problem), "needs-input", problem);
+    assert.equal(pose("unavailable"), "asleep");
+    const states = load("WizRig.js").STATES;
+    for (const page of ["checking", "current", "available", "preparing", "installing", "restart", "finishing",
+        "confirm", "recovering", "problem", "unavailable", "whats-new", "ready"]) {
+        const value = H.statusPose(page, "check", false, false);
+        assert.ok(states.includes(value.pose), page + ": " + value.pose);
+        assert.equal(value.unread, page === "available", page);
+    }
+});
+
+test("the review of a prepared update and its toasts stay free of Wiz", () => {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const { shellDir } = require("./shell.cjs");
+    const read = name => fs.readFileSync(path.join(shellDir, name), "utf8");
+    assert.doesNotMatch(read("SoftwareUpdate/ReadyPage.qml"), /Wiz\b/);
+    assert.doesNotMatch(read("Bar/Modules/Updates.qml"), /Wiz\b/);
+    assert.match(read("SoftwareUpdate/StatusPage.qml"), /AssistantUi\.Wiz \{/);
+    assert.match(read("SoftwareUpdate/WhatsNewPage.qml"), /AssistantUi\.Wiz \{/);
+});
+
+const keptRecord = { state: "done", changeKind: "update", scope: "cybexos", transaction: "a".repeat(32),
+    installedVersion: "1.0.0-beta.20", availableVersion: "1.0.0-beta.21", notes: "## Highlights\n- Wiz",
+    highlights: { schema: 1, components: [{ id: "cybexos", before: "1.0.0-beta.20", after: "1.0.0-beta.21" },
+        { id: "kernel", before: "6.12.55", after: "6.12.58" }], apps: [], tools: [], background: 3, sizeChange: 0 } };
+
+test("a kept Cybex OS release keeps its notes and important changes", () => {
+    const kept = H.keptRelease(keptRecord);
+    assert.equal(kept.version, "1.0.0-beta.21");
+    assert.equal(kept.previous, "1.0.0-beta.20");
+    assert.equal(kept.notes, "## Highlights\n- Wiz");
+    assert.deepEqual(kept.components.map(row => row.id), ["cybexos", "kernel"]);
+    assert.equal(H.keptRelease({ ...keptRecord, scope: "both" }).version, "1.0.0-beta.21");
+    assert.deepEqual(H.keptRelease({ ...keptRecord, highlights: null, notes: undefined }).components, [],
+        "a record without highlights still has its What's New");
+});
+
+test("only a kept new Cybex OS version is a release; NixOS packages alone are just up to date", () => {
+    assert.equal(H.keptRelease({ ...keptRecord, scope: "upstream", availableVersion: "1.0.0-beta.20" }), null);
+    assert.equal(H.keptRelease({ ...keptRecord, availableVersion: "1.0.0-beta.20" }), null, "same version");
+    assert.equal(H.keptRelease({ ...keptRecord, scope: "firmware" }), null,
+        "a later firmware-only update keeps the older version fields");
+    for (const state of ["ready", "activating", "awaiting-boot", "awaiting-login", "rolled-back", "failed", "idle"])
+        assert.equal(H.keptRelease({ ...keptRecord, state }), null, state);
+    for (const changeKind of ["configuration", "software", "region", "maintenance", undefined])
+        assert.equal(H.keptRelease({ ...keptRecord, changeKind }), null, String(changeKind));
+    assert.equal(H.keptRelease({ ...keptRecord, availableVersion: "" }), null);
+    assert.equal(H.keptRelease(null), null);
+    assert.equal(H.keptRelease({}), null);
+});
+
+test("each kept release is announced once", () => {
+    const kept = H.keptRelease(keptRecord);
+    assert.equal(H.announce(kept, ""), true);
+    assert.equal(H.announce(kept, "1.0.0-beta.20"), true, "an older release was announced");
+    assert.equal(H.announce(kept, "1.0.0-beta.21"), false);
+    assert.equal(H.announce(null, ""), false);
+});
+
+test("release notes render as Markdown that never fetches anything", () => {
+    const notes = "## Highlights\n- **Wiz** joins Software Update ![wiz](https://example.com/wiz.png)\n"
+        + "- See [the docs](https://example.com/docs) or <https://example.com/x>\n"
+        + "<img src=\"https://example.com/track.gif\"><b>bold</b>\n![ref][logo]\n\n[logo]: https://example.com/logo.png";
+    const value = H.releaseNotes(notes);
+    assert.doesNotMatch(value, /wiz\.png|track\.gif|<img|<b>|!\[/);
+    assert.match(value, /^#### Highlights\n- \*\*Wiz\*\* joins Software Update/,
+        "headings stay under the page's own heading");
+    assert.equal(H.releaseNotes("# One\n### Three\n####### seven\n#hashtag"), "#### One\n#### Three\n####### seven\n#hashtag");
+    assert.match(value, /\[the docs\]\(https:\/\/example\.com\/docs\)/);
+    assert.match(value, /\[https:\/\/example\.com\/x\]\(https:\/\/example\.com\/x\)/, "an autolink stays a link");
+    assert.equal(H.releaseNotes(""), "");
+    assert.equal(H.releaseNotes(undefined), "");
+});

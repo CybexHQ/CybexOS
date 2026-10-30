@@ -44,6 +44,19 @@ Singleton {
     property string lastState: ""
     // The running system's own component versions, for the up-to-date page.
     property var installedComponents: ({})
+    // A kept Cybex OS release (UpdatesHelpers.keptRelease), or null. The app
+    // shows it on the up-to-date page with its What's New.
+    readonly property var kept: Helpers.keptRelease(deployment)
+    // The release What's New shows, held while it is open: preparing the
+    // next update replaces the worker's record, not the page being read.
+    property var whatsNew: null
+    // The kept release last announced, so each is announced once. Shell
+    // state, as the guide's progress is: it follows the person, not the
+    // machine. While it is unreadable nothing is announced, rather than the
+    // same release on every start.
+    readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/cybexos"
+    property string announced: ""
+    property bool announcedLoaded: false
 
     readonly property bool available: statusLoaded && deployment.available !== false && sources.available !== false
     readonly property bool busy: checker.busy
@@ -105,7 +118,14 @@ Singleton {
         componentsFile.reload();
         opened();
     }
-    function close() { appOpen = false; }
+    function close() { appOpen = false; whatsNew = null; }
+    // The kept release's notes and important changes, in the app. Once its
+    // record is gone the app opens on whatever it shows now.
+    function showWhatsNew() {
+        if (kept) whatsNew = kept;
+        show();
+    }
+    function closeWhatsNew() { whatsNew = null; }
     onAppOpenChanged: rememberOpen()
     function rememberOpen() {
         if (reopenLoaded) reopenFile.setText(appOpen ? Startup.sessionKey + "\n" : "");
@@ -187,11 +207,40 @@ Singleton {
             check();
         }
         if (!["awaiting-login", "activating"].includes(previous) || value.state !== "done") return;
+        // A new Cybex OS release is announced with its What's New instead.
+        if (announcedLoaded && Helpers.announce(Helpers.keptRelease(value), announced)) return;
         Quickshell.execDetached(["notify-send", "--app-name=Software Update", "--icon=cybexos",
             value.changeKind === "update" ? I18n.tr("Update complete") : I18n.tr("System change complete"),
             (value.firmware || {}).error
                 ? I18n.tr("The system update passed its checks. Some device firmware still needs attention.")
                 : I18n.tr("Everything passed its checks after the restart.")]);
+    }
+    // One toast per kept release, whose action opens What's New. An open app
+    // already shows the release as kept, so it needs no toast.
+    function maybeAnnounce() {
+        if (!announcedLoaded || !statusLoaded || !Helpers.announce(kept, announced)) return;
+        const release = kept;
+        announced = release.version;
+        stateDirectory.running = true;
+        if (appOpen) return;
+        announcement.running = false;
+        announcement.command = ["notify-send", "--app-name=Software Update", "--icon=cybexos",
+            "--action=default=" + I18n.tr("What's New"), "--action=whats-new=" + I18n.tr("What's New"),
+            I18n.format("Cybex OS %1 is ready", [release.version]),
+            (deployment.firmware || {}).error ? I18n.tr("See what's new. Some device firmware still needs attention.")
+                : I18n.tr("See what's new.")];
+        announcement.running = true;
+    }
+    function loadAnnounced(text) {
+        if (announcedLoaded) return;
+        try {
+            const value = JSON.parse(text);
+            announced = value && typeof value.announced === "string" ? value.announced : "";
+        } catch (error) {
+            announced = "";
+        }
+        announcedLoaded = true;
+        maybeAnnounce();
     }
 
     JsonCommand {
@@ -254,6 +303,7 @@ Singleton {
             root.statusLoaded = true;
             root.statusError = "";
             root.maybePrepare();
+            root.maybeAnnounce();
             if (value.installedIdentity && value.installedIdentity !== root.installedIdentity) {
                 root.installedIdentity = value.installedIdentity;
                 root.sourcesLoaded = false;
@@ -286,6 +336,36 @@ Singleton {
         blockWrites: true
         onLoaded: root.restoreOpen(text())
         onLoadFailed: root.restoreOpen("")
+    }
+    // Silent for the same reason: no record yet is the normal case. Any
+    // other read failure leaves the announcement off.
+    FileView {
+        id: announcedFile
+        path: root.stateDir + "/software-update.json"
+        printErrors: false
+        atomicWrites: true
+        blockWrites: true
+        onLoaded: root.loadAnnounced(text())
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound) root.loadAnnounced("");
+        }
+    }
+    Process {
+        id: stateDirectory
+        command: ["mkdir", "-p", "--", root.stateDir]
+        onExited: code => {
+            if (code === 0) announcedFile.setText(JSON.stringify({schema: 1, announced: root.announced}) + "\n");
+        }
+    }
+    // notify-send waits for the toast and prints the action chosen, or
+    // nothing when it is dismissed.
+    Process {
+        id: announcement
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (["default", "whats-new"].includes(text.trim())) root.showWhatsNew();
+            }
+        }
     }
     JsonCommand {
         id: chooser

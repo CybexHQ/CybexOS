@@ -23,6 +23,7 @@ libseat backend through logind rather than direct device access as root.
 | `ui/sheets.slint` | Wi-Fi, keyboard, language, menu, log and USB save, applications, NVIDIA driver, time zone picker |
 | `ui/store.slint` | the `Store` global: every property the screens show and every request they make |
 | `ui/widgets.slint`, `ui/theme.slint` | controls and brand tokens |
+| `ui/wiz.slint`, `src/wiz.rs` | Wiz, the assistant's character, on the welcome, installing, done, stop and failure screens; `src/wiz.rs` draws his pictures (`assets/wiz`) once per size |
 | `ui/icons.slint` | generated Tabler icon paths; the names are in `assets/tabler/icons.json` |
 | `src/ui.rs` | daemon snapshots → `Store`, requests → daemon |
 | `src/names.rs` | the username and computer-name filter (`[a-z][a-z0-9-]{0,30}`) |
@@ -44,9 +45,24 @@ cargo test
 cargo run --features preview --bin installer-preview -- /tmp/static.json /tmp/renders
 ```
 
-Renders use fixture snapshots at a fixed moment (2026-10-23 19:00 UTC). Compare
-them with the design reference, `../ui-reference/index.html`, when changing the
-screens. The time zone tests read the host's TZif files (`TZDIR`).
+Renders use fixture snapshots at a fixed moment (2026-10-23 19:00 UTC), with
+Slint's clock stopped, so Wiz is at rest; the `…-<ms>ms` renders show him that
+long after their screen appeared. Compare them with the design reference,
+`../ui-reference/index.html`, when changing the screens. The time zone tests
+read the host's TZif files (`TZDIR`).
+
+Wiz's pictures come from the desktop's rig, `desktop/quickshell/Common/WizRig.js`:
+change the rig, then run `scripts/export-wiz` from the repository root, which
+writes `assets/wiz` (`--check` reports a stale file). Each pose the installer
+shows is cut into his body, eyes (with two blink frames) and hat, plus the
+pose's moving parts placed where they move in that pose. Slint's software
+renderer cannot rotate or scale and rasterises an SVG on every repaint, so
+`src/wiz.rs` rasterises each picture once at its exact physical size and
+`ui/wiz.slint` only moves, fades and swaps them on the pixel grid, at 25 frames a
+second and only while he thinks or works (the runes, the spell), blinks, pulses
+a waiting question or celebrates the finished installation. A loop repaints
+about 3,000 physical pixels a frame at zoom 1. Sheets and the reconnecting
+screen hold him still.
 
 Icons are Tabler outline paths, the release the desktop's icon font uses.
 `Icon` draws them at Tabler's 1.5-unit line, scaled with the icon size and
@@ -107,6 +123,7 @@ reference's icon table.
 | `assets/landmask.txt` | Derived from [Natural Earth](https://www.naturalearthdata.com/) 1:110m land (`ne_110m_land.geojson`), sampled at 2° cell centres | Public domain |
 | `ui/icons.slint` | Generated from [`@tabler/icons` 3.48.0](https://www.npmjs.com/package/@tabler/icons/v/3.48.0) `tabler-nodes-outline.json`; archive SHA-256 `28447dcf6f0bb2b8d92c59a1b3d30900a180de2e97d7db4d267e6320dc68f449` | MIT, `assets/tabler/LICENSE` |
 | `assets/logo.svg`, `assets/symbol.svg` | Copies of `assets/brand/logo/svg/cybexos-logo-on-dark.svg` and `assets/brand/symbol/svg/cybexos-symbol-on-dark.svg` | Repository MIT licence |
+| `assets/wiz/*.svg` | Written by `scripts/export-wiz` from `desktop/quickshell/Common/WizRig.js` | Repository MIT licence |
 
 Font SHA-256 at import: SpaceGrotesk-Regular
 `5ede28c4425f3fe4830c8f4754b39e9a87a93d0c3baa5e0a9924532aaa8a98bd`, Medium

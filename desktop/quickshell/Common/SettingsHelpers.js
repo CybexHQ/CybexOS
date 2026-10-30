@@ -205,7 +205,6 @@ var NOTE_CLAUDE_EFFORTS = NOTE_CLAUDE_EFFORT_CHOICES.map(
 // lists reuse the reviewed Notes catalogs; "default" leaves the choice to the
 // agent's own configuration.
 var ASSISTANT_AGENTS = ["auto", "claude", "codex"];
-var ASSISTANT_CHARACTERS = ["wiz", "mark"];
 var ASSISTANT_CLAUDE_MODELS = ["default"].concat(NOTE_CLAUDE_MODELS);
 var ASSISTANT_CODEX_MODELS = ["default"].concat(NOTE_CODEX_MODELS);
 
@@ -476,7 +475,6 @@ function defaults() {
         // Off until enabled: the screen button attaches a screenshot only
         // to the question it was pressed for.
         assistantScreenContext: false,
-        assistantCharacter: "wiz",
         // Where the character was left. Runtime state, persisted so a shell
         // reload or a new session finds it there; -1 is the default corner.
         assistantShown: false,
@@ -1497,8 +1495,6 @@ function merge(raw, context) {
             d.assistantCodexModel),
         assistantSpeak: boolIn(parsed.assistantSpeak, d.assistantSpeak),
         assistantScreenContext: boolIn(parsed.assistantScreenContext, d.assistantScreenContext),
-        assistantCharacter: enumIn(parsed.assistantCharacter, ASSISTANT_CHARACTERS,
-            d.assistantCharacter),
         assistantShown: boolIn(parsed.assistantShown, d.assistantShown),
         assistantScreen: textIn(parsed.assistantScreen, 64, d.assistantScreen),
         assistantX: intIn(parsed.assistantX, -1, 32768, 1, d.assistantX),
@@ -1778,7 +1774,6 @@ var exported = {
     NOTE_CODEX_EFFORT_CHOICES: NOTE_CODEX_EFFORT_CHOICES,
     NOTE_CLAUDE_EFFORT_CHOICES: NOTE_CLAUDE_EFFORT_CHOICES,
     ASSISTANT_AGENTS: ASSISTANT_AGENTS,
-    ASSISTANT_CHARACTERS: ASSISTANT_CHARACTERS,
     ASSISTANT_CLAUDE_MODELS: ASSISTANT_CLAUDE_MODELS,
     ASSISTANT_CODEX_MODELS: ASSISTANT_CODEX_MODELS,
     moduleGroup: moduleGroup,

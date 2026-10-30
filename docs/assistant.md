@@ -26,7 +26,9 @@ listen or speak unless asked to for one question.
   while a question is being worked on, `!` while one needs your answer and a
   dot for a reply you have not seen. Drag the character anywhere, including to
   another display. It stays where it was left, across sessions, and keeps out
-  of the way while game mode is on.
+  of the way while game mode is on. The welcome guide's own Wiz stands in for
+  him while the guide covers the screen, and finishing the guide brings him
+  out to his corner (docs/welcome.md).
 - **Check this computer.** The box's first suggestion, Settings → Assistant,
   the welcome guide's Ready step and `cybexos-runtime ipc assistant check` all
   ask the same question. It tells the service this is a system check, so the
@@ -37,6 +39,17 @@ listen or speak unless asked to for one question.
 - **Ask** by hovering the character, or tap `Super+I`, then type and press
   Enter. Hovering opens the box without taking the keyboard; clicking it or
   the shortcut does.
+- **Ask Wiz from the launcher.** When what you type in the launcher
+  (`Super+Space`) matches no app or action, its one row is **Ask Wiz**, with
+  your words quoted under him. Enter or a click closes the launcher and asks
+  them, as typing them into the box would; the character comes out if it was
+  hidden. Without a signed-in agent the question waits in the box behind the
+  sign-in buttons. The row appears only for a plain query on the Apps list (a
+  prefix such as `:` or `=` keeps its own results), and only while the
+  assistant can answer: its service running, no other question in progress,
+  and game mode off. Nothing about the screen is sent; if the box already
+  holds a screenshot, the question waits there with it for you to send or
+  detach.
 - **Talk** by holding `Super+I` (or the microphone button) and releasing it to
   send. The words are transcribed locally by Voxtype; no audio leaves the
   computer. `Esc` or the cancel button discards a recording.
@@ -103,13 +116,12 @@ Settings → Assistant, stored in `~/.config/cybexos/shell.json`:
 | `assistantCodexModel` | `default`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` | `default` |
 | `assistantSpeak` | spoken replies | `false` |
 | `assistantScreenContext` | offer the screen button | `false` |
-| `assistantCharacter` | `wiz`, `mark` | `wiz` |
 | `assistantShown` | the character is on screen | `false` |
 | `assistantScreen`, `assistantX`, `assistantY` | where it was left | primary display, top right |
 
 ### The character
 
-`wiz` is Wiz: a small figure in a charcoal cloak under an oversized, slightly
+Wiz is a small figure in a charcoal cloak under an oversized, slightly
 crooked hat with the red Cybex band. His face stays in shadow and two glowing
 eyes carry the expression. He follows the assistant's turn:
 
@@ -135,12 +147,10 @@ still, he trembles and sweats. A few quick back-and-forths make him dizzy:
 spiral eyes, his hat askew and stars circling it, for about two seconds after
 he is put down. Dropped, he lands with a thud, eyes squeezed shut and a puff
 of dust, harder the faster he was moving; his hat lands a beat later,
-crooked, and he shakes it straight. The logo only tilts.
+crooked, and he shakes it straight.
 
 A blue pip marks a reply you have not seen, as the menubar dot does. His eyes
-follow the pointer while it rests on him. `mark` is the Cybex X from the
-supplied wordmark on a charcoal disc, kept still, with a blue activity ring;
-amber marks a question waiting for an answer.
+follow the pointer while it rests on him.
 
 Wiz is cheap to keep on screen. He is drawn from still layers
 (`desktop/quickshell/assets/wiz/`), each rendered once at its final size and
@@ -156,8 +166,32 @@ power saver profile or an idle session he holds each pose still, and nothing
 runs while he is hidden.
 
 His artwork, poses and timing live in `Common/WizRig.js`. After changing it,
-run `scripts/export-wiz` to rebuild the layers; the tests fail while they are
-out of date.
+run `scripts/export-wiz` to rebuild the layers, the still poses in
+`assets/wiz/` and the installer's pictures; the tests fail while they are out
+of date.
+
+### Wiz elsewhere
+
+The same character shows the state of the system's other long or uncertain
+moments, and each pose means the same thing everywhere: thinking is checking,
+working is changing something, the amber pip is your move, listening is a
+question to you, sorry is a failure and asleep is nothing available. He speaks
+only once, in the welcome guide's hello; everywhere else he only shows.
+
+| Where | What he shows |
+| --- | --- |
+| Installer ([installation](installation.md)) | the system check (thinking, happy, or the amber pip), the installation (working), done (finished), stopped or failed |
+| Welcome guide ([welcome](welcome.md)) | a greeting on Hello, asleep on Connect until an agent is signed in, the system check on Ready, then the hop to his corner |
+| Software Update ([updates](updates.md)) | every status page, and What's New once a new Cybex OS version is kept |
+| Launcher | **Ask Wiz** when nothing matches |
+| Notifications | the empty notification centre; asleep under Focus |
+| Disk unlock at boot, lock screen, kitty's fastfetch ([branding](branding.md)) | still pictures: asleep, listening as you type, sorry or happy at unlock |
+
+He stays out of permission prompts, the installer's disk choice and erase
+review, Settings pages, the update review, the menubar, notification toasts,
+the boot menu and the recovery desktop. While the welcome guide fills the
+screen, its Wiz is the only one: the corner Wiz waits and takes over when the
+guide closes.
 
 The menubar, boot splash and documents use the corresponding logo assets
 from [the brand directory](../assets/brand/README.md).

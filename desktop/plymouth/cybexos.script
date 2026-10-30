@@ -32,6 +32,17 @@ fun refresh_callback ()
     update_layout();
     global.animation_frame++;
 
+    # Wiz fades out over his last 20 frames.
+    global.wiz_frame++;
+    if (global.wiz_until > 0)
+      {
+        frames_left = global.wiz_until - global.wiz_frame;
+        if (frames_left <= 0)
+          wiz_hide();
+        else if (frames_left < 20)
+          wiz.sprite.SetOpacity(frames_left / 20);
+      }
+
     # Animate fake progress to limit over time with easing
     if (global.fake_progress_active == 1)
       {
@@ -118,19 +129,88 @@ fun stop_fake_progress()
 entry.image = Image("entry.png");
 bullet.image = Image("bullet.png");
 
+# Wiz, the assistant's character, stands on the passphrase field while a disk
+# unlock prompt shows, and never on a boot without one. His poses share one
+# box with his feet at the same height (assets/wiz, rendered at build time by
+# nix/packages/plymouth.nix), so a pose swaps in place. The box is 132 rig
+# units high with his feet at 122; he stands centred on the field's top edge,
+# below the logo. Without his pictures the field keeps its place under the logo.
+wiz.asleep = Image("wiz-asleep.png");
+wiz.listening = Image("wiz-listening.png");
+wiz.sorry = Image("wiz-sorry.png");
+wiz.happy = Image("wiz-happy.png");
+wiz.sprite = Sprite();
+wiz.sprite.SetOpacity(0);
+if (wiz.asleep && wiz.listening && wiz.sorry && wiz.happy)
+  {
+    wiz.feet = Math.Int(wiz.asleep.GetHeight() * 122 / 132);
+    # Space between the logo and the field: his box, from its top to his feet.
+    global.entry_gap = 16 + wiz.feet;
+  }
+else
+  {
+    wiz.feet = 0;
+    global.entry_gap = 40;
+  }
+
 entry.sprite = Sprite(entry.image);
 entry.x = Window.GetWidth()/2 - entry.image.GetWidth() / 2;
-entry.y = logo.sprite.GetY() + logo.image.GetHeight() + 40;
+entry.y = logo.sprite.GetY() + logo.image.GetHeight() + global.entry_gap;
 entry.sprite.SetPosition(entry.x, entry.y, 10001);
 entry.sprite.SetOpacity(0);
 
 # Bullet array
 bullet.sprites = [];
 
+# Wiz's pose follows the prompt:
+#   asleep     the field is empty
+#   listening  there are bullets, and while the answer is checked
+#   sorry      systemd-cryptsetup asks again: the same prompt straight after an
+#              answer means the passphrase was wrong (it sends no other sign)
+#   happy      for two seconds once systemd reports a systemd-cryptsetup@ unit
+#              started, which it does only when its disk unlocked
+global.wiz_asking = 0;    # a password prompt is showing
+global.wiz_checking = 0;  # a prompt was answered and no verdict came yet
+global.wiz_prompt = "";   # the latest prompt's text
+global.wiz_retry = 0;     # the showing prompt follows a wrong passphrase
+global.wiz_frame = 0;     # refresh frames, 50 a second
+global.wiz_until = 0;     # the frame at which he leaves; 0 while he stays
+
+fun wiz_place ()
+  {
+    if (wiz.feet > 0)
+      wiz.sprite.SetPosition(entry.x + entry.image.GetWidth() / 2 - wiz.asleep.GetWidth() / 2, entry.y - wiz.feet, 10003);
+  }
+
+fun wiz_show (image)
+  {
+    if (wiz.feet > 0)
+      {
+        wiz.sprite.SetImage(image);
+        wiz_place();
+        wiz.sprite.SetOpacity(1);
+      }
+  }
+
+fun wiz_hide ()
+  {
+    wiz.sprite.SetOpacity(0);
+    global.wiz_until = 0;
+  }
+
 fun display_normal_callback ()
   {
     update_layout();
     hide_password_dialog();
+
+    # An answered prompt: Wiz keeps listening while the passphrase is checked,
+    # and leaves after 30 seconds should no verdict arrive.
+    if (global.wiz_asking == 1)
+      {
+        global.wiz_asking = 0;
+        global.wiz_checking = 1;
+        global.wiz_until = global.wiz_frame + 1500;
+      }
 
     # Get current mode
     mode = Plymouth.GetMode();
@@ -179,6 +259,35 @@ fun display_password_callback (prompt, bullets)
           }
         bullet.sprites[index].SetOpacity(1);
       }
+
+    # Wiz comes last, so a fault in his part cannot hide the field.
+    if (global.wiz_asking == 0)
+      {
+        global.wiz_retry = 0;
+        if (global.wiz_checking == 1 && prompt == global.wiz_prompt)
+          global.wiz_retry = 1;
+        global.wiz_asking = 1;
+        global.wiz_checking = 0;
+        global.wiz_prompt = prompt;
+      }
+    global.wiz_until = 0;
+    if (bullets > 0)
+      wiz_show(wiz.listening);
+    else if (global.wiz_retry == 1)
+      wiz_show(wiz.sorry);
+    else
+      wiz_show(wiz.asleep);
+  }
+
+# systemd sends the name of each unit that has started.
+fun update_status_callback (status)
+  {
+    if (global.wiz_checking == 1 && String(status).SubString(0, 19) == "systemd-cryptsetup@")
+      {
+        global.wiz_checking = 0;
+        wiz_show(wiz.happy);
+        global.wiz_until = global.wiz_frame + 100;
+      }
   }
 
 #----------------------------------------- Progress Bar --------------------------------
@@ -224,8 +333,9 @@ fun update_layout ()
     logo.sprite.SetY(logo.y);
 
     entry.x = new_width / 2 - entry.image.GetWidth() / 2;
-    entry.y = logo.y + logo.image.GetHeight() + 40;
+    entry.y = logo.y + logo.image.GetHeight() + global.entry_gap;
     entry.sprite.SetPosition(entry.x, entry.y, 10001);
+    wiz_place();
 
     for (index = 0; bullet.sprites[index]; index++)
       {
@@ -282,6 +392,7 @@ update_layout();
 Plymouth.SetRefreshFunction(refresh_callback);
 Plymouth.SetDisplayNormalFunction(display_normal_callback);
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetUpdateStatusFunction(update_status_callback);
 Plymouth.SetBootProgressFunction(progress_callback);
 Plymouth.SetQuitFunction(quit_callback);
 Plymouth.SetDisplayMessageFunction (display_message_callback);

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "Common"
 import "Common/LauncherNavigation.js" as Navigation
+import "Assistant"
 import "Popovers"
 
 // Compact eight-row tabbed command palette. LauncherProviders owns routing,
@@ -19,6 +20,9 @@ Surface {
     readonly property int resultIconSize: Theme.scaled(28)
     // A selected clipboard image grows its row to show the picture under it.
     readonly property int previewRowHeight: rowHeight * 4
+    // Wiz's row, when nothing matched, has room for him and two lines.
+    readonly property int askRowHeight: Theme.scaled(58)
+    readonly property int askWizSize: Theme.scaled(52)
     readonly property int fullHeight: padding * 2 + tabHeight + searchHeight
         + maxResults * rowHeight + spacing * 2
     property int selected: 0
@@ -33,6 +37,8 @@ Surface {
     readonly property bool argumentMode: LauncherProviders.argumentMode
     readonly property var selectedRow: rows[selected] || null
     readonly property bool selectedPreview: !!(selectedRow && selectedRow.thumbnail)
+    readonly property bool asking: rows.length === 1 && rows[0].kind === "ask"
+    readonly property string askQuote: asking ? rows[0].subtitle : ""
     readonly property string searchPlaceholder: argumentMode
         ? (pendingAction.argument ? pendingAction.argument.placeholder : "Search web apps")
         : ({
@@ -443,7 +449,8 @@ Surface {
     Item {
         width: parent.width
         height: Math.min(Math.min(root.maxResults * root.rowHeight, root.rows.length * root.rowHeight
-                + (root.selectedPreview ? root.previewRowHeight - root.rowHeight : 0)),
+                + (root.selectedPreview ? root.previewRowHeight - root.rowHeight : 0)
+                + (root.asking ? root.askRowHeight - root.rowHeight : 0)),
             root.availableHeight > 0 ? Math.max(0, root.availableHeight - root.padding * 2 - root.tabHeight - root.searchHeight - root.spacing * 2) : root.maxResults * root.rowHeight)
         clip: true
 
@@ -464,10 +471,14 @@ Surface {
                 // Only the selected image shows its picture; every other row
                 // keeps the single-line height.
                 readonly property bool previewing: isSelected && !!modelData.thumbnail
+                // Nothing matched, and this row offers the query to Wiz, who
+                // is drawn over it (below).
+                readonly property bool asking: modelData.kind === "ask"
                 readonly property string iconUrl: modelData.thumbnail
                     ? modelData.thumbnail : LauncherProviders.iconSource(modelData.icon)
                 width: resultList.width
-                height: previewing ? root.previewRowHeight : root.rowHeight
+                height: asking ? root.askRowHeight
+                    : previewing ? root.previewRowHeight : root.rowHeight
                 radius: Theme.rowRadius
                 // The selected result lights the bar's held chip. A full-accent
                 // slab across a 460px row was the loudest thing in the shell, and
@@ -477,6 +488,7 @@ Surface {
 
                 Item {
                     id: resultIcon
+                    visible: !resultRow.asking
                     x: Theme.scaled(10)
                     y: Math.round((root.rowHeight - height) / 2)
                     width: root.resultIconSize
@@ -518,6 +530,7 @@ Surface {
                 }
 
                 Text {
+                    visible: !resultRow.asking
                     x: resultIcon.x + resultIcon.width + Theme.scaled(10)
                     width: Math.max(0, parent.width - x - Theme.scaled(12)
                         - (trailing.width > 0 ? trailing.width + Theme.scaled(10) : 0))
@@ -592,6 +605,17 @@ Surface {
             }
         }
 
+        // Wiz over the list's one row when nothing matched, the row under
+        // him keeping the highlight and the pointer. He outlives the row:
+        // every key rebuilds the list, and typing on past a miss must not
+        // rebuild him with it.
+        Loader {
+            active: root.asking
+            width: resultList.width
+            height: root.askRowHeight
+            sourceComponent: AskWiz {}
+        }
+
         ScrollChrome {
             anchors.fill: parent
             target: resultList
@@ -626,4 +650,84 @@ Surface {
         }
     }
 
+    // ---- Ask Wiz ---------------------------------------------------------
+    // The launcher's one two-line row: a query nothing matched, offered to
+    // the assistant (LauncherProviders.askRows). Wiz listens beside his name,
+    // the query is quoted under it, and Enter hands it over. He holds still
+    // but for a blink; nothing loops while the launcher is open.
+    component AskWiz: Item {
+        // A touch below the middle: his hat's tip reaches higher above the
+        // middle than his feet reach below it.
+        Wiz {
+            id: askWiz
+            x: Theme.scaled(4)
+            y: Math.round((parent.height - height) / 2) + Theme.scaled(2)
+            width: root.askWizSize
+            height: root.askWizSize
+            pose: "listening"
+        }
+
+        Column {
+            x: askWiz.x + askWiz.width + Theme.scaled(6)
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(0, enterKey.x - x - Theme.scaled(10))
+            spacing: Theme.scaled(1)
+
+            Text {
+                width: parent.width
+                text: I18n.tr("Ask Wiz")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.heading
+                font.weight: Theme.weightMedium
+                color: Theme.textHi
+                elide: Text.ElideRight
+            }
+
+            // The quoted query; its closing mark stays after the ellipsis.
+            Row {
+                width: parent.width
+
+                Text {
+                    width: Math.min(implicitWidth, parent.width - closingQuote.implicitWidth)
+                    text: "“" + root.askQuote
+                    textFormat: Text.PlainText
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.secondary
+                    color: Theme.textDim
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    id: closingQuote
+                    text: "”"
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.secondary
+                    color: Theme.textDim
+                }
+            }
+        }
+
+        Rectangle {
+            id: enterKey
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.scaled(12)
+            anchors.verticalCenter: parent.verticalCenter
+            width: enterLabel.implicitWidth + Theme.scaled(12)
+            height: Theme.scaled(20)
+            radius: Theme.scaled(5)
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.hairline
+
+            Text {
+                id: enterLabel
+                anchors.centerIn: parent
+                text: "Enter" // i18n: untranslated (key name)
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+                font.weight: Theme.weightMedium
+                color: Theme.textDim
+            }
+        }
+    }
 }

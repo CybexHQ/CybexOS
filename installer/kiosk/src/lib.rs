@@ -11,5 +11,6 @@ pub mod map;
 pub mod names;
 pub mod protocol;
 pub mod ui;
+pub mod wiz;
 pub mod zones;
 pub mod zoom;

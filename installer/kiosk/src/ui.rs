@@ -33,7 +33,7 @@ const TIPS: [(&[&str], &str); 6] = [
     (&["Super", "Return"], "opens a terminal. Fish is already set up."),
     (&["Super", "K"], "shows every keyboard shortcut the desktop actually has."),
     (&["Super", "Tab"], "opens the window overview with live thumbnails."),
-    (&["Super", "I"], "talks to the Cybex OS Assistant. Hold it to dictate."),
+    (&["Super", "I"], "talks to Wiz, the Cybex OS Assistant. Hold it to dictate."),
     (&["Super", "Ctrl", "V"], "opens clipboard history. Ctrl+P pins an entry."),
 ];
 
@@ -374,6 +374,10 @@ impl App {
         });
         let ok = checks.iter().all(|c| c.state == 0);
         let running = checks.iter().any(|c| c.state == 1);
+        // Wiz checks while a check runs. A warning, an error or a question
+        // is your move, except a test build you have already accepted.
+        let asks = matches!(phase, "development" | "preflight") || checks.iter().any(|c| c.state >= 3 && c.label != "Release");
+        store.set_check_pose(s(if running { "thinking" } else if asks { "needs-input" } else { "happy" }));
         store.set_checks(model(store.get_checks(), checks));
         store.set_check_summary(s(if running { "checking…" } else if ok { "all good" } else if !net.connected { "needs a network" } else { "" }));
         store.set_busy(running);
@@ -643,6 +647,10 @@ impl App {
         let (keys, text) = TIPS[(stage.max(1) as usize - 1) % TIPS.len()];
         store.set_tip_keys(model(store.get_tip_keys(), keys.iter().map(|k| s(*k)).collect()));
         store.set_tip_text(s(text));
+        // The worker waits for a lost connection with this message
+        // (lifecycle/cybexos/installer_network.py); Wiz checks meanwhile.
+        let waiting = state.phase == "installing" && state.message.starts_with("Connection interrupted");
+        store.set_install_pose(s(if waiting { "thinking" } else { "working" }));
         self.elapsed_base = (state.elapsed, Instant::now());
         store.set_elapsed(s(format_elapsed(state.elapsed)));
         if let Some(result) = &state.result {
@@ -651,10 +659,11 @@ impl App {
             store.set_done_host(s(&result.hostname));
             store.set_done_encrypted(result.encrypted);
         }
-        // Stopped before any disk change, or failed after it.
+        // Stopped before any disk change, or failed after it. Wiz waits for
+        // you when the fix is yours, and is sorry when something failed.
         let error = state.error.clone();
-        let (kicker, title, body, check_label, check_value, steps, action) = if state.phase == "cancelled" {
-            ("STOPPED · NO DISK WAS CHANGED", "Installation cancelled.", "Nothing was written to any disk. Start again whenever you are ready.".to_string(), "", String::new(), vec![], "retry")
+        let (kicker, title, body, check_label, check_value, steps, action, pose) = if state.phase == "cancelled" {
+            ("STOPPED · NO DISK WAS CHANGED", "Installation cancelled.", "Nothing was written to any disk. Start again whenever you are ready.".to_string(), "", String::new(), vec![], "retry", "needs-input")
         } else if !state.firmware.uefi {
             (
                 "STOPPED BEFORE ANY DISK CHANGE",
@@ -665,6 +674,7 @@ impl App {
                 vec!["Restart and open the boot menu (often F12, F11 or Esc).", "Choose the UEFI entry for this USB drive or network boot.", "If there is none, enable UEFI boot in the firmware settings."],
                 // A BIOS boot cannot request the firmware settings screen.
                 "restart",
+                "needs-input",
             )
         } else if state.firmware.secure_boot || error.contains("Secure Boot") {
             (
@@ -675,9 +685,10 @@ impl App {
                 "Enabled".to_string(),
                 vec!["Restart into your firmware settings with the button below.", "Turn Secure Boot off, then save and exit.", "Start the Cybex OS installer again."],
                 "firmware",
+                "needs-input",
             )
         } else {
-            ("STOPPED BEFORE ANY DISK CHANGE", "The installer could not continue.", format!("{} None of your disks have been touched.", error.trim_end_matches('.')), "", String::new(), vec!["Open the details to see what happened.", "Fix the cause, for example the network connection.", "Choose Try again."], "retry")
+            ("STOPPED BEFORE ANY DISK CHANGE", "The installer could not continue.", format!("{}. None of your disks have been touched.", error.trim_end_matches('.')), "", String::new(), vec!["Open the details to see what happened.", "Fix the cause, for example the network connection.", "Choose Try again."], "retry", "sorry")
         };
         store.set_stop_kicker(s(kicker));
         store.set_stop_title(s(title));
@@ -686,6 +697,7 @@ impl App {
         store.set_stop_check_value(s(check_value));
         store.set_stop_steps(model(store.get_stop_steps(), steps.into_iter().map(s).collect()));
         store.set_stop_action(s(action));
+        store.set_stop_pose(s(pose));
         store.set_fail_title(s("Installation stopped."));
         store.set_fail_message(s(if error.is_empty() { "The installation worker stopped." } else { error.as_str() }));
         store.set_fail_touched(state.disk_touched);
@@ -1082,6 +1094,7 @@ fn bind(app: &Shared, window: &InstallerWindow) {
         }
         this.update_account(&store, "", "");
     });
+    store.on_wiz_art(|name, ppu, size| crate::wiz::art(&name, ppu, size));
     let filter_store = window.as_weak();
     store.on_filter_name(move |text, caret| {
         let _ = &filter_store;

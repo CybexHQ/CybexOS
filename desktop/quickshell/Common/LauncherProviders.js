@@ -786,6 +786,47 @@ function blendRows(appRows, actions, query) {
     return apps.concat(blendedActionRows(actions, query, BLEND_LIMIT));
 }
 
+// ---- Ask Wiz -------------------------------------------------------------
+// A plain Apps query that matches nothing is offered to the assistant as a
+// question: one row, never under a prefix or in a prompt, which keep their
+// own empty states. It is offered only while the assistant can take a
+// question now: installed, its service connected, no turn running, and not
+// put away for game mode. Signed out still counts; the question then waits in
+// the assistant's box behind its sign-in prompt.
+var ASK_PREVIEW_LIMIT = 200;
+
+function askRows(query, assistant) {
+    var question = String(query || "").trim();
+    var state = assistant || {};
+    if (question === "" || !state.available || !state.connected || state.busy || state.away)
+        return [];
+    return [{
+        providerId: "assistant",
+        kind: "ask",
+        title: "Ask Wiz",
+        // The quoted line under the title. The question goes as typed.
+        subtitle: oneLine(question).slice(0, ASK_PREVIEW_LIMIT),
+        question: question,
+        highlight: false
+    }];
+}
+
+// How the launcher's question reaches the assistant once the launcher has
+// closed. "send" asks it as Super+I, typing and Enter would; without a
+// signed-in agent the assistant itself keeps it in its box behind the
+// sign-in prompt. "draft" leaves it in the box to send by hand: a screenshot
+// attached there would otherwise go along unasked, and a service that
+// stopped, or a turn that started, in the meantime cannot take it now.
+function askHandoff(question, assistant) {
+    var text = String(question || "").trim();
+    var state = assistant || {};
+    if (text === "" || !state.available)
+        return { mode: "none", text: "" };
+    if (!state.connected || state.busy || state.screenAttached || state.capturing)
+        return { mode: "draft", text: text };
+    return { mode: "send", text: text };
+}
+
 // ---- Argument mode -----------------------------------------------------
 // A web address for a web app: http or https, a host, no credentials and no
 // whitespace or control characters. A bare host gets https://. The helper
@@ -1036,6 +1077,9 @@ var exported = {
     actionRows: actionRows,
     blendedActionRows: blendedActionRows,
     blendRows: blendRows,
+    ASK_PREVIEW_LIMIT: ASK_PREVIEW_LIMIT,
+    askRows: askRows,
+    askHandoff: askHandoff,
     webUrlArgument: webUrlArgument,
     gitUrlArgument: gitUrlArgument,
     validateArgument: validateArgument,

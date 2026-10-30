@@ -1,0 +1,251 @@
+// Wiz, the Cybex OS Assistant's character (docs/assistant.md), keeps the
+// system check, the installation and its outcome company. He never speaks
+// here, and stays off the disk, account and review screens and out of the
+// sheets: the erase warning keeps full attention.
+//
+// Slint's software renderer moves, fades and swaps pictures but neither
+// rotates nor scales them, and it rasterises an SVG again on every repaint.
+// So scripts/export-wiz cuts each pose into a few pictures (assets/wiz), from
+// the desktop's rig, and src/wiz.rs draws each once at its physical size. This
+// file only moves and swaps them, in whole frames on the pixel grid, 25 a
+// second while something moves. Only thinking and working loop. The other
+// poses hold still: a blink every few seconds, a waiting question pulses three
+// times and then every 8 s, and a finished installation nods and sparkles
+// once. Under a sheet or the reconnecting screen every pose holds still.
+//
+// His frame is the rig's WizRig.STILL_BOX, [-8, -12, 136, 132] in rig units,
+// with his feet on the ground at rig y 110. Motion follows the rig's ops().
+
+import { Store, WizArt } from "store.slint";
+
+// One of his pictures, drawn 1:1 and placed by its centre in the rig's frame.
+component Art inherits Image {
+    in property <string> name;
+    in property <float> ppu;       // physical pixels per rig unit
+    in property <float> size: 1;   // about its centre
+    in property <length> dx;
+    in property <length> dy;
+    property <WizArt> art: Store.wiz-art(root.name, root.ppu, root.size);
+    source: root.art.image;
+    width: root.art.image.width * 1phx;
+    height: root.art.image.height * 1phx;
+    x: root.art.x * 1phx - self.width / 2 + root.dx;
+    y: root.art.y * 1phx - self.height / 2 + root.dy;
+}
+
+export component Wiz inherits Rectangle {
+    // thinking, working, needs-input, happy, sorry, or finished: a nod and a
+    // sparkle, then happy.
+    in property <string> pose: "happy";
+    // From his top edge to his feet: screens stand him on a card with it.
+    out property <length> feet: 122 * root.unit;
+    width: 136px;
+    height: root.width * 132 / 136;
+
+    property <length> unit: root.width / 136;
+    property <float> ppu: root.unit / 1phx;
+    property <string> look: root.pose == "finished" ? "happy" : root.pose;
+    property <bool> animated: Store.sheet == "" && Store.connected;
+    property <bool> loops: root.pose == "thinking" || root.pose == "working";
+
+    // Rig units to whole physical pixels: an offset that rounds the same never
+    // repaints.
+    pure function px(units: float) -> length {
+        return round(units * root.ppu) * 1phx;
+    }
+
+    // ---- frames ------------------------------------------------------------
+    // The frame counter runs only while he loops or something plays once: a
+    // blink (4 frames), the waiting pulse (28) or the finished cheer (24).
+    property <int> tick;
+    property <float> t: root.tick * 0.04;   // seconds
+    property <int> blink-at: -100;
+    property <int> blinks;
+    property <int> pulse-at: -100;
+    property <int> pulses;
+    property <int> cheer-at: -100;
+    property <int> since-blink: root.tick - root.blink-at;
+    property <int> since-pulse: root.tick - root.pulse-at;
+    property <int> since-cheer: root.tick - root.cheer-at;
+
+    Timer {
+        interval: 40ms;
+        running: root.animated && (root.loops || root.since-blink < 4 || root.since-pulse < 28 || root.since-cheer < 24);
+        triggered => {
+            root.tick += 1;
+        }
+    }
+
+    // A blink every 3.4 to 5 s; happy eyes are closed arcs already.
+    Timer {
+        interval: 3400ms + Math.mod(root.blinks * 700, 1700) * 1ms;
+        running: root.animated && root.look != "happy";
+        triggered => {
+            root.blink-at = root.tick;
+            root.blinks += 1;
+        }
+    }
+
+    // Three pulses as the question arrives, then a reminder every 8 s.
+    Timer {
+        interval: root.pulses < 3 ? 1111ms : 8s;
+        running: root.animated && root.pose == "needs-input";
+        triggered => {
+            root.pulse-at = root.tick;
+            root.pulses += 1;
+        }
+    }
+
+    init => {
+        if (root.pose == "finished") {
+            root.cheer-at = root.tick;
+        }
+    }
+    changed pose => {
+        root.pulses = 0;
+        if (root.pose == "finished") {
+            root.cheer-at = root.tick;
+        }
+    }
+
+    // ---- what the frame shows --------------------------------------------------
+    // Breathing while he loops, the hat a moment after the body. The rig's
+    // breath is under a pixel; one unit keeps it on the pixel grid.
+    property <length> bob: root.loops ? root.px(sin(root.t * 2.1rad)) : 0;
+    property <length> hat-bob: root.loops ? root.px(sin(root.t * 2.1rad - 0.7rad)) : 0;
+    // A blink closes and opens the lids over 160 ms.
+    property <string> lids: root.look == "happy" ? ""
+        : root.since-blink == 0 || root.since-blink == 3 ? "-half"
+        : root.since-blink == 1 || root.since-blink == 2 ? "-shut" : "";
+    // Finished: two nods after 150 ms, the body dipping a little, the eyes
+    // more, the hat most.
+    property <float> nod: root.since-cheer >= 4 && root.since-cheer < 24 ? sin(Math.mod(root.since-cheer - 4, 10) * 18deg) : 0;
+    // Thinking: four runes circle the hat, behind it on the far side.
+    pure function orbit(q: int) -> angle {
+        return root.t * 1.25rad + q * 90deg + 0.4rad;
+    }
+    // Working: the spell flickers in steps of 120 ms and its ring turns.
+    property <int> step: floor(root.tick / 3.0);
+
+    // Rig (0, 0), for the pictures' centres.
+    Rectangle {
+        x: 8 * root.unit;
+        y: 12 * root.unit;
+        width: 0;
+        height: 0;
+
+        Art {
+            name: root.look + "-body";
+            ppu: root.ppu;
+            dy: root.bob + root.px(0.8 * root.nod);
+        }
+
+        Art {
+            name: root.look + "-eyes" + root.lids;
+            ppu: root.ppu;
+            dy: root.bob + root.px(2.2 * root.nod);
+        }
+
+        if root.pose == "working": Rectangle {
+            width: 0;
+            height: 0;
+            Art {
+                name: "working-glow";
+                ppu: root.ppu;
+                size: [1, 1.07, 0.97, 1.1, 0.95, 1.04][Math.mod(root.step, 6)];
+                dy: root.bob;
+            }
+
+            Art {
+                name: "working-ring" + Math.mod(root.step, 3);
+                ppu: root.ppu;
+                dy: root.bob;
+            }
+
+            Art {
+                name: "working-core";
+                ppu: root.ppu;
+                size: [1, 0.95, 1.08, 0.98, 1.06][Math.mod(root.step, 5)];
+                dy: root.bob;
+            }
+
+            // Motes rise off the spell and fade, a quarter of a rise apart.
+            for j in 4: Art {
+                property <float> rise: Math.mod(root.t * 0.8 + j * 0.25, 1);
+                name: "working-mote";
+                ppu: root.ppu;
+                dx: root.px(sin((j * 2.3 + root.t * 2.5) * 1rad) * 3.5 * (1 - 0.3 * self.rise));
+                dy: root.bob + root.px(-15 * self.rise);
+                opacity: 1 - self.rise;
+            }
+        }
+
+        if root.pose == "thinking": Rectangle {
+            width: 0;
+            height: 0;
+            for q in 4: Art {
+                property <angle> at: root.orbit(q);
+                name: "thinking-rune" + q;
+                ppu: root.ppu;
+                size: round((0.82 + 0.22 * sin(self.at)) * 10) / 10.0;
+                dx: root.px(31 * cos(self.at));
+                dy: root.hat-bob + root.px(6.5 * sin(self.at) + 1.3 * sin(root.t * 2.2rad + q * 1rad));
+                opacity: 0.5;
+                visible: sin(self.at) <= 0;
+            }
+        }
+
+        Art {
+            name: root.look + "-hat";
+            ppu: root.ppu;
+            dy: root.hat-bob + root.px(3.4 * root.nod);
+        }
+
+        if root.pose == "thinking": Rectangle {
+            width: 0;
+            height: 0;
+            for q in 4: Art {
+                property <angle> at: root.orbit(q);
+                name: "thinking-rune" + q;
+                ppu: root.ppu;
+                size: round((0.82 + 0.22 * sin(self.at)) * 10) / 10.0;
+                dx: root.px(31 * cos(self.at));
+                dy: root.hat-bob + root.px(6.5 * sin(self.at) + 1.3 * sin(root.t * 2.2rad + q * 1rad));
+                visible: sin(self.at) > 0;
+            }
+        }
+
+        // Finished: each sparkle grows and shrinks in 600 ms, in turn.
+        if root.pose == "finished" && root.since-cheer < 24: Rectangle {
+            width: 0;
+            height: 0;
+            for delay[z] in [0, 0.1, 0.2, 0.3, 0.06]: Art {
+                property <float> phase: (root.since-cheer * 0.04 - delay) / 0.6;
+                name: "happy-sparkle" + z;
+                ppu: root.ppu;
+                size: self.phase > 0 && self.phase < 1 ? round(sin(self.phase * 180deg) * 6) / 6.0 : 0;
+                visible: self.size > 0;
+            }
+        }
+
+        // A question waiting: the amber pip, and a ring widening off it.
+        if root.pose == "needs-input": Rectangle {
+            width: 0;
+            height: 0;
+            Art {
+                property <float> spread: root.since-pulse / 28.0;
+                name: "needs-input-ring";
+                ppu: root.ppu;
+                // The rig's ring grows from 3 to 9 units; the picture's is 5.4.
+                size: round((3 + 6 * self.spread) / 5.4 * 8) / 8.0;
+                opacity: 0.8 * (1 - self.spread);
+                visible: root.since-pulse < 28;
+            }
+
+            Art {
+                name: "needs-input-pip";
+                ppu: root.ppu;
+            }
+        }
+    }
+}

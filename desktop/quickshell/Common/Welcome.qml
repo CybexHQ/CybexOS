@@ -85,9 +85,22 @@ Singleton {
     // Web apps for the shortcut editor's "A web app" choice.
     property var webapps: []
     property string webappsError: ""
+    // ---- One Wiz at a time -----------------------------------------------------
+    // While the full-screen guide shows, its own Wiz is the only one: the
+    // assistant's stays hidden (AssistantWindow). WelcomeWindow keeps this
+    // current, its hand-off included.
+    property bool coversAssistant: false
+    // "Start using Cybex OS" hands Wiz over to his corner: "flying" while the
+    // guide's Wiz hops from Ready to the assistant's resting place, "landed"
+    // for the moment the assistant's own Wiz takes over there.
+    property string handOff: ""
     signal present()
     // WelcomeWindow closes these through Hyprland and stays up until they are gone.
     signal closeWindows(var addresses)
+    // Finishing: WelcomeWindow plays the hand-off, if it can, before the guide goes.
+    signal finishing()
+    // The assistant's Wiz is back in his corner after the hand-off, to land there.
+    signal assistantArrived()
     onAsideChanged: {
         if (aside) return;
         connectAside = "";
@@ -231,6 +244,11 @@ Singleton {
     function finish() {
         closeConnectWindows(true);
         changed(Object.assign({}, document, {status: "completed"}));
+        // Hello promised that Wiz lives in the corner afterwards: he goes
+        // there, on this display unless he already has a place.
+        if (Assistant.available)
+            Assistant.show(Settings.assistantScreen === "" ? screenName : "");
+        finishing();
         open = false;
         aside = false;
         closeSheet();
@@ -238,6 +256,7 @@ Singleton {
     }
     function status() {
         return JSON.stringify({open: open, aside: aside, sheet: sheet, leaving: leaving, status: document.status, step: step,
+            coversAssistant: coversAssistant, handOff: handOff,
             steps: steps, checklist: checklist, connectWindows: connectWindows.map(window => window.address), connect: {
                 password: !passwordAvailable ? "unavailable" : passwordSignedIn ? "ready" : passwordOpened ? "opened" : "available",
                 assistant: !Assistant.available ? "unavailable" : Assistant.agentReady ? "ready"

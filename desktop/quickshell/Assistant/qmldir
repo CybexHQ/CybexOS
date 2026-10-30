@@ -3,7 +3,6 @@
 # Assistant/*.qml type must be listed. qmldir.test.cjs enforces that.
 AssistantApproval AssistantApproval.qml
 AssistantButton AssistantButton.qml
-AssistantCharacter AssistantCharacter.qml
 AssistantComposer AssistantComposer.qml
 AssistantReply AssistantReply.qml
 AssistantSetup AssistantSetup.qml

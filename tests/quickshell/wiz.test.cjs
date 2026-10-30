@@ -216,23 +216,20 @@ test("carried, he reacts only while live and always comes back to rest", () => {
         assert.ok(off.includes(step), step);
 });
 
-test("the character loads one drawing and stills Wiz with reduced motion or nobody there", () => {
-    const character = read("Assistant/AssistantCharacter.qml");
-    assert.match(character, /sourceComponent: root\.wiz \? wizDrawing : markDrawing/);
-    assert.match(character, /animated: !Theme\.reducedMotion && !Activity\.idle/);
-    assert.match(character, /running: mark\.working && !Theme\.reducedMotion/);
+test("Wiz is the only character and holds still with reduced motion or nobody there", () => {
+    assert.match(read("Assistant/Wiz.qml"), /property bool animated: !Theme\.reducedMotion && !Activity\.idle/);
     assert.match(read("Assistant/qmldir"), /^Wiz Wiz\.qml$/m);
+    assert.doesNotMatch(read("Assistant/qmldir"), /AssistantCharacter/);
 
     const window = read("AssistantWindow.qml");
     assert.match(window, /readonly property real size: Assistant\.characterSize/);
-    assert.match(window, /wiz: Settings\.assistantCharacter !== "mark"/);
+    assert.match(window, /Wiz \{\n\s*id: character/);
     assert.match(window, /pose: Assistant\.pose/);
     assert.match(window, /recording: Assistant\.listening/);
     // Once per pointer move, both coordinates at once; Wiz swings himself.
     assert.match(window, /root\.dragY = [^\n]+\n\s*root\.dragPoint = Qt\.point\(root\.dragX, root\.dragY\);/);
     assert.match(window, /grab: Qt\.point\(root\.pressWindow\.x - root\.pressBubble\.x, root\.pressWindow\.y - root\.pressBubble\.y\)/);
-    assert.match(window, /rotation: root\.dragging && !Theme\.reducedMotion && !character\.wiz/);
+    assert.doesNotMatch(window, /rotation: root\.dragging/);
     assert.match(read("shell.qml"), /size: Assistant\.characterSize/);
-    assert.match(read("Common/Assistant.qml"),
-        /readonly property real characterSize: Theme\.scaled\(Settings\.assistantCharacter === "mark" \? 64 : 88\)/);
+    assert.match(read("Common/Assistant.qml"), /readonly property real characterSize: Theme\.scaled\(88\)/);
 });

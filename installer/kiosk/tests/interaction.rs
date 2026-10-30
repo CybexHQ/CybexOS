@@ -8,12 +8,22 @@ use cybexos_installer::{
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Key, Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, Model, PhysicalSize};
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, time::Duration};
+
+thread_local! {
+    // Slint's clock stands still unless a test advances it, so timers and
+    // Wiz's motion run only when a test asks for them.
+    static CLOCK: Cell<Duration> = const { Cell::new(Duration::ZERO) };
+}
 
 struct Headless(Rc<MinimalSoftwareWindow>);
 impl Platform for Headless {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.0.clone())
+    }
+
+    fn duration_since_start(&self) -> Duration {
+        CLOCK.with(Cell::get)
     }
 }
 
@@ -266,6 +276,88 @@ fn network_panel_stays_available_while_installation_waits_for_reconnection() {
     draw(&surface);
     assert_eq!(store.get_sheet(), "wifi", "a background snapshot closed network recovery");
     assert_eq!(store.get_stages().row_data(3).unwrap().detail, state.message);
+    assert_eq!(store.get_install_pose(), "thinking", "Wiz should check while the network is away");
+    state.message = "Connection restored. Resuming installation…".into();
+    app.borrow_mut().apply_state(state);
+    assert_eq!(store.get_install_pose(), "working");
+}
+
+/// Frames drawn while Slint's clock runs `ms` milliseconds ahead.
+fn frames_over(surface: &MinimalSoftwareWindow, ms: u64) -> usize {
+    let mut frames = 0;
+    let mut pixels = vec![slint::Rgb8Pixel::default(); 1280 * 800];
+    for _ in 0..ms / 40 {
+        CLOCK.with(|clock| clock.set(clock.get() + Duration::from_millis(40)));
+        slint::platform::update_timers_and_animations();
+        surface.draw_if_needed(|renderer| {
+            frames += 1;
+            renderer.render(&mut pixels, 1280);
+        });
+    }
+    frames
+}
+
+#[test]
+fn wiz_moves_only_while_he_checks_or_works_and_never_under_a_sheet() {
+    use cybexos_installer::protocol::Disk;
+    let (ui, app, surface) = setup();
+    let store = ui.global::<Store>();
+    // Verifying the medium: the runes circle his hat, 25 frames a second.
+    app.borrow_mut().apply_state(State {
+        phase: "loading".into(),
+        ..State::default()
+    });
+    draw(&surface);
+    assert_eq!(store.get_check_pose(), "thinking");
+    assert!(frames_over(&surface, 1000) >= 20, "thinking should loop");
+    // A sheet over him holds him still; only the 1 Hz activity tick repaints.
+    store.invoke_open_sheet("keyboard".into());
+    draw(&surface);
+    assert!(frames_over(&surface, 2000) <= 3, "Wiz moved under a sheet");
+    store.invoke_close_sheet();
+    draw(&surface);
+    // Every check passed: happy, and still, with no blinks.
+    let mut ready = State {
+        phase: "setup".into(),
+        memory: 16 << 30,
+        disks: vec![Disk {
+            path: "/dev/vda".into(),
+            available: true,
+            ..Disk::default()
+        }],
+        ..State::default()
+    };
+    ready.firmware.uefi = true;
+    ready.network.connected = true;
+    app.borrow_mut().apply_state(ready.clone());
+    draw(&surface);
+    assert_eq!(store.get_check_pose(), "happy");
+    assert_eq!(frames_over(&surface, 10_000), 0, "a happy Wiz should hold still");
+    // Offline is your move: blinks and a few pulses, not a loop.
+    ready.network.connected = false;
+    app.borrow_mut().apply_state(ready);
+    draw(&surface);
+    assert_eq!(store.get_check_pose(), "needs-input");
+    let waiting = frames_over(&surface, 20_000);
+    assert!(waiting > 0 && waiting < 200, "needs-input drew {waiting} frames in 20 s");
+    // Installing: the spell works on, sorry after a failure.
+    app.borrow_mut().apply_state(State {
+        phase: "installing".into(),
+        stage: 2,
+        ..State::default()
+    });
+    draw(&surface);
+    assert_eq!(store.get_install_pose(), "working");
+    assert!(frames_over(&surface, 1000) >= 20, "working should loop");
+    let mut failed = State {
+        phase: "error".into(),
+        error: "The installation download service could not be reached.".into(),
+        ..State::default()
+    };
+    failed.firmware.uefi = true;
+    app.borrow_mut().apply_state(failed);
+    assert_eq!(store.get_screen(), "stopped");
+    assert_eq!(store.get_stop_pose(), "sorry");
 }
 
 #[test]

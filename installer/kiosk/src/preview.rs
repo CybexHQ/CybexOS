@@ -5,11 +5,15 @@
 //!
 //! `static.json` comes from `cybexos-installerd --dump-static`. The renders use
 //! the real controller, Slint UI and software renderer with fixture snapshots
-//! at a fixed moment; nothing contacts the daemon. Compare them with the design
-//! reference in installer/ui-reference/.
+//! at a fixed moment; nothing contacts the daemon. Slint's clock stands still,
+//! so Wiz is at rest, except in the renders named `…-<ms>ms`, taken that long
+//! after the screen appeared. Compare them with the design reference in
+//! installer/ui-reference/.
 
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::time::Duration;
 
 use cybexos_installer::client::Client;
 use cybexos_installer::protocol::{parse, Message};
@@ -25,11 +29,16 @@ const MOMENT: i64 = 1_792_782_000;
 
 struct Headless {
     window: Rc<MinimalSoftwareWindow>,
+    clock: Rc<Cell<Duration>>,
 }
 
 impl Platform for Headless {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.window.clone())
+    }
+
+    fn duration_since_start(&self) -> Duration {
+        self.clock.get()
     }
 }
 
@@ -147,6 +156,24 @@ fn scenarios() -> Vec<(&'static str, Value, Setup)> {
         }),
         ("20-apps", json!({"phase": "review"}), |store| store.invoke_open_sheet(SharedString::from("apps"))),
         ("21-reconnecting", json!({}), |store| store.set_connected(false)),
+        ("22-installing-waiting", json!({"phase": "installing", "stage": 4, "elapsed": 754, "diskTouched": true,
+            "message": "Connection interrupted. Reconnect Ethernet or Wi-Fi; installation will resume automatically.",
+            "network": {"connected": false, "kind": "", "address": "", "ethernetCable": false}}), none),
+        ("23-stopped-failure", json!({"phase": "error",
+            "error": "The installation download service could not be reached. Check the internet connection, proxy and system clock, then retry."}), none),
+    ]
+}
+
+/// Wiz in motion: a screen this many milliseconds after it appeared.
+fn moments() -> Vec<(&'static str, Value, u64)> {
+    vec![
+        ("24-welcome-checking", json!({"phase": "loading", "message": "Checking this installation medium…", "disks": []}), 1200),
+        ("25-welcome-offline", json!({"phase": "preflight", "error": "DNS could not resolve cache.nixos.org. Open the network menu and check the DNS provider and any VPN DNS settings, then retry. No disk has been erased.",
+            "network": {"connected": false, "ethernetCable": false, "kind": "", "address": ""}, "disks": []}), 1440),
+        ("26-installing", json!({"phase": "installing", "stage": 4, "elapsed": 754, "diskTouched": true,
+            "message": "Building and downloading packages"}), 600),
+        ("27-done", json!({"phase": "complete", "stage": 6, "diskTouched": true,
+            "result": {"username": "ada", "hostname": "ada-cybexos", "encrypted": true}}), 440),
     ]
 }
 
@@ -168,7 +195,8 @@ fn main() {
     let only: Vec<&String> = args.iter().skip(4).collect();
 
     let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-    slint::platform::set_platform(Box::new(Headless { window: window.clone() })).expect("headless platform");
+    let clock = Rc::new(Cell::new(Duration::ZERO));
+    slint::platform::set_platform(Box::new(Headless { window: window.clone(), clock: clock.clone() })).expect("headless platform");
     window.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: scale });
     window.set_size(PhysicalSize::new(width, height));
     let ui = InstallerWindow::new().expect("window");
@@ -189,15 +217,39 @@ fn main() {
         setup(&store);
         render(&window, width, height, &out.join(format!("{name}.png")));
     }
+
+    for (name, patch, ms) in moments() {
+        if !only.is_empty() && !only.iter().any(|o| name.contains(o.as_str())) {
+            continue;
+        }
+        // A fresh screen, so its Wiz starts from his first frame.
+        let store = ui.global::<Store>();
+        store.set_sheet(SharedString::from(""));
+        store.set_screen(SharedString::from(""));
+        draw(&window, width, height);
+        App::message(&app, state(patch));
+        store.set_connected(true);
+        draw(&window, width, height);
+        for _ in 0..ms / 40 {
+            clock.set(clock.get() + Duration::from_millis(40));
+            slint::platform::update_timers_and_animations();
+        }
+        render(&window, width, height, &out.join(format!("{name}-{ms}ms.png")));
+    }
 }
 
-fn render(window: &MinimalSoftwareWindow, width: u32, height: u32, path: &Path) {
+fn draw(window: &MinimalSoftwareWindow, width: u32, height: u32) -> Vec<Rgb8Pixel> {
     window.request_redraw();
     slint::platform::update_timers_and_animations();
     let mut buffer = vec![Rgb8Pixel::default(); (width * height) as usize];
     window.draw_if_needed(|renderer| {
         renderer.render(&mut buffer, width as usize);
     });
+    buffer
+}
+
+fn render(window: &MinimalSoftwareWindow, width: u32, height: u32, path: &Path) {
+    let buffer = draw(window, width, height);
     let bytes: Vec<u8> = buffer.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
     image::save_buffer(path, &bytes, width, height, image::ColorType::Rgb8).expect("write png");
     println!("{}", path.display());

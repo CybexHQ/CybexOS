@@ -4,9 +4,10 @@ import "../Common"
 import "../Common/UpdatesHelpers.js" as Helpers
 import "../Popovers" as Popovers
 
-// The Software Update app's content: the prepared-update review, or one
-// centred status with the next step. Technical wording stays behind
-// "Show Details"; the updater's own messages are never the headline.
+// The Software Update app's content: the prepared-update review, one
+// centred status with the next step, or what's new in a kept release.
+// Technical wording stays behind "Show Details"; the updater's own messages
+// are never the headline.
 Item {
     id: root
 
@@ -24,8 +25,45 @@ Item {
     readonly property var notes: Helpers.noteItems(vendor.notes || "", 5)
     readonly property bool bothAvailable: service.sourcesLoaded && service.sources.upstream.state === "available"
         && vendor.state === "available"
+    // Up to date on a release the person kept, with its What's New.
+    readonly property var kept: page === "current" ? service.kept : null
+    readonly property bool whatsNew: service.whatsNew !== null
 
     onPageChanged: problemDetails = false
+
+    // Wiz (UpdatesHelpers.statusPose). A kept release is finished: he nods
+    // and sparkles once as the Kept page, or What's New, comes into view,
+    // then settles into happy.
+    readonly property var wiz: Helpers.statusPose(whatsNew ? "whats-new" : page, problem,
+        Helpers.confirmFailed(deployment.state, deployment.request), kept !== null)
+    readonly property string celebration: !service.appOpen ? ""
+        : whatsNew ? "whats-new " + service.whatsNew.version
+        : kept ? "kept " + kept.version : ""
+    property string celebrated: ""
+    property bool celebrating: false
+    readonly property string pose: wiz.pose === "finished" && !celebrating ? "happy" : wiz.pose
+
+    function celebrateOnce() {
+        if (celebration !== "" && celebration !== celebrated) celebrate.restart();
+        else celebrate.stop();
+    }
+    onCelebrationChanged: celebrateOnce()
+    Component.onCompleted: celebrateOnce()
+    // The window maps first, so the nod is seen.
+    Timer {
+        id: celebrate
+        interval: 300
+        onTriggered: {
+            root.celebrated = root.celebration;
+            root.celebrating = true;
+            settle.restart();
+        }
+    }
+    Timer {
+        id: settle
+        interval: 1800
+        onTriggered: root.celebrating = false
+    }
 
     function checked() {
         if (!service.checkedAt)
@@ -50,7 +88,8 @@ Item {
         case "checking":
             return { tone: "neutral", busy: true, title: I18n.tr("Checking for updates…"), body: "" };
         case "current":
-            return { tone: "ok", busy: false, title: I18n.tr("Your system is up to date"),
+            return { tone: "ok", busy: false,
+                title: kept ? I18n.format("You're on Cybex OS %1", [kept.version]) : I18n.tr("Your system is up to date"),
                 body: (deployment.state === "done" && deployment.changeKind === "update"
                     ? I18n.tr("The last update was installed and passed its checks.") + "\n" : "") + checked() };
         case "available":
@@ -117,33 +156,28 @@ Item {
     }
 
     readonly property var current: info()
-    // Icons by page, then by problem; kept apart from the copy above.
-    readonly property var pageIcons: ({
-        checking: "refresh", current: "circle-check", available: "download", preparing: "download",
-        installing: "loader-2", restart: "refresh", finishing: "rosette-discount-check",
-        recovering: "arrow-back-up", unavailable: "info-circle"
-    })
-    readonly property var problemIcons: ({
-        status: "alert-triangle", failed: "alert-triangle", interrupted: "alert-triangle", stale: "refresh",
-        "rolled-back": "arrow-back-up", "recovery-failed": "alert-triangle", check: "cloud-off"
-    })
     readonly property var actionIcons: ({ available: "download" })
-    readonly property string icon: page === "confirm"
-        ? (Helpers.confirmFailed(deployment.state, deployment.request) ? "alert-triangle" : "rosette-discount-check")
-        : page === "problem" ? problemIcons[problem] || "alert-triangle" : pageIcons[page] || "info-circle"
 
     ReadyPage {
         anchors.fill: parent
-        visible: root.page === "ready"
+        visible: root.page === "ready" && !root.whatsNew
         service: root.service
+    }
+
+    WhatsNewPage {
+        anchors.fill: parent
+        visible: root.whatsNew
+        release: root.service.whatsNew || ({ version: "", notes: "", components: [] })
+        pose: root.pose
+        onBack: root.service.closeWhatsNew()
     }
 
     StatusPage {
         id: status
         anchors.fill: parent
-        visible: root.page !== "ready"
-        glyph: root.icon
-        tone: root.current.tone
+        visible: root.page !== "ready" && !root.whatsNew
+        pose: root.pose
+        unread: root.wiz.unread
         busy: root.current.busy
         title: root.current.title
         body: root.current.body
@@ -489,6 +523,7 @@ Item {
                 objectName: "updateCheck"
                 visible: root.page === "current" || (root.page === "problem" && root.problem === "check")
                 primary: root.page === "problem"
+                tone: root.current.tone
                 text: root.page === "current" ? I18n.tr("Check Now") : I18n.tr("Try Again")
                 enabled: !root.service.busy
                 onTriggered: { root.service.refreshStatus(); root.service.check(true); }
@@ -498,6 +533,7 @@ Item {
                 visible: ["available", "restart", "confirm"].includes(root.page)
                     || (root.page === "problem" && ["failed", "interrupted", "stale", "rolled-back", "recovery-failed", "status"].includes(root.problem))
                 primary: true
+                tone: root.current.tone
                 glyph: root.actionIcons[root.page] || ""
                 enabled: !root.service.requestPending && (root.page === "restart" ? !root.service.runActive
                     : root.page === "confirm" ? root.service.actions.confirm
@@ -524,6 +560,14 @@ Item {
                     else if (root.problem === "status") root.service.refreshStatus();
                     else root.service.prepare();
                 }
+            }
+            UpdateButton {
+                objectName: "updatePrimary"
+                visible: root.kept !== null
+                primary: true
+                glyph: "sparkles"
+                text: I18n.tr("What's New")
+                onTriggered: root.service.showWhatsNew()
             }
         }
 
