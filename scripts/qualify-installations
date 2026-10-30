@@ -1322,8 +1322,9 @@ print(json.dumps(lock['nodes'][lock['nodes'][lock['root']]['inputs']['cybexos']]
 QA_SOURCE''').strip())
         milestones['installedSourceIdentity'] = check_installed_identity(identity, installed_identity, installed_source)
         installed_hardware = json.loads(vm.command('cybex hardware').strip())
-        if installed_hardware['release'] != live_hardware['release'] or installed_hardware['assessment']['blockers']:
-            raise RuntimeError('Installed hardware inventory differs from the ISO source or has blockers')
+        if (installed_hardware['release'] != {key: installed_identity[key] for key in ('version', 'revision', 'narHash', 'nixos') if key in installed_identity}
+                or installed_hardware['assessment']['blockers']):
+            raise RuntimeError('Installed hardware inventory differs from the checked installed source or has blockers')
         milestones['installedHardwareInventory'] = {'result': 'passed', 'kernel': installed_hardware['kernel'],
             'scope': 'virtual devices only; no physical qualification'}
         vm.command('cybexos-verify-encryption' if encrypted else '! cybexos-verify-encryption')
