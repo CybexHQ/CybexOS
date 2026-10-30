@@ -113,15 +113,6 @@ if ((${#files[@]} == 0)); then
   exit 1
 fi
 
-# qmllint 6.12.0 aborts on these files (exit 255, no diagnostics), and an
-# abort would discard the whole slice's results. They are linted one at a
-# time below, where an abort is reported but other findings still fail.
-aborting=(./Commons/Border.qml ./Commons/Style.qml)
-for abort in "${aborting[@]}"; do
-  files=("${files[@]/#$abort}")
-done
-mapfile -t -d '' files < <(printf '%s\0' "${files[@]}" | grep -zv '^$')
-
 # tests/run passes its own --jobs; standalone, up to eight slices.
 shards=${CYBEXOS_TESTS_RUN_JOBS:-}
 if [[ ! $shards =~ ^[1-9][0-9]*$ ]]; then
@@ -162,19 +153,6 @@ for pid in "${lint_pids[@]}"; do
 done
 lint_pids=()
 
-aborted=()
-for index in "${!aborting[@]}"; do
-  report=$work/aborting.$index.out
-  "$qmllint" -I "$native_build/qml" "${import_args[@]}" -I "$work/imports" -I . "${aborting[index]}" >"$report" 2>&1
-  code=$?
-  if ((code == 255)) && [[ ! -s $report ]]; then
-    aborted+=("${aborting[index]#./}")
-  else
-    ((code == 0)) || status=1
-    reports+=("$report")
-  fi
-done
-((${#aborted[@]})) && printf 'Note: qmllint aborted on %s; not linted with this Qt.\n' "${aborted[*]}" >&2
 output=$(cat -- "${reports[@]}")
 
 # "[category]" suffixes, most frequent first — e.g. "421 unqualified".

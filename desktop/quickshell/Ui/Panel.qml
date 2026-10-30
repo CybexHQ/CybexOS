@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Io
-import qs.Commons
 import qs.Commons as Commons
 
 // Base item for plugin popup widgets. Many first-party plugins expose a bar
