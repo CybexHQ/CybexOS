@@ -28,7 +28,10 @@ hl.config({
     natural_scroll = true,
     repeat_rate = 40,
     repeat_delay = 600,
-    numlock_by_default = true,
+    -- Forcing Num Lock while rebuilding a keymap can emit modifiers before
+    -- prebuilt Hyprland has replaced its keymap fd, disconnecting clients
+    -- when the active layout is removed. Do not force it during reloads.
+    numlock_by_default = false,
     touchpad = {
       natural_scroll = true,
       disable_while_typing = true,

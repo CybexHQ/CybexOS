@@ -33,6 +33,8 @@ class Audit:
                        (b'PATH', b'XKB_CONFIG_ROOT', b'QML_IMPORT_PATH', b'QT_PLUGIN_PATH', b'HYPRLAND_INSTANCE_SIGNATURE', b'WAYLAND_DISPLAY')]
         self.prefix += ['HOME=/home/cybexqa', 'XDG_RUNTIME_DIR=/run/user/1000',
                         'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus']
+        self.shell_identity = (pid, self.user(['systemctl', '--user', 'show', 'quickshell.service',
+                                              '-p', 'InvocationID', '--value']))
 
     def user(self, command, *, initial=False, input=None, timeout=30):
         prefix = self.prefix
@@ -118,7 +120,15 @@ class Audit:
                 pass
         assert pids == [pid], (pid, pids)
         assert self.user(['systemctl', '--user', 'is-active', 'quickshell.service']) == 'active'
-        return {'mainPID': pid, 'shellPIDs': pids}
+        invocation = self.user(['systemctl', '--user', 'show', 'quickshell.service', '-p', 'InvocationID', '--value'])
+        assert (pid, invocation) == self.shell_identity, ('Managed shell restarted during audit', self.shell_identity, (pid, invocation))
+        guard = Path(__file__).resolve().parent/'lib/quickshell-live'
+        try:
+            self.user(['bash', '-c', 'export QS_LIVE_READ_ONLY=1; source "$1" && qs_live_check_journal',
+                       'settings-audit', str(guard)])
+        except subprocess.CalledProcessError as error:
+            raise AssertionError(error.stderr[-6000:]) from error
+        return {'mainPID': pid, 'shellPIDs': pids, 'currentInvocationJournal': 'passed'}
 
     def prepare(self):
         self.guard()
@@ -140,6 +150,8 @@ class Audit:
         config.write_text(str(target)+'\n')
         os.chown(config,1000,100)
         self.user(['systemctl','--user','restart','quickshell.service'])
+        self.shell_identity = tuple(self.user(['systemctl', '--user', 'show', 'quickshell.service',
+                                               '-p', key, '--value']) for key in ('MainPID', 'InvocationID'))
         self.wait('Settings.loaded',timeout=60)
         return self.guard()
 
@@ -282,6 +294,13 @@ class Audit:
         self.wait('!SystemSettings.input.busy && !!shell.auditPage()?.editState && !shell.auditPage().editState.dirty && !SystemSettings.input.loading')
         return {'layouts':actual['layouts'], 'switch':changed, 'reorderAndDiscard':True, 'restored':True}
 
+    def keyboard_stability(self):
+        self.guard()
+        for _ in range(8):
+            self.keyboard_preferences()
+            self.guard()
+        return {'applySwitchRemoveCycles': 8, 'managedShellUnchanged': True}
+
     def workspaces(self):
         self.page('workspaces')
         self.wait('DesktopWorkspaces.ready')
@@ -330,7 +349,10 @@ class Audit:
         self.edit(True,key='reducedMotion')
         expected=self.evaluate('Settings.snapshot()')
         self.saved()
+        self.guard()
         self.user(['systemctl','--user','restart','quickshell.service'])
+        self.shell_identity = tuple(self.user(['systemctl', '--user', 'show', 'quickshell.service',
+                                               '-p', key, '--value']) for key in ('MainPID', 'InvocationID'))
         deadline=time.monotonic()+30
         while True:
             try:
@@ -994,10 +1016,10 @@ class Audit:
 
     def administration(self):
         def clients():return json.loads(self.user(['hyprctl','clients','-j']))
-        def new_window(before):
+        def new_window(before, *, allow_reuse=False):
             deadline=time.monotonic()+30
             while time.monotonic()<deadline:
-                windows=[c for c in clients() if c['address'] not in before and c.get('mapped')]
+                windows=[c for c in clients() if (allow_reuse or c['address'] not in before) and c.get('mapped') and c.get('visible',True)]
                 active=json.loads(self.user(['hyprctl','activewindow','-j']))
                 if any(c['address']==active.get('address') for c in windows):return windows
                 time.sleep(.2)
@@ -1038,7 +1060,7 @@ class Audit:
         before={c['address'] for c in clients()}
         self.evaluate('shell.auditWalk(shell.auditRow("Settings file","")).find(i=>/^SettingsAction_/.test(String(i))).triggered()')
         self.wait('!Settings.panelOpen')
-        close_windows(new_window(before))
+        close_windows(new_window(before,allow_reuse=True))
         self.page('wallpaper')
         self.evaluate('shell.auditItems().filter(i=>/^SettingsDisclosure_/.test(String(i))).forEach(i=>i.open=true)')
         original=self.evaluate('Settings.wallDir')
@@ -1049,7 +1071,7 @@ class Audit:
             before={c['address'] for c in clients()}
             self.action('Open')
             self.wait('!Settings.panelOpen')
-            close_windows(new_window(before))
+            close_windows(new_window(before,allow_reuse=True))
         finally:
             self.evaluate('Settings.wallDir='+json.dumps(original))
             self.saved();folder.rmdir()
@@ -1093,7 +1115,7 @@ class Audit:
         before={c['address'] for c in clients()}
         self.evaluate('Settings.openExternalUrl("https://example.com")')
         self.wait('!Settings.panelOpen')
-        close_windows(new_window(before))
+        close_windows(new_window(before,allow_reuse=True))
         return {'retentionDraftChoices':12,'discard':True,'healthRefresh':True,'resetAllUndo':True,
                 'welcome':True,'software':True,'accountsWindow':True,'passwordWindow':True,
                 'advancedAudioWindow':True,'advancedNetworkWindow':True,
@@ -1114,7 +1136,7 @@ class Audit:
         return not any(test['result']=='failed' for test in self.report['tests'])
 
 
-EXTENDED = ['input_preferences','keyboard_preferences','workspaces','default_applications',
+EXTENDED = ['input_preferences','keyboard_preferences','keyboard_stability','workspaces','default_applications',
             'display_trial','display_formats','network_trial','network_addresses','vpn',
             'idle_and_night_light','idle_restart_burst','notifications','audio','wallpaper','appearance_extras',
             'bar_layout','bar_background','widget_options','plugin_lifecycle','persistence_and_reset','backup']

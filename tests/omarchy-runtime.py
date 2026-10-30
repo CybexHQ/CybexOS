@@ -12,8 +12,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import time
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('settings_runtime', ROOT/'tests/settings-runtime.py')
@@ -21,13 +23,14 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def exercise(audit):
+def exercise(audit, mpv=None):
     fixtures = ROOT/'tests/omarchy-plugins'
     home = Path('/home/cybexqa')
     preferences = home/'.config/cybexos/plugins.json'
     original = preferences.read_bytes() if preferences.exists() else None
     installed = home/'.local/share/cybexos/plugins'
     ids = []
+    player = None
 
     def cli(*args):
         reply = audit.user(['cybex', 'plugin', *args], timeout=60)
@@ -109,6 +112,24 @@ def exercise(audit):
             audit.wait('OmarchyPlugins.serviceFor("omarchy.media") !== null')
             audit.wait('UserPlugins.widgetHosts.some(h => h.descriptor.id === "omarchy.media" && h.ready)')
             assert audit.evaluate(widget('omarchy.media')+'.mediaService !== null')
+            if mpv:
+                sample = base/'media-audit.wav'
+                with wave.open(str(sample), 'wb') as audio:
+                    audio.setnchannels(1)
+                    audio.setsampwidth(2)
+                    audio.setframerate(16000)
+                    audio.writeframes(bytes(16000*2*30))
+                own(base)
+                player = subprocess.Popen(audit.prefix + [str(mpv), '--no-video', '--ao=null',
+                    '--loop-file=inf', '--force-media-title=Cybex QA Media', str(sample)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                media = 'OmarchyPlugins.serviceFor("omarchy.media")'
+                audit.wait(media+'.hasMedia && '+media+'.title === "Cybex QA Media"')
+                audit.wait(widget('omarchy.media')+'.title === "Cybex QA Media"')
+                assert audit.evaluate(media+'.runAction("pause",false)')
+                audit.wait('!'+media+'.activePlayer.isPlaying')
+                assert audit.evaluate(media+'.runAction("play",false)')
+                audit.wait(media+'.activePlayer.isPlaying')
 
             cli('instance','audit.omarchy.spacer','one','--section','left','--width','30')
             cli('instance','audit.omarchy.spacer','two','--section','right','--width','40')
@@ -140,8 +161,11 @@ def exercise(audit):
                     'upstreamMediaServiceAndNativeWidget':True,'serviceInjection':True,
                     'panelOverlayMenuPayloads':True,'upstreamReplacementAndNativeRestore':True,
                     'installedPackagesUnmodified':True,
-                    'mediaPlayback':'not exercised without a real MPRIS player'}
+                    'mediaPlayback':'local mpv MPRIS title, pause and resume' if mpv else 'not exercised without a real MPRIS player'}
         finally:
+            if player is not None:
+                player.terminate()
+                player.wait(timeout=15)
             cli('bar','native')
             for plugin in reversed(ids):
                 cli('disable',plugin)
@@ -160,10 +184,11 @@ def exercise(audit):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report',type=Path,required=True)
+    parser.add_argument('--mpv',type=Path,help='A disposable mpv build with the MPRIS script enabled')
     args=parser.parse_args()
     audit=MODULE.Audit(args.report)
     audit.test('one managed shell before Omarchy runtime audit',audit.guard)
-    audit.test('Omarchy packages in installed Hyprland',lambda:exercise(audit))
+    audit.test('Omarchy packages in installed Hyprland',lambda:exercise(audit,args.mpv))
     audit.test('one managed shell after Omarchy runtime audit',audit.guard)
     raise SystemExit(1 if any(test['result']=='failed' for test in audit.report['tests']) else 0)
 
