@@ -985,6 +985,12 @@ def qualify_kernel_update(vm, encrypted):
     if vm.command('uname -r').strip() != previous:
         raise RuntimeError('Kernel rollback did not boot the previous kernel')
 
+    # Deliberate rollback quarantines this exact system too. Inspecting the
+    # observed kernel above establishes the expected recovery; explicitly
+    # authorize retry before restoring our known-good latest candidate.
+    retry = json.loads(vm.command('cybex update retry-failed ' + candidate['transaction']).strip())
+    if retry.get('retryAuthorized') != candidate['transaction']:
+        raise RuntimeError('Kernel qualification did not authorize the deliberate retry')
     # Rollback restored our baseline module. Leave subsequent tests on latest.
     edit_import(vm, 'qualification-kernel.nix')
     restored = stage(vm)
