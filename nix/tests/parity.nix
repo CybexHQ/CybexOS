@@ -158,6 +158,9 @@ assert generic.programs.hyprland.portalPackage.drvPath == pkgs.xdg-desktop-porta
 assert generic.programs.xwayland.package.drvPath == pkgs.xwayland.drvPath;
 assert generic.i18n.glibcLocales.drvPath == pkgs.glibcLocales.drvPath;
 assert !generic.programs.uwsm.enable;
+# Desktop requests run through `pkexec cybexos-request`; NixOS 26.11 made the
+# setuid wrapper opt-in, and the payload installs without proprietary apps.
+assert payload.security.wrappers.pkexec.enable && generic.security.wrappers.pkexec.enable;
 assert (builtins.fromJSON (medium "release.json")).nixos == "unstable";
 assert installed.updates.branch == "nixos-unstable";
 # All default profiles, including the live medium, must boot the same latest

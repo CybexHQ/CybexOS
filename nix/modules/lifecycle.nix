@@ -92,6 +92,10 @@ in {
     };
     # Both units validate the updater's own state as root and take no input.
     # An active local administrator session may start them without a prompt.
+    # Every privileged desktop request (updates, Software, Settings) runs
+    # through `pkexec cybexos-request`. NixOS 26.11 makes the setuid pkexec
+    # wrapper opt-in; without it those requests fail with ENOENT.
+    security.polkit.enablePkexecWrapper = true;
     security.polkit.extraConfig = ''
       polkit.addRule(function (action, subject) {
         if (action.id == "org.freedesktop.systemd1.manage-units" && action.lookup("verb") == "start"
