@@ -13,6 +13,9 @@ ModulesPage ModulesPage.qml
 NotificationsPage NotificationsPage.qml
 WorkspacesPage WorkspacesPage.qml
 PickerRow PickerRow.qml
+PointerBusyShape PointerBusyShape.qml
+PointerGallery PointerGallery.qml
+PointerTryPad PointerTryPad.qml
 PillRow PillRow.qml
 ResponsiveActionRow ResponsiveActionRow.qml
 SectionHeader SectionHeader.qml

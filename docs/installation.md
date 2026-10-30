@@ -263,8 +263,9 @@ does not enable their widgets. Saved widget choices remain personal. LAN
 discovery is enabled by default: Avahi browses and publishes local addresses,
 `.local` resolution is available, and the firewall admits the discovery and
 selected application ports. Bibata Modern Classic is the default pointer across
-the installed desktop, GTK/Qt/XWayland and SDDM; user cursor preferences remain
-overrides.
+the installed desktop, GTK/Qt/XWayland and SDDM. A person's own choice in
+Settings → Appearance → Pointer ([Settings](settings.md#pointer)) applies to their
+desktop from the next login on. The login screen keeps Bibata.
 
 The ISO retains its tested flake input sources. A fresh machine's first lock
 starts with that exact Nixpkgs revision and content hash, retaining

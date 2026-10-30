@@ -10,6 +10,10 @@ downloads, kernel modules) are allowed. Anything else is a Nixpkgs package
 that NixOS has not prebuilt, or a configuration that changed one; the command
 lists those and exits 1.
 
+Settings' pointer themes are downloaded later, on demand, from the same cache
+(`system.build.cybexosPointerDownloads`); a path it does not hold is listed as
+`pointer theme: PATH` and fails the check too.
+
 NixOS generates much of a system's configuration (pam.d, the initrd, setuid
 wrappers, dconf and AppArmor rules) without marking it local-only. Such a
 derivation has no source of its own (`src`/`srcs`; `prebuilt.kind`): it is
@@ -57,7 +61,8 @@ def evaluate(nvidia, packages):
           }) ];
         };
       in { root = system.config.system.build.toplevel.drvPath;
-           expected = system.config.system.build.cybexosExpectedBuilds; }
+           expected = system.config.system.build.cybexosExpectedBuilds;
+           pointers = system.config.system.build.cybexosPointerDownloads; }
     ''' % {'root': json.dumps(str(ROOT)), 'nvidia': 'true' if nvidia else 'false',
            'packages': json.dumps(json.dumps(packages))}
     return json.loads(nix('eval', '--impure', '--json', '--expr', expression))
@@ -115,9 +120,12 @@ def main():
     print(f'{local} derivations build locally; {len(info["expected"])} expected local builds allowed.', file=sys.stderr)
     if configured:
         print(f'{len(configured)} configuration builds: ' + ', '.join(configured), file=sys.stderr)
-    for item in found:
+    with ThreadPoolExecutor(8) as pool:
+        missing = [path for path, hit in zip(info['pointers'], pool.map(cached, info['pointers'])) if not hit]
+    print(f'{len(info["pointers"])} pointer theme downloads checked.', file=sys.stderr)
+    for item in found + ['pointer theme: ' + path for path in missing]:
         print(item)
-    return 1 if found else 0
+    return 1 if found or missing else 0
 
 
 if __name__ == '__main__':

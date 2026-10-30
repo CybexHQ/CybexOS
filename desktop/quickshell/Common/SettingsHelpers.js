@@ -1,7 +1,7 @@
 // Pure settings-schema helpers shared by QML and Node tests.
 // Keep this file free of Qt APIs so persistence stays deterministic.
 
-var VERSION = 30;
+var VERSION = 31;
 
 var BAR_STYLES = ["hug", "floating", "attached"];
 var PALETTE_MODES = ["wallpaper", "fixed"];
@@ -25,6 +25,21 @@ var DRAWER_OVERVIEW_KEYS = ["media", "sliders", "tiles", "updates", "processes"]
 var IDLE_LOCK_MINS = [0, 1, 2, 5, 10, 15, 30];
 var IDLE_SCREEN_OFF_MINS = [0, 1, 2, 5, 10, 15, 30];
 var IDLE_SUSPEND_MINS = [0, 15, 30, 60, 120];
+
+// Schema 31 adds the pointer (Settings -> Appearance -> Pointer). Sizes are
+// pixels before the display's scale; "default" is the installation's own (24
+// unless a personal module says otherwise). Hyprland hides an idle pointer
+// after at most 20 seconds.
+var POINTER_SIZES = { large: 32, larger: 48, largest: 64 };
+var POINTER_SIZE_IDS = ["default", "large", "larger", "largest"];
+var POINTER_IDLE_SECONDS = [0, 3, 10, 20];
+// An XCursor theme's directory name; "" is the installation's default. The
+// same pattern guards scripts/pointer_xcursor.py and cybexos-session.
+var POINTER_THEME = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,79}$/;
+
+function pointerThemeIn(value) {
+    return typeof value === "string" && POINTER_THEME.test(value) ? value : "";
+}
 
 // Reads in default layout order: left, then center, then right. The order
 // only decides where an id the settings file has never seen is appended, but
@@ -480,7 +495,14 @@ function defaults() {
         assistantShown: false,
         assistantScreen: "",
         assistantX: -1,
-        assistantY: -1
+        assistantY: -1,
+        // The pointer: a theme's directory name ("" for the installation's
+        // own), its size and hand, and when Hyprland hides it.
+        pointerTheme: "",
+        pointerSize: "default",
+        pointerLeftHanded: false,
+        pointerHideTyping: false,
+        pointerHideIdle: 0
     };
 }
 
@@ -1498,7 +1520,12 @@ function merge(raw, context) {
         assistantShown: boolIn(parsed.assistantShown, d.assistantShown),
         assistantScreen: textIn(parsed.assistantScreen, 64, d.assistantScreen),
         assistantX: intIn(parsed.assistantX, -1, 32768, 1, d.assistantX),
-        assistantY: intIn(parsed.assistantY, -1, 32768, 1, d.assistantY)
+        assistantY: intIn(parsed.assistantY, -1, 32768, 1, d.assistantY),
+        pointerTheme: pointerThemeIn(parsed.pointerTheme),
+        pointerSize: enumIn(parsed.pointerSize, POINTER_SIZE_IDS, d.pointerSize),
+        pointerLeftHanded: boolIn(parsed.pointerLeftHanded, d.pointerLeftHanded),
+        pointerHideTyping: boolIn(parsed.pointerHideTyping, d.pointerHideTyping),
+        pointerHideIdle: enumIn(parsed.pointerHideIdle, POINTER_IDLE_SECONDS, d.pointerHideIdle)
     };
 }
 
@@ -1790,6 +1817,10 @@ var exported = {
     DRAWER_HOVER_MODES: DRAWER_HOVER_MODES,
     DRAWER_OVERVIEW_KEYS: DRAWER_OVERVIEW_KEYS,
     IDLE_LOCK_MINS: IDLE_LOCK_MINS,
+    POINTER_SIZES: POINTER_SIZES,
+    POINTER_SIZE_IDS: POINTER_SIZE_IDS,
+    POINTER_IDLE_SECONDS: POINTER_IDLE_SECONDS,
+    pointerThemeIn: pointerThemeIn,
     IDLE_SCREEN_OFF_MINS: IDLE_SCREEN_OFF_MINS,
     IDLE_SUSPEND_MINS: IDLE_SUSPEND_MINS,
     defaults: defaults,

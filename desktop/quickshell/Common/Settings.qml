@@ -131,6 +131,11 @@ Singleton {
     property string assistantScreen: defaults.assistantScreen
     property int assistantX: defaults.assistantX
     property int assistantY: defaults.assistantY
+    property string pointerTheme: defaults.pointerTheme
+    property string pointerSize: defaults.pointerSize
+    property bool pointerLeftHanded: defaults.pointerLeftHanded
+    property bool pointerHideTyping: defaults.pointerHideTyping
+    property int pointerHideIdle: defaults.pointerHideIdle
 
     // ---- Runtime state (not persisted) -----------------------------------
     property bool panelOpen: false
@@ -198,7 +203,7 @@ Singleton {
         { id: "home", label: I18n.tr("Home"), glyph: "home",
             description: I18n.tr("This computer at a glance") },
         { id: "appearance", group: "Personalize", label: I18n.tr("Appearance"), glyph: "palette",
-            description: I18n.tr("Theme, text and size, colors and panels") },
+            description: I18n.tr("Theme, text and size, colors, pointer and panels") },
         { id: "wallpaper", group: "Personalize", label: I18n.tr("Wallpaper"), glyph: "image",
             description: I18n.tr("Desktop image and automatic rotation") },
         { id: "bar", group: "Personalize", label: I18n.tr("Bar & Control Center"), glyph: "space_dashboard",
@@ -345,7 +350,8 @@ Singleton {
         appearance: ["themeMode", "glassEnabled", "highContrast", "reducedMotion",
             "textScale", "interfaceDensity", "shellFontSize", "shellScale", "surfaceBorderMode", "surfaceBorderColor", "surfaceBorderWidth", "surfaceBorderOpacity", "surfaceCornerRadius",
             "font", "accent", "paletteMode", "theme", "themePalette",
-            "pluginScale", "pluginBorderMode", "pluginBorderColor", "pluginBorderWidth", "pluginBorderOpacity", "pluginRadius", "pluginThemeOverrides"],
+            "pluginScale", "pluginBorderMode", "pluginBorderColor", "pluginBorderWidth", "pluginBorderOpacity", "pluginRadius", "pluginThemeOverrides",
+            "pointerTheme", "pointerSize", "pointerLeftHanded", "pointerHideTyping", "pointerHideIdle"],
         // The widget layout and every widget's options belong to the Bar
         // page, which also owns the bar's background color. The dock has
         // its own place on Workspaces & dock.
@@ -849,6 +855,7 @@ Singleton {
         loaded = true;
         applyScrollFactor();
         applyGlassEffect();
+        applyPointerHiding();
         if (retainPending && !newerSchema) {
             migrationPending = false;
             scheduleSave();
@@ -1100,6 +1107,17 @@ Singleton {
     onDockChanged: scheduleSave()
     onDockAutoHideChanged: scheduleSave()
     onDockPinnedChanged: scheduleSave()
+    onPointerThemeChanged: scheduleSave()
+    onPointerSizeChanged: scheduleSave()
+    onPointerLeftHandedChanged: scheduleSave()
+    onPointerHideTypingChanged: {
+        scheduleSave();
+        applyPointerHiding();
+    }
+    onPointerHideIdleChanged: {
+        scheduleSave();
+        applyPointerHiding();
+    }
 
     Timer {
         id: saveTimer
@@ -1153,6 +1171,38 @@ Singleton {
                 console.warn("could not apply touchpad scroll speed:", exitCode);
             if (Math.abs(root.dispatchedScrollFactor - root.scrollFactor) > 0.001)
                 scrollApplyTimer.restart();
+        }
+    }
+
+    // Hiding the pointer while typing and when it rests is Hyprland's own
+    // (looknfeel.lua reads both from this file as the compositor starts).
+    // A change is sent at once; one made while hyprctl is busy follows it.
+    // The pointer itself is Common/Pointer.qml's to apply.
+    property string dispatchedPointerHiding: ""
+
+    function pointerHidingLua() {
+        return "hl.config({ cursor = { hide_on_key_press = " + (pointerHideTyping ? "true" : "false")
+            + ", inactive_timeout = " + pointerHideIdle + " } })";
+    }
+
+    function applyPointerHiding() {
+        if (!loaded || pointerHidingProc.running)
+            return;
+        dispatchedPointerHiding = pointerHidingLua();
+        pointerHidingProc.command = ["hyprctl", "eval", dispatchedPointerHiding];
+        pointerHidingProc.running = true;
+    }
+
+    Process {
+        id: pointerHidingProc
+
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                console.warn("could not apply pointer hiding:", exitCode);
+        }
+        onRunningChanged: {
+            if (!running && root.dispatchedPointerHiding !== root.pointerHidingLua())
+                Qt.callLater(root.applyPointerHiding);
         }
     }
 

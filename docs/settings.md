@@ -100,6 +100,72 @@ Displays and Network edits stay on their own page and do not join Changes.
 Applying either starts a keep-or-revert trial. Leaving the page reverts a
 running trial and drops edits that were not applied.
 
+## Pointer
+
+**Appearance → Pointer** chooses the pointer's style, size and hand, and when
+Hyprland hides it. Like the rest of Appearance, a change applies at once,
+without Apply, and the next login starts with it.
+
+- **The gallery.** It shows each theme's arrow, link hand, text beam and busy
+  pointer from the theme's own files. Hovering a tile plays its busy animation.
+  The gallery has two parts:
+  - **On this computer:**
+    - the twelve Bibata variants and Adwaita, which every installation has;
+    - downloads;
+    - any other XCursor theme on `XCURSOR_PATH`. One under the home folder is
+      marked **Yours**.
+  - **Download:** the rest of `desktop/quickshell/assets/pointers/catalogue.json`.
+- **Downloads.** The machine records each downloadable package's exact store
+  path at its own Nixpkgs in `/etc/cybexos/pointers.json`, without making it
+  part of the system. Choosing such a theme substitutes that path from the
+  configured binary cache:
+  - The command is `nix-store --realise PATH --add-root ~/.local/state/cybexos/pointer/roots/PACKAGE`.
+  - Nix checks the signature, and nothing is compiled.
+  - The theme is then linked into `~/.local/share/icons`. A name already taken
+    there is the person's own and is left alone.
+  - Hovering a downloaded theme that is not in use offers **Remove download**,
+    which drops the links and the root. Nix frees the space at its next
+    collection.
+  - `scripts/check-prebuilt` fails a release whose recorded paths
+    cache.nixos.org does not hold.
+  - The previews ship with the shell. `scripts/render-pointer-previews` redraws
+    them from the catalogue's packages after a catalogue or Nixpkgs change.
+- **Applying.** `Common/Pointer.qml` resolves the choice:
+  - A picked theme that is no longer installed falls back to the
+    installation's own, from `XCURSOR_THEME`.
+  - **Left-handed** uses a theme's mirrored variant (Bibata `-Right`, Phinger
+    `-left`). It is unavailable for a theme without one.
+  - **Size** is 24, 32, 48 or 64 px before each display's scale.
+
+  `scripts/pointer.py apply` then runs `hyprctl setcursor`, sets GTK's
+  `cursor-theme` and `cursor-size` keys and updates the systemd/D-Bus
+  activation environment. A choice that differs from the installation's own is
+  recorded in `~/.local/state/cybexos/pointer/session.env`. `cybexos-session`
+  exports it before Hyprland starts, so the next login draws it from the
+  first frame.
+- **Hiding.** Hide while typing and Hide when idle (3, 10 or 20 seconds;
+  Hyprland's limit is 20) are Hyprland's `cursor:hide_on_key_press` and
+  `cursor:inactive_timeout`. `looknfeel.lua` reads them from `shell.json` as the
+  compositor starts. Settings applies a change through `hyprctl eval`.
+- **Limits.**
+  - Applications that let Hyprland draw their pointer change at once. One
+    exception: Hyprland keeps the image already on screen until a surface sets
+    the pointer again (`setcursor` only reloads the theme), so the new style
+    shows as soon as the pointer moves onto something else.
+  - Some applications draw their own pointer and read the theme when they
+    start, among them some GTK 3, XWayland and Java ones. They change when
+    reopened.
+  - Applications that the launcher starts inherit the shell's environment, so
+    an XWayland application started that way follows the choice from the next
+    login.
+  - The login screen keeps Bibata Modern Classic: it is system configuration.
+- **Scripting.** `cybexos-runtime ipc pointer` provides:
+  - `status`;
+  - `use THEME`, which downloads the theme first when it is not on this
+    computer;
+  - `remove THEME`;
+  - `refresh`.
+
 ## Page ids
 
 IPC (`cybexos-runtime ipc settings open ID`), the launcher and other views open
@@ -121,8 +187,23 @@ first view.
   It opens every page and tab and follows the legacy ids. It also drives Back,
   the palette (Enter and Ctrl+Enter), Recently changed with Undo, and two
   drafts reviewed and applied from the Changes sheet. A recording `cybex`
-  checks that the sheet sends one combined `cybex config region` call. Run it
-  through `nix develop` with grim and wtype.
+  checks that the sheet sends one combined `cybex config region` call. Its
+  Pointer section lists stand-in themes and one of the person's own. It
+  applies a size and hand through recording fakes and shows a download that
+  cannot reach the cache. Run it through `nix develop` with grim and wtype.
+- `checks.x86_64-linux.pointer` (`nix/tests/pointer.nix`) is the end-to-end
+  check, in a real Hyprland session. It runs these steps:
+  1. Download Hackneyed through the shell from a local binary cache holding its
+     real NAR.
+  2. Check the root and the link.
+  3. Check what Hyprland draws, in a screen copy.
+  4. Check GTK and the activation environment.
+  5. Apply edited settings when the shell starts.
+  6. Sign out and in again, and check that Hyprland starts with the pointer.
+  7. Remove the download, after which Nix may collect it.
+- `tests/nixos/test_pointer.py` covers the XCursor reader, `scripts/pointer.py`
+  and `cybexos-session`'s record. `tests/quickshell/pointer.test.cjs` covers the
+  resolution, the schema, the catalogue and its previews, and `looknfeel.lua`.
 - `tests/quickshell/settings-*.test.cjs` hold the page model, search, palette,
   Changes and Recently changed contracts.
 - `tests/settings-runtime.py` is the installed-VM audit of every page and tab;

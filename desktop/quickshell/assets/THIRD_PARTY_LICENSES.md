@@ -91,3 +91,26 @@ in `cybex_white.zip`. Deployment variants use the supplied X paths with their
 original red accent and off-white or white lettering. See `assets/brand/USAGE.md`
 and the byte-preserved SVG master.
 This code license does not grant rights in other depicted brands.
+
+## Pointer theme previews
+
+`pointers/previews/` holds small PNG renders of six shapes from each pointer
+theme in `pointers/catalogue.json`. `scripts/render-pointer-previews` draws them
+from the themes' own XCursor files, as packaged in Nixpkgs. Each render keeps
+its theme's licence and authors:
+
+| Themes | Upstream | Licence |
+| --- | --- | --- |
+| Bibata Modern and Original (Classic, Ice, Amber) | [ful1e5/Bibata_Cursor](https://github.com/ful1e5/Bibata_Cursor) | GPL-3.0-only |
+| Adwaita | [GNOME/adwaita-icon-theme](https://gitlab.gnome.org/GNOME/adwaita-icon-theme) | CC-BY-SA-3.0 |
+| WhiteSur | [vinceliuice/WhiteSur-cursors](https://github.com/vinceliuice/WhiteSur-cursors) | GPL-3.0-only |
+| Capitaine, Capitaine White | [keeferrourke/capitaine-cursors](https://github.com/keeferrourke/capitaine-cursors) | LGPL-3.0 |
+| Phinger Dark, Phinger Light | [phisch/phinger-cursors](https://github.com/phisch/phinger-cursors) | CC-BY-SA-4.0 |
+| Hackneyed | [Enthymeme/hackneyed-x11-cursors](https://gitlab.com/Enthymeme/hackneyed-x11-cursors) | MIT |
+| Rosé Pine, Rosé Pine Dawn (BreezeX) | [rose-pine/cursor](https://rosepinetheme.com/) | GPL-3.0 |
+| Catppuccin Mocha, Catppuccin Latte | [catppuccin/cursors](https://github.com/catppuccin/cursors) | GPL-2.0 |
+| Google Dot Black, Google Dot White | [ful1e5/Google_Cursor](https://github.com/ful1e5/Google_Cursor) | GPL-3.0-or-later |
+
+The themes themselves are not bundled except Bibata and Adwaita, which every
+installation already has. The others are downloaded on demand from the NixOS
+binary cache, under their own licences.

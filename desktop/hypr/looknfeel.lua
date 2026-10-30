@@ -23,6 +23,24 @@ local function persisted_glass_enabled()
   return enabled("glassEnabled") and not enabled("highContrast")
 end
 
+-- Settings -> Appearance -> Pointer: hiding the pointer while typing and after
+-- it rests, read the same way and for the same reason as glass above; the
+-- shell applies a change through `hyprctl eval`. Only the offered idle times
+-- count (Hyprland allows up to 20 seconds); anything else is off.
+local function persisted_pointer()
+  local home = os.getenv("HOME")
+  if not home then return false, 0 end
+  local file = io.open(home .. "/.config/cybexos/shell.json", "r")
+  if not file then return false, 0 end
+  local contents = file:read("*a")
+  file:close()
+  local seconds = tonumber(contents:match('[,{]%s*"pointerHideIdle"%s*:%s*(%d+)'))
+  local offered = { [3] = true, [10] = true, [20] = true }
+  return contents:match('[,{]%s*"pointerHideTyping"%s*:%s*(%a+)') == "true",
+    offered[seconds] and seconds or 0
+end
+local pointer_hide_typing, pointer_hide_idle = persisted_pointer()
+
 hl.config({
   general = {
     gaps_in = 5,
@@ -33,7 +51,8 @@ hl.config({
     -- appearance (theme_hyprland.py); the theme below replaces them.
     col = { active_border = "rgb(60a5fa)", inactive_border = "rgb(3a3936)" },
   },
-  cursor = { no_hardware_cursors = false },
+  cursor = { no_hardware_cursors = false, hide_on_key_press = pointer_hide_typing,
+             inactive_timeout = pointer_hide_idle },
   decoration = {
     -- Match Quickshell's Theme.hugCornerSize so tiled window corners continue
     -- the menubar's inverted edge curve at the reserved boundary.

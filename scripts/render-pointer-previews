@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Render the pointer gallery's previews from the catalogue's own packages.
+
+Settings -> Appearance -> Pointer shows every catalogue theme before it is
+downloaded, so its previews ship with the shell
+(desktop/quickshell/assets/pointers/previews). This fetches each catalogue
+package at the flake's locked Nixpkgs from the binary cache (nothing is
+compiled), draws the six preview shapes from the theme's XCursor files and
+rewrites the previews and their index. Run it after changing the catalogue
+or updating Nixpkgs; the output is deterministic for unchanged packages.
+
+    scripts/render-pointer-previews
+"""
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+POINTERS = ROOT / 'desktop/quickshell/assets/pointers'
+sys.path.insert(0, str(ROOT / 'desktop/quickshell/scripts'))
+import pointer_xcursor  # noqa: E402
+
+NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
+
+
+def main():
+    catalogue = json.loads((POINTERS / 'catalogue.json').read_text())
+    packages = sorted({theme['package'] for theme in catalogue['themes']})
+    result = subprocess.run(NIX + ['build', '--no-link', '--print-out-paths', '--inputs-from', str(ROOT)]
+                            + ['nixpkgs#' + package for package in packages],
+                            capture_output=True, text=True)
+    if result.returncode:
+        sys.exit(result.stderr.strip() or 'nix build failed')
+    outputs = result.stdout.split()
+    if len(outputs) != len(packages):
+        sys.exit(f'expected {len(packages)} outputs, got {len(outputs)}')
+    dirs = [str(Path(out) / 'share/icons') for out in outputs]
+    previews = POINTERS / 'previews'
+    shutil.rmtree(previews, ignore_errors=True)
+    entries = {}
+    for theme in catalogue['themes']:
+        entries[theme['id']] = pointer_xcursor.render(theme['id'], dirs, str(previews / theme['id']))
+        print(f"{theme['id']}: {', '.join(entries[theme['id']]['shapes'])}")
+    pointer_xcursor.write_index(str(previews / 'index.json'), entries)
+
+
+if __name__ == '__main__':
+    main()

@@ -8,7 +8,11 @@ Run through nix develop with grim and wtype on PATH, e.g.
 It opens every page and tab, follows legacy page ids (shortcuts, storage,
 about), drives Back, the palette (Enter jumps and highlights, Ctrl+Enter
 flips a switch in place), Home's Recently changed with Undo, and drafts on
-two pages reviewed and applied from the header's Changes sheet. `cybex` is a
+two pages reviewed and applied from the header's Changes sheet. Appearance's
+Pointer group lists stand-in themes and one of the person's own, applies a
+size and hand through recording gsettings and activation-environment fakes,
+and shows a failed download (nix-store is a fake that cannot reach the
+cache). `cybex` is a
 fake that records every call and answers the doctor, so the regional change
 the sheet prepares is checked as the one combined `cybex config region` call
 it sends, and nothing reaches pkexec. Only the PNG screenshots survive, and
@@ -74,6 +78,20 @@ if args[:2] == ["config", "region"]:
     sys.exit(0)
 sys.exit(127)
 '''
+# Every pointer helper call that would reach the desktop or Nix, recorded.
+FAKE_POINTER_TOOL = r'''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+with (Path(os.environ["HOME"]) / "pointer-calls").open("a") as log:
+    log.write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + "\n")
+if os.path.basename(sys.argv[0]) == "nix-store":
+    sys.stderr.write("error: unable to download 'https://cache.nixos.org/x.narinfo': Couldn't resolve host name\n")
+    sys.exit(1)
+'''
+_pointer_spec = importlib.util.spec_from_file_location('test_pointer', ROOT / 'tests/nixos/test_pointer.py')
+POINTER_FIXTURES = importlib.util.module_from_spec(_pointer_spec)
+_pointer_spec.loader.exec_module(POINTER_FIXTURES)
+
 TEST_IPC = '''
     function findNamed(item, name) {
         if (!item) return null;
@@ -125,6 +143,16 @@ TEST_IPC = '''
         function undoRecent(key: string): void { SettingsRecent.undo(SettingsRecent.rows.find(row => row.key === key)); }
         function pressEscape(): string { return String(shell.settingsView().handleEscape()); }
         function mark(text: string): void { console.log("TEST-MARK " + text); }
+        function pointer(): string {
+            return JSON.stringify({ loaded: Pointer.loaded, applied: Pointer.applied, failure: Pointer.failure,
+                failureDetail: Pointer.failureDetail,
+                failedTheme: Pointer.failedTheme, downloading: Pointer.downloading, applyError: Pointer.applyError,
+                resolved: { chosen: Pointer.resolved.chosen, theme: Pointer.resolved.theme, size: Pointer.resolved.size,
+                    explicit: Pointer.resolved.explicit },
+                themes: Pointer.themes.map(theme => [theme.id, theme.source, theme.installed, theme.downloadable]) });
+        }
+        function pickPointer(id: string): void { Pointer.pick(id); }
+        function highlight(key: string): void { Settings.highlightKey = ""; Settings.highlightKey = key; }
     }'''
 
 
@@ -145,7 +173,7 @@ def main():
         runtime.mkdir(mode=0o700)
         (runtime / 'cybexos').mkdir()
         (home / '.config/cybexos/hypr').mkdir(parents=True)
-        (home / '.config/cybexos/shell.json').write_text(json.dumps({'v': 30, 'wall': '', 'assistantShown': False}))
+        (home / '.config/cybexos/shell.json').write_text(json.dumps({'v': 31, 'wall': '', 'assistantShown': False}))
         (home / 'doctor.json').write_text(json.dumps(DOCTOR))
         (home / 'maintenance.json').write_text(json.dumps(MAINTENANCE))
         shell = base / 'runtime/quickshell'
@@ -170,7 +198,24 @@ def main():
         resolver.write_text(f'package.path = {json.dumps(str(ROOT / "desktop/hypr/?.lua"))} .. ";" .. package.path\n'
                             'package.preload.features = function() return {} end\n'
                             + stub + "\nrequire('bindings')\nrequire('keybinding_preferences')\n")
+        # Pointer themes: stand-ins for the installed catalogue ones, one of
+        # the person's own, and a machine record of downloadable store paths.
+        icons = base / 'icons'
+        catalogue = json.loads((ROOT / 'desktop/quickshell/assets/pointers/catalogue.json').read_text())
+        for theme in catalogue['themes']:
+            if theme.get('bundled'):
+                for name in filter(None, (theme['id'], theme.get('left'))):
+                    POINTER_FIXTURES.theme(icons, name, shapes=('default',))
+        POINTER_FIXTURES.theme(home / '.local/share/icons', 'MyPointer', index='[Icon Theme]\nName=My Pointer\n')
+        machine = base / 'pointers.json'
+        machine.write_text(json.dumps({'v': 1, 'default': {'theme': 'Bibata-Modern-Classic', 'size': 24},
+            'downloads': {theme['package']: '/nix/store/' + 'a' * 32 + '-' + theme['package'].replace('.', '-')
+                          for theme in catalogue['themes'] if not theme.get('bundled')}}))
         (base / 'bin').mkdir()
+        for name in ('gsettings', 'dbus-update-activation-environment', 'nix-store'):
+            path = base / 'bin' / name
+            path.write_text(FAKE_POINTER_TOOL)
+            path.chmod(0o700)
         for name, program in (('hyprctl', EDITOR.FAKE_HYPRCTL), ('cybex', FAKE_CYBEX)):
             path = base / 'bin' / name
             path.write_text(program)
@@ -187,8 +232,11 @@ def main():
                'PATH': str(base / 'bin') + os.pathsep + os.environ['PATH'],
                'QT_PLUGIN_PATH': subprocess.check_output(['qtpaths', '--query', 'QT_INSTALL_PLUGINS'], text=True).strip(),
                'QML_IMPORT_PATH': str(native / 'qml') + ':' + os.environ.get('CYBEXOS_QML_IMPORT_PATH', ''),
-               'PYTHONDONTWRITEBYTECODE': '1', **shell_fonts.fontconfig(base)}
-        for name in ('DISPLAY', 'WAYLAND_DISPLAY', 'HYPRLAND_INSTANCE_SIGNATURE', 'SWAYSOCK', 'DBUS_SESSION_BUS_ADDRESS'):
+               'PYTHONDONTWRITEBYTECODE': '1', 'XCURSOR_PATH': f'~/.icons:~/.local/share/icons:{icons}',
+               'CYBEXOS_POINTER_MACHINE': str(machine), 'GSETTINGS_BACKEND': 'memory',
+               **shell_fonts.fontconfig(base)}
+        for name in ('DISPLAY', 'WAYLAND_DISPLAY', 'HYPRLAND_INSTANCE_SIGNATURE', 'SWAYSOCK', 'DBUS_SESSION_BUS_ADDRESS',
+                     'XCURSOR_THEME', 'XCURSOR_SIZE'):
             env.pop(name, None)
         subprocess.run([str(base / 'bin/hyprctl'), 'reload'], env=env, check=True, capture_output=True)
 
@@ -241,6 +289,16 @@ def main():
             ipc('settings', 'open', page)
             expect = tab or ''
             return wait(lambda: (s := state()).get('pageReady') and s.get('tab', '') == expect and s, f'page {page}/{tab}')
+
+        def pointer():
+            try:
+                return json.loads(ipc('settings-test', 'pointer'))
+            except json.JSONDecodeError:
+                return {}
+
+        def pointer_calls():
+            path = home / 'pointer-calls'
+            return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
         def calls():
             path = home / 'cybex-calls'
@@ -298,6 +356,48 @@ def main():
             show('appearance')
             time.sleep(1)
             screenshot('05-appearance.png')
+
+            # Pointer: the gallery lists what is installed (the person's own
+            # theme too) and what can be downloaded, and the pointer the
+            # settings ask for reaches GTK, the environment and the next login.
+            listed = wait(lambda: (p := pointer()).get('loaded') and p, 'pointer list')
+            themes = {row[0]: row[1:] for row in listed['themes']}
+            assert themes['Bibata-Modern-Classic'] == ['bundled', True, False], themes
+            assert themes['MyPointer'] == ['yours', True, False], themes
+            assert themes['WhiteSur-cursors'] == ['download', False, True], themes
+            # The session started without one, so the installation's pointer is applied once.
+            wait(lambda: pointer().get('applied') == 'Bibata-Modern-Classic 24', 'the default pointer applied')
+            ipc('settings-test', 'highlight', 'pointerTheme')
+            time.sleep(1.5)
+            screenshot('13-pointer.png')
+            ipc('settings-test', 'setValue', 'pointerSize', json.dumps('largest'))
+            ipc('settings-test', 'setValue', 'pointerLeftHanded', json.dumps(True))
+            wait(lambda: pointer().get('applied') == 'Bibata-Modern-Classic-Right 64 explicit', 'left-handed, largest')
+            applied = pointer_calls()
+            assert ['gsettings', 'set', 'org.gnome.desktop.interface', 'cursor-theme', 'Bibata-Modern-Classic-Right'] in applied, applied
+            assert ['dbus-update-activation-environment', '--systemd', 'XCURSOR_THEME=Bibata-Modern-Classic-Right',
+                    'XCURSOR_SIZE=64'] in applied, applied
+            record = home / '.local/state/cybexos/pointer/session.env'
+            assert record.read_text() == 'XCURSOR_THEME=Bibata-Modern-Classic-Right\nXCURSOR_SIZE=64\n'
+            # A download that cannot reach the cache says so and changes nothing.
+            ipc('settings-test', 'pickPointer', 'WhiteSur-cursors')
+            failed = wait(lambda: (p := pointer()).get('failure') and p, 'the failed download')
+            assert failed['failure'].startswith('Could not download WhiteSur.'), failed
+            assert "Couldn't resolve host name" in failed['failureDetail'], failed
+            assert failed['resolved']['chosen'] == 'Bibata-Modern-Classic', failed
+            assert any(call[:2] == ['nix-store', '--realise'] for call in pointer_calls())
+            ipc('settings-test', 'highlight', 'pointerTheme')
+            time.sleep(1.5)
+            screenshot('14-pointer-download-failed.png')
+            ipc('settings-test', 'pickPointer', 'MyPointer')
+            wait(lambda: pointer().get('applied') == 'MyPointer 64 explicit', 'the person\'s own theme, without a left hand')
+            ipc('settings-test', 'highlight', 'pointerLeftHanded')
+            time.sleep(1.5)
+            screenshot('15-pointer-yours.png')
+            for key, value in (('pointerTheme', ''), ('pointerSize', 'default'), ('pointerLeftHanded', False)):
+                ipc('settings-test', 'setValue', key, json.dumps(value))
+            wait(lambda: pointer().get('applied') == 'Bibata-Modern-Classic 24', 'back to the default pointer')
+            assert not record.exists(), 'the installation default needs no record'
 
             # Back walks the pages visited since Settings opened.
             history = state()['history']

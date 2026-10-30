@@ -11,6 +11,20 @@ let cfg = config.cybexos;
       Type=Application
       DesktopNames=Hyprland
     '';
+    # Settings -> Appearance -> Pointer (docs/settings.md). The catalogue's
+    # downloadable themes are recorded as bare store paths at this machine's
+    # Nixpkgs, without their context: Settings substitutes one from the
+    # binary cache when it is chosen, so none is built or installed with the
+    # system. A package Nixpkgs no longer has is left out of the gallery.
+    pointerCatalogue = builtins.fromJSON (builtins.readFile ../../desktop/quickshell/assets/pointers/catalogue.json);
+    pointerDownloads = lib.listToAttrs (lib.concatMap (theme:
+      let
+        found = lib.attrByPath (lib.splitString "." theme.package) null pkgs;
+        path = builtins.tryEval (if found == null then null else found.outPath);
+      in lib.optional (!(theme.bundled or false) && path.success && path.value != null)
+        { name = theme.package; value = builtins.unsafeDiscardStringContext path.value; })
+      pointerCatalogue.themes);
+    pointerDefaultSize = builtins.tryEval (lib.toInt (toString (config.environment.sessionVariables.XCURSOR_SIZE or "24")));
 in {
   config = lib.mkIf cfg.enable {
     # Cybex OS starts Hyprland itself (cybexos-session), never through UWSM.
@@ -71,7 +85,19 @@ in {
       CYBEXOS_PROPRIETARY_APPS = if cfg.features.proprietary then "1" else "0";
       CYBEXOS_PODMAN = if cfg.features.podman then "1" else "0";
     };
-    environment.systemPackages = [ pkgs.bibata-cursors ];
+    # The pointer gallery's bundled themes: Bibata's twelve variants and Adwaita.
+    environment.systemPackages = [ pkgs.bibata-cursors pkgs.adwaita-icon-theme ];
+    environment.etc."cybexos/pointers.json".text = builtins.toJSON {
+      v = 1;
+      # The pointer this installation starts with, personal modules included;
+      # Settings returns to it on reset.
+      default = {
+        theme = toString (config.environment.sessionVariables.XCURSOR_THEME or "Bibata-Modern-Classic");
+        size = if pointerDefaultSize.success then pointerDefaultSize.value else 24;
+      };
+      downloads = pointerDownloads;
+    };
+    system.build.cybexosPointerDownloads = lib.unique (lib.attrValues pointerDownloads);
     environment.pathsToLink = [ "/share/icons" ];
     environment.etc."xdg/gtk-3.0/settings.ini".text = ''
       [Settings]

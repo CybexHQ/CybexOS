@@ -1,0 +1,468 @@
+{
+ "themes": {
+  "Adwaita": {
+   "busyDuration": 960,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    30,
+    36,
+    48,
+    72,
+    96
+   ]
+  },
+  "Bibata-Modern-Amber": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Bibata-Modern-Classic": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Bibata-Modern-Ice": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Bibata-Original-Amber": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Bibata-Original-Classic": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Bibata-Original-Ice": {
+   "busyDuration": 2160,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    16,
+    20,
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "BreezeX-RosePine-Linux": {
+   "busyDuration": 200,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "BreezeX-RosePineDawn-Linux": {
+   "busyDuration": 200,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "GoogleDot-Black": {
+   "busyDuration": 580,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "GoogleDot-White": {
+   "busyDuration": 570,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    22,
+    24,
+    28,
+    32,
+    40,
+    48,
+    56,
+    64,
+    72,
+    80,
+    88,
+    96
+   ]
+  },
+  "Hackneyed": {
+   "busyDuration": 750,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    36,
+    48,
+    60,
+    72,
+    84,
+    96
+   ]
+  },
+  "WhiteSur-cursors": {
+   "busyDuration": 690,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    30,
+    36,
+    48
+   ]
+  },
+  "capitaine-cursors": {
+   "busyDuration": 720,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    30,
+    36,
+    48,
+    60,
+    72
+   ]
+  },
+  "capitaine-cursors-white": {
+   "busyDuration": 720,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    30,
+    36,
+    48,
+    60,
+    72
+   ]
+  },
+  "catppuccin-latte-light-cursors": {
+   "busyDuration": 360,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72
+   ]
+  },
+  "catppuccin-mocha-dark-cursors": {
+   "busyDuration": 360,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    54,
+    60,
+    66,
+    72
+   ]
+  },
+  "phinger-cursors-dark": {
+   "busyDuration": 1500,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    32,
+    48,
+    64,
+    72,
+    96,
+    128
+   ]
+  },
+  "phinger-cursors-light": {
+   "busyDuration": 1500,
+   "busyFrames": 12,
+   "shapes": [
+    "arrow",
+    "hand",
+    "text",
+    "busy",
+    "resize",
+    "forbidden"
+   ],
+   "sizes": [
+    24,
+    32,
+    48,
+    64,
+    72,
+    96,
+    128
+   ]
+  }
+ },
+ "v": 1
+}

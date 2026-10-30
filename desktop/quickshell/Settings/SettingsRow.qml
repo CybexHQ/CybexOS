@@ -50,6 +50,9 @@ Item {
     // only make sense under one mode restores them together.
     property var resetKeys: settingKey === "" ? [] : [settingKey]
     property string hint: ""
+    // A technical reason after the hint (a tool's own message), drawn
+    // smaller and plain by SettingsHint.
+    property string hintDetail: ""
     // info | active | warning | error — see SettingsHint.
     property string hintTone: "info"
     property string disabledReason: ""
@@ -173,6 +176,7 @@ Item {
         y: root.lineHeight - root.rowPad + root.hintGap
         width: root.contentRight
         text: root.unavailable ? root.disabledReason : root.hint
+        detail: root.unavailable ? "" : root.hintDetail
         tone: root.unavailable ? "info" : root.hintTone
     }
 

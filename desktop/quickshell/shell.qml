@@ -229,6 +229,32 @@ ShellRoot {
         }
     }
 
+    // Settings -> Appearance -> Pointer from scripts and tests: the pointer
+    // in use and every theme known, picking one (a catalogue theme that is
+    // not here yet is downloaded first) and removing a download. `use` and
+    // `remove` answer "ok" once the work has started, or "error: <reason>";
+    // `status` then shows how it went.
+    IpcHandler {
+        target: "pointer"
+
+        function status(): string {
+            return Pointer.status();
+        }
+
+        function use(theme: string): string {
+            return Pointer.use(theme);
+        }
+
+        function remove(theme: string): string {
+            return Pointer.remove(theme) ? "ok"
+                : "error: " + theme + " is in use, part of Cybex OS, or not a download";
+        }
+
+        function refresh(): void {
+            Pointer.refresh();
+        }
+    }
+
     // Pinged by brightness-control after brightnessctl runs; volume needs
     // no IPC because the OSD watches Pipewire directly.
     IpcHandler {
@@ -447,6 +473,7 @@ ShellRoot {
         void Calendar.enabled;
         void Settings.loaded;
         void SystemTheme.settled;
+        void Pointer.loaded;
         void Updates.hasUpdates;
         void Recorder.active;
         void Dictation.state;

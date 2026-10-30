@@ -4,8 +4,10 @@ import "../Common"
 import "../Common" as Common
 import "../Common/SettingsHelpers.js" as SettingsHelpers
 import "../Common/ThemeHelpers.js" as ThemeHelpers
+import "../Common/PointerHelpers.js" as PointerHelpers
 
-// Appearance owns theme, text and size, colors, and panel chrome. Every
+// Appearance owns theme, text and size, colors, the pointer and panel
+// chrome. Every
 // control that changes how large the shell draws sits in one group under a
 // live preview of the result, because they multiply rather than override one
 // another. Three stay in view; the base size they build on is an advanced
@@ -87,6 +89,47 @@ SettingsPage {
         // brings the presets above it along.
         page.revealFocus(accentHueRow);
     }
+
+    // The pointer (Common/Pointer.qml): the themes on this computer, then
+    // those it can download, and what the Pointer style row says about the
+    // choice.
+    readonly property var pointerInstalled: Pointer.themes.filter(theme =>
+        theme.installed || theme.source === "bundled")
+    readonly property var pointerDownloads: Pointer.themes.filter(theme =>
+        !theme.installed && theme.downloadable)
+    readonly property var pointerEntry: Pointer.resolved.entry
+    readonly property string pointerName: pointerEntry ? pointerEntry.name : Pointer.resolved.chosen
+    readonly property int pointerSizeLimit: PointerHelpers.sizeLimit(pointerEntry, Pointer.resolved.size)
+
+    function pointerThemeName(id) {
+        const theme = Pointer.entry(id);
+        return theme ? theme.name : id;
+    }
+
+    readonly property string pointerStatus: {
+        if (Pointer.downloading !== "")
+            return I18n.format("Downloading %1 from the NixOS binary cache…", [pointerThemeName(Pointer.downloading)]);
+        if (Pointer.removing !== "")
+            return I18n.format("Removing %1…", [pointerThemeName(Pointer.removing)]);
+        if (Pointer.failure !== "")
+            return Pointer.failure;
+        if (Pointer.applyError !== "")
+            return I18n.format("The pointer could not be applied: %1", [Pointer.applyError]);
+        if (!Pointer.loaded)
+            return Pointer.listError !== "" ? Pointer.listError : I18n.tr("Looking for pointers…");
+        if (Pointer.resolved.missing)
+            return I18n.format("%1 is no longer installed · using %2", [Settings.pointerTheme, pointerName]);
+        const source = !pointerEntry ? ""
+            : pointerEntry.source === "download" ? I18n.tr("downloaded from the NixOS binary cache")
+            : pointerEntry.source === "yours" ? I18n.tr("yours, from your icons folder")
+            : pointerEntry.source === "system" ? I18n.tr("installed on this computer")
+            : Settings.pointerTheme === "" ? I18n.tr("the default")
+            : I18n.tr("included with Cybex OS");
+        return source === "" ? pointerName : pointerName + " · " + source;
+    }
+    readonly property string pointerStatusTone: Pointer.downloading !== "" || Pointer.removing !== "" ? "active"
+        : Pointer.failure !== "" || Pointer.applyError !== "" || Pointer.listError !== "" ? "error"
+        : Pointer.resolved.missing ? "warning" : "info"
 
     Timer {
         id: fixedColorScrollTimer
@@ -474,6 +517,119 @@ SettingsPage {
                         }
                     }
                 }
+            }
+        }
+
+        // The pointer (docs/settings.md#pointer). Picking a theme, a size or a
+        // hand applies at once and is what the next login starts with; a
+        // theme that is not on this computer yet is downloaded first. Hiding
+        // the pointer is Hyprland's, and Settings applies it.
+        SettingsGroup {
+            id: pointerGroup
+            width: parent.width
+            title: I18n.tr("Pointer")
+
+            // A theme installed or removed by hand appears the next time the
+            // page opens.
+            Claim {
+                active: page.visible && Settings.panelOpen
+                onClaimed: Pointer.refresh()
+            }
+
+            Text {
+                width: parent.width
+                text: I18n.tr("On this computer")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.secondary
+                font.weight: Theme.weightMedium
+                color: Theme.textLow
+            }
+            PointerGallery {
+                width: parent.width
+                entries: page.pointerInstalled
+            }
+            Text {
+                visible: page.pointerDownloads.length > 0
+                width: parent.width
+                topPadding: Theme.scaled(6)
+                text: I18n.tr("Download")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.secondary
+                font.weight: Theme.weightMedium
+                color: Theme.textLow
+            }
+            PointerGallery {
+                visible: page.pointerDownloads.length > 0
+                width: parent.width
+                entries: page.pointerDownloads
+            }
+            SettingsRow {
+                width: parent.width
+                label: I18n.tr("Pointer style")
+                settingKey: "pointerTheme"
+                hint: page.pointerStatus
+                hintDetail: Pointer.downloading === "" && Pointer.failure !== "" ? Pointer.failureDetail : ""
+                hintTone: page.pointerStatusTone
+            }
+            Text {
+                width: parent.width
+                topPadding: Theme.scaled(4)
+                leftPadding: Theme.settingsMarkInset
+                text: I18n.tr("Try it: each place asks for its own pointer.")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.secondary
+                color: Theme.textFaint
+            }
+            PointerTryPad {
+                width: parent.width
+                theme: page.pointerEntry
+                mirrored: Settings.pointerLeftHanded && Pointer.resolved.leftAvailable
+            }
+            PickerRow {
+                width: parent.width
+                label: I18n.tr("Size")
+                settingKey: "pointerSize"
+                resetLabel: "Pointer size"
+                model: [
+                    { value: "default", label: I18n.tr("Default") },
+                    { value: "large", label: I18n.tr("Large") },
+                    { value: "larger", label: I18n.tr("Larger") },
+                    { value: "largest", label: I18n.tr("Largest") }
+                ]
+                hint: page.pointerSizeLimit > 0
+                    ? I18n.format("%1 px · %2 is drawn at most %3 px", [Pointer.resolved.size, page.pointerName, page.pointerSizeLimit])
+                    : I18n.format("%1 px, multiplied by each display's scale", [Pointer.resolved.size])
+            }
+            SwitchRow {
+                width: parent.width
+                label: I18n.tr("Left-handed")
+                settingKey: "pointerLeftHanded"
+                resetLabel: "Left-handed pointer"
+                description: I18n.format("Uses the mirrored %1", [page.pointerName])
+                disabledReason: Pointer.loaded && !Pointer.resolved.leftAvailable
+                    ? I18n.format("%1 has no left-handed version", [page.pointerName]) : ""
+            }
+            SwitchRow {
+                width: parent.width
+                label: I18n.tr("Hide while typing")
+                settingKey: "pointerHideTyping"
+                resetLabel: "Hide pointer while typing"
+                description: I18n.tr("Comes back when the mouse moves")
+            }
+            PickerRow {
+                width: parent.width
+                label: I18n.tr("Hide when idle")
+                settingKey: "pointerHideIdle"
+                resetLabel: "Hide idle pointer"
+                model: [
+                    { value: 0, label: I18n.tr("Never") },
+                    { value: 3, label: I18n.tr("3 s") },
+                    { value: 10, label: I18n.tr("10 s") },
+                    { value: 20, label: I18n.tr("20 s") }
+                ]
+                hint: Settings.pointerHideIdle > 0
+                    ? I18n.format("After %1 seconds without moving", [Settings.pointerHideIdle])
+                    : I18n.tr("The pointer stays visible")
             }
         }
 

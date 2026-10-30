@@ -135,6 +135,8 @@
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
         firmware = import ./nix/tests/firmware.nix { inherit pkgs module; };
         hyprland-pointer = import ./nix/tests/hyprland-pointer.nix { inherit pkgs module; };
+        # Settings -> Appearance -> Pointer: a download, Hyprland and the next login.
+        pointer = import ./nix/tests/pointer.nix { inherit pkgs module; };
         # Wiz on the disk unlock screen, the lock screen and in kitty.
         plymouth-unlock = import ./nix/tests/plymouth-unlock.nix { inherit pkgs; inherit (self.packages.${system}) plymouth; };
         lock-terminal = import ./nix/tests/lock-terminal.nix { inherit pkgs module; };
