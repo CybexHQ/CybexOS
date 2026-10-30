@@ -657,6 +657,13 @@ impl App {
 
     fn apply_review(&self, store: &Store, state: &State) {
         let draft = &state.draft;
+        // Hardware facts remain useful even before a disk has been selected.
+        store.set_nvidia(state.nvidia());
+        store.set_nvidia_open(draft.nvidia_open);
+        let selection = state.hardware.get("nvidiaSelection");
+        store.set_nvidia_open_available(selection.and_then(|s| s.get("open")).and_then(Value::as_bool).unwrap_or(true));
+        store.set_nvidia_closed_available(selection.and_then(|s| s.get("closed")).and_then(Value::as_bool).unwrap_or(true));
+        store.set_gpu_names(s(if state.graphics.is_empty() { "NVIDIA graphics".into() } else { state.graphics.join(" + ") }));
         let Some(disk) = state.disks.iter().find(|d| d.path == draft.disk) else { return };
         let model_name = if disk.model.is_empty() { format!("The disk {}", disk.path) } else { disk.model.clone() };
         let short = model_name
@@ -743,12 +750,6 @@ impl App {
         store.set_summary_left(model(store.get_summary_left(), left));
         store.set_summary_right(model(store.get_summary_right(), right));
         store.set_review_error(s(if state.phase == "review" { state.error.as_str() } else { "" }));
-        store.set_nvidia(state.nvidia());
-        store.set_nvidia_open(draft.nvidia_open);
-        let selection = state.hardware.get("nvidiaSelection");
-        store.set_nvidia_open_available(selection.and_then(|s| s.get("open")).and_then(Value::as_bool).unwrap_or(true));
-        store.set_nvidia_closed_available(selection.and_then(|s| s.get("closed")).and_then(Value::as_bool).unwrap_or(true));
-        store.set_gpu_names(s(if state.graphics.is_empty() { "NVIDIA graphics".into() } else { state.graphics.join(" + ") }));
     }
 
     fn apply_progress(&mut self, store: &Store, state: &State) {
