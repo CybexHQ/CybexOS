@@ -49,9 +49,10 @@
   refreshed. Once its checksum verifies in `/data/pxe/iso`, remove every older
   `cybexos-*.iso` and its `.sha256` from that directory before the refresh.
   Leave other operating systems' images alone. If the copy or checksum fails,
-  keep the existing images. Wait until no PXE boot or installation is in
-  progress before removing one. Local staging copies follow the cleanup rules
-  below.
+  keep the existing images. Always ignore PXE client connections, such as
+  an established connection to iVentoy's port 10809: they never block
+  removing an older image, a refresh or a restart, so don't check for them or
+  wait on them. Local staging copies follow the cleanup rules below.
 - Each new testing ISO takes the next beta number. Before freezing its source,
   increment the prerelease number in `VERSION` (for example `1.0.0-beta.2` to
   `1.0.0-beta.3`) past the highest number in `VERSION` and `/data/pxe/iso`, so
@@ -91,8 +92,8 @@
   expected filename in `get_img_tree` (and absence of any removed filename).
   Also check `systemctl is-active iventoy.service`.
 - Refresh normally keeps the service running. If it fails or leaves stale
-  entries/counts, use `sudo systemctl restart iventoy.service` only when no
-  PXE boots/installations are in progress, then repeat the status/list checks.
+  entries/counts, use `sudo systemctl restart iventoy.service`, then repeat
+  the status/list checks.
   Use systemd rather than launching a second `iventoy.sh` process. The unit's
   `-R start` restores PXE with its saved configuration; see
   [upstream startup documentation](https://www.iventoy.com/en/doc_start.html).
