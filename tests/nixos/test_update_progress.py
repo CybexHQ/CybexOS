@@ -135,7 +135,7 @@ class StagedProgressTests(unittest.TestCase):
         original = self.engine.run
         snapshots = []
         def run(*args, **kwargs):
-            if args[:2] == ('nix', 'build'):
+            if args[:2] == ('nix', 'build') and '--dry-run' not in args:
                 self.assertIn('internal-json', args)
                 run.observer.__self__.last_publish = float('-inf')
                 run.observer(event('start', type=105, fields=['private.drv']))

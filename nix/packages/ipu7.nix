@@ -1,8 +1,11 @@
-# Narrow hardware source pins: Intel's IPU7 userspace and missing PSYS/CVS
-# companions are absent from Nixpkgs 26.05. Requalify on each kernel/HAL update;
-# remove these derivations when upstream supplies an equivalent processed path.
+# Narrow hardware source pins for the matched XPS camera. Nixpkgs
+# (nixos-unstable) now has a generic IPU7 stack (hardware.ipu7: camera bins,
+# ipu75xa HAL, PSYS-only ipu7-drivers) at other revisions, without this
+# camera's CVS-first HAL bridge and PSYS bus/core-layout patches. Requalify on
+# each kernel/HAL update; switch to Nixpkgs' path only after the XPS camera
+# qualifies on it.
 { lib, stdenv, fetchurl, cmake, pkg-config, autoPatchelfHook, autoreconfHook,
-  patchelf, expat, jsoncpp, libtool, gst_all_1, libdrm, kernel }:
+  patchelf, expat, jsoncpp, libtool, gst_all_1, libdrm, kernel, kernelModuleMakeFlags }:
 let
   fetch = repo: revision: hash: fetchurl {
     name = "${repo}-${revision}.tar.gz";
@@ -73,11 +76,16 @@ let
     src = fetch "ipu7-drivers" "a88b19096a738d0708742a78d6540d6d4a3021ff" "b2208f4b1b20be7ef0aea75d80ee8f8e6e4cbe559e598511688757d28a86ace0";
     patches = [ ../../hardware/xps/camera/patches/0004-ipu7-psys-register-bus.patch ../../hardware/xps/camera/patches/0005-ipu7-psys-stock-core-layout.patch ];
     nativeBuildInputs = kernel.moduleBuildDependencies;
-    makeFlags = [ "KERNELRELEASE=${kernel.modDirVersion}" "KERNEL_SRC=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build" "IPU7_PSYS_ONLY=1" ];
-    installPhase = ''
-      mkdir -p $out/lib/modules/${kernel.modDirVersion}/extra
-      find . -name 'intel-ipu7-psys.ko' -exec cp {} $out/lib/modules/${kernel.modDirVersion}/extra/ \;
-      test -n "$(find $out -name '*.ko')"
+    makeFlags = kernelModuleMakeFlags ++ [ "KERNELRELEASE=${kernel.modDirVersion}" "KERNEL_SRC=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build" "IPU7_PSYS_ONLY=1" ];
+    # Kbuild's own install signs the module (Nixpkgs' kmodigest) and writes
+    # the .ko.cer certificate that NixOS's module aggregation requires.
+    installFlags = [ "-C" "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build" "M=$(PWD)"
+      "INSTALL_MOD_PATH=${placeholder "out"}" "INSTALL_MOD_DIR=extra" ];
+    installTargets = [ "modules_install" ];
+    postInstall = ''
+      test -n "$(find $out/lib/modules/${kernel.modDirVersion}/extra -name 'intel-ipu7-psys.ko*' -not -name '*.cer')"
+      test -n "$(find $out/lib/modules/${kernel.modDirVersion}/extra -name 'intel-ipu7-psys.ko*.cer')"
+      test -z "$(find $out -name '*.ko*' -not -name '*psys*')"
     '';
   };
 in { inherit bins hal sensor psys; }

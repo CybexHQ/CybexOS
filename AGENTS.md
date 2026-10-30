@@ -19,9 +19,14 @@
   in `/etc/nixos`; secrets/state stay outside the Nix store. Never overwrite
   personal packages, services, VPNs, widgets, preferences, data or skills to make
   an update pass. Never implicitly refresh unrelated personal inputs.
-- Nixpkgs follows the supported stable branch independently; Cybex OS follows
-  the machine Nixpkgs and is pinned to an authenticated exact release revision
-  and NAR identity. Major NixOS upgrades are deliberate; do not change
+- Nixpkgs follows **nixos-unstable** independently: a rolling branch whose
+  packages come prebuilt from cache.nixos.org, guarded by the updater's
+  prebuilt check (`lifecycle/cybexos/prebuilt.py`, `nix/modules/prebuilt.nix`).
+  Only Cybex OS's own packages, unfree vendor downloads, kernel modules and
+  machine configuration build locally; fix an uncached Nixpkgs build through
+  configuration, never an overlay, and check releases with
+  `scripts/check-prebuilt`. Cybex OS follows the machine Nixpkgs and is pinned
+  to an authenticated exact release revision and NAR identity. Do not change
   `system.stateVersion` during routine updates.
 - Preserve password fallback, encryption-gated automatic login after disk
   unlock (once per boot, keyring unlocked from the disk passphrase), firewall

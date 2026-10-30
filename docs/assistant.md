@@ -164,10 +164,10 @@ from [the brand directory](../assets/brand/README.md).
 
 ## Installation
 
-`cybexos.features.assistant` (default on) installs the service, Codex, and
-Claude Code when proprietary applications are selected too. It does not need
-the developer tooling feature. Voxtype, Pipewire and speech-dispatcher are part
-of every installation. Turning the feature off removes the menubar button,
+`cybexos.features.assistant` (default on) installs the service. Codex is part
+of every installation, and Claude Code of every installation with proprietary
+applications, whatever the assistant and developer tooling choices. Voxtype,
+Pipewire and speech-dispatcher are part of every installation too. Turning the feature off removes the menubar button,
 the shortcut and the service; nothing in `shell.json` is lost.
 
 ## Architecture

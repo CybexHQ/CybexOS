@@ -1,6 +1,8 @@
 { config, lib, pkgs, ... }:
 let cfg = config.cybexos;
     assistant = pkgs.callPackage ../packages/assistant.nix {};
+    titlebars = pkgs.callPackage ../packages/titlebars.nix { hyprland = config.programs.hyprland.package; };
+    hermesBridge = pkgs.callPackage ../packages/hermes-bridge.nix {};
     session = pkgs.writeTextDir "share/wayland-sessions/cybexos.desktop" ''
       [Desktop Entry]
       Name=Cybex OS
@@ -11,7 +13,25 @@ let cfg = config.cybexos;
     '';
 in {
   config = lib.mkIf cfg.enable {
-    programs.hyprland = { enable = true; withUWSM = false; };
+    # Cybex OS starts Hyprland itself (cybexos-session), never through UWSM.
+    # NixOS's module rebuilds any package whose override accepts withUWSM
+    # (genFinalPackage in nixos/modules/programs/wayland/lib.nix), here as an
+    # uncached NO_UWSM variant; xdg-desktop-portal-hyprland then follows it.
+    # NO_UWSM only omits the hyprland-uwsm.desktop session file, so hand the
+    # module Nixpkgs' prebuilt default build as a package it leaves as given.
+    # withUWSM = false still keeps programs.uwsm off; SDDM lists that build's
+    # own "Hyprland (uwsm-managed)" entry beside the default Cybex OS session.
+    programs.hyprland = {
+      enable = true;
+      withUWSM = false;
+      package = lib.mkDefault (pkgs.hyprland // {
+        override = lib.setFunctionArgs pkgs.hyprland.override
+          (builtins.removeAttrs (lib.functionArgs pkgs.hyprland.override) [ "withUWSM" ]);
+      });
+    };
+    # A font path rebuilds Xwayland (programs.xwayland.defaultFontPath). Keep
+    # NixOS's prebuilt package; applications use fontconfig, not X core fonts.
+    programs.xwayland.defaultFontPath = lib.mkDefault "";
     services.displayManager.sddm = { enable = true; wayland.enable = true; };
     services.displayManager.sessionPackages = [ (session.overrideAttrs (_: { passthru.providedSessions = [ "cybexos" ]; })) ];
     services.displayManager.defaultSession = lib.mkDefault "cybexos";
@@ -35,7 +55,9 @@ in {
     # filled at unlock; SDDM's own session keyring must be linked to it.
     systemd.services.display-manager.serviceConfig.KeyringMode = lib.mkIf cfg.autoLogin "shared";
     environment.etc."cybexos/runtime".source = "${cfg.desktopPackage}/share/cybexos/runtime";
-    environment.etc."cybexos/titlebars.so".source = "${pkgs.callPackage ../packages/titlebars.nix { hyprland = config.programs.hyprland.package; }}/lib/omarchy-hyprland-titlebars/titlebars.so";
+    environment.etc."cybexos/titlebars.so".source = "${titlebars}/lib/omarchy-hyprland-titlebars/titlebars.so";
+    # Cybex OS's own builds outside systemPackages (nix/modules/prebuilt.nix).
+    cybexos.updates.expectedBuilds = [ titlebars ] ++ lib.optional cfg.features.connectedWidgets hermesBridge;
     environment.etc."cybexos/fingerprint-enabled" = lib.mkIf cfg.authentication.fingerprint { text = "enabled\n"; };
     environment.etc."cybexos/proprietary-enabled" = lib.mkIf cfg.features.proprietary { text = "enabled\n"; };
     environment.etc."cybexos/developer-enabled" = lib.mkIf cfg.features.developer { text = "enabled\n"; };
@@ -138,7 +160,7 @@ in {
       description = "Remote Hermes WebUI desktop bridge";
       partOf = [ "hyprland-session.target" ]; wantedBy = [ "hyprland-session.target" ];
       serviceConfig = {
-        ExecStart = "${pkgs.callPackage ../packages/hermes-bridge.nix {}}/bin/cybexos-hermes-bridge --listen 127.0.0.1 --port 9120 --remote-only --state %h/.local/state/hermes-menubar/conversations.json --remote-auth-state %h/.local/state/hermes-menubar/remote-webui-auth.json";
+        ExecStart = "${hermesBridge}/bin/cybexos-hermes-bridge --listen 127.0.0.1 --port 9120 --remote-only --state %h/.local/state/hermes-menubar/conversations.json --remote-auth-state %h/.local/state/hermes-menubar/remote-webui-auth.json";
         UMask = "0077";
         Restart = "on-failure"; RestartSec = 2; RestartSteps = 8; RestartMaxDelaySec = "5min";
         TimeoutStopSec = 15;

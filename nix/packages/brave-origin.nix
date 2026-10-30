@@ -3,9 +3,10 @@
   # private actions and the selected-browser helper retain camera/IME support.
   commandLineArgs ? "--enable-features=TouchpadOverscrollHistoryNavigation,PipeWireCamera,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --enable-wayland-ime --restore-last-session --hide-crash-restore-bubble"
 }:
-# Reuse the machine Nixpkgs Chromium wrapper, libraries and sandbox policy.
-# The Origin edition is not yet selectable in that recipe. Remove this pin
-# when stable Nixpkgs packages Origin; review it on every vendor release.
+# Reuse the machine Nixpkgs Chromium wrapper, libraries and sandbox policy,
+# with Brave's own desktop and executable names. Nixpkgs (nixos-unstable) now
+# packages brave-origin under Origin's names; adopt it together with the
+# browser defaults and the 1Password host check. Review on every vendor release.
 (brave.override { inherit commandLineArgs; }).overrideAttrs (old: {
   pname = "brave-origin";
   version = "1.97.59";

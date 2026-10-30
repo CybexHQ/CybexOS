@@ -10,12 +10,14 @@ Nixpkgs supplies recipes. Nix normally substitutes their exact outputs from
 `cache.nixos.org`, with signature verification. Packages already in the store
 need neither download nor rebuild. A custom recipe, patch or dependency produces
 a different store identity; an upstream binary cannot replace that identity.
-Cybex OS requires its matched Hyprland/graphics/plugin stack. Dropping that
-compatibility overlay would remove required desktop functionality.
+On NixOS 26.05, Cybex OS needed a Hyprland/graphics compatibility overlay for
+its matched desktop stack, which compiled on every machine.
 
 The affected-machine investigation measured 294.387 seconds of preparation,
-including about 204 seconds in Hyprland's build. This UI change does not reduce
+including about 204 seconds in Hyprland's build. This UI change did not reduce
 that compilation time. See [the measurements](measurements/update-performance-2026-10-28.md).
+Cybex OS now follows nixos-unstable, which carries that stack prebuilt; the
+overlay is gone ([Prebuilt packages only](updates.md#prebuilt-packages-only)).
 
 ## Implemented behavior
 

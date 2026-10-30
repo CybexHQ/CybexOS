@@ -1,12 +1,12 @@
 # Hardware and security qualification
 
-The supported target is fresh x86_64 UEFI NixOS 26.05. Current implementation
-status is developmental. This document distinguishes declarations from tested
+The supported target is fresh x86_64 UEFI NixOS on the nixos-unstable branch.
+Current implementation status is developmental. This document distinguishes declarations from tested
 hardware support; no physical hardware was qualified during this implementation.
 
 | Area | Native implementation | Qualification still required |
 | --- | --- | --- |
-| Generic desktop | Hyprland pinned by the documented compatibility overlay; Quickshell and Qt from machine Nixpkgs; PipeWire, portals, Bluetooth, Gutenprint/free HPLIP printing and scanning, Orca/AT-SPI/speech-dispatcher, IBus typing booster, firmware/microcode, NetworkManager | Installed compositor/titlebar runtime, real login, suspend/resume, external displays and peripheral matrix |
+| Generic desktop | Hyprland, Quickshell and Qt prebuilt from machine Nixpkgs; PipeWire, portals, Bluetooth, Gutenprint/free HPLIP printing and scanning, Orca/AT-SPI/speech-dispatcher, IBus typing booster, firmware/microcode, NetworkManager | Installed compositor/titlebar runtime, real login, suspend/resume, external displays and peripheral matrix |
 | Encryption | LUKS2 root, ext4, separate ESP, zram; runtime ancestry verification gates automatic login | Encrypted fresh install/first boot, wrong/missing unlock, every persistent storage branch and swap |
 | Login/authentication | Encrypted: SDDM automatic login once per verified boot, GNOME Keyring unlocked from the disk passphrase; otherwise and after logout, password login; fingerprint/FIDO2 alternatives for sudo, Polkit and lock with password fallback; no crash relogin | Physical readers/keys, PAM failure paths, keyring unlock and lock-before-suspend |
 | Firewall | Enabled; LocalSend 53317 TCP/UDP and mDNS 5353 UDP; gaming ports explicitly opt-in | Packet-level tests, VPN routing, application/container interactions |

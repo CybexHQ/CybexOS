@@ -1,7 +1,8 @@
-# Nixpkgs 26.05 has no LPMd package. This narrow hardware pin restores Intel's
-# Panther Lake active-idle policy. Review new upstream releases and XPS power /
-# suspend behavior on each supported NixOS kernel update; drop the recipe when
-# Nixpkgs supplies the maintained package. It never pins another Nixpkgs tree.
+# Nixpkgs (nixos-unstable) has no LPMd package. This narrow hardware pin
+# restores Intel's Panther Lake active-idle policy. Review new upstream
+# releases and XPS power / suspend behavior on each supported NixOS kernel
+# update; drop the recipe when Nixpkgs supplies the maintained package. It
+# never pins another Nixpkgs tree.
 { lib, stdenv, fetchurl, autoreconfHook, pkg-config, autoconf-archive, gtk-doc,
   glib, libxml2, libnl, systemd, upower }:
 stdenv.mkDerivation {

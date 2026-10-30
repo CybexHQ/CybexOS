@@ -32,5 +32,6 @@ vendor `mkDefault` values. The primary user's shell uses priority 900 because
 NixOS also supplies it with `mkDefault`; a normal administrator definition wins.
 Use `mkForce` deliberately, not to hide conflicts.
 
-No updater changes `system.stateVersion`. Routine updates advance within 26.05;
-a major release upgrade requires explicit edits and fresh qualification.
+No updater changes `system.stateVersion`. Routine updates advance the rolling
+nixos-unstable branch, including when its NixOS version number moves on; a
+change to another Nixpkgs branch requires explicit edits and fresh qualification.

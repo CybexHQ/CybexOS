@@ -204,14 +204,39 @@ in {
     };
 
     # ── hardware and boot ───────────────────────────────────────────────────
-    # iVentoy's upstream NixOS hook inserts network-disk setup into the scripted
-    # stage-one init. It cannot patch systemd's binary init: that ISO boots Linux
-    # but then waits forever for the network-backed installation medium. Use the
-    # upstream live-media initrd here; installed machines retain systemd stage one.
-    boot.initrd.systemd.enable = lib.mkForce false;
-    # iVentoy needs the wired NIC before it can expose the network-backed ISO.
-    # In particular, the X1 Pro's RTL8125 (10ec:8125) uses r8169. The ordinary CD
-    # profile only carries storage drivers in its initrd; stage-two NICs are late.
+    # The medium boots with systemd stage 1 like installed machines: NixOS
+    # removed the scripted initrd. Stage 1 waits for the volume label
+    # (/dev/disk/by-label/CYBEXOS_INSTALL), which USB and optical media carry.
+    # iVentoy 1.0.41 boots its own init first: it unpacks its tools under
+    # /ventoy and this initrd into the same root, then patches the scripted
+    # /init to run its NixOS hook before the root mount. The hook brings up the
+    # wired NIC and attaches the ISO as /dev/nbd0 (its nbd-client carries
+    # systemd's keep-alive mark). systemd's binary /init cannot be patched, so
+    # this unit runs the same hook, only when iVentoy injected it, with
+    # iVentoy's bundled DHCP client on PATH. Network boots may take longer to
+    # find the label than local media.
+    boot.initrd.systemd.services.cybexos-network-medium = {
+      description = "Attach the iVentoy network installation medium";
+      wantedBy = [ "initrd.target" ];
+      before = [ "initrd-root-device.target" "sysroot-iso.mount" ];
+      after = [ "systemd-udevd.service" "systemd-udev-trigger.service" "systemd-modules-load.service" ];
+      unitConfig = {
+        DefaultDependencies = false;
+        ConditionPathExists = "/ventoy/hook/nixos/ventoy_disk.sh";
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        Environment = "PATH=/ventoy/tools:/ventoy/busybox:/bin:/sbin";
+        ExecStart = "/ventoy/busybox/sh /ventoy/hook/nixos/ventoy_disk.sh";
+        StandardOutput = "journal+console";
+        TimeoutStartSec = "5min";
+      };
+    };
+    boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec = "5min";
+    # A network-medium hook needs the wired NIC in stage 1; the ordinary CD
+    # profile only carries storage drivers there. In particular, the X1 Pro's
+    # RTL8125 (10ec:8125) uses r8169.
     boot.initrd.availableKernelModules = [
       "af_packet" "nbd"
       "r8169" "r8152" "igc" "igb" "e1000e" "e1000" "ixgbe"
@@ -219,6 +244,9 @@ in {
     ];
     # Keep serial diagnostics, but send /dev/console prompts to the local screen.
     boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" ];
+    # The medium supports ZFS but never boots from a pool: take NixOS's
+    # forthcoming default rather than forcibly importing a root pool.
+    boot.zfs.forceImportRoot = false;
     # The screen draws with the CPU through any KMS driver (amdgpu, i915/xe,
     # nouveau, virtio) or the firmware framebuffer (simpledrm with nomodeset),
     # so the medium needs no GPU userspace and no separate NVIDIA kernel. The

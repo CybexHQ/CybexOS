@@ -13,7 +13,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lifecycle'))
 from cybexos.common import Failure, atomic, read
-from cybexos.trust import Fetcher, REPO, validate_release, verify, version
+from cybexos.trust import Fetcher, NIXOS, REPO, validate_release, verify, version
 
 REQUIRED = {
     'encrypted-install', 'plain-install', 'installation-parity', 'upstream-only', 'cybexos-only',
@@ -67,9 +67,9 @@ def manifest(directory, release_version, revision, nar_hash, notes, dependencies
         assets.append({'name': path.name, 'url': f'https://github.com/{REPO}/releases/download/v{release_version}/{path.name}',
                        'sha256': checksum, 'bytes': path.stat().st_size})
     result = {'schema': 1, 'version': release_version, 'revision': revision, 'narHash': nar_hash,
-              'architectures': ['x86_64-linux'], 'nixos': ['26.05'], 'configurationApi': 1, 'pluginApi': 1,
+              'architectures': ['x86_64-linux'], 'nixos': [NIXOS], 'configurationApi': 1, 'pluginApi': 1,
               'minUpdater': 1, 'notes': notes, 'assets': assets, 'vendorInputs': dependencies}
-    validate_release(result, '0.0.0', 'x86_64-linux', '26.05', 'beta')
+    validate_release(result, '0.0.0', 'x86_64-linux', NIXOS, 'beta')
     atomic(directory / 'manifest.json', result, 0o644)
 
 
@@ -77,7 +77,7 @@ def channel(manifest_path, name, sequence, previous=None, trust=None, fetch=None
     if not isinstance(trust, dict):
         raise Failure('Channel promotion requires publisher trust')
     release = verify(manifest_path.read_bytes(), Path(str(manifest_path) + '.sig').read_bytes(), trust, 'release')
-    validate_release(release, '0.0.0', 'x86_64-linux', '26.05', name)
+    validate_release(release, '0.0.0', 'x86_64-linux', NIXOS, name)
     if sequence < 1:
         raise Failure('Channel sequence must be positive and strictly advance the published channel')
     if previous is not None:
@@ -96,7 +96,7 @@ def channel(manifest_path, name, sequence, previous=None, trust=None, fetch=None
         if hashlib.sha256(body).hexdigest() != old['sha256']:
             raise Failure('Published channel release identity mismatch')
         old_release = verify(body, fetch.get(old['manifest'] + '.sig'), trust, 'release')
-        validate_release(old_release, '0.0.0', 'x86_64-linux', '26.05', name)
+        validate_release(old_release, '0.0.0', 'x86_64-linux', NIXOS, name)
         if old['manifest'] != f'https://github.com/{REPO}/releases/download/v{old_release["version"]}/manifest.json':
             raise Failure('Published channel and release version disagree')
         if version(release['version']) < version(old_release['version']):

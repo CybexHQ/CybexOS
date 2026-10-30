@@ -11,7 +11,7 @@ let
   });
   previewFlake = pkgs.writeText "cybexos-preview-flake.nix" ''
     {
-      inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+      inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
       inputs.cybexos.url = "path:${../..}";
       inputs.cybexos.inputs.nixpkgs.follows = "nixpkgs";
       outputs = { nixpkgs, cybexos, ... }: {
@@ -43,8 +43,6 @@ in pkgs.testers.runNixOSTest {
     virtualisation = { memorySize = 4096; cores = 4; graphics = true; diskSize = 4096; };
     networking.hostName = "machine";
     users.users.tester.initialPassword = "qualification-only";
-    # As in machine.nix: the languages a regional preview may choose from.
-    i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" "nl_NL.UTF-8/UTF-8" ];
     # Retain the complete candidate and its exact input sources. Staging must
     # use the real Nix/updater path without requiring external delivery in a VM.
     system.extraDependencies = inputSources ++ [ candidate previewFlake initialLock pkgs.hello pkgs.sshpass ];

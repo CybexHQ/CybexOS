@@ -13,15 +13,26 @@ from urllib.parse import urlencode
 from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse, read, syncdir
 from . import inputs
 from .trust import Fetcher, NoPublishedRelease, discover, version
-from . import review, firmware
+from . import review, firmware, prebuilt
 from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
 BUSY = ('discovering', 'building', 'validating', 'activating', 'recovering', 'firmware')
 UPSTREAM_METADATA = ('nix', 'flake', 'metadata', '--refresh', '--json',
-                     'github:NixOS/nixpkgs/nixos-26.05')
+                     'github:NixOS/nixpkgs/nixos-unstable')
 UPSTREAM_LOOKUP_FAILED = 'Nix metadata lookup failed. Check network access and Nix configuration.'
 UPSTREAM_LOOKUP_TIMEOUT = 'Nix metadata lookup timed out. Check network access and retry when connected.'
+
+
+class NotPrebuilt(Failure):
+    """A candidate would compile Nixpkgs packages NixOS has not built yet."""
+    def __init__(self, names):
+        self.names = list(names)
+        shown = ', '.join(self.names[:5]) + (f' and {len(self.names) - 5} more' if len(self.names) > 5 else '')
+        super().__init__(f"NixOS hasn't finished building {len(self.names)} "
+                         f"package{'s' if len(self.names) != 1 else ''} in this change yet ({shown}). "
+                         'Nothing was changed. Cybex OS installs prebuilt packages only; '
+                         'try again after NixOS has built them.')
 
 
 def upstream_discovery_error(output):
@@ -139,7 +150,7 @@ class Engine:
             previous = {'schema': 1, 'startedAt': now, 'phase': '', 'error': '', 'notes': '',
                         'changes': '', 'packageChanges': [], 'highlights': None, 'reviewToken': None, 'inputs': {},
                         'recovery': '', 'retry': '', 'restart': '', 'requestId': None,
-                        'workerUnit': None, 'software': None, 'firmware': None}
+                        'workerUnit': None, 'software': None, 'firmware': None, 'notPrebuilt': None}
         if (values.get('state', previous.get('state')) != previous.get('state')
                 or values.get('phase', previous.get('phase')) != previous.get('phase')):
             previous['phaseStartedAt'] = now
@@ -232,7 +243,7 @@ class Engine:
                                       'detail': 'Stage upstream to build and review actual package changes.'}
         if problem:
             result['upstream'] = {'state': 'unreachable', 'error':
-                'Nixpkgs (nixos-26.05) package-source status is unknown. ' + problem +
+                'Nixpkgs (nixos-unstable) package-source status is unknown. ' + problem +
                 ' Run `' + ' '.join(UPSTREAM_METADATA) + '` locally for read-only diagnostics.'}
         try:
             candidate, sequence = self.channel()
@@ -352,6 +363,10 @@ class Engine:
                     atomic(tx / 'channel.json', {'channel': read(self.policy)['channel'], 'sequence': sequence})
                 self.status(state='building', phase='Downloading inputs and building the complete system')
                 self.archive(config, tx)
+                if kind in ('update', 'software'):
+                    self.status(phase='Checking that every package is prebuilt')
+                    self.require_prebuilt(config)
+                    self.status(phase='Downloading inputs and building the complete system')
                 if region is not None:
                     from .configuration import verify_region
                     verify_region(config, region, self.run)
@@ -403,12 +418,35 @@ class Engine:
                 for authorization in retry_authorizations:
                     authorization.unlink(missing_ok=True)
                 return record
+            except NotPrebuilt as error:
+                self.status(state='failed', phase='Waiting for NixOS to finish building this change', error=str(error),
+                            notPrebuilt=error.names, retry='Prepare again after NixOS has built these packages.')
+                raise
             except BaseException as error:
                 self.status(state='failed', phase='Staging failed; working system retained', error=str(error),
                             retry='Stage upstream explicitly to retain the installed Cybex OS version.' if scope == 'both' else 'Correct the failure and stage again.')
                 raise
             finally:
                 self.run.log = None
+
+    def require_prebuilt(self, config):
+        """Refuse a candidate that would compile Nixpkgs packages here.
+
+        A dry run against this computer's store and configured caches; nothing
+        is built. Configuration, fixed-output downloads and the system's
+        expected local builds (Cybex OS's own packages, unfree vendor
+        downloads, kernel modules, `cybexos.updates.expectedBuilds`) are fine.
+        """
+        build = f'path:{config}#nixosConfigurations.cybexos.config.system.build'
+        root = self.nix('eval', '--raw', '--no-update-lock-file', build + '.toplevel.drvPath').strip()
+        expected = parse(self.nix('eval', '--json', '--no-update-lock-file', build + '.cybexosExpectedBuilds'))
+        if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root) or not isinstance(expected, list)
+                or any(not isinstance(item, str) for item in expected)):
+            raise Failure('The candidate system has no valid build plan.')
+        plan = prebuilt.dry_run(self.run, build + '.toplevel', options=('--no-update-lock-file',))
+        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected) if plan['build'] else []
+        if found:
+            raise NotPrebuilt(found)
 
     def git_metadata_record(self, root):
         key = hashlib.sha256(str(Path(root).resolve()).encode()).hexdigest()
@@ -561,6 +599,18 @@ class Engine:
                 self.select_config(tx / 'config', identifier)
                 self.profile(record['system'])
                 self.reject_new_failures(previously_failed)
+                if self.packages_only(record, tx):
+                    # Only the installed packages changed: the same kernel, initrd,
+                    # boot parameters and configuration apart from Software's own
+                    # declaration. Activation and health passed, so the new
+                    # generation becomes the default without a trial boot. The
+                    # recovery record moves to the boot phase first: a crash
+                    # before the commit restores the previous generation.
+                    atomic(self.pending_path, record | {'phase': 'boot', 'bootId': self.boot_id()})
+                    self.run('cybexos-boot-trial', '--commit', record['system'])
+                    atomic(tx / 'good.json', {'at': int(time.time())})
+                    self.finish_confirmation(record, 'Installed. System services and the desktop passed health checks.')
+                    return
                 # Keep the previous boot as default and try the candidate once.
                 # A failed boot therefore does not strand the next boot on it.
                 self.run('cybexos-boot-trial', record['system'], record['previousSystem'])
@@ -693,12 +743,31 @@ class Engine:
             atomic(tx / 'good.json', {'at': int(time.time())})
             self.finish_confirmation(record)
 
-    def finish_confirmation(self, record):
+    def packages_only(self, record, tx):
+        """Does this Software change differ from the deployed system only in packages?"""
+        if record.get('changeKind') != 'software':
+            return False
+        def tree(root):
+            root = Path(root).resolve()
+            return {str(path.relative_to(root)): (path.read_bytes() if path.is_file() else None)
+                    for path in configuration_paths(root)
+                    if str(path.relative_to(root)) != 'local/software.json'}
+        def boot(system):
+            system = Path(system)
+            return [os.path.realpath(system / 'kernel'), os.path.realpath(system / 'initrd'),
+                    (system / 'kernel-params').read_text() if (system / 'kernel-params').exists() else None]
+        try:
+            return (tree(tx / 'config') == tree(self.state / 'deployed')
+                    and boot(record['system']) == boot(record['previousSystem']))
+        except OSError:
+            return False
+
+    def finish_confirmation(self, record, phase='Boot, login, system services, Hyprland and Quickshell passed health checks.'):
         """Idempotent finalization after the durable successful-health marker."""
         link(self.tx(record['id']) / 'config', self.state / 'deployed')
         # Publish the completed state before removing the recovery record. A
         # crash after unlink must never leave an unconfirmable awaiting-login UI.
-        self.status(state='done', phase='Boot, login, system services, Hyprland and Quickshell passed health checks.',
+        self.status(state='done', phase=phase,
                     recovery='Known-good generation and all input identities retained against garbage collection.', restart='None')
         self.pending_path.unlink(missing_ok=True)
         syncdir(self.state)

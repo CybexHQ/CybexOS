@@ -3,7 +3,7 @@
 The machine owns `/etc/nixos/flake.nix` and `flake.lock`:
 
 ```nix
-inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 inputs.cybexos.url = "github:DigitalPals/CybexOS/EXACT_AUTHENTICATED_REVISION";
 inputs.cybexos.inputs.nixpkgs.follows = "nixpkgs";
 ```
@@ -13,24 +13,19 @@ The updater rejects duplicate Nixpkgs universes and unrelated lock changes.
 Upstream binaries use `cache.nixos.org`; no extra cache key is implicitly trusted.
 
 The installer and every installed hardware profile default to
-`linuxPackages_latest` from that same stable Nixpkgs input. Upstream staging
+`linuxPackages_latest` from that same nixos-unstable Nixpkgs input. Upstream staging
 therefore advances the kernel with Nixpkgs, without a separate kernel input or
 a hardware-specific series pin. Personal `boot.kernelPackages` declarations
 remain machine-owned. The narrow Linux 7.3 ZFS backport in
 `nix/kernel-packages.nix` keeps the installation medium's filesystem support
 enabled until Nixpkgs supplies a compatible ZFS release; unsupported future
 kernel/module combinations still fail their normal compatibility checks.
-For Linux 7.3, the same package set uses upstream Nixpkgs' production NVIDIA
-595.112.07 point release until stable supplies it. The machine's own driver
-recipe builds its matching userspace and kernel modules; the supported
-580 closed branch remains independently selected.
+NVIDIA drivers come from that kernel package set's own Nixpkgs driver
+packages: the open modules follow NVIDIA's `stable` driver branch (595 for
+Linux 7.3), and the supported 580 closed branch remains independently selected.
 
-The 26.05 package set needs a narrowly scoped Hyprland 0.56.2/hyprutils 0.14
-compatibility overlay for the existing Lua desktop and native titlebars, plus a
-scoped build-time Wayland protocol pin and the required Aquamarine source fix.
-It uses Nixpkgs recipes and the single machine package universe. `nix/desktop-compatibility.nix`
-records exact source identities; remove it after stable catches up and the
-runtime qualifies. Other upstream inputs continue to advance independently.
+Hyprland, hypridle and their libraries come from Nixpkgs unchanged; there is
+no compatibility overlay. Other upstream inputs continue to advance independently.
 
 `cybex update check` checks upstream and Cybex OS independently. An unreachable
 source is unknown/unavailable, never reported current. Nixpkgs checks identify
@@ -156,7 +151,7 @@ Discovery creates no deployment or transaction log. Its public error includes
 this read-only diagnostic command, which can be run locally without elevation:
 
 ```sh
-nix flake metadata --refresh --json github:NixOS/nixpkgs/nixos-26.05
+nix flake metadata --refresh --json github:NixOS/nixpkgs/nixos-unstable
 ```
 
 Checks classify command diagnostics internally and publish only static guidance;
@@ -226,9 +221,32 @@ is consumed only after a successful preview. Recovery is separate from
 authenticated normal updates; a channel
 cannot use a lower semantic version as a normal update.
 
-Advancing 26.05 is routine. Changing the root stable branch is a deliberate major
-upgrade and currently requires new compatibility qualification. Never change
-`system.stateVersion` as part of a routine update.
+nixos-unstable is a rolling branch: advancing it is routine, including when
+its NixOS version moves on (26.11, then later). Release metadata and
+`/etc/cybexos/release.json` name the branch (`"nixos": ["unstable"]`), not a
+version. Never change `system.stateVersion` as part of a routine update.
+
+## Prebuilt packages only
+
+Every Nixpkgs package comes prebuilt from the configured cache
+(`cache.nixos.org`); the updater holds back a Nixpkgs revision that NixOS has
+not finished building (`lifecycle/cybexos/prebuilt.py`). Cybex OS's modules
+use NixOS's cached default builds: Hyprland and its portal as Nixpkgs builds
+them, Xwayland without a font path, and every glibc locale. What builds on the
+computer by design:
+
+- Cybex OS's own packages and hardware stacks, and its NetworkManager
+  Libreswan path fix;
+- unfree vendor downloads, which NixOS never caches: Brave Origin,
+  1Password, Spotify, ChatGPT, Claude Code, Steam and NVIDIA's userspace,
+  with NVIDIA's 32-bit EGL platform libraries for Steam;
+- out-of-tree kernel modules (NVIDIA, the XPS camera, the medium's ZFS);
+- the machine's own configuration: initrd, PAM, setuid wrappers, dconf.
+
+A package you deliberately build from source goes in
+`cybexos.updates.expectedBuilds` in your personal configuration. Releases run
+`scripts/check-prebuilt`, `--nvidia` and `--catalogue` (every Software profile
+app); each lists any other build and exits 1.
 
 ## Release delivery prerequisite
 

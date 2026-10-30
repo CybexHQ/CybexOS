@@ -10,6 +10,12 @@ downloads, kernel modules) are allowed. Anything else is a Nixpkgs package
 that NixOS has not prebuilt, or a configuration that changed one; the command
 lists those and exits 1.
 
+NixOS generates much of a system's configuration (pam.d, the initrd, setuid
+wrappers, dconf and AppArmor rules) without marking it local-only. Such a
+derivation has no source of its own (`src`/`srcs`; `prebuilt.kind`): it is
+listed on stderr as configuration, and its inputs are still checked, so a
+package it would compile is still reported.
+
     scripts/check-prebuilt                       # the default product system
     scripts/check-prebuilt --nvidia              # with NVIDIA drivers
     scripts/check-prebuilt --catalogue           # plus every Software profile app
@@ -30,6 +36,14 @@ from cybexos.prebuilt import kind, name  # noqa: E402
 NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
 
 
+def nix(*arguments):
+    """Nix's stdout; on failure, exit with Nix's own error message."""
+    result = subprocess.run(NIX + list(arguments), capture_output=True, text=True)
+    if result.returncode:
+        sys.exit(result.stderr.strip() or 'nix ' + arguments[0] + ' failed')
+    return result.stdout
+
+
 def evaluate(nvidia, packages):
     expression = '''
       let
@@ -46,8 +60,7 @@ def evaluate(nvidia, packages):
            expected = system.config.system.build.cybexosExpectedBuilds; }
     ''' % {'root': json.dumps(str(ROOT)), 'nvidia': 'true' if nvidia else 'false',
            'packages': json.dumps(json.dumps(packages))}
-    return json.loads(subprocess.run(NIX + ['eval', '--impure', '--json', '--expr', expression],
-                                     check=True, capture_output=True, text=True).stdout)
+    return json.loads(nix('eval', '--impure', '--json', '--expr', expression))
 
 
 def cached(path):
@@ -62,10 +75,9 @@ def cached(path):
 
 
 def walk(root, expected):
-    graph = json.loads(subprocess.run(NIX + ['derivation', 'show', '-r', root],
-                                      check=True, capture_output=True, text=True).stdout)
+    graph = json.loads(nix('derivation', 'show', '-r', root))
     graph = {k if k.startswith('/nix/store/') else '/nix/store/' + k: v for k, v in graph.items()}
-    expected, seen, frontier, found, local = set(expected), set(), [root], set(), 0
+    expected, seen, frontier, found, configured, local = set(expected), set(), [root], set(), set(), 0
     with ThreadPoolExecutor(32) as pool:
         while frontier:
             batch = [d for d in dict.fromkeys(frontier) if d not in seen and d not in expected]
@@ -78,12 +90,14 @@ def walk(root, expected):
                     continue
                 local += 1
                 sort = kind(graph[drv])
+                if sort == 'configuration':
+                    configured.add(name(drv))
                 if sort == 'compile':
                     found.add(name(drv))
-                elif sort == 'trivial':
+                elif sort in ('trivial', 'configuration'):
                     frontier.extend(k if k.startswith('/nix/store/') else '/nix/store/' + k
                                     for k in graph[drv].get('inputDrvs') or {})
-    return sorted(found), local
+    return sorted(found), sorted(configured), local
 
 
 def main():
@@ -97,8 +111,10 @@ def main():
         apps = {app['id']: app for app in catalogue['apps']}
         packages = sorted({apps[i]['attribute'] for p in catalogue['profiles'] for i in p['apps']})
     info = evaluate(arguments.nvidia, packages)
-    found, local = walk(info['root'], info['expected'])
+    found, configured, local = walk(info['root'], info['expected'])
     print(f'{local} derivations build locally; {len(info["expected"])} expected local builds allowed.', file=sys.stderr)
+    if configured:
+        print(f'{len(configured)} configuration builds: ' + ', '.join(configured), file=sys.stderr)
     for item in found:
         print(item)
     return 1 if found else 0

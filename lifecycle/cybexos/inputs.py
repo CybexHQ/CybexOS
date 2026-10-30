@@ -14,11 +14,11 @@ def resolved(lock, name):
     return lock['nodes'][value]
 
 
-def validate_machine(lock, branch='nixos-26.05'):
+def validate_machine(lock, branch='nixos-unstable'):
     upstream, vendor = resolved(lock, 'nixpkgs'), resolved(lock, 'cybexos')
     original = upstream['original']
     if original != {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'ref': branch}:
-        raise Failure('Upstream must follow the selected supported stable NixOS branch; major upgrades are deliberate.')
+        raise Failure('Upstream must follow the nixos-unstable branch that Cybex OS supports.')
     if vendor['inputs'].get('nixpkgs') != ['nixpkgs']:
         raise Failure('Cybex OS must follow the machine nixpkgs input')
     selected = vendor.get('locked', {})

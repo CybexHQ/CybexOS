@@ -1,6 +1,6 @@
-# Nixpkgs' chatgpt currently packages only the macOS application. This is the
-# official Linux preview, pinned to the versioned Debian pool object. Replace
-# this recipe with a maintained native Nixpkgs package after runtime review.
+# The official Linux preview, pinned to the versioned Debian pool object.
+# Nixpkgs (nixos-unstable) now packages chatgpt for x86_64 Linux as well;
+# replace this recipe with it after runtime and AppArmor review.
 # Source SHA-256 was verified against OpenAI's signed APT InRelease/Packages,
 # key fingerprint 3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4, on 2026-10-22.
 { lib, stdenv, fetchurl, dpkg, autoPatchelfHook, makeWrapper, wrapGAppsHook3,

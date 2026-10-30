@@ -34,7 +34,7 @@ in {
   config = lib.mkMerge [ (lib.mkIf (cfg.enable || cfg.installationMedium) {
     # The medium authenticates its own release with the same trust and policy.
     environment.etc."cybexos/trust.json".text = builtins.toJSON { schema = 1; keys = cfg.updates.trustKeys; };
-    environment.etc."cybexos/update.json".text = builtins.toJSON { schema = 1; channel = cfg.updates.channel; branch = "nixos-26.05"; };
+    environment.etc."cybexos/update.json".text = builtins.toJSON { schema = 1; channel = cfg.updates.channel; branch = "nixos-unstable"; };
   }) (lib.mkIf cfg.enable {
     environment.etc."cybexos/health-services.json".text = builtins.toJSON {
       schema = 1;

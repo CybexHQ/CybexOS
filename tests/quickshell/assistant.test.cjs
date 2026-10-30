@@ -247,10 +247,14 @@ test("the installation feature carries the service, the agents and the menubar",
     assert.match(desktop, /ExecStart = "\$\{assistant\}\/bin\/cybexos-assistant serve";/);
     assert.match(desktop, /path = \[ config\.system\.path \];\s*serviceConfig = \{\s*ExecStart = "\$\{assistant\}/);
     const applications = repo("nix/modules/applications.nix");
-    assert.match(applications, /lib\.optionals \(cfg\.features\.proprietary && \(cfg\.features\.developer \|\| cfg\.features\.assistant\)\) \[ claude-code \]/,
+    // The agentic OS always carries an agent CLI: Codex everywhere, and Claude
+    // Code whenever unfree packages are allowed (it is unfree).
+    assert.match(applications, /# The agent CLIs are part of every installation\. Claude Code is unfree\.\s*codex\s*\]/);
+    assert.match(applications, /lib\.optionals cfg\.features\.proprietary \[[^\]]*claude-code \]/,
         "Claude Code is unfree: it still needs the proprietary feature");
-    assert.match(applications, /lib\.optionals cfg\.features\.assistant \[ assistant codex \]/);
-    assert.match(repo("installer/cybexos-install"), /\('assistant', 'Cybex OS Assistant'\)/);
+    assert.match(applications, /lib\.optionals cfg\.features\.assistant \[ assistant \]/);
+    // The installer offers no switch for it: every installation includes it.
+    assert.match(repo("installer/cybexos-install"), /the assistant is always\s*# included/);
     assert.match(repo("lifecycle/cybexos/cli.py"), /for name in \('agent', 'assistant', 'backup', 'report', 'doctor'\):/);
     assert.match(read("Common/Settings.qml"), /readonly property bool assistantConfigured:\s*Quickshell\.env\("CYBEXOS_ASSISTANT"\) !== "0"/);
 });

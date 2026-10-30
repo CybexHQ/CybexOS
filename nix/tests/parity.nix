@@ -53,7 +53,7 @@ let
         firmwareEntries = map (boot: boot.efiBootloaderId) c.boot.loader.grub.mirroredBoots;
         selection = builtins.fromJSON c.environment.etc."cybexos/boot.json".text;
       };
-      quiet = { inherit (c.boot) consoleLogLevel; inherit (c.boot.initrd) verbose; params = lib.take 6 c.boot.kernelParams; };
+      quiet = { inherit (c.boot) consoleLogLevel; params = lib.take 6 c.boot.kernelParams; };
     };
     fonts = map toString c.fonts.packages;
     compositor = c.programs.hyprland.package.version;
@@ -150,6 +150,16 @@ let
   ui = installer.systemd.services.cybexos-installer-ui;
 in
 assert live == installed;
+# Prebuilt packages only: NixOS's cached default builds, not module variants
+# (Hyprland's NO_UWSM rebuild and its portal, a font-path Xwayland, a locale
+# subset). UWSM stays off. The release follows the nixos-unstable branch.
+assert generic.programs.hyprland.package.drvPath == pkgs.hyprland.drvPath;
+assert generic.programs.hyprland.portalPackage.drvPath == pkgs.xdg-desktop-portal-hyprland.drvPath;
+assert generic.programs.xwayland.package.drvPath == pkgs.xwayland.drvPath;
+assert generic.i18n.glibcLocales.drvPath == pkgs.glibcLocales.drvPath;
+assert !generic.programs.uwsm.enable;
+assert (builtins.fromJSON (medium "release.json")).nixos == "unstable";
+assert installed.updates.branch == "nixos-unstable";
 # All default profiles, including the live medium, must boot the same latest
 # kernel. Force the ZFS module's compatibility check, not just kernel scalars.
 assert lib.all (c: c.boot.kernelPackages.kernel == pkgs.linuxPackages_latest.kernel)
@@ -208,11 +218,11 @@ assert installed.bootBrand.menu.theme == toString installer.isoImage.grubTheme;
 assert installed.bootBrand.menu.enable && installed.bootBrand.menu.efiSupport;
 assert installed.bootBrand.menu.firmwareEntries == [ "CybexOS" ];
 assert installed.bootBrand.menu.selection == { loader = "grub"; menu = "/boot/grub/grub.cfg"; environment = "/boot/grub/grubenv"; };
-assert installed.bootBrand.quiet == { consoleLogLevel = 0; verbose = false; params = [
+assert installed.bootBrand.quiet == { consoleLogLevel = 0; params = [
   "quiet" "udev.log_level=3" "rd.udev.log_level=3"
   "systemd.show_status=false" "rd.systemd.show_status=false" "vt.global_cursor_default=0"
 ]; };
-assert installer.boot.consoleLogLevel == 0 && !installer.boot.initrd.verbose;
+assert installer.boot.consoleLogLevel == 0;
 assert lib.all (param: lib.elem param installer.boot.kernelParams) installed.bootBrand.quiet.params;
 assert lib.elem "plymouth.ignore-serial-consoles" installer.boot.kernelParams;
 # The menu stays hidden for a second; GRUB marks each start, the system clears

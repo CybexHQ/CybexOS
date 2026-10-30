@@ -1,6 +1,7 @@
-# T3 Code's desktop is not in the selected stable Nixpkgs. Keep the connected
-# widget's supported desktop client exact and immutable; review its release and
-# bar API together. Replace with Nixpkgs when an equivalent package is available.
+# The T3 Code desktop client the connected widget's bar API was reviewed with,
+# exact and immutable: a nightly AppImage (Nixpkgs' t3code is the 0.1.2
+# release, with another desktop entry). Review its release and bar API together.
+# Replace with Nixpkgs' t3code once it carries an equivalent client.
 { lib, appimageTools, fetchurl, makeDesktopItem }:
 let
   pname = "t3code-desktop";
@@ -10,7 +11,7 @@ let
     url = "https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-x86_64.AppImage";
     sha256 = "cdda407bf1bdff08f6de5d939f451ea83b8bb927332b669fe00cda8b15b7eea3";
   };
-  contents = appimageTools.extractType2 { inherit pname version src; };
+  contents = appimageTools.extract { inherit pname version src; };
   desktop = makeDesktopItem {
     name = "t3code-nightly";
     desktopName = "T3 Code";

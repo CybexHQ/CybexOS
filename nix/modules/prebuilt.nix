@@ -13,7 +13,7 @@ let
     || lib.hasPrefix "cybexos-" (package.pname or package.name or "");
   candidates = config.environment.systemPackages ++ config.fonts.packages
     ++ config.boot.plymouth.themePackages ++ config.networking.networkmanager.plugins
-    ++ config.hardware.firmware ++ config.services.udev.packages ++ config.systemd.packages;
+    ++ lib.toList config.hardware.firmware ++ config.services.udev.packages ++ config.systemd.packages;
   expected = builtins.filter (package: lib.isDerivation package && (unfree package || ours package)) candidates
     ++ config.boot.extraModulePackages
     ++ lib.optional (lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package

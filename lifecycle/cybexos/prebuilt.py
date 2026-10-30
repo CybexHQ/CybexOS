@@ -43,9 +43,9 @@ def parse_dry_run(text):
     return result
 
 
-def dry_run(run, *installables, timeout=900):
+def dry_run(run, *installables, options=(), timeout=900):
     """Build/fetch plan for flake installables without building anything."""
-    output = run('nix', 'build', '--dry-run', '--no-link', *installables,
+    output = run('nix', 'build', '--dry-run', '--no-link', *options, *installables,
                  timeout=timeout, sensitive=True, diagnostics=True)
     return parse_dry_run(output)
 
@@ -62,13 +62,22 @@ def attributes(env):
 
 
 def kind(info):
-    """`fetch` (fixed output), `trivial` (local-only by design) or `compile`."""
+    """How a derivation that is not in any cache gets built here.
+
+    `fetch`: a fixed-output download. `trivial`: marked local-only by design.
+    `configuration`: no source of its own (`src`/`srcs`); NixOS generates
+    pam.d, the initrd, setuid wrappers, dconf and AppArmor rules this way
+    without marking them local-only. `compile`: everything else, a package
+    built from its source on this computer.
+    """
     if any(isinstance(output, dict) and 'hash' in output for output in (info.get('outputs') or {}).values()):
         return 'fetch'
     attrs = attributes(info.get('env') or {})
-    local = attrs.get('preferLocalBuild') in (True, '1')
-    unsubstitutable = attrs.get('allowSubstitutes') in (False, '')
-    return 'trivial' if local or unsubstitutable else 'compile'
+    if attrs.get('preferLocalBuild') in (True, '1') or attrs.get('allowSubstitutes') in (False, ''):
+        return 'trivial'
+    if not any(attrs.get(key) for key in ('src', 'srcs')):
+        return 'configuration'
+    return 'compile'
 
 
 def show(run, derivations):
@@ -85,10 +94,11 @@ def show(run, derivations):
 def compiles(run, derivations, *, root=None, expected=()):
     """Names of real builds that are not expected local builds.
 
-    Starting from `root` (when given), descend through trivial derivations
-    only: anything needed solely to build an expected derivation (Cybex OS's
-    own packages, unfree vendor downloads) is covered by that expectation.
-    Without a root every non-trivial, unexpected derivation counts.
+    Starting from `root` (when given), descend through trivial and
+    configuration derivations only: anything needed solely to build an
+    expected derivation (Cybex OS's own packages, unfree vendor downloads) or
+    a compiled one is covered by it. Without a root every unexpected compile
+    counts.
     """
     pending = set(derivations)
     graph = show(run, sorted(pending))
@@ -108,7 +118,7 @@ def compiles(run, derivations, *, root=None, expected=()):
         if sort == 'compile':
             found.append(name(current))
             continue
-        if sort == 'trivial':
+        if sort in ('trivial', 'configuration'):
             for child in graph[current].get('inputDrvs') or {}:
                 child = child if child.startswith('/nix/store/') else '/nix/store/' + child
                 if child in pending:

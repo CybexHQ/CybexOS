@@ -88,7 +88,8 @@ if features.developer_tools then
   bind(mainMod .. " + D", hl.dsp.exec_cmd(terminal .. " " .. lazydocker),
     { description = "Development: Docker (lazydocker)" }, "development.docker-lazydocker")
 end
-if features.connected_widgets then
+-- T3 Code comes with the developer tools (Software Development profile).
+if features.developer_tools then
   bind(mainMod .. " + T", hl.dsp.exec_cmd("t3code-desktop"), { description = "Apps: T3 Code" }, "apps.t3-code")
 end
 bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd(terminal .. " btop"), { description = "Apps: System monitor" }, "apps.system-monitor")

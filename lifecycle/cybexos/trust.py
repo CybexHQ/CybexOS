@@ -15,6 +15,9 @@ from .common import Failure, atomic, parse, read
 
 API = 1
 REPO = 'DigitalPals/CybexOS'
+# The Nixpkgs branch a release follows: release.json's "nixos" and an entry of
+# signed release metadata's "nixos" list. A branch identity, not a version.
+NIXOS = 'unstable'
 CHANNEL_BASE = f'https://digitalpals.github.io/{REPO.split("/")[1]}/channels'
 SEMVER = re.compile(r'^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(beta|rc)\.([1-9][0-9]*))?$')
 
@@ -144,7 +147,7 @@ def validate_release(release, installed, architecture, nixos, channel):
     if release['schema'] != 1 or release['configurationApi'] != 1 or release['pluginApi'] != 1 or release['minUpdater'] > API:
         raise Failure('Release requires a newer updater or incompatible configuration/plugin API')
     if architecture not in release['architectures'] or nixos not in release['nixos']:
-        raise Failure('Release does not support this architecture or NixOS release')
+        raise Failure('Release does not support this architecture or NixOS branch')
     selected_version = version(release['version'])
     if channel == 'stable' and '-' in release['version']:
         raise Failure('Stable channel contains a prerelease')

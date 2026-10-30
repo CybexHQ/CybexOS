@@ -102,26 +102,30 @@ trust. Increasing updater/schema requirements requires an overlap release that
 old updaters can authenticate and install.
 
 Nixpkgs supplies Quickshell, Qt, Hyprland, applications and fonts through the
-machine's stable Nixpkgs input and upstream binary cache. Cybex OS supplies the
-desktop interface, assets, native notification-image module and extensions.
-Narrow Intel camera/OMaWrite/font source pins and the temporary Hyprland/native
-library compatibility overlay are source derivations, not another Nixpkgs
-universe; requalify their ABI/license constraints when updating them.
-T3 Code is an exact hashed upstream AppImage wrapped with Nixpkgs because the
-selected stable package set does not provide the application. Replace that
-source recipe with the maintained Nixpkgs package when available, after product
-runtime qualification; its successful wrapper build is not desktop validation.
-The selected stable Nixpkgs ChatGPT recipe is macOS-only. The Linux recipe pins
-OpenAI's versioned Debian pool object and SHA-256, reviewed against the signed
+machine's nixos-unstable Nixpkgs input and upstream binary cache, prebuilt.
+Cybex OS supplies the desktop interface, assets, native notification-image
+module and extensions. Narrow Intel camera/OMaWrite/font source pins are source
+derivations, not another Nixpkgs universe; requalify their ABI/license
+constraints when updating them. Before publishing, `scripts/check-prebuilt`,
+`--nvidia` and `--catalogue` must report no build beyond the expected ones
+([Prebuilt packages only](updates.md#prebuilt-packages-only)).
+T3 Code is an exact hashed upstream nightly AppImage wrapped with Nixpkgs, the
+client the connected widget was reviewed with; Nixpkgs' `t3code` is the 0.1.2
+release. Replace that source recipe with the maintained Nixpkgs package after
+product runtime qualification; its successful wrapper build is not desktop
+validation.
+Nixpkgs now also packages ChatGPT for x86_64 Linux; it is not adopted yet. The
+Linux recipe pins OpenAI's versioned Debian pool object and SHA-256, reviewed against the signed
 OpenAI repository metadata; it executes no distribution maintainer scripts or
 repository enrollment. Preserve the Chromium sandbox and exact-executable
 AppArmor user-namespace allowance when updating it. Replace the recipe with a
 maintained native Nixpkgs Linux package after runtime qualification.
 
 Brave Origin reuses the selected Nixpkgs Chromium wrapper/libraries and pins the
-official Origin Debian asset because stable Nixpkgs does not yet select that
-edition. Review both exact proprietary package pins on every vendor release;
-replace the Origin override when a maintained equivalent enters Nixpkgs.
+official Origin Debian asset. Nixpkgs now has a maintained `brave-origin`
+package with different desktop and executable names; adopt it only together
+with the browser defaults and `checks.x86_64-linux.browser-1password`. Review
+both exact proprietary package pins on every vendor release.
 They remain part of the explicit proprietary-application choice and require
 installed runtime, security and redistribution qualification.
 

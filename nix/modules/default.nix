@@ -72,8 +72,8 @@ in {
       podman = mkOption { type = types.bool; default = true; };
       tailscale = mkOption { type = types.bool; default = true; };
       connectedWidgets = mkOption { type = types.bool; default = true; };
-      # The floating Cybex OS Assistant, its service and the agent CLIs it uses
-      # (Codex; Claude Code also needs proprietary). Independent of developer.
+      # The floating Cybex OS Assistant and its service. The agent CLIs it uses
+      # are always installed (Claude Code with proprietary). Independent of developer.
       assistant = mkOption { type = types.bool; default = true; };
       localNetworkServices = mkOption { type = types.bool; default = true; };
     };
@@ -105,7 +105,7 @@ in {
     console.keyMap = mkDefault "us";
     hardware.enableRedistributableFirmware = mkDefault true;
     # The installer and every installed hardware profile share the current
-    # kernel from the machine's stable Nixpkgs, including its module packages.
+    # kernel from the machine's Nixpkgs, including its module packages.
     boot.kernelPackages = mkDefault (import ../kernel-packages.nix { inherit pkgs; });
     boot.plymouth.enable = mkDefault true;
     boot.plymouth.theme = mkDefault "cybexos";
@@ -114,28 +114,35 @@ in {
     # Shared by the ISO and installed machines. Keep console output behind
     # Plymouth; the journal retains diagnostics and disk unlock stays visible.
     # "quiet" precedes NixOS's loglevel= parameter, which then takes effect.
+    # Both use systemd stage 1 (NixOS's only initrd), quieted by the rd.* ones.
     boot.kernelParams = lib.mkBefore [
       "quiet" "udev.log_level=3" "rd.udev.log_level=3"
       "systemd.show_status=false" "rd.systemd.show_status=false"
       "vt.global_cursor_default=0"
     ];
     boot.consoleLogLevel = mkDefault 0;
-    boot.initrd.verbose = mkDefault false;
     # Label boot generations while keeping the upstream NixOS os-release ID.
     system.nixos.label = lib.mkOverride 900 "CybexOS-${cfg.release.version}-${config.system.nixos.release}";
     environment.etc."cybexos/release.json".text = builtins.toJSON {
       inherit (cfg.release) version revision narHash;
-      configurationApi = 1; pluginApi = 1; updaterApi = 1; nixos = "26.05";
+      # The Nixpkgs branch this release follows, compared with signed release
+      # metadata (nixos: [ "unstable" ]); not the rolling 26.11 version number.
+      configurationApi = 1; pluginApi = 1; updaterApi = 1; nixos = "unstable";
       architecture = pkgs.stdenv.hostPlatform.system;
     };
   }) (mkIf cfg.enable {
     assertions = [
       { assertion = !cfg.autoLogin || cfg.encrypted; message = "Cybex OS automatic login requires verified LUKS encryption."; }
-      { assertion = lib.elem config.system.nixos.release [ "26.05" ]; message = "This Cybex OS release supports NixOS 26.05. Major upgrades require explicit qualification."; }
-      { assertion = lib.versionAtLeast config.programs.hyprland.package.version "0.56.2"; message = "The Cybex OS Lua desktop needs Hyprland >=0.56.2. Externally supplied pkgs must include cybexos.overlays.default."; }
-      { assertion = lib.versionAtLeast pkgs.hypridle.version "0.1.8"; message = "Cybex OS idle locking needs hypridle >=0.1.8. Externally supplied pkgs must include cybexos.overlays.default."; }
+      { assertion = lib.versionAtLeast config.system.nixos.release "26.11"; message = "Cybex OS follows nixos-unstable (NixOS 26.11 or newer); the machine's nixpkgs input must track nixos-unstable."; }
+      { assertion = lib.versionAtLeast config.programs.hyprland.package.version "0.56.2"; message = "The Cybex OS Lua desktop needs Hyprland >=0.56.2 from the machine's nixos-unstable Nixpkgs."; }
+      { assertion = lib.versionAtLeast pkgs.hypridle.version "0.1.8"; message = "Cybex OS idle locking needs hypridle >=0.1.8 from the machine's nixos-unstable Nixpkgs."; }
     ];
     nixpkgs.config = mkIf (cfg.features.proprietary && options.nixpkgs.config.type.name != "unique") { allowUnfree = mkDefault true; };
+    # Every glibc locale: NixOS prebuilds only this archive (pkgs.glibcLocales,
+    # about 220 MB); any selected subset compiles glibc's locales locally. A
+    # language chosen at installation or in Settings then only rewrites /etc.
+    # List definitions merge, so personal additions keep the prebuilt archive.
+    i18n.supportedLocales = [ "all" ];
     services.dbus.enable = true;
     # Stable discovery paths follow the selected generation. NixOS does not
     # otherwise link arbitrary package share directories into the system profile.
@@ -151,7 +158,11 @@ in {
       nssmdns4 = cfg.features.localNetworkServices;
       nssmdns6 = cfg.features.localNetworkServices;
       openFirewall = false; # The shared firewall below owns discovery ports.
-      publish = { enable = cfg.features.localNetworkServices; addresses = cfg.features.localNetworkServices; };
+      # Address records only: no user services, HINFO, workstation or domain.
+      settings.publish = {
+        disable-publishing = !cfg.features.localNetworkServices;
+        publish-addresses = cfg.features.localNetworkServices;
+      };
     };
     services.blueman.enable = mkDefault true;
     hardware.bluetooth.enable = mkDefault true;
@@ -211,7 +222,6 @@ in {
       if config.boot.loader.grub.enable
       then { loader = "grub"; menu = "${grubDirectory}/grub.cfg"; environment = "${grubDirectory}/grubenv"; }
       else { loader = "systemd-boot"; });
-    boot.initrd.systemd.enable = true;
     boot.lanzaboote = mkIf cfg.secureBoot { enable = true; pkiBundle = "/var/lib/cybexos/secrets/secureboot"; };
   }) ];
 }

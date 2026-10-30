@@ -2,7 +2,7 @@
 let
   cfg = config.cybexos;
   xps = cfg.hardware.xps;
-  camera = pkgs.callPackage ../packages/ipu7.nix { kernel = config.boot.kernelPackages.kernel; };
+  camera = pkgs.callPackage ../packages/ipu7.nix { inherit (config.boot.kernelPackages) kernel kernelModuleMakeFlags; };
   lpmd = pkgs.callPackage ../packages/intel-lpmd.nix {};
   relay = config.services.v4l2-relayd.instances.ipu7;
 in {
@@ -61,6 +61,11 @@ in {
     };
     services.switcherooControl.enable = lib.mkDefault cfg.hardware.nvidiaPrime.enable;
     hardware.graphics.extraPackages = [ pkgs.nvidia-vaapi-driver ];
+    # NVIDIA's EGL platform libraries, which the NixOS driver module adds for
+    # 32-bit graphics (Steam): NixOS prebuilds only the 64-bit ones. They are
+    # expected driver builds, like the driver itself (nix/modules/prebuilt.nix).
+    cybexos.updates.expectedBuilds = lib.optionals config.hardware.graphics.enable32Bit
+      (with pkgs.pkgsi686Linux; [ egl-wayland egl-gbm egl-wayland2 egl-x11 ]);
     environment.sessionVariables = { NVD_BACKEND = "direct"; }
       // lib.optionalAttrs (!cfg.hardware.nvidiaPrime.enable) {
         LIBVA_DRIVER_NAME = "nvidia"; __GLX_VENDOR_LIBRARY_NAME = "nvidia";
@@ -154,6 +159,8 @@ in {
       install -Dm444 ${../../hardware/xps/camera/71-xps-ipu7-hide-isys.rules} $out/lib/udev/rules.d/71-xps-ipu7-hide-isys.rules
       install -Dm444 ${../../hardware/xps/camera/90-xps-ipu7-psys.rules} $out/lib/udev/rules.d/90-xps-ipu7-psys.rules
     '') ];
+    # The relay's GStreamer source is part of this camera's own stack.
+    cybexos.updates.expectedBuilds = [ camera.sensor ];
     services.v4l2-relayd.instances.ipu7 = {
       enable = true; cardLabel = "Hardware ISP Camera";
       extraPackages = [ camera.sensor ];

@@ -12,7 +12,7 @@
       systems = [ "x86_64-linux" ];
       each = nixpkgs.lib.genAttrs systems;
       # Carry the tested input sources in the live store. A fresh machine starts
-      # from this lock, without resolving the moving stable branch during install.
+      # from this lock, without resolving the moving nixos-unstable branch during install.
       inputNodes = builtins.genericClosure {
         startSet = map (value: { key = value.outPath; inherit value; })
           (builtins.attrValues (builtins.removeAttrs inputs [ "self" ]));
@@ -21,17 +21,13 @@
       };
       inputSources = map (node: node.key) inputNodes;
       inputNarHashes = map (node: node.value.narHash) inputNodes;
-      compatibility = import ./nix/desktop-compatibility.nix;
       # The default desktop the installation ISO carries as an offline payload.
       installerPayload = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ module ./nix/modules/installer-payload.nix ];
       };
-      module = { options, lib, ... }: {
+      module = {
         imports = [ ./nix/modules lanzaboote.nixosModules.lanzaboote ];
-        # NixOS VM tests can supply an already-configured, read-only pkgs.
-        # Normal installations must receive the same exported compatibility overlay.
-        nixpkgs.overlays = lib.mkIf (options.nixpkgs.overlays.type.name != "unique") [ compatibility ];
         cybexos.release = {
           version = nixpkgs.lib.mkDefault (nixpkgs.lib.trim (builtins.readFile ./VERSION));
           revision = nixpkgs.lib.mkDefault (self.rev or "uncommitted");
@@ -39,15 +35,14 @@
         };
       };
     in {
-      overlays.default = compatibility;
       nixosModules = { default = module; cybexos = module; installer = ./nix/modules/installer.nix; };
-      packages = each (system: let pkgs = import nixpkgs { inherit system; overlays = [ compatibility ]; config.allowUnfree = true; }; in rec {
+      packages = each (system: let pkgs = import nixpkgs { inherit system; config.allowUnfree = true; }; in rec {
         desktop = pkgs.callPackage ./nix/packages/desktop.nix { source = self; };
         updater = pkgs.callPackage ./nix/packages/updater.nix { source = self; };
         installer-ui = pkgs.callPackage ./nix/packages/installer.nix { source = self; };
         plymouth = pkgs.callPackage ./nix/packages/plymouth.nix { source = self; };
-        xps-camera = (pkgs.callPackage ./nix/packages/ipu7.nix { kernel = pkgs.linuxPackages_latest.kernel; }).sensor;
-        xps-psys = (pkgs.callPackage ./nix/packages/ipu7.nix { kernel = pkgs.linuxPackages_latest.kernel; }).psys;
+        xps-camera = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).sensor;
+        xps-psys = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).psys;
         t3-code = pkgs.callPackage ./nix/packages/t3-code.nix {};
         titlebars = pkgs.callPackage ./nix/packages/titlebars.nix {};
         iso = self.nixosConfigurations.installer.config.system.build.isoImage;
@@ -62,7 +57,7 @@
             (map builtins.unsafeDiscardStringContext inputSources);
         } ];
       };
-      checks = each (system: let pkgs = import nixpkgs { inherit system; overlays = [ compatibility ]; }; in {
+      checks = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
         parity = import ./nix/tests/parity.nix {
           inherit nixpkgs pkgs module system inputSources inputNarHashes;
           installer = self.nixosConfigurations.installer.config;
@@ -143,10 +138,10 @@
         # 1Password and Brave Origin are the proprietary application choice.
         browser-1password = import ./nix/tests/browser-1password.nix {
           inherit module;
-          pkgs = import nixpkgs { inherit system; overlays = [ compatibility ]; config.allowUnfree = true; };
+          pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
         };
       });
-      devShells = each (system: let pkgs = import nixpkgs { inherit system; overlays = [ compatibility ]; }; in {
+      devShells = each (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
         default = pkgs.mkShell {
           packages = with pkgs; [ openssl nixfmt git nodejs quickshell matugen grim wtype imagemagick qt6.qtdeclarative restic systemd
             qt6.qttools cmake ninja pkg-config qt6.qtbase sway qemu OVMF dbus util-linux lua5_5 jq procps hyprland xorriso mtools squashfsTools xdg-terminal-exec desktop-file-utils hostapd dnsmasq iw

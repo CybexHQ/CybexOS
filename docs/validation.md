@@ -36,9 +36,9 @@ tests and failures; inspect that evidence before using a particular image.
   authenticating the external installation payload; signing a boot executable
   alone is insufficient. Secure Boot installation refuses before erasure;
   disabling firmware verification is not an accepted workaround.
-- The desktop requires Hyprland 0.56.2 and native titlebars. The stable Nixpkgs
-  compositor is older; the narrow compatibility overlay and its dependent native
-  libraries and titlebars build. Real native configuration verification accepts
+- The desktop requires Hyprland 0.56.2 and native titlebars. nixos-unstable's
+  prebuilt compositor is 0.56.2; its libraries and the native titlebars build
+  without a compatibility overlay. Real native configuration verification accepts
   the product configuration and rejects an invalid declaration. It also exposed
   an upstream verifier/event-loop interaction, now handled without scheduling
   runtime timers during parsing. Installed startup/rendering and runtime health
