@@ -59,7 +59,7 @@ Singleton {
     // (or by opening the guide again) closes it, so it does not cover the
     // sign-in that follows. Once the guide is back, or stands aside for a
     // sign-in, 1Password's windows no longer count.
-    readonly property var passwordEntry: DesktopEntries.applications.values.find(entry => entry.id === "1password") ?? null
+    readonly property var passwordEntry: DesktopEntries.applications.values.find(entry => Helpers.isPassword(entry.id)) ?? null
     readonly property bool passwordAvailable: passwordEntry !== null
     property bool passwordOpened: false
     property string passwordWindow: ""

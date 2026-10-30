@@ -102,10 +102,10 @@ in {
     environment.etc."brave/policies/managed/cybexos.json" = lib.mkIf cfg.features.proprietary {
       text = builtins.toJSON cfg.browser.bravePolicies;
     };
-    # 1Password writes its browser-extension host only to the profiles it
-    # knows, Brave's among them; Origin reads its own profile and Chromium's
-    # system directory. Point that system entry at the NixOS module's setgid
-    # helper, with the extension origins 1Password itself allows.
+    # 1Password writes its browser-extension host to the profiles it knows,
+    # Origin's only since 8.12.42 and only once it has run; Origin also reads
+    # Chromium's system directory. Point that system entry at the NixOS
+    # module's setgid helper, with the extension origins 1Password itself allows.
     environment.etc."chromium/native-messaging-hosts/com.1password.1password.json" = lib.mkIf (cfg.features.proprietary && config.programs._1password-gui.enable) {
       text = builtins.toJSON {
         name = "com.1password.1password";

@@ -386,12 +386,16 @@ and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
    or time zone sheet; the network row steps aside to Settings → Network.
 2. **`connect`.** Two optional sign-ins as installer cards, both of which
    step aside because they open windows:
-   - **1Password**, shown when the `1password` desktop entry exists.
-     `Welcome.openPassword()` runs that entry and steps aside. The Hyprland
-     `openwindow` event with class `1Password` (in any case: its Wayland app
-     id is `1password`) records its address; the `closewindow` event for
-     that address resumes the guide. Both apply only while the guide stands
-     aside for 1Password (`Welcome.passwordAside`): once it is back, or
+   - **1Password**, shown when its desktop entry exists:
+     `com.onepassword.OnePassword` since 1Password 8.12.42, `1password`
+     before (`WelcomeHelpers.isPassword`). `Welcome.openPassword()` runs that
+     entry and steps aside. The Hyprland `openwindow` event for a 1Password
+     window records its address. 8.12.42's windows keep the app id
+     `1password`, under XWayland too, though its entry names
+     `com.onepassword.OnePassword`; either counts, in any case. The
+     `closewindow` event for that address resumes the guide, and Resume
+     closes the windows it recorded. All three apply only while the guide
+     stands aside for 1Password (`Welcome.passwordAside`): once it is back, or
      stands aside for a sign-in, a 1Password window closing (the one left
      open, or one 1Password raises for the browser) leaves it where it is,
      so it never comes back over a sign-in page. Whether 1Password is signed in comes

@@ -302,8 +302,9 @@ class Session:
             (base / 'bin' / name).chmod(0o700)
         applications = self.home / '.local/share/applications'
         applications.mkdir(parents=True)
-        (applications / '1password.desktop').write_text('[Desktop Entry]\nType=Application\nName=1Password\n'
-                                                         f'Exec={base / "bin/fake-1password"}\n')
+        # Named as 1Password 8.12.42 names its entry.
+        (applications / 'com.onepassword.OnePassword.desktop').write_text(
+            f'[Desktop Entry]\nType=Application\nName=1Password\nExec={base / "bin/fake-1password"}\n')
         self.home.joinpath('signed-out-claude').touch()
         self.home.joinpath('doctor.json').write_text(json.dumps(DOCTOR))
         config = self.home / '.config/cybexos'
@@ -657,7 +658,7 @@ def main():
             session.wait(lambda: session.state().get('aside'), 'the guide steps aside for 1Password')
             assert session.state()['connect']['password'] == 'opened'
             session.call('welcome-test', 'windowEvent', 'openwindow', 'a1b2,1,kitty,Terminal')
-            session.call('welcome-test', 'windowEvent', 'openwindow', 'c3d4,1,1Password,Lock Screen, 1Password')
+            session.call('welcome-test', 'windowEvent', 'openwindow', 'c3d4,1,1password,Lock Screen, 1Password')
             session.call('welcome-test', 'windowEvent', 'closewindow', 'a1b2')
             time.sleep(.5)
             assert session.state()['aside'], 'another window closing does not bring the guide back'
@@ -685,7 +686,7 @@ def main():
             # but not one the person opened.
             assert session.call('welcome-test', 'press', 'connectPassword') == 'true'
             session.wait(lambda: session.state().get('aside'), 'the guide steps aside for 1Password again')
-            session.call('welcome-test', 'windowEvent', 'openwindow', 'c5d6,1,1Password,1Password')
+            session.call('welcome-test', 'windowEvent', 'openwindow', 'c5d6,1,1password,1Password')
             session.call('welcome-test', 'windowEvent', 'openwindow', 'e7f8,1,org.gnome.Nautilus,Files')
             session.call('welcome-test', 'resume')
             session.wait(lambda: not session.state().get('aside'), 'Resume')

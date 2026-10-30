@@ -72,10 +72,12 @@ function openedWindow(data) {
     const fields = String(data || "").split(",");
     return fields.length >= 3 ? {address: fields[0], windowClass: fields[2]} : null;
 }
-// 1Password's windows. Its entry names the X11 class 1Password; an app id
-// taken from its desktop file would be 1password, so case does not count.
-function isPassword(windowClass) {
-    return /^1password$/i.test(String(windowClass || ""));
+// 1Password's desktop entry id and its windows' class. Since 8.12.42 its
+// entry is com.onepassword.OnePassword, and so is the StartupWMClass it
+// names, but its windows, Wayland or XWayland, are still 1password. The
+// earlier entry named 1Password, so case does not count.
+function isPassword(name) {
+    return /^(com\.onepassword\.onepassword|1password)$/i.test(String(name || ""));
 }
 // A window opened for a Connect action, or null for one the guide leaves
 // alone. While the guide stands aside for a sign-in ("sign-in"), every new
