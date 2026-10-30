@@ -17,9 +17,19 @@ the backdrop behind every label lies between the scrim over black and over
 white, and each text colour is checked, and if needed moved, to 4.5:1 against
 the worse of the two. Without a wallpaper the background is the base colour.
 
+Wiz, the assistant's character, sleeps beside the password field: hyprlock
+draws pictures, not the shell's animation, so it is his `asleep` pose as one
+still (rendered by nix/packages/desktop.nix at twice its size here). The
+picture is his pose's box (WizRig.STILL_BOX, 136×132 rig units), with his
+feet at 122 of its 132 units and the brim of his hat starting 32.5 units from
+its left edge. He stands a small gap past the field's right end, his feet
+level with its bottom edge, and grows with the text like the field.
+
 reload() does nothing: hyprlock reads its configuration each time the lock
 starts, and a lock that is already up keeps the look it started with.
 """
+import math
+
 from theme_tokens import contrast, ensure_contrast, mix, rgba, scaled
 
 NAME = 'hyprlock'
@@ -35,6 +45,10 @@ BLUR_SIZE = 8
 # copy reads against the fill, as it did in the vendor file.
 FIELD_ALPHA = 0.85
 TEXT_CONTRAST = 4.5
+# The installed system's picture; the vendor file names the same one.
+WIZ_PATH = '/run/current-system/sw/share/cybexos/wiz/lock/asleep.png'
+WIZ_HEIGHT = 84
+WIZ_GAP = 12
 
 
 def _color(value, alpha=1.0):
@@ -103,6 +117,13 @@ def render(tokens):
     def size(value):
         return scaled(value, tokens)
 
+    field_width, field_height, field_y = size(300), size(54), -size(18)
+    # hyprlock's y grows upwards from the centre; `size` is the box height.
+    wiz_height = size(WIZ_HEIGHT)
+    wiz_width = wiz_height * 136 / 132
+    wiz_x = field_width / 2 + size(WIZ_GAP) + wiz_width * (0.5 - 32.5 / 136)
+    wiz_y = field_y - field_height / 2 + wiz_height * (0.5 - 10 / 132)
+
     lines = [
         HEADER,
         '# Edits are overwritten; ~/.config/cybexos/hypr/hyprlock.conf replaces it.',
@@ -147,7 +168,7 @@ def render(tokens):
         '',
         'input-field {',
         '  monitor =',
-        f'  size = {size(300)}, {size(54)}',
+        f'  size = {field_width}, {field_height}',
         '  outline_thickness = 2',
         '  dots_size = 0.28',
         '  dots_spacing = 0.22',
@@ -166,7 +187,19 @@ def render(tokens):
         f'  fail_color = {_color(colors["red"])}',
         '  rounding = 12',
         '  font_family = $font',
-        f'  position = 0, {-size(18)}',
+        f'  position = 0, {field_y}',
+        '  halign = center',
+        '  valign = center',
+        '}',
+        '',
+        'image {',
+        '  monitor =',
+        f'  path = {WIZ_PATH}',
+        f'  size = {wiz_height}',
+        # hyprlock frames a picture in a circle with a border by default.
+        '  rounding = 0',
+        '  border_size = 0',
+        f'  position = {math.floor(wiz_x + 0.5)}, {math.floor(wiz_y + 0.5)}',
         '  halign = center',
         '  valign = center',
         '}',

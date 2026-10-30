@@ -1,22 +1,30 @@
 import QtQuick
 import "../Common"
 
-// The app's buttons: one accent-filled primary action per page, quiet
-// secondary ones. Taller than a settings action, as a dialog's are.
+// The app's buttons: one filled primary action per page, quiet secondary
+// ones. Taller than a settings action, as a dialog's are.
 Rectangle {
     id: root
 
     property string text: ""
     property string glyph: ""
     property bool primary: false
+    // The page's tone (accent, ok, warn, error or neutral). A primary action
+    // after a warning or a failure is amber: the next step is the person's.
+    property string tone: "accent"
     signal triggered()
 
-    readonly property color ink: primary ? Theme.textOnAccent : Theme.textHi
+    readonly property bool attention: primary && (tone === "warn" || tone === "error")
+    // Amber copy already contrasts with the panel, so ink of the panel's
+    // own lightness reads on an amber fill.
+    readonly property color ink: !primary ? Theme.textHi
+        : attention ? (Theme.dark ? "#1c1c12" : "#ffffff")
+        : Theme.textOnAccent
 
     implicitWidth: content.implicitWidth + Theme.scaled(32)
     implicitHeight: Theme.scaled(38)
     radius: Theme.chipRadius + 3
-    color: primary ? Theme.accent : Theme.hoverFill
+    color: !primary ? Theme.hoverFill : attention ? Theme.amber : Theme.accent
     border.width: activeFocus ? 2 : 0
     border.color: primary ? Theme.textHi : Theme.accentText
     opacity: enabled ? 1 : 0.45

@@ -1,9 +1,15 @@
 #!/usr/bin/env node
-// Rebuild Wiz's layers, desktop/quickshell/assets/wiz/<layer>.svg, from the
-// rig in desktop/quickshell/Common/WizRig.js (docs/assistant.md).
+// Rebuild Wiz's pictures from the rig in desktop/quickshell/Common/WizRig.js
+// (docs/assistant.md):
 //
-//   scripts/export-wiz           write every layer, removing stale ones
-//   scripts/export-wiz --check   exit 1 when a committed layer differs
+//   desktop/quickshell/assets/wiz/<layer>.svg   the layers the shell moves
+//   assets/wiz/<pose>.svg                        each pose at rest, for the boot
+//                                                splash, lock screen and terminal
+//   installer/kiosk/assets/wiz/<pose>-<part>.svg the poses the installer shows,
+//                                                in the parts it moves
+//
+//   scripts/export-wiz           write every picture, removing stale ones
+//   scripts/export-wiz --check   exit 1 when a committed picture differs
 //
 // The shell draws each layer once at its final size and only moves it, so a
 // change to Wiz's artwork is a change to the rig followed by this export.
@@ -13,41 +19,170 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const WizRig = require(path.join(root, "desktop/quickshell/Common/WizRig.js"));
-const outDir = path.join(root, "desktop/quickshell/assets/wiz");
 
-function expected() {
+// ---- the installer ------------------------------------------------------------
+// The installer kiosk (installer/kiosk/ui/wiz.slint) draws with Slint's
+// software renderer, which moves, fades and swaps pictures but neither rotates
+// nor scales them. Each pose it shows is three pictures in place: his body
+// (cloak, collar and shadow), his eyes (again half and fully closed, for a
+// blink) and his hat. The pose's moving parts are the shell's layers, drawn
+// around the point they move about in that pose. Every picture is cropped to
+// what it draws, so a blink or a passing rune repaints only a little.
+const KIOSK_POSES = ["thinking", "working", "needs-input", "happy", "sorry"];
+
+function posed(state, patch) {
+    const rig = WizRig.create(0);
+    rig.update(0, state, { reducedMotion: true });
+    Object.assign(rig.cur, patch);
+    return rig.ops({});
+}
+
+// The matrix m followed by one of toSVG's transforms.
+function then(m, step) {
+    let n;
+    if (step[0] === "t") n = [1, 0, 0, 1, step[1], step[2]];
+    else if (step[0] === "s") n = [step[1], 0, 0, step[2], 0, 0];
+    else {
+        const a = step[1] * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a), x = step[2], y = step[3];
+        n = [cos, sin, -sin, cos, x - cos * x + sin * y, y - sin * x - cos * y];
+    }
+    return [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3],
+        m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+}
+
+// Calls visit(op, map) for each drawing op, map taking its points to the still's frame.
+function walk(ops, visit) {
+    const stack = [[1, 0, 0, 1, 0, 0]];
+    for (const op of ops) {
+        if (op.k === "g") stack.push(op.t.reduce(then, stack[stack.length - 1]));
+        else if (op.k === "end") stack.pop();
+        else {
+            const m = stack[stack.length - 1];
+            visit(op, (x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+        }
+    }
+}
+
+// Where `point`, in the frame `layer` is drawn in, lands in the still.
+function placed(ops, layer, point) {
+    let found = null;
+    walk(ops, (op, map) => { if (!found && op.layer === layer) found = map(point[0], point[1]); });
+    if (!found) throw new Error(`the pose draws no ${layer}`);
+    return found;
+}
+
+// The whole units around the drawing of `layers`, `margin` wider on each side.
+function bounds(ops, layers, margin) {
+    const xs = [], ys = [];
+    walk(ops, (op, map) => {
+        if (!layers.includes(op.layer)) return;
+        const points = op.k === "radial"
+            ? [[op.cx - op.r, op.cy - op.r * op.sy], [op.cx + op.r, op.cy + op.r * op.sy],
+                [op.cx - op.r, op.cy + op.r * op.sy], [op.cx + op.r, op.cy - op.r * op.sy]]
+            : op.d.flatMap(segment => segment.slice(1).flatMap((v, i, all) => i % 2 ? [] : [[v, all[i + 1]]]));
+        for (const [x, y] of points.map(p => map(p[0], p[1]))) {
+            xs.push(x);
+            ys.push(y);
+        }
+    });
+    const x = Math.floor(Math.min(...xs) - margin), y = Math.floor(Math.min(...ys) - margin);
+    return [x, y, Math.ceil(Math.max(...xs) + margin) - x, Math.ceil(Math.max(...ys) + margin) - y];
+}
+
+function picture(ops, layers, box) {
+    const kept = ops.filter(op => (op.k !== "path" && op.k !== "radial") || layers.includes(op.layer));
+    return WizRig.toSVG(kept, null, box || bounds(ops, layers, 1.5)) + "\n";
+}
+
+// One of the shell's layers around `centre`, scaled and turned about it.
+function part(name, centre, scale = 1, turn = 0) {
+    const L = WizRig.LAYERS[name], at = L.at || [0, 0], b = L.box;
+    const ops = [{ k: "g", t: [["t", centre[0], centre[1]], ["r", turn, 0, 0], ["s", scale, scale], ["t", -at[0], -at[1]]], a: 1 }]
+        .concat(WizRig.layerOps(name), [{ k: "end" }]);
+    return WizRig.toSVG(ops, null, [centre[0] + b[0] * scale, centre[1] + b[1] * scale, b[2] * scale, b[3] * scale]) + "\n";
+}
+
+function kiosk() {
     const files = {};
-    for (const name of Object.keys(WizRig.LAYERS))
-        files[`${name}.svg`] = WizRig.layerSVG(name);
+    for (const state of KIOSK_POSES) {
+        const ops = posed(state), add = (name, svg) => { files[`${state}-${name}.svg`] = svg; };
+        add("body", picture(ops, ["shadow", "body", "underlight", "collar"]));
+        add("hat", picture(ops, ["brim", "cone", "band"]));
+        // The blink's frames share the open eyes' box; the glow needs room.
+        const eyes = bounds(ops, ["eyes"], 5), open = WizRig.POSES[state].eyeOpen;
+        add("eyes", picture(ops, ["eyes"], eyes));
+        if (state !== "happy") {
+            add("eyes-half", picture(posed(state, { eyeOpen: open * 0.45 }), ["eyes"], eyes));
+            add("eyes-shut", picture(posed(state, { eyeOpen: open * 0.08 }), ["eyes"], eyes));
+        }
+        if (state === "thinking") {
+            const orbit = placed(ops, "brim", [WizRig.LAYOUT.orbit.cx, WizRig.LAYOUT.orbit.cy]);
+            for (let q = 0; q < 4; q++)
+                add(`rune${q}`, part(`rune${q}`, orbit));
+        } else if (state === "working") {
+            const core = WizRig.LAYERS["spell-core"].at, mote = WizRig.LAYERS.mote.at;
+            const spell = placed(ops, "spell-core", core);
+            add("glow", part("spell-glow", spell));
+            add("core", part("spell-core", spell));
+            add("mote", part("mote", [spell[0] + mote[0] - core[0], spell[1] + mote[1] - core[1]]));
+            // The ring turns in three steps across the gap between two dashes.
+            const dashes = WizRig.layerOps("spell-ring")[0].d.filter(segment => segment[0] === "M").length;
+            for (let i = 0; i < 3; i++)
+                add(`ring${i}`, part("spell-ring", spell, 1, i * 120 / dashes));
+        } else if (state === "needs-input") {
+            const pip = placed(ops, "pip", WizRig.LAYOUT.pip);
+            add("pip", part("pip", pip));
+            add("ring", part("pip-ring", pip));
+        } else if (state === "happy") {
+            // A finished turn's sparkles, each at its own size.
+            WizRig.LAYOUT.sparks.forEach((spark, z) =>
+                add(`sparkle${z}`, part("sparkle", placed(ops, "body", spark), spark[3])));
+        }
+    }
     return files;
 }
 
-function present() {
-    return fs.existsSync(outDir) ? fs.readdirSync(outDir).filter(name => name.endsWith(".svg")) : [];
+// Each output directory and the files it holds.
+function expected() {
+    const layers = {}, stills = {};
+    for (const name of Object.keys(WizRig.LAYERS))
+        layers[`${name}.svg`] = WizRig.layerSVG(name);
+    for (const state of WizRig.STATES.filter(state => state !== "carried"))
+        stills[`${state}.svg`] = WizRig.stillSVG(state);
+    return { "desktop/quickshell/assets/wiz": layers, "assets/wiz": stills, "installer/kiosk/assets/wiz": kiosk() };
+}
+
+function present(dir) {
+    return fs.existsSync(dir) ? fs.readdirSync(dir).filter(name => name.endsWith(".svg")) : [];
 }
 
 function main(argv) {
-    const files = expected();
-    const stale = present().filter(name => !(name in files));
-    if (argv[0] === "--check") {
-        const changed = Object.keys(files).filter(name => {
-            const file = path.join(outDir, name);
-            return !fs.existsSync(file) || fs.readFileSync(file, "utf8") !== files[name];
-        });
-        for (const name of [...changed, ...stale])
-            console.error(`assets/wiz/${name} is out of date; run scripts/export-wiz`);
-        return changed.length || stale.length ? 1 : 0;
-    }
-    if (argv.length) {
+    const outputs = expected();
+    if (argv.length && argv[0] !== "--check" || argv.length > 1) {
         console.error("usage: scripts/export-wiz [--check]");
         return 2;
     }
-    fs.mkdirSync(outDir, { recursive: true });
-    for (const [name, svg] of Object.entries(files))
-        fs.writeFileSync(path.join(outDir, name), svg);
-    for (const name of stale)
-        fs.unlinkSync(path.join(outDir, name));
-    return 0;
+    let differs = 0;
+    for (const [rel, files] of Object.entries(outputs)) {
+        const dir = path.join(root, rel);
+        const stale = present(dir).filter(name => !(name in files));
+        if (argv[0] === "--check") {
+            const changed = Object.keys(files).filter(name => {
+                const file = path.join(dir, name);
+                return !fs.existsSync(file) || fs.readFileSync(file, "utf8") !== files[name];
+            });
+            for (const name of [...changed, ...stale])
+                console.error(`${rel}/${name} is out of date; run scripts/export-wiz`);
+            differs += changed.length + stale.length;
+            continue;
+        }
+        fs.mkdirSync(dir, { recursive: true });
+        for (const [name, svg] of Object.entries(files))
+            fs.writeFileSync(path.join(dir, name), svg);
+        for (const name of stale)
+            fs.unlinkSync(path.join(dir, name));
+    }
+    return differs ? 1 : 0;
 }
 
 process.exitCode = main(process.argv.slice(2));

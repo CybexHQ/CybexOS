@@ -3,12 +3,18 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../Common"
+import "../Assistant" as Character
+import "../Common/KeybindEditor.js" as Editor
 
 // Hello, in the installer's welcome-screen composition: the kicker, the
 // headline and the lead on the left with what comes next, and a card on the
 // right listing what the installer already set, read from the live backends,
 // so nothing is asked twice. Change opens an installer-style sheet, or steps
 // aside to Settings for the network.
+//
+// Wiz perches on that card, lifts his hat and says hello: the one place he
+// speaks. With the assistant on this system he says where to find him once
+// the guide is done, with its shortcut as the keybindings have it.
 Item {
     id: root
     readonly property var region: SystemSettings.region.snapshot
@@ -43,6 +49,24 @@ Item {
     ]
     Claim { active: root.visible; onClaimed: EthernetState.acquire(); onReleased: EthernetState.release() }
     SystemClock { id: clock; precision: SystemClock.Minutes; enabled: root.visible }
+
+    // ---- Wiz -------------------------------------------------------------------
+    // The step exists while the guide is closed too, so the greeting counts
+    // from when it is on screen.
+    property bool greeting: true
+    Timer { interval: 2500; running: root.visible && root.greeting; onTriggered: root.greeting = false }
+    // One read for the keycap, once on screen; the default key until it arrives.
+    Claim { active: root.visible && Assistant.available && !Keybindings.loaded; onClaimed: Keybindings.refresh() }
+    readonly property var assistantKeys: Keybindings.loaded ? Keybindings.keysFor("shell.assistant") : ["SUPER + I"]
+    readonly property string shortcut: assistantKeys.length > 0 ? Editor.display(assistantKeys[0]).join(" + ") : ""
+    function escaped(text) { return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function hello(name, keys) {
+        if (!Assistant.available)
+            return I18n.format("Hi %1, I’m Wiz. I’ll walk you through the rest.", [name]);
+        if (root.shortcut === "")
+            return I18n.format("Hi %1, I’m Wiz. I’ll walk you through the rest. Afterwards I live in the corner of your screen.", [name]);
+        return I18n.format("Hi %1, I’m Wiz. I’ll walk you through the rest. Afterwards I live in the corner of your screen: press %2 to talk to me.", [name, keys]);
+    }
     FileView {
         path: "/etc/hostname"
         printErrors: false
@@ -151,8 +175,10 @@ Item {
     }
 
     KioskCard {
+        id: installed
         x: Kiosk.px(746)
-        y: Kiosk.px(60)
+        // Low enough for Wiz to stand on it under the top bar.
+        y: Kiosk.px(164)
         width: Kiosk.px(470)
         height: card.implicitHeight
         Column {
@@ -265,5 +291,74 @@ Item {
                 }
             }
         }
+    }
+
+    // What he says, to his left above the card, its tail pointing at him.
+    Rectangle {
+        id: bubble
+        objectName: "helloBubble"
+        readonly property string plainText: root.hello(Welcome.firstName, root.shortcut)
+        // His eyes, where the tail points, kept off the rounded corners.
+        readonly property real tailY: Math.max(radius + tail.reach, Math.min(height - radius - tail.reach,
+            wiz.y + wiz.height * wiz.layout.eyes[1] / 120 - y))
+        x: Kiosk.px(746)
+        y: installed.y - Kiosk.px(18) - height
+        width: Kiosk.px(326)
+        height: words.implicitHeight + Kiosk.px(30)
+        radius: Kiosk.px(18)
+        color: Kiosk.card2
+        border.width: Math.max(1, Kiosk.px(1))
+        border.color: Kiosk.line2
+        Accessible.role: Accessible.StaticText
+        Accessible.name: plainText
+        KioskText {
+            id: words
+            x: Kiosk.px(18)
+            y: Kiosk.px(15)
+            width: parent.width - Kiosk.px(36)
+            textFormat: Text.RichText
+            // The shortcut in the accent's mono, as keys are written here, on one line.
+            text: root.hello(root.escaped(Welcome.firstName), "<span style=\"font-family: '" + Kiosk.mono
+                + "'; font-weight: 500; color: " + Kiosk.accent + ";\">"
+                + root.escaped(root.shortcut).replace(/ /g, "&nbsp;") + "</span>") // i18n: untranslated (markup)
+            size: 15
+            lineHeight: 1.12
+            wrapMode: Text.WordWrap
+            Accessible.ignored: true
+        }
+        // A square turned on its corner, clipped to the half outside the
+        // bubble, whose fill covers the bubble's border where they meet.
+        Item {
+            id: tail
+            readonly property real reach: Kiosk.px(10)
+            readonly property real edge: bubble.border.width
+            x: bubble.width - edge
+            y: bubble.tailY - reach
+            width: edge + reach
+            height: reach * 2
+            clip: true
+            Rectangle {
+                width: tail.reach * Math.SQRT2
+                height: width
+                x: tail.edge - width / 2
+                y: tail.reach - height / 2
+                rotation: 45
+                antialiasing: true
+                color: Kiosk.card2
+                border.width: tail.edge
+                border.color: Kiosk.line2
+            }
+        }
+    }
+
+    // On the card's top edge, his feet on it: hat lifted for a moment, then at ease.
+    Character.Wiz {
+        id: wiz
+        objectName: "helloWiz"
+        width: Kiosk.px(140)
+        height: width
+        x: Kiosk.px(1140) - width / 2
+        y: installed.y - height * wiz.layout.ground[1] / 120
+        pose: root.greeting ? "greeting" : "idle"
     }
 }

@@ -9,10 +9,20 @@ sends them; approvals are answered over the service socket, as the card's
 buttons do. What a turn left behind (Undo, a new widget) is checked on disk
 and in the service's snapshot, and the shell's log must stay free of QML
 errors throughout.
+
+The launcher's Ask Wiz row is typed into with wtype: a query nothing matches
+reaches the assistant once the launcher has closed, kept behind sign-in while
+no agent is signed in. With --screenshots DIR (grim, and the installed
+desktop's fonts from tests/shell_fonts.py), that row and the empty
+notification centre, with Do Not Disturb off and on, are saved there. Those
+runs draw with OpenGL on Mesa's llvmpipe (CYBEXOS_TEST_MESA, or the flake's
+nixpkgs#mesa): the software scene graph cannot draw the launcher's
+ClippingRectangle, so its card would be missing from the picture.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -30,6 +40,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 DBUS = ["dbus-run-session", *(["--config-file", os.environ["CYBEXOS_DBUS_SESSION_CONFIG"]]
                               if os.environ.get("CYBEXOS_DBUS_SESSION_CONFIG") else []), "--"]
+NIX = ["nix", "--extra-experimental-features", "nix-command flakes"]
 QML_ERRORS = re.compile(r"TypeError|ReferenceError|Binding loop|is not a type|Type \w+ unavailable"
                         r"|Cannot assign|Unable to assign|Illegal method name|Failed to load configuration")
 
@@ -102,6 +113,15 @@ while True:
     else:
         reply("I can help with Cybex OS.")
 '''
+
+
+def opengl():
+    """The environment that renders with OpenGL on Mesa's llvmpipe."""
+    mesa = os.environ.get("CYBEXOS_TEST_MESA") or subprocess.run(
+        NIX + ["build", "--no-link", "--print-out-paths", "--inputs-from", str(ROOT), "nixpkgs#mesa"],
+        cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()[0]
+    return {"__EGL_VENDOR_LIBRARY_FILENAMES": f"{mesa}/share/glvnd/egl_vendor.d/50_mesa.json",
+            "LIBGL_DRIVERS_PATH": f"{mesa}/lib/dri"}
 
 
 class VirtualPointer:
@@ -183,7 +203,15 @@ class Session:
         shutil.copytree(ROOT / "desktop/quickshell", self.shell)
         shell_entry = self.shell / 'shell.qml'
         shell_entry.write_text(shell_entry.read_text().replace('target: "assistant"',
-            'target: "assistant"\n        function signIn(agent: string): void { Assistant.signIn(agent); }'))
+            'target: "assistant"\n        function signIn(agent: string): void { Assistant.signIn(agent); }'
+            '\n        function draft(): string { return Assistant.draft; }'
+            '\n        function dnd(on: bool): void { Notifs.setDnd(on); }'
+            '\n        function notifications(): string {'
+            ' return JSON.stringify({count: Notifs.count, dnd: Notifs.dnd}); }'
+            '\n        function launcher(): string { const rows = LauncherProviders.rows;'
+            ' return JSON.stringify({open: Launcher.open, query: LauncherProviders.query,'
+            ' kinds: rows.slice(0, 3).map(row => row.kind),'
+            ' question: rows.length > 0 ? rows[0].question || "" : ""}); }'))
         fake = base / "claude"
         fake.write_text(f"#!{sys.executable}\n" + FAKE_CLAUDE)
         fake.chmod(0o700)
@@ -213,6 +241,7 @@ class Session:
                             "CYBEXOS_ASSISTANT_STATUS": str(base / "no-status.json")}
         self.processes = []
         self.pointer = None
+        self.screenshots = None
 
     def start(self, argv, log, extra=None):
         process = subprocess.Popen(argv, env={**self.env, **(extra or {})}, stdout=(self.base / log).open("w"),
@@ -245,6 +274,37 @@ class Session:
             return json.loads(self.ipc("status") or "{}")
         except (json.JSONDecodeError, subprocess.TimeoutExpired):
             return {}
+
+    def launcher_state(self):
+        try:
+            return json.loads(self.ipc("launcher") or "{}")
+        except (json.JSONDecodeError, subprocess.TimeoutExpired):
+            return {}
+
+    def press(self, *args):
+        """Keys through a virtual keyboard, to whichever surface holds focus."""
+        subprocess.run(["wtype", "-s", "200", "-d", "12", *args, "-s", "100"], env=self.env,
+                       check=True, timeout=20)
+
+    def ask_from_launcher(self, query, screenshot=None):
+        """Super+Space, a query nothing matches, and its one row: Ask Wiz."""
+        subprocess.run(["qs", "ipc", "-p", str(self.shell), "call", "launcher", "toggle"],
+                       env=self.env, capture_output=True, timeout=10, check=True)
+        self.wait(lambda: self.launcher_state().get("open"), "the launcher")
+        self.press(query)
+        row = self.wait(lambda: (lambda s: s if s.get("kinds") == ["ask"] else None)(self.launcher_state()),
+                        f"the Ask Wiz row for {query!r}")
+        assert row["question"] == query.strip(), row
+        if screenshot:
+            self.screenshot(screenshot)
+        self.press("-k", "Return")
+        self.wait(lambda: self.launcher_state().get("open") is False, "the launcher to close")
+
+    def screenshot(self, name):
+        if self.screenshots is not None:
+            # Past the surface's entry motion and Wiz's pose blend.
+            time.sleep(0.8)
+            subprocess.run(["grim", str(self.screenshots / name)], env=self.env, check=True, timeout=15)
 
     def call(self, method, params):
         with socket.socket(socket.AF_UNIX) as client:
@@ -300,13 +360,27 @@ class Session:
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--screenshots", type=Path,
+                        help="save the Ask Wiz row and the empty notification centre here")
+    options = parser.parse_args()
     if not shutil.which("qs") or any(subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name],
             stdout=subprocess.DEVNULL).returncode == 0 for name in ('qs', '.quickshell-wra')):
         print("Assistant overlay test deferred to isolated CI")
         return
+    for executable in ("wtype", *(("grim",) if options.screenshots else ())):
+        if not shutil.which(executable):
+            raise SystemExit(f"{executable} is required; use nix develop")
     with tempfile.TemporaryDirectory(prefix="cybexos-assistant-overlay-") as temporary:
         session = Session(Path(temporary))
         try:
+            if options.screenshots:
+                import shell_fonts
+                options.screenshots.mkdir(parents=True, exist_ok=True)
+                session.screenshots = options.screenshots
+                session.env.update(shell_fonts.fontconfig(session.base))
+                del session.env["QT_QUICK_BACKEND"]
+                session.env.update(opengl())
             (session.base / "sway.conf").write_text("output HEADLESS-1 mode 1440x900\nseat seat0 fallback true\n")
             sway = session.base / "sway"
             shutil.copyfile(shutil.which("sway"), sway)
@@ -333,6 +407,31 @@ def main():
             assert session.shell_state()['pose'] == 'listening', session.shell_state()
             assert session.turn() is None
             session.wait(lambda: not session.shell_state().get('authChecking'), 'the initial sign-in check')
+
+            # The launcher offers a query nothing matches to Wiz. Signed out,
+            # it waits in the box behind the sign-in prompt, as a typed one
+            # does; the hidden character comes back for it.
+            session.ipc('hide')
+            session.wait(lambda: session.shell_state().get('shown') is False, 'the character to hide')
+            session.ask_from_launcher('connect my printer', 'launcher-ask-wiz.png')
+            session.wait(lambda: (lambda s: s.get('shown') and s.get('composing'))(session.shell_state()),
+                         'the box with the launcher\'s question')
+            assert session.ipc('draft') == 'connect my printer', session.ipc('draft')
+            assert session.turn() is None, 'a signed-out question never reaches a model'
+            # Prefixes and whitespace are not questions.
+            subprocess.run(["qs", "ipc", "-p", str(session.shell), "call", "launcher", "toggle"],
+                           env=session.env, capture_output=True, timeout=10, check=True)
+            session.wait(lambda: session.launcher_state().get('open'), 'the launcher again')
+            for typed in ('   ', ':zzqxv', '=', '/', '!zzqxv'):
+                session.press(typed)
+                state = session.wait(lambda: (lambda s: s if s.get('query') == typed else None)(
+                    session.launcher_state()), f'the query {typed!r}')
+                assert 'ask' not in state['kinds'], state
+                session.press('-k', 'Escape')
+                session.wait(lambda: session.launcher_state().get('query') == '', 'the cleared query')
+            session.press('-k', 'Escape')
+            session.wait(lambda: session.launcher_state().get('open') is False, 'the launcher to close')
+
             session.ipc('signIn', 'claude')
             session.wait(lambda: session.shell_state().get('agentReady') and session.shell_state().get('hasDraft'),
                          'automatic sign-in detection with the saved question')
@@ -363,6 +462,15 @@ def main():
                 # Wiz is carried while held and lands when dropped.
                 assert held == ['carried'], held
                 session.wait(lambda: session.shell_state().get('pose') not in (None, 'carried'), 'Wiz to land')
+
+            # Signed in, the launcher's question is asked straight away, with
+            # nothing of the screen.
+            session.ask_from_launcher('connect my printer')
+            asked = session.finished('connect my printer')
+            assert asked['status'] == 'completed' and asked['text'] == 'I can help with Cybex OS.', asked
+            assert asked['screenshot'] is False, asked
+            session.wait(lambda: session.shell_state().get('turn') == 'completed', "the launcher question's reply")
+            assert session.ipc('draft') == '', session.ipc('draft')
 
             # A preference edit is allowed without a card and comes back with Undo.
             session.ipc("ask", "Make the menubar transparent")
@@ -414,16 +522,28 @@ def main():
             hello = session.call("hello", {"client": "overlay-test", "protocol": 1})["result"]
             assert hello["conversation"] == {"agent": "claude", "resumable": True}, hello
 
+            # The empty notification centre: Wiz idle, asleep under Do Not
+            # Disturb. Loading him there must not log a QML error either.
+            assert json.loads(session.ipc("notifications")) == {"count": 0, "dnd": False}
+            subprocess.run(["qs", "ipc", "-p", str(session.shell), "call", "popouts", "open", "notifications"],
+                           env=session.env, capture_output=True, timeout=10, check=True)
+            time.sleep(0.4)
+            session.screenshot("notifications-empty.png")
+            session.ipc("dnd", "true")
+            assert json.loads(session.ipc("notifications")) == {"count": 0, "dnd": True}
+            session.screenshot("notifications-empty-dnd.png")
+            session.ipc("dnd", "false")
+
             output = session.log()
             errors = [line for line in output.splitlines() if QML_ERRORS.search(line)]
             assert not errors, "\n".join(errors)
-            print("Assistant onboarding/draft preservation, repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged) and hiding passed")
+            print("Assistant onboarding/draft preservation, Ask Wiz from the launcher (signed out and in), repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged), hiding and the empty notification centre passed")
         finally:
             session.stop()
 
 
 if __name__ == "__main__":
     if os.geteuid() == 0:
-        raise SystemExit(subprocess.call(["runuser", "-u", "nobody", "--", sys.executable, __file__]))
+        raise SystemExit(subprocess.call(["runuser", "-u", "nobody", "--", sys.executable, __file__, *sys.argv[1:]]))
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     main()

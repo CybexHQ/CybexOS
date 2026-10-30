@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import "../Common"
+import "../Assistant" as Character
 import "../Common/AssistantHelpers.js" as AssistantHelpers
 
 // Connect: two optional sign-ins as installer cards. 1Password comes first,
@@ -10,6 +11,10 @@ import "../Common/AssistantHelpers.js" as AssistantHelpers
 // reports it is signed in, or when the 1Password window is closed. Ticks
 // come from live state only: the agent's sign-in, and whether 1Password has
 // an account, counted in its own database.
+//
+// The assistant's card shows Wiz himself: asleep until the agent is signed
+// in, attentive while it signs in, happy once it has, sorry when its state
+// could not be checked.
 Item {
     id: root
     readonly property bool online: EthernetState.connected || WifiState.connected || NetworkStatus.online
@@ -17,6 +22,10 @@ Item {
     readonly property var installed: AssistantHelpers.AGENT_IDS.filter(id => (Assistant.agents[id] || {}).available === true)
     readonly property bool signingIn: Assistant.signingIn !== ""
     readonly property bool authUnknown: Assistant.agentInstalled && (Assistant.agents[Assistant.agent] || {}).auth === "unknown"
+    readonly property string wizPose: !Assistant.connected || root.installed.length === 0 ? "asleep"
+        : Assistant.agentReady ? "happy"
+        : root.signingIn || (Assistant.authChecking && root.authUnknown) ? "listening"
+        : root.authUnknown ? "sorry" : "asleep"
     Claim { active: root.visible; onClaimed: EthernetState.acquire(); onReleased: EthernetState.release() }
     Component.onCompleted: { Assistant.refreshAuth(); Welcome.refreshPassword(); }
     // A sign-in finished in 1Password while the guide is showing shows up too.
@@ -33,6 +42,8 @@ Item {
         property string title: ""
         property string body: ""
         property string glyph: ""
+        // A Wiz pose: the card shows him instead of its icon badge.
+        property string character: ""
         property string status: ""
         // accent (done), amber (needs something) or fog (waiting).
         property string statusTone: "fog"
@@ -47,13 +58,19 @@ Item {
             Row {
                 width: parent.width
                 spacing: Kiosk.px(16)
-                Rectangle {
+                // The icon badge, or the room Wiz stands in: the kicker and
+                // title move right, the text below starts under his feet.
+                Item {
                     id: badge
-                    width: Kiosk.px(48)
-                    height: width
-                    radius: Kiosk.px(14)
-                    color: Kiosk.accentTint
-                    KioskIcon { anchors.centerIn: parent; name: card.glyph; designSize: 24; color: Kiosk.accent }
+                    width: Kiosk.px(card.character !== "" ? 64 : 48)
+                    height: Kiosk.px(card.character !== "" ? 68 : 48)
+                    Rectangle {
+                        visible: card.character === ""
+                        anchors.fill: parent
+                        radius: Kiosk.px(14)
+                        color: Kiosk.accentTint
+                        KioskIcon { anchors.centerIn: parent; name: card.glyph; designSize: 24; color: Kiosk.accent }
+                    }
                 }
                 Column {
                     width: parent.width - badge.width - parent.spacing
@@ -99,6 +116,53 @@ Item {
             anchors.bottomMargin: Kiosk.px(28)
             width: card.width - Kiosk.px(56)
             spacing: Kiosk.px(12)
+        }
+        // Wiz in the card's top-left corner. Asleep, two small z's float up
+        // beside his hat; with reduced motion they are not there.
+        Loader {
+            active: card.character !== ""
+            x: Kiosk.px(8)
+            y: Kiosk.px(6)
+            width: Kiosk.px(104)
+            height: width
+            sourceComponent: Item {
+                Character.Wiz {
+                    id: wiz
+                    objectName: "connectWiz"
+                    anchors.fill: parent
+                    pose: card.character
+                }
+                Repeater {
+                    model: wiz.pose === "asleep" && wiz.live ? 2 : 0
+                    delegate: KioskText {
+                        id: snore
+                        required property int index
+                        readonly property real unit: wiz.width / 120
+                        text: "z" // i18n: untranslated (a snore)
+                        size: snore.index === 0 ? 13 : 11
+                        font.weight: Font.Bold
+                        tone: "fog"
+                        x: 97 * unit
+                        y: 36 * unit
+                        opacity: 0
+                        // The second a half rise behind the first.
+                        SequentialAnimation {
+                            running: true
+                            PauseAnimation { duration: snore.index * 1300 }
+                            ParallelAnimation {
+                                loops: Animation.Infinite
+                                XAnimator { target: snore; from: 97 * snore.unit; to: 108 * snore.unit; duration: 2600 }
+                                YAnimator { target: snore; from: 36 * snore.unit; to: 6 * snore.unit; duration: 2600; easing.type: Easing.OutSine }
+                                SequentialAnimation {
+                                    OpacityAnimator { target: snore; from: 0; to: 0.9; duration: 500 }
+                                    PauseAnimation { duration: 1300 }
+                                    OpacityAnimator { target: snore; from: 0.9; to: 0; duration: 800 }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -201,7 +265,7 @@ Item {
             visible: Assistant.available
             width: cards.cardWidth
             height: cards.cardHeight
-            glyph: "sparkles"
+            character: root.wizPose
             kicker: root.both ? I18n.format("%1 · %2", ["02", I18n.tr("AI assistant · recommended")]) : I18n.tr("AI assistant · recommended")
             title: I18n.tr("Cybex OS Assistant")
             body: I18n.tr("Sign in with Claude Code or Codex. Your assistant can then check this computer for missing drivers and other problems, and fix what it finds once you agree.")

@@ -93,4 +93,28 @@ if status is-interactive
     alias hypr-workspaces='hyprctl workspaces'
     alias ..='cd ..'
     alias ...='cd ../..'
+
+    # Plain `fastfetch` in kitty shows Wiz through kitty's graphics protocol.
+    # The default config's logo is $CYBEXOS_FASTFETCH_LOGO, else the braille
+    # logo. This sets it, and the picture's height in rows, only when the config
+    # names it, this shell runs in kitty itself (not in tmux, over ssh or in a
+    # terminal started from kitty) and fastfetch writes to it. Arguments, a pipe
+    # or NO_COLOR keep the braille logo: where fastfetch cannot draw a picture
+    # it prints the file as text. `command fastfetch` skips this.
+    function fastfetch --wraps fastfetch --description 'fastfetch, with Wiz in kitty'
+        set -l wiz /run/current-system/sw/share/cybexos/wiz/terminal/idle.png
+        set -l config ~/.config/fastfetch/config.jsonc
+        test -n "$XDG_CONFIG_HOME"; and set config $XDG_CONFIG_HOME/fastfetch/config.jsonc
+        set -l parent (string replace -rf '^PPid:\s+' '' </proc/$fish_pid/status)
+        set -l terminal
+        if test (count $argv) -eq 0; and isatty stdout; and not set -q NO_COLOR
+            and test -r $wiz -a -r $config -a -n "$parent"
+            and string match -q '*${CYBEXOS_FASTFETCH_LOGO:-*' <$config
+            and read terminal </proc/$parent/comm
+            and contains -- $terminal kitty .kitty-wrapped
+            CYBEXOS_FASTFETCH_LOGO=$wiz command fastfetch --logo-height 9
+        else
+            command fastfetch $argv
+        end
+    end
 end

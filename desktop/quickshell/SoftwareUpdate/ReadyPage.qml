@@ -34,17 +34,6 @@ Item {
         return update ? I18n.tr("Updated apps and system components") : I18n.tr("Changes to your system configuration");
     }
 
-    component SectionTitle: Text {
-        width: parent ? parent.width : 0
-        topPadding: Theme.scaled(10)
-        color: Theme.textDim
-        font.family: Theme.fontMenu
-        font.pixelSize: Theme.typography.metadata
-        font.weight: Theme.weightSemibold
-        font.capitalization: Font.AllUppercase
-        font.letterSpacing: 0.6
-        textFormat: Text.PlainText
-    }
     component Chip: Rectangle {
         id: chip
         property string text: ""
@@ -141,40 +130,9 @@ Item {
                 visible: root.review.components.length > 0
                 text: I18n.tr("Important changes")
             }
-            Rectangle {
-                visible: root.review.components.length > 0
+            ComponentChanges {
                 width: parent.width
-                height: components.implicitHeight
-                radius: Theme.chipRadius + 3
-                color: Theme.cardFill
-                border.width: 1
-                border.color: Theme.hairlineSoft
-                Column {
-                    id: components
-                    width: parent.width
-                    Repeater {
-                        model: root.review.components
-                        delegate: ChangeRow {
-                            id: componentRow
-                            required property var modelData
-                            required property int index
-                            readonly property var info: Helpers.component(modelData.id)
-                            // Within one NixOS release only the build date moves; the
-                            // title names the release and the versions read as dates.
-                            readonly property bool sameRelease: modelData.id === "nixos"
-                                && Helpers.versionParts("nixos", modelData.before).text === root.nixosRelease
-                            objectName: "updateComponent"
-                            width: components.width
-                            divider: index > 0
-                            glyph: info.glyph
-                            title: sameRelease ? I18n.format("NixOS %1", [root.nixosRelease]) : I18n.tr(info.label)
-                            detail: I18n.tr(info.detail)
-                            component: sameRelease ? "date" : modelData.id
-                            before: sameRelease ? Helpers.versionParts("nixos", modelData.before).date.replace(/-/g, "") : modelData.before
-                            after: sameRelease ? Helpers.versionParts("nixos", modelData.after).date.replace(/-/g, "") : modelData.after
-                        }
-                    }
-                }
+                components: root.review.components
             }
 
             SectionTitle {

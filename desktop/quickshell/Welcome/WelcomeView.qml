@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
 import "../Common"
+import "../Assistant" as Character
 
 // The guide's 1280×800 design canvas, drawn like the installer: the top bar
 // with the wordmark, the Connect · Wallpaper · Style · Shortcuts steps and the
@@ -18,6 +19,8 @@ FocusScope {
     readonly property var stepNames: root.numbered.map(id => root.names[id])
     readonly property int stepperIndex: root.numbered.indexOf(Welcome.step) + 1
     readonly property bool sheetOpen: Welcome.sheet !== ""
+    // Ready's Wiz, whom finishing hands over to the assistant's corner.
+    readonly property Character.Wiz perch: (content.item as FinishStep)?.perch ?? null
     width: Kiosk.px(1280)
     height: Kiosk.px(800)
     focus: true

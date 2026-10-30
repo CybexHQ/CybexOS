@@ -2,6 +2,7 @@ import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
 import { Store, Check, DiskRow, SummaryRow, StageRow, AppTile, ProfileCard } from "store.slint";
 import { Icon, SlotIcon, Kicker, Heading, Lead, Btn, LinkButton, Card, Field, Toggle, Row, Mark, Tag, Help, FieldLabel } from "widgets.slint";
+import { Wiz } from "wiz.slint";
 
 // ── shared pieces ────────────────────────────────────────────────────────────
 
@@ -238,9 +239,10 @@ export component WelcomeScreen inherits Rectangle {
                 }
             }
         }
-        Card {
+        // Lower than the column, so Wiz fits on its edge under the top bar.
+        check-card := Card {
             x: 746px;
-            y: 132px;
+            y: 206px;
             width: 470px;
             height: checks.preferred-height;
             checks := VerticalLayout {
@@ -284,6 +286,11 @@ export component WelcomeScreen inherits Rectangle {
                     }
                 }
             }
+        }
+        Wiz {
+            x: 1126px - self.width / 2;
+            y: check-card.y - self.feet;
+            pose: Store.check-pose;
         }
     }
     init => { keys.focus(); }
@@ -998,15 +1005,12 @@ export component SoftwareScreen inherits Rectangle {
             }
             return reject;
         }
-        // Wiz, the assistant, listens while you choose. A static pose until
-        // the animated Wiz component replaces this single image.
-        wiz-listening := Image {
+        // Wiz waits for your choice: the amber pip means it is your move.
+        Wiz {
             x: 1090px;
             y: 78px;
             width: 120px;
-            height: 117px;
-            source: @image-url("../assets/wiz-listening.svg");
-            image-fit: contain;
+            pose: "needs-input";
         }
         Kicker {
             x: 64px;
@@ -1433,9 +1437,9 @@ export component InstallingScreen inherits Rectangle {
             }
         }
     }
-    Card {
+    stage-card := Card {
         x: 680px;
-        y: 128px;
+        y: 206px;
         width: 536px;
         height: steps.preferred-height + 12px;
         steps := VerticalLayout {
@@ -1449,6 +1453,11 @@ export component InstallingScreen inherits Rectangle {
                 first: i == 0;
             }
         }
+    }
+    Wiz {
+        x: 1126px - self.width / 2;
+        y: stage-card.y - self.feet;
+        pose: Store.install-pose;
     }
 }
 
@@ -1488,31 +1497,29 @@ component NextCard inherits Card {
 export component DoneScreen inherits Rectangle {
     width: 1280px;
     height: 800px;
-    Image {
+    Wiz {
         x: (parent.width - self.width) / 2;
-        y: 130px;
-        width: 80px;
-        height: 64px;
-        source: @image-url("../assets/symbol.svg");
-        image-fit: contain;
+        y: 92px;
+        width: 150px;
+        pose: "finished";
     }
     Heading {
         x: 0;
-        y: 210px;
+        y: 246px;
         width: parent.width;
         horizontal-alignment: center;
         text: "Welcome home, " + Store.done-name + ".";
     }
     Lead {
         x: 0;
-        y: 280px;
+        y: 316px;
         width: parent.width;
         horizontal-alignment: center;
         text: "Cybex OS " + Store.version + " is installed on " + Store.done-host + ".";
     }
     HorizontalLayout {
         x: 190px;
-        y: 344px;
+        y: 380px;
         width: 900px;
         spacing: 14px;
         NextCard {
@@ -1533,7 +1540,7 @@ export component DoneScreen inherits Rectangle {
     }
     HorizontalLayout {
         x: (parent.width - self.preferred-width) / 2;
-        y: 530px;
+        y: 566px;
         width: self.preferred-width;
         spacing: 14px;
         restart := Btn {
@@ -1661,6 +1668,13 @@ export component StoppedScreen inherits Rectangle {
             }
         }
     }
+    // Beside the text, centred in the space to its right.
+    Wiz {
+        x: 965px;
+        y: 150px;
+        width: 150px;
+        pose: Store.stop-pose;
+    }
 }
 
 export component FailedScreen inherits Rectangle {
@@ -1716,5 +1730,12 @@ export component FailedScreen inherits Rectangle {
                 clicked => { Store.power("poweroff"); }
             }
         }
+    }
+    // Beside the text, centred in the space to its right.
+    Wiz {
+        x: 965px;
+        y: 150px;
+        width: 150px;
+        pose: "sorry";
     }
 }

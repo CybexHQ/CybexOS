@@ -171,26 +171,5 @@ SettingsPage {
                 }
             }
         }
-
-        SettingsGroup {
-            width: parent.width
-            title: I18n.tr("Character")
-
-            PickerRow {
-                width: parent.width
-                label: I18n.tr("Look")
-                settingKey: "assistantCharacter"
-                model: [
-                    { value: "wiz", label: I18n.tr("Wiz") },
-                    { value: "mark", label: I18n.tr("Logo only") }
-                ]
-            }
-            SettingsHint {
-                width: parent.width
-                text: Settings.assistantCharacter === "mark"
-                    ? I18n.tr("The Cybex OS logo; the ring around it shows what the assistant is doing.")
-                    : I18n.tr("Wiz shows what the assistant is doing: listening, thinking, working, or waiting for your answer.")
-            }
-        }
     }
 }

@@ -72,10 +72,9 @@ Singleton {
         speaking: root.speaking, celebrating: root.celebrating, failed: root.failed,
         composing: root.composing, step: root.turn ? root.turn.step || "" : ""
     })
-    readonly property string mood: AssistantHelpers.mood(characterState)
     readonly property string pose: AssistantHelpers.characterPose(characterState)
-    // Wiz stands on his own and needs the room; the mark is a compact disc.
-    readonly property real characterSize: Theme.scaled(Settings.assistantCharacter === "mark" ? 64 : 88)
+    // Wiz stands on his own and needs the room.
+    readonly property real characterSize: Theme.scaled(88)
 
     // ---- voice ---------------------------------------------------------------
     // Voxtype runs on every installation; Dictation watches its state for us.
@@ -142,6 +141,14 @@ Singleton {
             hide();
         else
             show(outputName);
+    }
+
+    // Where the character rests on an output this size: AssistantWindow puts
+    // him there, and the welcome guide's hand-off flies him there.
+    function restingPlace(width, height) {
+        const reserve = Settings.position === "top" ? Theme.barHeight + Theme.barTopMargin : 0;
+        return AssistantHelpers.placement({ x: Settings.assistantX, y: Settings.assistantY },
+            { width: width, height: height }, characterSize, reserve);
     }
 
     function moveTo(outputName, x, y) {

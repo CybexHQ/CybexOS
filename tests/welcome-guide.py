@@ -9,6 +9,7 @@ HOME/XDG tree; hyprctl is a fake that serves shortcut state from that tree.
 The real cybexos-assistant service runs beside the shell with a scripted
 `claude` (signed out until its login command runs), `cybex doctor` serves a
 fixture report, and 1Password is a desktop entry for a recording script.
+The assistant's own Wiz is probed through the LazyLoader that holds it.
 No installed desktop is modified. Only requested screenshots survive
 teardown; failed logs are printed inline.
 """
@@ -46,6 +47,8 @@ ACTIONS = {
     'windows.overview': ('Windows', 'Overview', ['SUPER + TAB'], ['SUPER + TAB']),
     'workspaces.switch.1': ('Workspaces', 'Switch to workspace 1', ['SUPER + 1'], ['SUPER + 1']),
     'workspaces.switch.2': ('Workspaces', 'Switch to workspace 2', ['SUPER + 2'], ['SUPER + 2']),
+    # Remapped, so Hello's bubble proves it names the key from Keybindings.
+    'shell.assistant': ('Shell', 'Assistant', ['SUPER + A'], ['SUPER + I']),
 }
 FAKE_HYPRCTL = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -130,9 +133,14 @@ SYSTEM_CHECK = 'Check this computer for missing drivers and other problems.'
 TEST_IPC = '''
     // What the guide asked Hyprland to close, which this compositor cannot.
     property var testClosed: []
+    // Every hand-off state, and each time the assistant's Wiz was told to land.
+    property var testHandOff: []
+    property int testArrivals: 0
     Connections {
         target: Welcome
         function onCloseWindows(addresses) { shell.testClosed = shell.testClosed.concat(addresses); }
+        function onHandOffChanged() { shell.testHandOff = shell.testHandOff.concat([Welcome.handOff]); }
+        function onAssistantArrived() { shell.testArrivals = shell.testArrivals + 1; }
     }
     function testFind(item, predicate) {
         if (!item) return null;
@@ -145,6 +153,19 @@ TEST_IPC = '''
     }
     function testItem(name) {
         return shell.testFind(welcomeWindow.contentItem, item => item.objectName === name);
+    }
+    function testWiz(name) {
+        const item = shell.testItem(name);
+        return item ? {pose: item.pose, visible: item.visible, live: item.live} : null;
+    }
+    // The assistant's own Wiz, where AssistantWindow draws him.
+    function testCorner() {
+        const window = assistantLoader.item;
+        if (!window) return null;
+        const wiz = shell.testFind(window.contentItem, item => item.dragPoint !== undefined);
+        return {window: window.visible, visible: wiz ? wiz.visible : false, live: wiz ? wiz.live : false,
+            x: wiz ? wiz.x : -1, y: wiz ? wiz.y : -1, size: wiz ? wiz.width : 0,
+            resting: Assistant.restingPlace(window.width, window.height)};
     }
     IpcHandler {
         target: "welcome-test"
@@ -197,6 +218,7 @@ TEST_IPC = '''
             else Welcome.windowClosed(data);
         }
         function launcher(open: bool): void { Launcher.open = open; }
+        function closeComposer(): void { Assistant.closeComposer(); }
         function state(): string {
             const view = shell.testItem("welcomeView");
             const step = shell.testItem("welcomeWallpaperStep");
@@ -205,6 +227,7 @@ TEST_IPC = '''
             const origin = view ? view.mapToItem(null, 0, 0) : {x: 0, y: 0};
             const keys = {};
             for (const id of ACTION_IDS) keys[id] = Keybindings.keysFor(id);
+            const bubble = shell.testItem("helloBubble");
             return JSON.stringify({grid: shell.testItem("wallpaperGrid") !== null, tab: step ? step.tab : "",
                 selected: OnlineWallpapers.selected ? OnlineWallpapers.selected.fileName || "" : "",
                 wall: Settings.wall, current: Wallpaper.current, peeking: view ? view.peeking : false,
@@ -219,7 +242,13 @@ TEST_IPC = '''
                 effectiveAccent: Theme.accent.toString(), theme: Settings.theme,
                 themePaletteActive: Theme.themePaletteActive,
                 themeMode: Settings.themeMode, closed: shell.testClosed,
-                requests: OnlineWallpapers.requestTimes.length});
+                requests: OnlineWallpapers.requestTimes.length, firstName: Welcome.firstName,
+                wiz: {hello: shell.testWiz("helloWiz"), connect: shell.testWiz("connectWiz"),
+                    ready: shell.testWiz("readyWiz"), flyer: shell.testWiz("welcomeFlyer")},
+                bubble: bubble ? bubble.plainText : null, corner: shell.testCorner(),
+                handOffs: shell.testHandOff, arrivals: shell.testArrivals,
+                flight: {x: welcomeWindow.flightTo.x, y: welcomeWindow.flightTo.y,
+                    size: welcomeWindow.flightSize, scale: welcomeWindow.flightScale}});
         }
     }
 '''
@@ -314,6 +343,9 @@ class Session:
         entry = shell / 'shell.qml'
         text = entry.read_text().replace('import "Common"\n', 'import "Common"\nimport "Common" as TestCommon\nimport "Welcome" as TestGuide\n')
         assert text.count('    WelcomeWindow {}\n') == 1
+        loader = '    LazyLoader {\n        active: Assistant.shown\n'
+        assert text.count(loader) == 1
+        text = text.replace(loader, '    LazyLoader {\n        id: assistantLoader\n        active: Assistant.shown\n')
         entry.write_text(text.replace('    WelcomeWindow {}\n', '    WelcomeWindow { id: welcomeWindow }\n'
             + TEST_IPC.replace('const keys = {};', ids + '\n            const keys = {};'), 1))
         path = shell / 'Welcome/WelcomeView.qml'
@@ -543,6 +575,25 @@ def main():
             assert (rect['width'], rect['height']) == (1434, 896) and (rect['x'], rect['y']) == (3, 2), rect
             first = session.capture(shots, 'welcome-hello-en.png', settle=.3)
 
+            # Wiz perches on the card, hat lifted, then stands at ease. He
+            # names the assistant's key as Keybindings has it (remapped here).
+            probe = session.probe()
+            assert probe['wiz']['hello']['pose'] == 'greeting' and probe['wiz']['hello']['live'], probe['wiz']
+            hello = (f"Hi {probe['firstName']}, I’m Wiz. I’ll walk you through the rest. Afterwards I live in the "
+                     'corner of your screen: press Super + A to talk to me.')
+            session.wait(lambda: session.probe().get('bubble') == hello, 'Wiz names the assistant key')
+            session.capture(shots, 'welcome-hello-wiz-en.png', settle=.2)
+            session.wait(lambda: session.probe()['wiz']['hello']['pose'] == 'idle', 'the greeting ends', timeout=6)
+            # One Wiz at a time: the assistant's own Wiz, shown now, stays
+            # hidden and still while the guide covers the screen.
+            assert probe['corner'] is None, probe['corner']
+            session.call('assistant', 'show')
+            corner = session.wait(lambda: (c := session.probe().get('corner')) and c['window'] and c, 'assistant window')
+            time.sleep(.5)
+            corner = session.probe()['corner']
+            assert not corner['visible'] and not corner['live'], corner
+            assert session.state()['coversAssistant']
+
             # A fresh installation shows a plain background without creating
             # a wallpaper folder or requesting a palette.
             probe = session.probe()
@@ -550,6 +601,9 @@ def main():
             assert not (session.home / 'Pictures/Wallpapers').exists()
             session.call('welcome-test', 'aside')
             session.wait(lambda: session.state().get('aside') and not session.probe().get('mapped'), 'guide steps aside')
+            # Aside, the guide's Wiz is gone and the assistant's is back.
+            session.wait(lambda: (c := session.probe()['corner'])['visible'] and c['live'], 'the assistant Wiz while aside')
+            assert not session.state()['coversAssistant'] and not session.probe()['wiz']['hello']['live']
             behind = session.capture(shots, 'welcome-aside-en.png')
             width, height = Image.open(behind).size
             strip = (8, int(height * .3), int(width * .25), int(height * .7))
@@ -559,6 +613,7 @@ def main():
             assert region_difference(first, behind, strip) > 15, 'the guide must cover the desktop'
             assert session.ipc('open', '') == 'ok'
             session.wait(lambda: not session.state().get('aside') and session.guide_rect(), 'open resumes the guide')
+            session.wait(lambda: not session.probe()['corner']['visible'], 'the assistant Wiz hidden again')
 
             assert not session.probe()['paletteActive']
             assert session.probe()['paletteError'] == ''
@@ -570,9 +625,13 @@ def main():
                 if step == 'connect':
                     session.wait(lambda: session.state()['connect'] == {'password': 'available', 'assistant': 'required'},
                                  'Connect offers 1Password and the assistant sign-in')
+                    # Signed out, the assistant's Wiz sleeps on its card.
+                    session.wait(lambda: session.probe()['wiz']['connect']['pose'] == 'asleep', 'Wiz asleep')
                 if step == 'finish':
                     session.wait(lambda: session.state()['doctor']['attention']
                                  == ['graphics:suggestion', 'firmware-updates:suggestion'], 'the system check report')
+                    # Two suggestions: he waits for the person on the system check.
+                    session.wait(lambda: session.probe()['wiz']['ready']['pose'] == 'needs-input', 'Wiz on Ready')
                 if step == 'wallpaper':
                     session.wait(lambda: (p := session.probe()).get('grid') and p.get('tab') == 'online', 'Wallhaven first')
                 if step == 'shortcuts':
@@ -635,6 +694,7 @@ def main():
             session.call('welcome-test', 'windowEvent', 'openwindow', '2c3d,1,brave-browser,Claude')
             session.call('welcome-test', 'windowEvent', 'openwindow', '4e5f,1,1password,Unlock 1Password')
             assert session.state()['connect']['assistant'] == 'signing-in', session.state()
+            assert session.probe()['wiz']['connect']['pose'] == 'listening', session.probe()['wiz']
             # The 1Password window left open closing does not bring the guide
             # back over the sign-in page: it stands aside for the sign-in now.
             session.call('welcome-test', 'windowEvent', 'closewindow', 'c5d6')
@@ -645,6 +705,8 @@ def main():
                          'the guide comes back once the assistant is signed in', timeout=40)
             assert session.state()['step'] == 'connect'
             assert session.state()['connectWindows'] == ['0a1b', '2c3d', '4e5f'], session.state()
+            # Signed in, he wakes up happy.
+            session.wait(lambda: session.probe()['wiz']['connect']['pose'] == 'happy', 'Wiz awake')
             session.capture(shots, 'welcome-connect-ready-en.png')
             # Ready: the check's findings, and the assistant asked about them.
             session.ipc('open', 'finish')
@@ -683,13 +745,40 @@ def main():
             session.call('welcome-test', 'launcher', 'false')
             session.wait(lambda: not session.state().get('aside'), 'the guide resumes after the launcher')
             assert session.state()['step'] == 'shortcuts'
+            # So is the assistant's box that Super+I opens: his Wiz shows with it.
+            session.call('assistant', 'compose')
+            session.wait(lambda: session.state().get('aside') and session.probe()['corner']['visible'],
+                         'the assistant box makes the guide step aside')
+            session.call('welcome-test', 'closeComposer')
+            session.wait(lambda: not session.state().get('aside'), 'the guide resumes after the assistant box')
+            session.wait(lambda: not session.probe()['corner']['visible'], 'the assistant Wiz hidden again')
 
-            # Enter activates the primary action with initial page focus.
+            # Enter activates the primary action with initial page focus. Wiz
+            # hops from Ready to the assistant's corner as the guide fades,
+            # and the assistant's own Wiz lands there.
             session.ipc('open', 'finish')
+            session.wait(lambda: (w := session.probe()['wiz']['ready']) and w['visible'] and w['live'], 'Ready Wiz')
+            assert not session.probe()['corner']['visible'], 'one Wiz at a time'
             session.call('welcome-test', 'focusRoot')
-            session.key('-k', 'Return')
+            finishing = session.start(['wtype', '-s', '400', '-k', 'Return', '-s', '100'], 'finish-key.log')
+            time.sleep(.75)
+            session.capture(shots, 'welcome-handoff-en.png', settle=0)
+            assert finishing.wait(timeout=10) == 0, 'wtype failed'
             session.wait(lambda: session.state().get('status') == 'completed', 'Finish')
             assert not session.state()['open']
+            session.wait(lambda: session.state()['handOff'] == '' and session.probe()['arrivals'] == 1, 'the hand-off')
+            probe = session.probe()
+            assert probe['handOffs'] == ['flying', 'landed', ''], probe['handOffs']
+            corner = probe['corner']
+            resting = (corner['resting']['x'], corner['resting']['y'])
+            assert corner['visible'] and corner['live'] and (round(corner['x']), round(corner['y'])) == resting, corner
+            assert (probe['flight']['x'], probe['flight']['y']) == resting, probe['flight']
+            assert abs(probe['flight']['size'] * probe['flight']['scale'] - corner['size']) < .5, probe['flight']
+            assert not session.state()['coversAssistant'] and session.probe().get('mapped') is False
+            landed = session.capture(shots, 'welcome-landed-en.png', settle=1.6)
+            wiz_box = (resting[0], resting[1], resting[0] + round(corner['size']), resting[1] + round(corner['size']))
+            landed_diff = region_difference(landed, Image.new('RGB', Image.open(landed).size, '#101116'), wiz_box)
+            assert landed_diff > 5, f'the assistant Wiz shows in his corner (difference {landed_diff:.2f})'
             # Leaving for the desktop closes what Connect opened, and only that.
             assert session.probe()['closed'] == ['0a1b', '2c3d', '4e5f'], session.probe()
             assert session.state()['connectWindows'] == [], session.state()
@@ -834,6 +923,9 @@ def main():
             session.call('welcome-test', 'focusGrid')
             session.key('-k', 'Escape')
             session.wait(lambda: session.state().get('status') == 'dismissed', 'Escape dismiss')
+            # Closed any other way, the assistant's Wiz simply reappears.
+            session.wait(lambda: session.probe()['corner']['visible'], 'the assistant Wiz after dismissal')
+            assert session.probe()['arrivals'] == 1 and session.state()['handOff'] == ''
             session.wait(lambda: session.state_path.exists() and json.loads(session.state_path.read_text()).get('status') == 'dismissed', 'saved dismissal')
             session.start_shell('qs-restart.log')
             time.sleep(1)
@@ -910,14 +1002,31 @@ def main():
             session.ipc('reset')
             session.wait(lambda: not session.state_path.exists(), 'reset')
             assert sentinel.read_text() == 'keep'
+            # With reduced motion there is no flight: the guide closes and the
+            # assistant's Wiz is simply there, still.
+            session.patch_settings(reducedMotion=True)
+            assert session.ipc('open', 'finish') == 'ok'
+            session.wait(lambda: (w := session.probe()['wiz']['ready']) and w['visible'] and not w['live'], 'a still Ready Wiz')
+            session.call('welcome-test', 'focusRoot')
+            session.key('-k', 'Return')
+            session.wait(lambda: session.state().get('status') == 'completed' and session.probe().get('mapped') is False,
+                         'Finish without motion')
+            probe = session.probe()
+            assert probe['handOffs'] == [] and probe['arrivals'] == 1, probe
+            assert probe['corner']['visible'] and not probe['corner']['live'], probe['corner']
+            session.patch_settings(reducedMotion=False)
             session.env['CYBEXOS_WELCOME'] = '0'
             session.start_shell('qs-disabled.log')
             time.sleep(1)
             assert not session.state()['open'], 'environment suppression'
             session.check_logs()
             print(json.dumps({'plainBackgroundDifference': round(default_diff, 2),
-                              'peekDifference': round(peek_diff, 2), 'applied': applied['wall']}))
-            print('PASS: fresh-install plain background behind the full-screen guide, installer zoom at four '
+                              'peekDifference': round(peek_diff, 2), 'applied': applied['wall'],
+                              'landedWizDifference': round(landed_diff, 2)}))
+            print('PASS: Wiz (Hello greeting and bubble with the remapped assistant key, asleep/listening/happy on Connect, '
+                  'needs-input on Ready, the assistant Wiz hidden while the guide covers and back aside, for Super+I '
+                  'and after dismissal, the hand-off flight landing on his resting place, none with reduced motion), '
+                  'fresh-install plain background behind the full-screen guide, installer zoom at four '
                   'output sizes, first login, all six steps, Connect (1Password aside and return on its window closing, its tick once an account appears, '
                   'the assistant\'s own sign-in and automatic return), the system check on Ready and the question it asks, '
                   'Keybindings keycaps (remapped/unbound) and claim '

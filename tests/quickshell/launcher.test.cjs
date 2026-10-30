@@ -87,9 +87,10 @@ test("the app directory keeps every match in a fixed scrolling viewport", () => 
     assert.doesNotMatch(appRows, /slice\(0, root\.maxResults\)/,
         "the provider must not discard apps below the first viewport");
     // At most eight rows tall; a selected clipboard image adds its preview
-    // inside that viewport rather than growing the card.
+    // inside that viewport rather than growing the card, as Wiz's taller
+    // row does when nothing matched.
     assert.match(results,
-        /height:\s*Math\.min\(Math\.min\(root\.maxResults \* root\.rowHeight, root\.rows\.length \* root\.rowHeight\s*\+ \(root\.selectedPreview \? root\.previewRowHeight - root\.rowHeight : 0\)\),/);
+        /height:\s*Math\.min\(Math\.min\(root\.maxResults \* root\.rowHeight, root\.rows\.length \* root\.rowHeight\s*\+ \(root\.selectedPreview \? root\.previewRowHeight - root\.rowHeight : 0\)\s*\+ \(root\.asking \? root\.askRowHeight - root\.rowHeight : 0\)\),/);
     assert.match(results, /interactive:\s*contentHeight > height/);
     assert.match(results, /boundsBehavior:\s*Flickable\.StopAtBounds/);
     assert.match(results, /ScrollChrome\s*\{[\s\S]*target:\s*resultList/);
@@ -400,7 +401,7 @@ test("typed arguments run as argv without a shell; fixed commands report failure
         "captures start once the launcher has left the screen");
     assert.match(run, /Settings\.showSetting\(page, key\)/);
     assert.match(providers, /ProviderHelpers\.availableActions\(\s*ProviderHelpers\.BUILTIN_ACTIONS, \{\s*developerTools: Settings\.developerToolsConfigured,\s*connectedWidgets: Settings\.connectedWidgetsConfigured/);
-    assert.match(providers, /return ProviderHelpers\.blendRows\(root\.appRows, root\.actions, root\.term\);/);
+    assert.match(providers, /const matches = ProviderHelpers\.blendRows\(root\.appRows, root\.actions, root\.term\);/);
 });
 
 test("clipboard entries paste on Enter, copy on Shift+Enter, and pin on Ctrl+P", () => {
@@ -431,4 +432,86 @@ test("the password-manager hint keeps a secret out of the history", () => {
         "../../assets/scripts/clipboard-history-store"), "utf8"));
     assert.match(store, /if \[\[ \$\{CLIPBOARD_STATE:-\} == sensitive \]\]; then\s*discard/);
     assert.ok(store.indexOf("CLIPBOARD_STATE") < store.indexOf("exec cliphist"));
+});
+
+test("a plain query nothing matches offers Ask Wiz, reading the assistant only then", () => {
+    const providers = read("Common/LauncherProviders.qml");
+    const rows = providers.slice(providers.indexOf("readonly property var rows:"),
+        providers.indexOf("readonly property bool busy:"));
+    const plain = rows.slice(rows.indexOf("default:"));
+
+    // Only the Apps list's default case: prefixes and prompts return earlier
+    // with their own empty states.
+    assert.ok(rows.indexOf("if (root.argumentMode)") < rows.indexOf("askRows"));
+    assert.equal((rows.match(/askRows/g) || []).length, 1);
+    assert.match(plain,
+        /return matches\.length > 0 \? matches\s*: ProviderHelpers\.askRows\(root\.term, root\.assistantState\(\)\);/,
+        "a list of matches must not depend on the assistant's state");
+    const state = providers.match(/function assistantState\(\) \{[\s\S]*?\n    \}/)?.[0] ?? "";
+    for (const name of ["available", "connected", "busy", "screenAttached", "capturing"])
+        assert.match(state, new RegExp(`${name}: Assistant\\.${name}`), name);
+    assert.match(state, /away: GameMode\.active/);
+});
+
+test("Ask Wiz closes the launcher, then asks as Super+I and Enter would", () => {
+    const providers = read("Common/LauncherProviders.qml");
+    const shell = read("shell.qml");
+    const activate = providers.slice(providers.indexOf("function activate(row"),
+        providers.indexOf("function canRemove(row)"));
+    const ask = providers.slice(providers.indexOf("function askAssistant(question)"),
+        providers.indexOf("id: pinsView"));
+    const timer = ask.slice(ask.indexOf("id: askTimer"));
+    assert.ok(timer.includes("onTriggered"));
+
+    assert.match(activate, /case "assistant":\s*root\.askAssistant\(row\.question\);/);
+    // The launcher lets go of the keyboard before the assistant's box can
+    // want it: closed at once, the question handed over after the fade-out.
+    assert.match(ask,
+        /const text = String\(question \|\| ""\)\.trim\(\);\s*if \(text === ""\)\s*return;\s*root\.pendingQuestion = text;\s*Launcher\.close\(\);\s*askTimer\.restart\(\);/);
+    assert.match(timer, /interval: Theme\.launcherFadeOutDuration \+ 40/);
+    assert.match(timer,
+        /ProviderHelpers\.askHandoff\(root\.pendingQuestion,\s*root\.assistantState\(\)\);\s*root\.pendingQuestion = "";/);
+    // The same two calls as the assistant's `ask` IPC; send() itself keeps
+    // the question behind the sign-in prompt when no agent is signed in.
+    assert.match(timer,
+        /handoff\.mode === "send"\) \{[^}]*Assistant\.openComposer\(false\);\s*Assistant\.send\(handoff\.text\);/);
+    assert.match(shell,
+        /function ask\(text: string\): void \{\s*Assistant\.openComposer\(false\);\s*Assistant\.send\(text\);/);
+    assert.match(timer,
+        /handoff\.mode === "draft"\) \{\s*Assistant\.draft = handoff\.text;\s*Assistant\.openComposer\(true\);/);
+    // Nothing about the screen is attached on the launcher's behalf.
+    assert.doesNotMatch(ask, /attachScreen|askAboutScreen|screenPath|screenshot/);
+});
+
+test("the Ask Wiz row shows a listening Wiz, the quoted query and the Enter key", () => {
+    const view = read("LauncherView.qml");
+    const results = view.slice(view.indexOf("// ---- Results"),
+        view.indexOf("// ---- Empty state"));
+    const askRow = view.slice(view.indexOf("component AskWiz: Item"));
+
+    assert.match(view, /import "Assistant"/);
+    assert.match(view, /readonly property bool asking: rows\.length === 1 && rows\[0\]\.kind === "ask"/);
+    assert.match(view, /askRowHeight: Theme\.scaled\(58\)/);
+    assert.match(view, /askWizSize: Theme\.scaled\(52\)/);
+    // The ordinary row stays single-line. Wiz exists only while his row is
+    // listed, drawn over it rather than in the delegate: every key rebuilds
+    // the delegates, and must not rebuild him.
+    assert.match(results, /height: asking \? root\.askRowHeight\s*: previewing \? root\.previewRowHeight : root\.rowHeight/);
+    assert.equal((view.match(/visible: !resultRow\.asking/g) || []).length, 2,
+        "the icon and the one-line title step aside for Wiz's row");
+    const delegate = results.slice(results.indexOf("delegate:"), results.indexOf("// Wiz over the list"));
+    assert.ok(delegate.length > 0);
+    assert.doesNotMatch(delegate, /AskWiz|\bWiz \{/);
+    assert.match(results,
+        /Loader \{\s*active: root\.asking\s*width: resultList\.width\s*height: root\.askRowHeight\s*sourceComponent: AskWiz \{\}/);
+    assert.match(view, /readonly property string askQuote: asking \? rows\[0\]\.subtitle : ""/);
+
+    assert.match(askRow, /Wiz \{[\s\S]*?width: root\.askWizSize[\s\S]*?pose: "listening"/);
+    assert.doesNotMatch(askRow, /recording:|animated:/,
+        "he listens without the recording loop, and keeps the shared motion gate");
+    assert.match(askRow, /text: "Ask Wiz"/);
+    // A typed "<b>" is shown, not interpreted.
+    assert.match(askRow, /text: "“" \+ root\.askQuote\s*textFormat: Text\.PlainText[\s\S]*?elide: Text\.ElideRight/);
+    assert.match(askRow, /id: closingQuote\s*text: "”"/);
+    assert.match(askRow, /text: "Enter" \/\/ i18n: untranslated \(key name\)/);
 });

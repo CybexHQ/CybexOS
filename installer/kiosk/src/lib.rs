@@ -12,5 +12,6 @@ pub mod names;
 pub mod protocol;
 pub mod software;
 pub mod ui;
+pub mod wiz;
 pub mod zones;
 pub mod zoom;

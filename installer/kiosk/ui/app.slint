@@ -1,7 +1,8 @@
 // Cybex OS installer screen: one window, drawn by Slint's software renderer
 // straight to KMS/DRM. The 1280×800 canvas is zoomed to the panel by the Rust
 // side and centred when the panel's aspect ratio differs. Flat by design: no
-// blur, no shadows, no animation beyond a 1 Hz activity tick.
+// blur, no shadows, and no animation beyond a 1 Hz activity tick and Wiz
+// (wiz.slint), who moves in small, pre-drawn steps.
 
 import "../assets/fonts/SpaceGrotesk-Regular.ttf";
 import "../assets/fonts/SpaceGrotesk-Medium.ttf";
@@ -13,12 +14,12 @@ import "../assets/fonts/JetBrainsMono-Bold.ttf";
 
 import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
-import { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered } from "store.slint";
+import { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered, WizArt } from "store.slint";
 import { Icon, SlotIcon, Chip, Kicker } from "widgets.slint";
 import { WelcomeScreen, DiskScreen, AccountScreen, SoftwareScreen, ReviewScreen, InstallingScreen, DoneScreen, StoppedScreen, FailedScreen } from "screens.slint";
 import { WifiSheet, KeyboardSheet, LanguageSheet, ToolsMenu, LogSheet, AppsSheet, GpuSheet, TimezoneSheet } from "sheets.slint";
 
-export { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered }
+export { Store, Check, Choice, DiskRow, ZoneRow, SummaryRow, StageRow, WifiRow, AppTile, ProfileCard, CustomRow, UsbRow, Filtered, WizArt }
 
 component Steps inherits HorizontalLayout {
     in property <int> current;

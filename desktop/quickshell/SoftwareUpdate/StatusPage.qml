@@ -2,15 +2,17 @@ import QtQuick
 import QtQuick.Controls as Controls
 import "../Common"
 import "../Common/Format.js" as Format
+import "../Assistant" as AssistantUi
 
-// A centred status: a toned icon, what is happening, and what to do next.
-// The page's buttons, facts and choices follow as its own content.
+// A centred status: Wiz showing how things stand, what is happening, and
+// what to do next. The page's buttons, facts and choices follow as its own
+// content; its primary button carries the tone.
 Flickable {
     id: root
 
-    property string glyph: "info-circle"
-    // accent, ok, warn, error or neutral.
-    property string tone: "accent"
+    // Wiz's pose (UpdatesHelpers.statusPose) and his unread pip.
+    property string pose: "idle"
+    property bool unread: false
     property string title: ""
     property string body: ""
     property bool busy: false
@@ -18,11 +20,6 @@ Flickable {
     property real progress: -1
     property string progressLabel: ""
     default property alias content: extra.data
-
-    readonly property color toneFill: tone === "ok" ? Theme.okBg : tone === "warn" ? Theme.amberBg
-        : tone === "error" ? Theme.redBg : Theme.chip
-    readonly property color toneInk: tone === "ok" ? Theme.ok : tone === "warn" ? Theme.amber
-        : tone === "error" ? Theme.redText : tone === "neutral" ? Theme.textMid : Theme.accentText
 
     contentWidth: width
     contentHeight: Math.max(height, column.implicitHeight + Theme.scaled(64))
@@ -38,21 +35,16 @@ Flickable {
         y: Math.max(Theme.scaled(32), Math.round((root.contentHeight - implicitHeight) / 2))
         spacing: Theme.scaled(10)
 
-        Rectangle {
+        // Decorative, as the icon he replaces was: the heading says it.
+        AssistantUi.Wiz {
+            objectName: "updateWiz"
             anchors.horizontalCenter: parent.horizontalCenter
-            width: Theme.scaled(80)
+            width: Theme.scaled(128)
             height: width
-            radius: Theme.scaled(24)
-            color: root.toneFill
-            Sym {
-                anchors.centerIn: parent
-                name: root.glyph
-                size: Theme.scaled(38)
-                color: root.toneInk
-            }
+            pose: root.pose
+            unread: root.unread
+            Accessible.ignored: true
         }
-
-        Item { width: 1; height: Theme.scaled(6) }
 
         Text {
             objectName: "updateTitle"

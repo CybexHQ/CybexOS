@@ -34,6 +34,46 @@ Space Grotesk and JetBrains Mono. GRUB sizes a list from its theme, so each
 list comes in row variants that the menus choose. The ISOLINUX screen for a
 legacy BIOS start is the same build's 800×600 notice.
 
+### Wiz at the disk unlock, on the lock screen and in the terminal
+
+Wiz, the assistant's character (docs/assistant.md), appears where the shell
+cannot draw him, as still pictures of his poses: `scripts/export-wiz` writes
+each pose at rest to `assets/wiz/<pose>.svg`, all in one box with his feet at
+the same height, and the packages render them with librsvg at build time.
+He never speaks, and the boot logo stays the Cybex mark.
+
+- **Disk unlock.** While Plymouth asks for the disk passphrase, Wiz (84 pixels
+  high, about 65 standing) stands centred on the password field, which moves
+  down under the unchanged logo to make room. He is `asleep` while the field
+  is empty, `listening` while there are bullets and while the answer is
+  checked, `sorry` when systemd-cryptsetup asks again (the same prompt right
+  after an answer; it sends no other sign of a wrong passphrase) and `happy`
+  for two seconds when systemd reports the `systemd-cryptsetup@` unit
+  started, which happens only once the disk unlocked. Boots without a prompt,
+  including the installation medium's, never show him. Plymouth's script
+  plugin draws images one pixel per logical pixel and enlarges them at double
+  scale, so he, like the logo, is drawn from a single-density picture (the
+  theme's `logo@2x.png` is not read by the script).
+- **Lock screen.** hyprlock shows pictures, not the shell's animation: Wiz
+  sleeps (`asleep`) right of the password field, his feet level with its
+  bottom edge, in the vendor lock screen and the one the system theme
+  renders, growing with the shell's text size like the field.
+- **Terminal.** Typing a plain `fastfetch` at fish's prompt in kitty shows Wiz
+  (`idle`, 9 rows high) through kitty's graphics protocol. The default
+  fastfetch config's logo is `$CYBEXOS_FASTFETCH_LOGO`, else the braille
+  logo; fish's `fastfetch` function sets it only when the config names it,
+  the shell runs in kitty itself, fastfetch writes to the terminal, there are
+  no arguments and `NO_COLOR` is unset. Where fastfetch cannot draw a picture
+  it would print the file as text, so other terminals, tmux, ssh, pipes and
+  `command fastfetch` keep the braille logo.
+
+`checks.x86_64-linux.plymouth-unlock` unlocks a LUKS volume in a real
+systemd initrd through the packaged theme with a wrong and then the right
+passphrase, and shows it at double scale; `checks.x86_64-linux.lock-terminal`
+locks a signed-in desktop with both lock screens and runs fastfetch in kitty.
+Both take screenshots for review; they are VM qualification, not of physical
+displays.
+
 The graphical and terminal installers, timezone map, password dialog and
 brand controls use blue with charcoal text. New desktop preferences, the
 Cybex OS theme, terminal fallback, window borders and lock screen default to

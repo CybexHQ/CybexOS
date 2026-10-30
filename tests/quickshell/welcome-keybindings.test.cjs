@@ -8,9 +8,10 @@ const {root, luaBinary, stub} = require('./keybindings-support.cjs');
 const shellDir = path.join(root, 'desktop/quickshell');
 const read = name => fs.readFileSync(path.join(shellDir, name), 'utf8');
 
-// The real catalog, resolved by the vendor Lua with every feature gate off:
-// the guide must not depend on an optional feature's actions.
-function catalog() {
+// The real catalog, resolved by the vendor Lua with every feature gate off
+// unless named: the guide must not depend on an optional feature's actions,
+// except where it shows them only with that feature (GATED).
+function catalog(features = []) {
     const lua = luaBinary();
     assert.ok(lua, 'Lua is required: run these tests through nix develop');
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'cybexos-welcome-keys-'));
@@ -19,7 +20,7 @@ function catalog() {
             fs.mkdirSync(path.join(temporary, dir), {recursive: true});
         const result = spawnSync(lua, ['-'], {encoding: 'utf8', input:
             `package.path = ${JSON.stringify(path.join(root, 'desktop/hypr/?.lua'))} .. ';' .. package.path\n`
-            + 'package.preload.features = function() return {} end\n' + stub
+            + 'package.preload.features = function() return {' + features.map(name => name + ' = true').join(', ') + '} end\n' + stub
             + "require('bindings'); require('keybinding_preferences')\n",
             env: {...process.env, HOME: temporary, XDG_CONFIG_HOME: path.join(temporary, 'config'),
                 XDG_DATA_HOME: path.join(temporary, 'data'), XDG_STATE_HOME: path.join(temporary, 'state'),
@@ -40,17 +41,35 @@ function guideIds() {
     return [...ids].sort();
 }
 
+// Hello names the assistant's key only when the assistant is on this system.
+const GATED = {'shell.assistant': 'assistant'};
+
 test('every action ID the welcome guide uses exists in the ungated vendor catalog', () => {
     const state = catalog();
     const ids = guideIds();
-    for (const id of ['shell.launcher', 'apps.terminal', 'windows.close', 'windows.overview', 'shell.shortcuts'])
+    for (const id of ['shell.launcher', 'apps.terminal', 'windows.close', 'windows.overview', 'shell.shortcuts', 'shell.assistant'])
         assert.ok(ids.includes(id), 'scan found ' + id);
-    for (const id of ids) {
+    for (const id of ids.filter(id => !(id in GATED))) {
         const row = state.actions.find(action => action.id === id);
         assert.ok(row, id + ' is missing from bindings.lua');
         assert.equal(row.hidden, false, id);
         assert.ok(row.keys.length > 0, id + ' has a default key');
     }
+});
+
+test('Hello names the assistant\'s own key, and only with the assistant', () => {
+    const state = catalog(['assistant']);
+    for (const [id, feature] of Object.entries(GATED)) {
+        const row = state.actions.find(action => action.id === id);
+        assert.ok(row, `${id} is missing from bindings.lua with the ${feature} feature`);
+        assert.deepEqual(row.keys, ['SUPER + I'], id);
+        assert.ok(!catalog().actions.some(action => action.id === id), `${id} is gated by ${feature}`);
+    }
+    const hello = read('Welcome/HelloStep.qml');
+    assert.match(hello, /Keybindings\.loaded \? Keybindings\.keysFor\("shell\.assistant"\) : \["SUPER \+ I"\]/);
+    // Without the assistant Wiz does not mention it, nor its key.
+    assert.match(hello, /if \(!Assistant\.available\)\s*return I18n\.format\("Hi %1, I’m Wiz\. I’ll walk you through the rest\.", \[name\]\);/);
+    assert.match(hello, /Claim \{ active: root\.visible && Assistant\.available && !Keybindings\.loaded; onClaimed: Keybindings\.refresh\(\) \}/);
 });
 
 test('the wallpaper step opens on Wallhaven, applies on choice and keeps Space typing in text fields', () => {

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../../Common"
+import "../../Assistant"
 import ".."
 
 // The drawer's Notifications tab: the recent hour's cards, an EARLIER block
@@ -180,8 +181,55 @@ Column {
             }
         }
 
+        // Nothing kept at all: Wiz rests where the cards would be, asleep
+        // while Focus holds notifications back. Idle he holds still between
+        // a blink or a glance, so an open, empty centre draws next to nothing.
+        Loader {
+            active: Notifs.count === 0
+            visible: active
+            width: parent.width
+
+            sourceComponent: Item {
+                implicitHeight: emptyColumn.implicitHeight + Theme.scaled(20)
+
+                Column {
+                    id: emptyColumn
+                    anchors.centerIn: parent
+                    width: parent.width
+                    spacing: Theme.scaled(4)
+
+                    Wiz {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Theme.scaled(64)
+                        height: Theme.scaled(64)
+                        pose: Notifs.dnd ? "asleep" : "idle"
+                    }
+
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: I18n.tr("Nothing new")
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.primary
+                        font.weight: Theme.weightSemibold
+                        color: Theme.textMid
+                    }
+
+                    Text {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: I18n.tr("You're all caught up.")
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.secondary
+                        color: Theme.textDim
+                    }
+                }
+            }
+        }
+
+        // Only older notifications: nothing new this hour.
         Item {
-            visible: root.recent.length === 0
+            visible: root.recent.length === 0 && Notifs.count > 0
             width: parent.width
             height: 64
 

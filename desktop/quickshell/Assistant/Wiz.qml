@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
+import "../Common"
 import "../Common/WizRig.js" as Rig
 
 // Wiz, the assistant's character (docs/assistant.md).
@@ -41,9 +42,10 @@ Item {
     // pointer move, and the point it was grabbed by, in item pixels.
     property point dragPoint: Qt.point(0, 0)
     property point grab: Qt.point(width / 2, height / 2)
-    // Off for reduced motion and an unattended session: poses snap into
-    // place and nothing loops.
-    property bool animated: true
+    // Off for reduced motion (which power saver turns on) and an unattended
+    // session: poses snap into place and nothing loops. Every surface that
+    // shows him inherits this.
+    property bool animated: !Theme.reducedMotion && !Activity.idle
 
     readonly property var wiz: Rig.WizRig
     readonly property var layout: wiz.LAYOUT
@@ -147,7 +149,7 @@ Item {
     }
 
     Timer {
-        running: root.live && ["happy", "finished", "asleep"].indexOf(root.pose) === -1 && !root.dizzy
+        running: root.live && ["happy", "greeting", "finished", "asleep"].indexOf(root.pose) === -1 && !root.dizzy
         repeat: true
         interval: 3400
         onTriggered: {
@@ -1155,7 +1157,7 @@ Item {
 
     // A thud: squashed with his eyes shut, the hat landing a beat later and
     // crooked, dust, then a bead of sweat and a shake of the hat.
-    function land() {
+    function land(sweat) {
         startling.stop();
         doubleTake.stop();
         landing.restart();
@@ -1164,7 +1166,17 @@ Item {
         crooking.restart();
         for (let i = 0; i < puffs.count; i++)
             (puffs.itemAt(i) as Puff)?.burst();
-        phew.slide();
+        if (sweat !== false)
+            phew.slide();
+    }
+
+    // Set down somewhere new without a drag, as the welcome guide hands him
+    // to his corner: a light landing, no sweat.
+    function arrive() {
+        if (!live)
+            return;
+        impact = 0.5;
+        land(false);
     }
 
     SequentialAnimation {

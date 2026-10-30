@@ -92,6 +92,16 @@ The flow is **Welcome → Disk → You → Software → Review → Installing �
   log belongs to this boot only.
 - **Done** offers restart or power off; installation never reboots by itself.
 
+Wiz, the assistant's character, keeps the system check, the installation and
+its outcome company without a word. Runes circle his hat while a check runs; he
+peeks from under it, an amber pip pulsing, while a check warns or fails or a
+question is open (a test build you accepted no longer counts); he is happy once
+everything passes. While the disk is written he works a spell, checking instead
+while the worker waits for a lost connection. When it is done he nods and
+sparkles; a stop that needs you shows him waiting, and a failure, sorry. He
+stays off Disk, You and Review, so the erase warning keeps full attention, and
+holds still under the sheets.
+
 Before building the desktop, the installer explicitly copies already-built
 dependencies from the medium into the fresh machine's Nix store. This also
 reuses outputs such as shell completions that prohibit cache substitution and

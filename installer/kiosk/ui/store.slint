@@ -20,6 +20,9 @@ export struct ProfileCard {
 export struct CustomRow { kind: int, id: string, title: string, detail: string, aux: string, icon: image, symbol: string, mono: string, on: bool, enabled: bool, warn: bool }
 export struct UsbRow { device: string, label: string, size: string }
 export struct Filtered { text: string, caret: int, note: string }
+// One of Wiz's pictures as src/wiz.rs drew it, and its centre in physical
+// pixels from the rig's origin (ui/wiz.slint).
+export struct WizArt { image: image, x: float, y: float }
 
 export global Store {
     // Connection and routing.
@@ -145,6 +148,11 @@ export global Store {
     in-out property <string> fail-message;
     in-out property <bool> fail-touched;
 
+    // Wiz's pose where the screen leaves it to the state (ui/wiz.slint).
+    in-out property <string> check-pose: "thinking";     // thinking, needs-input or happy
+    in-out property <string> install-pose: "working";    // working, or thinking while the network is away
+    in-out property <string> stop-pose: "needs-input";   // needs-input, or sorry after a failure
+
     // Network sheet.
     in-out property <bool> net-connected;
     in-out property <string> net-kind;
@@ -210,4 +218,7 @@ export global Store {
     callback usb-save(string);
     callback start-over();
     callback power(string);
+    // Wiz's picture `name` (assets/wiz) at so many physical pixels per rig unit,
+    // scaled about its centre by the last argument.
+    pure callback wiz-art(string, float, float) -> WizArt;
 }

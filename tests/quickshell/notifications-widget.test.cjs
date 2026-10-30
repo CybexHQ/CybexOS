@@ -68,3 +68,21 @@ test("the retired bell id is not reused for the new widget", () => {
     assert.ok(settings.MODULE_IDS.includes("notifications"));
     assert.equal(fs.existsSync(path.join(shellDir, "Bar/Modules/Bell.qml")), false);
 });
+
+test("an empty notification centre shows Wiz, asleep while Focus is on", () => {
+    const centre = read("Popovers/Drawer/DrawerNotifications.qml");
+    const empty = centre.slice(centre.indexOf("Nothing kept at all"),
+        centre.indexOf("Only older notifications"));
+
+    assert.match(centre, /import "\.\.\/\.\.\/Assistant"/);
+    // Created only while nothing is kept, and still: idle blinks, asleep
+    // does not even do that; neither loops.
+    assert.match(empty, /Loader \{\s*active: Notifs\.count === 0/);
+    assert.match(empty, /Wiz \{[\s\S]*?width: Theme\.scaled\(64\)[\s\S]*?pose: Notifs\.dnd \? "asleep" : "idle"/);
+    assert.doesNotMatch(empty, /recording:|animated:|"thinking"|"working"/);
+    assert.match(empty, /I18n\.tr\("Nothing new"\)[\s\S]*?I18n\.tr\("You're all caught up\."\)/);
+    assert.doesNotMatch(empty, /Sym \{/, "Wiz replaces the bell");
+    // Older notifications alone keep the quiet line and its glyph.
+    assert.match(centre,
+        /Item \{\s*visible: root\.recent\.length === 0 && Notifs\.count > 0[\s\S]*?name: "notifications_off"/);
+});

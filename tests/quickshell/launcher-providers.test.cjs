@@ -328,6 +328,62 @@ test("a typed Apps query blends at most three marked actions after the apps", ()
         row.action.id === "game-mode"));
 });
 
+test("a query nothing matches is offered to Wiz while the assistant can take it", () => {
+    const ready = { available: true, connected: true, busy: false, away: false };
+    const [row, ...rest] = P.askRows("  connect my printer ", ready);
+    assert.deepEqual(rest, [], "exactly one row");
+    assert.equal(row.providerId, "assistant");
+    assert.equal(row.kind, "ask");
+    assert.equal(row.question, "connect my printer", "the question is the trimmed query");
+    assert.equal(row.subtitle, "connect my printer");
+    assert.equal(row.highlight, false);
+
+    // Whitespace alone is no question.
+    for (const query of ["", "   ", "\t \n", undefined, null])
+        assert.deepEqual(P.askRows(query, ready), [], JSON.stringify(query));
+    // Only while the assistant can take a question now. Signed out still
+    // counts: the question then waits behind the assistant's sign-in.
+    for (const [reason, state] of Object.entries({
+        "not installed": { ...ready, available: false },
+        "service not running": { ...ready, connected: false },
+        "a turn running": { ...ready, busy: true },
+        "put away for game mode": { ...ready, away: true },
+        "no state": undefined
+    }))
+        assert.deepEqual(P.askRows("connect my printer", state), [], reason);
+
+    // A long or pasted multi-line query is quoted on one bounded line; the
+    // question itself is sent whole, as typed.
+    const long = "why does " + "the printer ".repeat(100) + "\n\tstop?";
+    const [longRow] = P.askRows(long, ready);
+    assert.equal(longRow.question, long.trim());
+    assert.equal(longRow.subtitle.length, P.ASK_PREVIEW_LIMIT);
+    assert.doesNotMatch(longRow.subtitle, /\s{2}|[\n\t]/);
+    assert.equal(P.askRows("printer\n\tsetup", ready)[0].subtitle, "printer setup");
+});
+
+test("the launcher's question is sent as asked, or kept in the box to send by hand", () => {
+    const ready = { available: true, connected: true, busy: false,
+        screenAttached: false, capturing: false };
+    assert.deepEqual(P.askHandoff(" connect my printer ", ready),
+        { mode: "send", text: "connect my printer" });
+    // Never with a screenshot it was not asked with: one attached in the box,
+    // or one being taken for another question, keeps it a draft.
+    assert.deepEqual(P.askHandoff("connect my printer", { ...ready, screenAttached: true }),
+        { mode: "draft", text: "connect my printer" });
+    assert.deepEqual(P.askHandoff("connect my printer", { ...ready, capturing: true }),
+        { mode: "draft", text: "connect my printer" });
+    // The service stopped or a turn started after the row was offered: the
+    // question is kept rather than lost.
+    assert.equal(P.askHandoff("connect my printer", { ...ready, connected: false }).mode, "draft");
+    assert.equal(P.askHandoff("connect my printer", { ...ready, busy: true }).mode, "draft");
+    // Nothing to ask, or no assistant to ask.
+    assert.deepEqual(P.askHandoff("   ", ready), { mode: "none", text: "" });
+    assert.deepEqual(P.askHandoff("connect my printer", { ...ready, available: false }),
+        { mode: "none", text: "" });
+    assert.deepEqual(P.askHandoff("connect my printer"), { mode: "none", text: "" });
+});
+
 test("argument actions validate their one value before Enter can run them", () => {
     const install = P.BUILTIN_ACTIONS.find(action => action.id === "webapp-install");
     const theme = P.BUILTIN_ACTIONS.find(action => action.id === "theme-install");
