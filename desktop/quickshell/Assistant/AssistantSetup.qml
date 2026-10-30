@@ -20,7 +20,7 @@ Column {
     Text {
         width: parent.width
         text: Assistant.signingIn !== ""
-            ? I18n.tr("Finish signing in in the terminal and browser. This box will update when you’re connected.")
+            ? I18n.tr("Finish signing in in your browser. This box will update when you’re connected.")
             : I18n.tr("Choose Claude Code or Codex and sign in to your account. Then you can ask your first question.")
         color: Theme.textMid
         font.family: Theme.fontMenu
@@ -73,6 +73,11 @@ Column {
             label: Assistant.authChecking ? I18n.tr("Checking sign-in…") : I18n.tr("Check sign-in")
             enabled: !Assistant.authChecking
             onTriggered: Assistant.refreshAuth()
+        }
+        AssistantButton {
+            visible: Assistant.signingIn !== ""
+            label: I18n.tr("Cancel sign-in")
+            onTriggered: Assistant.cancelSignIn()
         }
         AssistantButton {
             visible: !AssistantHelpers.anyAgent(Assistant.agents)

@@ -93,6 +93,10 @@ function connectWindow(data, action) {
 function windowsToClose(windows, signInPending) {
     return (windows || []).filter(window => !(window.signIn && signInPending)).map(window => window.address);
 }
+// Resuming from 1Password closes its windows, but not a sign-in's.
+function passwordWindows(windows) {
+    return (windows || []).filter(window => !window.signIn).map(window => window.address);
+}
 // The GECOS full name, or "" when the account has none.
 function fullName(passwd) {
     const fields = String(passwd || "").trim().split(":");
@@ -105,4 +109,4 @@ function firstName(passwd, username) {
 }
 if (typeof module !== "undefined" && module.exports)
     module.exports = {STEPS, MIDDLE, ITEMS, initial, validate, parse, serialize, visit, resume, steps, neighbour, checklist,
-        openedWindow, isPassword, connectWindow, windowsToClose, fullName, firstName};
+        openedWindow, isPassword, connectWindow, windowsToClose, passwordWindows, fullName, firstName};

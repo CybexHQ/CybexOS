@@ -413,9 +413,11 @@ Singleton {
 
     // Sign-in stays with the agent. The service only supplies its fixed login
     // command and checks its status; no credential is sent through this socket.
+    // Both agents' commands open the browser and wait for it on localhost, so
+    // the command runs in the background, without a terminal.
     // Returns whether the sign-in was asked for.
     function signIn(agentId) {
-        if (!connected || authChecking || busy)
+        if (!connected || authChecking || busy || signInProcess.running)
             return false;
         Settings.set("assistantAgent", agentId);
         request("auth.login", { agent: agentId }, (result, error) => {
@@ -423,14 +425,26 @@ Singleton {
                 root.notice = error ? error.message : I18n.tr("Sign-in could not start.");
                 return;
             }
+            if (signInProcess.running)
+                return;
             root.signingIn = agentId;
             root.focusRequested = false;
-            Quickshell.execDetached(["cybexos-apps", "terminal", "--hold",
-                "--dir=" + result.cwd, "--"].concat(result.argv));
+            signInProcess.agent = agentId;
+            signInProcess.workingDirectory = result.cwd;
+            signInProcess.command = ["sh", "-c", "exec \"$@\" </dev/null >/dev/null 2>&1", "sh"].concat(result.argv);
+            signInProcess.running = true;
             authPoll.restart();
             authDeadline.restart();
         });
         return true;
+    }
+
+    // Stops a sign-in still waiting for the browser.
+    function cancelSignIn() {
+        authPoll.stop();
+        authDeadline.stop();
+        signingIn = "";
+        signInProcess.running = false;
     }
 
     function refreshAuth() {
@@ -452,6 +466,7 @@ Singleton {
             signingIn = "";
             authPoll.stop();
             authDeadline.stop();
+            signInProcess.running = false;
             notice = I18n.tr("Signed in. Your question is ready to send.");
         }
     }
@@ -466,9 +481,26 @@ Singleton {
     Timer {
         id: authDeadline
         interval: 300000
-        onTriggered: {
+        onTriggered: root.cancelSignIn()
+    }
+
+    // The agent's login command. Its output can name the account, so it is
+    // discarded rather than read or logged. It exits once the browser has
+    // signed in; the status check confirms it.
+    Process {
+        id: signInProcess
+        property string agent: ""
+        onExited: (code) => {
+            if (root.signingIn !== agent)
+                return;
+            if (code === 0) {
+                root.refreshAuth();
+                return;
+            }
             authPoll.stop();
+            authDeadline.stop();
             root.signingIn = "";
+            root.notice = I18n.tr("Sign-in did not finish. Try again.");
         }
     }
 

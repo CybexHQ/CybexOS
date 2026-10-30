@@ -267,8 +267,9 @@ class Server:
         if adapter is not None:
             await adapter.close()
         self.authentication.pop(name, None)
-        # A terminal runs the agent's own browser authentication. Credentials
-        # never pass through the assistant, QML or the JSON-RPC connection.
+        # The shell runs the agent's own browser authentication in the
+        # background, its output discarded. Credentials never pass through the
+        # assistant, QML or the JSON-RPC connection.
         return {"argv": [executable, *auth.LOGIN_ARGS[name]], "cwd": str(self.home)}
 
     def busy(self):

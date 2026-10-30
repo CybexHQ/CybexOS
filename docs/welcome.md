@@ -25,20 +25,23 @@ windows, so the guide steps aside while you use them:
 - **1Password** comes first, when it is installed, so it can fill in the
   password for your AI account in the browser. Its extension in Brave connects
   to the app while 1Password is running, so the browser needs no sign-in of its
-  own. The guide comes back when you close the 1Password window it opened.
+  own. The guide comes back when you close the 1Password window it opened,
+  and **Resume** closes that window, so it does not cover the sign-in that
+  follows.
   Once you have signed in, the card shows a tick: the guide counts the
   accounts in 1Password's own database, without reading them.
 - **The AI assistant** (recommended) signs in to Claude Code or Codex with that
-  agent's own sign-in, in a terminal and your browser. The guide comes back by
-  itself once the agent reports you are signed in. Your sign-in stays with the
-  agent; Cybex OS never stores it. Wiz stands in the card's corner: asleep,
-  with two small z's (none with reduced motion), while the service is not
-  running or no agent is signed in; attentive while you sign in; happy once
-  you have; sorry when the sign-in could not be checked.
+  agent's own sign-in, in your browser; no terminal opens. The guide comes
+  back by itself once the agent reports you are signed in, and
+  **Cancel sign-in** stops a sign-in you abandoned. Your sign-in stays with
+  the agent; Cybex OS never stores it. Wiz stands in the card's corner:
+  asleep, with two small z's (none with reduced motion), while the service is
+  not running or no agent is signed in; attentive while you sign in; happy
+  once you have; sorry when the sign-in could not be checked.
 
 When you leave the guide, it closes the windows these sign-ins opened, as
 their close buttons would: a 1Password window still open, and the
-sign-in's terminal and browser window. A window you opened yourself stays,
+sign-in's browser window. A window you opened yourself stays,
 and so does a sign-in you have not finished. Closing the guide from its pill
 leaves everything open, since you are using it.
 
@@ -170,10 +173,12 @@ with a test-only IPC target. Shortcut state is served by a fake `hyprctl`
 - Ctrl+PageUp / Ctrl+PageDown, Escape from the wallpaper grid, and the claim
   release;
 - Connect: Hello continues to it; 1Password opens from its desktop entry, the
-  guide steps aside and returns only when that window closes; the card gets
+  guide steps aside and returns only when that window closes, and Resume
+  closes 1Password's windows but not one the person opened; the card gets
   its tick once an account appears in a database shaped like 1Password's,
   while the guide shows; the assistant's
-  own login command runs in a terminal against the real `cybexos-assistant`
+  own login command runs in the background, with no terminal, its input and
+  output on `/dev/null`, against the real `cybexos-assistant`
   service with a scripted Claude Code, and the guide returns by itself once
   the service reports the sign-in, not when the 1Password window left open
   closes meanwhile; Finish asks to close exactly the sign-in's windows,
