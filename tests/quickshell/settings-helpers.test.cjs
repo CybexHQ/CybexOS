@@ -114,7 +114,7 @@ test("defaults carry the design values", () => {
         recording: "region", elapsed: true,
         reminderDisplay: "icon", reminderClick: "list", reminderMinutes: 15,
         nightStartup: "remember", dndStartup: "remember", dndMode: "always",
-        idleStartup: "off", idleMode: "1h", idleRemaining: false
+        idleStartup: "off", idleMode: "always", idleRemaining: false
     });
     assert.equal(d.modOpts.clock.seconds, false);
     assert.equal(d.modOpts.clock.dateFormat, "ddd dd");
@@ -327,7 +327,7 @@ test("normalizeModOpts clamps, snaps, and validates option values", () => {
     assert.equal(next.indicators.dndStartup, "remember");
     assert.equal(next.indicators.dndDefaultMode, "always");
     assert.equal(next.indicators.idleStartup, "off");
-    assert.equal(next.indicators.idleDefaultMode, "1h");
+    assert.equal(next.indicators.idleDefaultMode, "always");
     assert.equal(next.indicators.idleShowRemaining, false);
     const configuredIndicators = H.normalizeModOpts({ indicators: {
         enabled: [], dictationPrimaryLanguage: "en,nl", dictationSecondaryLanguage: "de-de",

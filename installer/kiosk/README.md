@@ -95,7 +95,10 @@ reference's icon table.
 - The pinned Slint dependencies have a small local patch, `slint-kms.patch`,
   applied to the Nix build's private vendor copy. It draws the software cursor
   in the same partial-rendering pass, damages its old and new bounds, and adds
-  XKB-aware held-key repeat (350 ms delay, 33 ms interval). Buttons ignore
+  XKB-aware held-key repeat (350 ms delay, 33 ms interval), and forwards
+  libinput wheel, finger and continuous scroll events. Legacy duplicate axis
+  events are ignored. List scrollbars support track clicks and thumb dragging.
+  Buttons ignore
   repeated activation keys. Test the packaged KMS backend through Nix; plain
   Cargo uses the upstream dependencies without this patch.
 - KMS software frames render in cached RAM instead of blending in uncached

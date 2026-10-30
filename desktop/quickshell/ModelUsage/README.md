@@ -8,7 +8,13 @@ Commit: `d4986628d0493aa303d02de0d9017237747704ec` (version 1.3.2)
 The upstream QML and JavaScript receive the reviewed
 [`integration.patch`](../../../scripts/model-usage/integration.patch):
 shared quota and legacy activity workers, idle/offline polling control, and
-first-use popup construction. Assets, helper scripts and licenses are unchanged. The
+first-use popup construction, and native sign-in handling. The Codex quota
+probe checks the account before requesting subscription limits, ignores an
+inherited API key for that probe, and asks Codex to refresh a rejected managed
+sign-in once. API-key accounts show an explanation instead of an RPC error.
+Claude accepts the CLI's OAuth-token environment sign-in and re-reads
+credentials after an expired sign-in status check. Neither probe sends model
+prompts or manages refresh tokens itself. Assets and licenses are unchanged. The
 manifest, documentation, keeper deployment and CI are not copied. The unit
 tests and fixtures live in `tests/model-usage/`, with the manifest as test data.
 

@@ -248,6 +248,39 @@ fn log_scrolls_with_keyboard_and_refresh_keeps_the_reading_position() {
 }
 
 #[test]
+fn log_scrolls_with_wheel_content_drag_and_scrollbar_drag() {
+    let (ui, _app, surface) = setup();
+    let store = ui.global::<Store>();
+    store.set_details((0..250).map(|i| format!("Log line {i:03}: installation diagnostics\n")).collect::<String>().into());
+    store.invoke_open_sheet("log".into());
+    draw(&surface);
+    key(&ui, &surface, Key::Home);
+    let head = log_pixels(&surface);
+    let position = slint::LogicalPosition::new(300.0, 300.0);
+    ui.window().dispatch_event(WindowEvent::PointerMoved { position });
+    ui.window().dispatch_event(WindowEvent::PointerScrolled { position, delta_x: 0.0, delta_y: -240.0 });
+    draw(&surface);
+    CLOCK.with(|clock| clock.set(clock.get() + Duration::from_millis(250)));
+    draw(&surface);
+    assert!(head != log_pixels(&surface), "wheel must move the rendered log");
+    key(&ui, &surface, Key::Home);
+    ui.window().dispatch_event(WindowEvent::PointerPressed { position, button: slint::platform::PointerEventButton::Left });
+    ui.window().dispatch_event(WindowEvent::PointerMoved { position: slint::LogicalPosition::new(300.0, 230.0) });
+    draw(&surface);
+    ui.window().dispatch_event(WindowEvent::PointerReleased { position: slint::LogicalPosition::new(300.0, 230.0), button: slint::platform::PointerEventButton::Left });
+    draw(&surface);
+    assert!(head != log_pixels(&surface), "content drag must move the rendered log");
+    key(&ui, &surface, Key::Home);
+    // The log panel is wide, with the scrollbar at its right content edge.
+    let thumb = slint::LogicalPosition::new(1216.0, 142.0);
+    ui.window().dispatch_event(WindowEvent::PointerPressed { position: thumb, button: slint::platform::PointerEventButton::Left });
+    ui.window().dispatch_event(WindowEvent::PointerMoved { position: slint::LogicalPosition::new(1216.0, 430.0) });
+    ui.window().dispatch_event(WindowEvent::PointerReleased { position: slint::LogicalPosition::new(1216.0, 430.0), button: slint::platform::PointerEventButton::Left });
+    draw(&surface);
+    assert!(head != log_pixels(&surface), "scrollbar drag must move the rendered log");
+}
+
+#[test]
 fn network_panel_stays_available_while_installation_waits_for_reconnection() {
     let (ui, app, surface) = setup();
     let store = ui.global::<Store>();

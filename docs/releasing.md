@@ -7,8 +7,11 @@ credentials. A release is always selected by exact commit and NAR content
 identity, never by checking out a moving branch after discovery.
 
 The installed `release/keys/trust.json` is deliberately empty. An owner must
-supply real Ed25519 publisher public keys before production installation or
-Cybex OS channel updates can work. Upstream-only updates do not use this
+supply real Ed25519 publisher public keys before publisher-authenticated
+installation or Cybex OS channel updates can work. Final installation media
+with empty trust install only their exact bundled source, checking its NAR
+against the medium's committed identity and labelling it as bundled.
+Upstream-only updates do not use this
 channel. Do not ship a generated development key as publisher trust.
 
 Keep private signing keys outside the repository and Nix store. The protected

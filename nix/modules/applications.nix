@@ -66,6 +66,9 @@ in {
         "x-scheme-handler/http" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
         "x-scheme-handler/https" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
         "text/html" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
+        "application/xhtml+xml" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
+        "x-scheme-handler/about" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
+        "x-scheme-handler/unknown" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
         "text/plain" = lib.mkDefault "org.gnome.TextEditor.desktop";
         "application/pdf" = lib.mkDefault "org.gnome.Evince.desktop";
         "image/png" = lib.mkDefault "imv.desktop";
@@ -93,6 +96,7 @@ in {
       };
     };
     cybexos.browser.bravePolicies = lib.mkIf cfg.features.proprietary {
+      DefaultBrowserSettingEnabled = lib.mkDefault true;
       RestoreOnStartup = lib.mkDefault 1;
       SpellcheckLanguage = lib.mkDefault [ (lib.toLower (lib.head (lib.splitString "_" config.i18n.defaultLocale))) ];
       ExtensionInstallForcelist = lib.mkDefault [ "aeblfdkhhhdcdjpifhhbdiojplfjncoa;https://clients2.google.com/service/update2/crx" ];

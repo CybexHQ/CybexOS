@@ -85,8 +85,9 @@ The flow is **Welcome → Disk → You → Software → Review → Installing �
 
 - **Welcome** sets the language and keyboard and shows the system check:
   firmware (UEFI, Secure Boot), network, release verification, disks, graphics
-  and memory. An unsigned development ISO says so; **Use this test build** (or
-  Enter) is the explicit consent. Without a network, **Connect to Wi-Fi** opens
+  and memory. Final media use **Get started**, with no beta/test-build prompt.
+  A bundled source is labelled as such; a verified publisher signature is
+  shown only when one exists. Without a network, **Connect to Wi-Fi** opens
   the network sheet, which uses the desktop's own NetworkManager helper.
 - **Disk** lists usable whole disks with model, size and contents; the only
   usable disk is preselected. **More options** shows serial numbers and the
@@ -332,8 +333,12 @@ installer screens show the version without its prerelease suffix (`1.0.0` for
 `1.0.0-beta.25`) and no channel; the ISO name, release metadata and installed
 system keep the full version.
 
-Production installation is blocked until owner-controlled trust keys and an
-authenticated published release exist. For isolated development qualification,
+Publisher-authenticated installation requires owner-controlled trust keys and
+an authenticated published release. When those keys are deliberately empty,
+final media install their exact bundled source after checking its NAR against
+the medium's committed release identity, without a development consent step.
+This is content verification, not publisher authentication. A configured
+publisher's authentication failure never falls back to this path. For isolated development qualification,
 `cybexos-install --development-source /path/to/source` explicitly selects an
 unreleased content-addressed test source. The graphical welcome on an unsigned
 development ISO explains this limitation and offers the bundled test build,

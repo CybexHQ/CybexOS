@@ -99,17 +99,19 @@ component ListArea inherits Rectangle {
     changed offset => { root.scrolled(root.at-end); }
     clip: true;
     flick := Flickable {
+        mouse-drag-pan-enabled: true;
         width: parent.width - 10px;
         height: parent.height;
         content-height: root.content-height;
         @children
     }
     ScrollHint {
-        x: parent.width - 4px;
+        x: parent.width - self.width;
         height: parent.height;
         viewport-height: root.content-height;
         visible-height: root.height;
         offset: flick.content-y;
+        moved(offset) => { flick.content-y = offset; }
     }
     public function show(top: length, bottom: length) {
         if (top < -flick.content-y) {

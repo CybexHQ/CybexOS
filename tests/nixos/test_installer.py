@@ -945,7 +945,8 @@ class MediaAuthenticationTests(unittest.TestCase):
         self.assertIn('erased', str(raised.exception))
         runner.assert_not_called()
         if network:
-            self.assertEqual(self.requests[:1], [RELEASES + 'v1.0.0-beta.1/manifest.json'])
+            media_version = json.loads((self.etc / 'release.json').read_text())['version']
+            self.assertEqual(self.requests[:1], [RELEASES + f'v{media_version}/manifest.json'])
         else:
             self.assertEqual(self.requests, [], 'blocked medium contacted a release endpoint')
         return raised.exception
@@ -1054,6 +1055,34 @@ class MediaAuthenticationTests(unittest.TestCase):
         self.assertEqual(kwargs['channel'], 'beta')
         self.assertIn('UNRELEASED TEST INSTALLATION', output)
         self.assertEqual(self.requests, [])
+
+    def test_final_unsigned_medium_installs_its_exact_bundle_without_testing_consent(self):
+        self.trust['keys'] = {}
+        self.medium(version='1.0.0', channel='stable')
+        (self.etc / 'installer-source').write_text(str(self.base))
+        runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
+        install, output = self.main(runner=runner)
+        self.assertEqual(install.call_args.args[2:5], ('path:' + STORE_SOURCE, REVISION, NAR))
+        self.assertEqual(install.call_args.kwargs['channel'], 'stable')
+        self.assertIn('bundled source verified', output)
+        self.assertNotIn('TEST', output)
+        self.assertEqual(self.requests, [])
+
+    def test_final_unsigned_medium_rejects_a_different_bundle_before_disk_selection(self):
+        self.trust['keys'] = {}
+        self.medium(version='1.0.0', channel='stable')
+        (self.etc / 'installer-source').write_text(str(self.base))
+        for changes in ({'narHash': OTHER_NAR}, {'revision': 'uncommitted'}):
+            self.medium(version='1.0.0', channel='stable', **changes)
+            runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
+            with self.subTest(changes=changes), self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs'):
+                self.main(runner=runner)
+
+    def test_final_signed_medium_never_falls_back_to_an_unsigned_bundle(self):
+        self.medium(version='1.0.0', channel='stable')
+        (self.etc / 'installer-source').write_text(str(self.base))
+        self.served.clear()
+        self.assert_rejected('not authenticated')
 
     def test_interactive_unreleased_medium_requires_explicit_consent_before_choices(self):
         self.trust['keys'] = {}

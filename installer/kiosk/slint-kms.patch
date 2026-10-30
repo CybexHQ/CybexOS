@@ -379,3 +379,46 @@
                  }
  
                  self.measure_frame_rendered(&mut renderer);
+--- a/i-slint-backend-linuxkms-1.18.1/calloop_backend/input.rs
++++ b/i-slint-backend-linuxkms-1.18.1/calloop_backend/input.rs
+@@ -24,6 +24,7 @@
+ use i_slint_core::window::WindowAdapter;
+ use i_slint_core::{Property, SharedString};
+ use input::LibinputInterface;
++use input::event::pointer::{Axis, PointerScrollEvent};
+ use input::event::keyboard::{KeyState, KeyboardEventTrait};
+ use input::event::touch::{TouchEventPosition, TouchEventSlot};
+ use xkbcommon::*;
+@@ -266,6 +267,32 @@
+                             };
+                             window.dispatch_event_with_result(event).map_err(Self::Error::other)?;
+                         }
++                        // libinput emits both legacy Axis and modern Scroll*
++                        // events. Handle modern events only to avoid doubling.
++                        input::event::PointerEvent::ScrollWheel(scroll) => {
++                            let event = WindowEvent::PointerScrolled {
++                                position: self.mouse_pos.as_ref().get().unwrap_or_default(),
++                                delta_x: -(scroll.scroll_value_v120(Axis::Horizontal) / 120. * 40.) as f32,
++                                delta_y: -(scroll.scroll_value_v120(Axis::Vertical) / 120. * 40.) as f32,
++                            };
++                            window.dispatch_event_with_result(event).map_err(Self::Error::other)?;
++                        }
++                        input::event::PointerEvent::ScrollFinger(scroll) => {
++                            let event = WindowEvent::PointerScrolled {
++                                position: self.mouse_pos.as_ref().get().unwrap_or_default(),
++                                delta_x: -scroll.scroll_value(Axis::Horizontal) as f32,
++                                delta_y: -scroll.scroll_value(Axis::Vertical) as f32,
++                            };
++                            window.dispatch_event_with_result(event).map_err(Self::Error::other)?;
++                        }
++                        input::event::PointerEvent::ScrollContinuous(scroll) => {
++                            let event = WindowEvent::PointerScrolled {
++                                position: self.mouse_pos.as_ref().get().unwrap_or_default(),
++                                delta_x: -scroll.scroll_value(Axis::Horizontal) as f32,
++                                delta_y: -scroll.scroll_value(Axis::Vertical) as f32,
++                            };
++                            window.dispatch_event_with_result(event).map_err(Self::Error::other)?;
++                        }
+                         _ => {}
+                     }
+                 }

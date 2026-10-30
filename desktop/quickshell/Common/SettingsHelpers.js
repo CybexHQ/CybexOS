@@ -280,7 +280,7 @@ function defaultModOpts() {
             dndStartup: "remember",
             dndDefaultMode: "always",
             idleStartup: "off",
-            idleDefaultMode: "1h",
+            idleDefaultMode: "always",
             idleShowRemaining: false
         },
         clock: {

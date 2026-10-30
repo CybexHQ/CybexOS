@@ -483,19 +483,40 @@ export component FieldLabel inherits HorizontalLayout {
     }
 }
 
-// A thin scroll indicator for Flickables (mouse wheel and drag still scroll).
+// A wide pointer target around the thin thumb, with track clicks and dragging.
 export component ScrollHint inherits Rectangle {
     in property <length> viewport-height;
     in property <length> visible-height;
     in property <length> offset;
-    width: 4px;
+    callback moved(length);
+    width: 12px;
     property <float> ratio: root.viewport-height > 0 ? min(1, root.visible-height / root.viewport-height) : 1;
     visible: root.ratio < 1;
-    Rectangle {
+    thumb := Rectangle {
+        x: (parent.width - self.width) / 2;
         y: root.viewport-height > root.visible-height ? (-root.offset / (root.viewport-height - root.visible-height)) * (root.visible-height - self.height) : 0;
         height: max(30px, root.visible-height * root.ratio);
         width: 4px;
         border-radius: 2px;
-        background: Theme.line-2;
+        background: touch.pressed ? Theme.accent : Theme.line-2;
+    }
+    touch := TouchArea {
+        property <length> grab-offset;
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                self.grab-offset = self.mouse-y >= thumb.y && self.mouse-y <= thumb.y + thumb.height
+                    ? self.mouse-y - thumb.y : thumb.height / 2;
+                root.drag-to(self.mouse-y - self.grab-offset);
+            }
+        }
+        moved => {
+            if (self.pressed) { root.drag-to(self.mouse-y - self.grab-offset); }
+        }
+    }
+    function drag-to(top: length) {
+        if (root.visible-height > thumb.height) {
+            root.moved(-clamp(top / (root.visible-height - thumb.height), 0, 1)
+                * max(0px, root.viewport-height - root.visible-height));
+        }
     }
 }

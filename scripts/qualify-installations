@@ -24,9 +24,9 @@ PASSWORD = 'Cybexos8!'
 
 
 def check_installed_identity(media, installed, source):
-    """Require the ISO's exact content identity after a bundled test install.
+    """Require the ISO's exact content identity after a bundled installation.
 
-    Development installation locks the bundled directory as a path input. Nix
+    Bundled installation locks the source directory as a path input. Nix
     preserves its NAR hash but supplies no Git revision to that flake. Record
     this metadata distinction rather than rejecting identical source bytes or
     claiming that the installed flake still carries the medium's Git metadata.
@@ -535,16 +535,26 @@ QA_DEFAULTS''', timeout=60)
         found = json.loads(self.command(r'''python3 - <<'QA_PROPRIETARY'
 import json, pathlib, re, subprocess
 entries = [path.name for path in pathlib.Path('/run/current-system/sw/share/applications').iterdir()]
+user_env = ['runuser', '-u', 'cybexqa', '--', 'env', 'HOME=/home/cybexqa', 'XDG_CONFIG_DIRS=/etc/xdg',
+            'XDG_DATA_DIRS=/run/current-system/sw/share']
+defaults = json.loads(subprocess.check_output(user_env + ['cybexos-apps', 'effective-defaults'], text=True))
+xdg_browser = subprocess.check_output(user_env + ['xdg-settings', 'get', 'default-web-browser'], text=True).strip()
+policies = json.loads(pathlib.Path('/etc/brave/policies/managed/cybexos.json').read_text()) if 'brave-browser.desktop' in entries else {}
 catalogue = json.loads(pathlib.Path('/run/current-system/sw/share/cybexos/software/catalogue.json').read_text())
 unfree = sorted(app['attribute'] for app in catalogue['apps'] if not app['free'])
 check = json.loads(subprocess.check_output(['runuser', '-u', 'cybexqa', '--', 'env', 'HOME=/home/cybexqa',
                                             'cybex', 'software', 'check', *unfree], text=True))
-print(json.dumps({'onePassword': any(re.fullmatch(r'(com\.onepassword\.onepassword|1password)\.desktop', name, re.I) for name in entries),
+print(json.dumps({'defaultBrowser': defaults['browser'], 'xdgBrowser': xdg_browser, 'browserPolicy': policies.get('DefaultBrowserSettingEnabled'), 'onePassword': any(re.fullmatch(r'(com\.onepassword\.onepassword|1password)\.desktop', name, re.I) for name in entries),
                   'packages': {attribute: {key: row[key] for key in ('state', 'reason', 'vendor')}
                                for attribute, row in check['packages'].items()}}))
 QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
         card = welcome['connect']['password']
         problems = []
+        browser = 'brave-browser.desktop' if expected else 'firefox.desktop'
+        if found['defaultBrowser'] != browser or found['xdgBrowser'] != browser:
+            problems.append('default browser is ' + found['defaultBrowser'] + ' (xdg-settings: ' + found['xdgBrowser'] + ')')
+        if expected and found['browserPolicy'] is not True:
+            problems.append('Brave default-browser policy is missing')
         if found['onePassword'] != expected:
             problems.append('1Password is ' + ('missing' if expected else 'installed'))
         if (card != 'unavailable') != expected or (expected and 'connect' not in welcome['steps']):
@@ -558,6 +568,7 @@ QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
         if problems:
             raise RuntimeError('Proprietary applications: ' + '; '.join(problems))
         return {'result': 'passed', 'proprietary': expected, 'onePassword': found['onePassword'], 'connectCard': card,
+                'defaultBrowser': found['defaultBrowser'], 'xdgBrowser': found['xdgBrowser'],
                 'vendorApps': sorted(found['packages'])}
 
     def authorize(self, command, *, payload=None, approve=True):
@@ -736,8 +747,8 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
     def type_text(self, text):
         self.press(*[self.KEYS.get(c, 'shift-' + c.lower() if c.isupper() else c) for c in text])
 
-    def click(self, x, y, size=(1280, 800)):
-        """A real pointer click at canvas coordinates through the USB tablet.
+    def move_pointer(self, x, y, size=(1280, 800)):
+        """Move the real pointer to canvas coordinates through the USB tablet.
 
         The screen fits its 1280×800 canvas to the display and centres it, with
         the same zoom rule as cybexos-installer (src/zoom.rs).
@@ -748,15 +759,74 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         def axis(value, extent):
             return {'type': 'abs', 'data': {'axis': value, 'value': int(round(extent))}}
         position = [axis('x', px * 32767 / (size[0] - 1)), axis('y', py * 32767 / (size[1] - 1))]
-        button = lambda down: {'type': 'btn', 'data': {'down': down, 'button': 'left'}}
         self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': position}})
         time.sleep(0.2)
+
+    def click(self, x, y, size=(1280, 800)):
+        self.move_pointer(x, y, size)
+        button = lambda down: {'type': 'btn', 'data': {'down': down, 'button': 'left'}}
         self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': [button(True)]}})
         # USB polls button reports; a press and release in one polling interval
         # can collapse into a pointer move without a click.
         time.sleep(0.1)
         self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': [button(False)]}})
         time.sleep(0.3)
+
+    def installer_scrolling(self, size):
+        """Real libinput wheel and mouse drags in the packaged KMS screen."""
+        from PIL import Image
+        self.click(1120, 664, size)  # Customize apps
+        time.sleep(0.5)
+        image = self.directory / 'scroll-probe.png'
+        zoom = round(min(max(min(size[0] / 1280, size[1] / 800), 0.8), 3.0), 2)
+        def pixels():
+            self.screenshot(image)
+            with Image.open(image) as frame:
+                # Text only: exclude the pointer, thumb and animated assistant.
+                offset_x = (size[0] - 1280 * zoom) / 2
+                offset_y = (size[1] - 800 * zoom) / 2
+                return frame.crop(tuple(int(round(v)) for v in
+                    (offset_x + 320 * zoom, offset_y + 240 * zoom,
+                     offset_x + 550 * zoom, offset_y + 440 * zoom))).tobytes()
+        def wheel(button):
+            events = lambda down: [{'type': 'btn', 'data': {'button': button, 'down': down}}]
+            for _ in range(6):
+                self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': events(True)}})
+                time.sleep(0.08)
+                self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': events(False)}})
+                time.sleep(0.08)
+            time.sleep(0.5)
+        def drag(start, end):
+            self.move_pointer(*start, size)
+            button = lambda down: [{'type': 'btn', 'data': {'button': 'left', 'down': down}}]
+            self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': button(True)}})
+            time.sleep(0.1)
+            for i in range(1, 7):
+                self.move_pointer(start[0] + (end[0] - start[0]) * i / 6,
+                                  start[1] + (end[1] - start[1]) * i / 6, size)
+            self.qmp_commands({'execute': 'input-send-event', 'arguments': {'events': button(False)}})
+            time.sleep(0.5)
+        try:
+            self.move_pointer(600, 400, size)
+            before = pixels()
+            wheel('wheel-down')
+            if pixels() == before:
+                raise RuntimeError('Installer KMS wheel input did not scroll Customize apps')
+            wheel('wheel-up')
+            before = pixels()
+            drag((600, 470), (600, 250))
+            if pixels() == before:
+                raise RuntimeError('Installer mouse content drag did not scroll Customize apps')
+            wheel('wheel-up')
+            before = pixels()
+            drag((988, 190), (988, 430))
+            if pixels() == before:
+                raise RuntimeError('Installer scrollbar drag did not scroll Customize apps')
+            return {'result': 'passed', 'wheel': True, 'contentDrag': True, 'scrollbarDrag': True,
+                    'scope': 'QMP pointer input through libinput and packaged KMS screen; rendered list pixels changed'}
+        finally:
+            image.unlink(missing_ok=True)
+            self.press('esc')
 
     def installer_state(self, timeout=20):
         """The installer service's current snapshot, exactly as the screen receives it."""
@@ -850,6 +920,8 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         self.press('ret')
         state = self.wait_installer(lambda s: s['draft']['screen'] == 'software', 'the software step')
         shot('software.png')
+        if applications == 'standard':
+            evidence['installerScrolling'] = self.installer_scrolling(size)
         self.press('ret')
         state = self.wait_installer(lambda s: s.get('phase') == 'review' and not s.get('reviewPending'), 'the review')
         plan = state['review']

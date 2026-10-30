@@ -353,7 +353,7 @@ impl App {
             "loading" => Check { label: s("Release"), value: s("Verifying this installation medium…"), detail: s(&net.message), state: 1 },
             "development" => Check { label: s("Release"), value: s("Unreleased development build"), detail: s("Use only on a disposable or backed-up disk"), state: 3 },
             "preflight" => Check { label: s("Release"), value: s("Could not be verified"), detail: s("See the message on the left"), state: 4 },
-            _ if state.development => Check { label: s("Release"), value: s(format!("Test build {}", self.statics.version)), detail: s("Bundled source, not a published release"), state: 3 },
+            _ if state.development => Check { label: s("Release"), value: s(format!("Cybex OS {}", self.statics.version)), detail: s("Bundled installation source"), state: 0 },
             _ => Check {
                 label: s("Release"),
                 value: s(format!("Cybex OS {} · signature verified", self.statics.version)),
@@ -740,10 +740,10 @@ impl App {
             row(
                 "Release",
                 format!("Cybex OS {}", self.statics.version),
-                if state.development { "unreleased test build".into() } else { "signature verified".into() },
+                if state.development { "bundled installation source".into() } else { "signature verified".into() },
                 "",
                 "",
-                state.development,
+                false,
                 false,
             ),
         ];

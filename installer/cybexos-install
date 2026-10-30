@@ -822,6 +822,28 @@ def resolve_source(args, runner):
         try:
             release, channel = authenticate_media(Fetcher(CACHE), ETC, lambda: ensure_network(runner))
         except UnreleasedMedia:
+            trust = read(ETC / 'trust.json')
+            if not isinstance(trust, dict) or trust.get('keys') != {}:
+                raise Failure('Installation medium has invalid publisher trust configuration. Nothing has been erased')
+            media = read(ETC / 'release.json')
+            # Final media install the exact bundled source without a testing
+            # opt-in. This proves content identity, not a publisher signature.
+            # A configured publisher still takes the signed path above and
+            # authentication failures never fall back to the bundled source.
+            version(media.get('version'))
+            if '-' not in media['version']:
+                source_path = Path((ETC / 'installer-source').read_text().strip()).resolve()
+                metadata = parse(runner('nix', 'flake', 'metadata', '--json', f'path:{source_path}'))
+                nar_hash = metadata['locked']['narHash']
+                if (nar_hash != media.get('narHash')
+                        or not re.fullmatch('[0-9a-f]{40}', media.get('revision', ''))):
+                    raise Failure('Bundled source identity differs from this installation medium. Nothing has been erased')
+                channel = read(ETC / 'update.json').get('channel')
+                if channel not in ('stable', 'beta'):
+                    raise Failure('Installation requires a supported release channel. Nothing has been erased')
+                args.bundled_source = True
+                return (f'path:{metadata["path"]}', media['revision'], nar_hash, channel,
+                        f'Cybex OS {media["version"]} • bundled source verified')
             if getattr(args, 'json_ui', False):
                 event('development-required', message='This is an unreleased development build. Use it only for testing on a backed-up or disposable disk.')
                 request = ui_request()
@@ -908,7 +930,7 @@ def graphical_session(args, runner):
                 'available': not reason, 'reason': reason,
                 'filesystems': sorted({node.get('fstype') for node in disk.get('children', []) if node.get('fstype')})})
         event('ready', disks=choices, defaults=defaults, region=regions, layout=layout(),
-              release=label, development=bool(args.development_source), hardware=detect())
+              release=label, development=bool(args.development_source) or getattr(args, 'bundled_source', False), hardware=detect())
 
     snapshot()
     while True:

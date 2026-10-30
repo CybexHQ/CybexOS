@@ -314,7 +314,9 @@ in {
       splashImage = "${config.cybexos.bootTheme}/bios.png";
       efiSplashImage = ../../desktop/boot/splash.png;
     };
-    image.baseName = lib.mkForce "cybexos-${config.cybexos.release.version}-${pkgs.stdenv.hostPlatform.system}";
+    # The first final release's requested media name; metadata stays SemVer.
+    image.baseName = lib.mkForce (if config.cybexos.release.version == "1.0.0"
+      then "cybexos-1.0" else "cybexos-${config.cybexos.release.version}-${pkgs.stdenv.hostPlatform.system}");
     system.stateVersion = "26.05";
   };
 }
