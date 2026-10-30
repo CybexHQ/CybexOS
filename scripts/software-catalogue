@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+"""Generate the Software catalogue (desktop/software/catalogue.json + icons).
+
+The curated list lives in desktop/software/sources.json. This maintainer tool
+resolves each entry against the repository's locked Nixpkgs, keeps only apps
+that NixOS has prebuilt (or that are unfree vendor downloads, which NixOS never
+caches), and adds metadata from Flathub's public AppStream API: name, summary,
+description, developer, brand colours, screenshot URLs, monthly installs (the
+"Popular" ranking) and a 128 px icon, re-encoded locally.
+
+    nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux.python3.withPackages (p: [ p.pillow ])' \
+        -c scripts/software-catalogue            # regenerate
+    scripts/software-catalogue --check          # offline: catalogue matches sources and icons
+
+Downloaded metadata is untrusted: fields are type-checked, HTML is reduced to
+plain paragraphs, URLs must be https on dl.flathub.org, and icons are decoded
+and re-encoded as plain PNG.
+"""
+import argparse
+import html
+import io
+import json
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from html.parser import HTMLParser
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SOFTWARE = ROOT / 'desktop/software'
+SOURCES = SOFTWARE / 'sources.json'
+CATALOGUE = SOFTWARE / 'catalogue.json'
+ICONS = SOFTWARE / 'icons'
+FLATHUB = 'https://flathub.org/api/v2/'
+CACHE = 'https://cache.nixos.org'
+ID = re.compile(r'[a-z0-9]{2,32}')
+ATTRIBUTE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_+-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_+-]*)*')
+NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
+
+
+def sources():
+    data = json.loads(SOURCES.read_text())
+    ids = [app[0] for app in data['apps']]
+    if len(ids) != len(set(ids)) or not all(ID.fullmatch(i) for i in ids):
+        raise SystemExit('sources.json: app ids must be unique, lowercase and short')
+    categories = {c['id']: {s for s, _ in c['subcategories']} for c in data['categories']}
+    for app_id, attribute, appstream, category, subcategory in data['apps']:
+        if not ATTRIBUTE.fullmatch(attribute) or subcategory not in categories.get(category, ()):
+            raise SystemExit(f'sources.json: invalid attribute or category for {app_id}')
+    for profile in data['profiles']:
+        missing = set(profile['apps']) - set(ids)
+        if missing:
+            raise SystemExit(f'sources.json: profile {profile["id"]} lists unknown apps {sorted(missing)}')
+    if set(data['featured']) - set(ids):
+        raise SystemExit('sources.json: featured lists unknown apps')
+    return data
+
+
+def evaluate(attributes):
+    """Metadata from the locked Nixpkgs, one failure-isolated entry per attribute."""
+    expression = '''
+      let
+        flake = builtins.getFlake (toString %s);
+        pkgs = import flake.inputs.nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
+        lib = pkgs.lib;
+        licenses = l: map (x: x.spdxId or x.shortName or "unknown") (lib.toList l);
+        one = attr: let
+          value = lib.attrByPath (lib.splitString "." attr) null pkgs;
+          info = {
+            exists = value != null && lib.isDerivation value;
+            version = value.version or "";
+            out = builtins.unsafeDiscardStringContext (toString value);
+            unfree = !(lib.all (l: l.free or true) (lib.toList (value.meta.license or [])));
+            licenses = licenses (value.meta.license or []);
+            homepage = value.meta.homepage or "";
+            broken = value.meta.broken or false;
+            available = value.meta.available or true;
+          };
+          attempt = builtins.tryEval (builtins.deepSeq info info);
+        in if attempt.success then attempt.value else { exists = false; };
+      in lib.genAttrs (builtins.fromJSON %s) one
+    ''' % (json.dumps(str(ROOT)), json.dumps(json.dumps(attributes)))
+    output = subprocess.run(NIX + ['eval', '--impure', '--json', '--expr', expression],
+                            check=True, capture_output=True, text=True).stdout
+    return json.loads(output)
+
+
+def fetch(url, limit=4 * 1024 * 1024):
+    request = urllib.request.Request(url, headers={'User-Agent': 'cybexos-software-catalogue/1'})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                data = response.read(limit + 1)
+                if len(data) > limit:
+                    raise ValueError(f'{url}: response too large')
+                return data
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return None
+            if attempt == 2:
+                raise
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == 2:
+                raise
+        time.sleep(2 * (attempt + 1))
+
+
+def cached(path):
+    digest = Path(path).name.split('-', 1)[0]
+    return fetch(f'{CACHE}/{digest}.narinfo', 64 * 1024) is not None
+
+
+class Text(HTMLParser):
+    """AppStream description markup reduced to paragraphs and list items."""
+    def __init__(self):
+        super().__init__()
+        self.blocks, self.current, self.item = [], [], False
+
+    def flush(self):
+        text = re.sub(r'\s+', ' ', ''.join(self.current)).strip()
+        if text:
+            self.blocks.append(('• ' if self.item else '') + text)
+        self.current = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('p', 'li'):
+            self.flush()
+            self.item = tag == 'li'
+
+    def handle_endtag(self, tag):
+        if tag in ('p', 'li', 'ul', 'ol'):
+            self.flush()
+            self.item = False
+
+    def handle_data(self, data):
+        self.current.append(data)
+
+
+def description(markup):
+    if not isinstance(markup, str):
+        return []
+    parser = Text()
+    parser.feed(markup)
+    parser.close()
+    parser.flush()
+    blocks, size = [], 0
+    for block in parser.blocks:
+        block = html.unescape(block)[:600]
+        if re.search(r'flatpak|flathub', block, re.IGNORECASE):
+            continue  # packaging notes for Flathub's build, not this one
+        if size + len(block) > 1600:
+            break
+        blocks.append(block)
+        size += len(block)
+    return blocks
+
+
+def text(value, limit):
+    return re.sub(r'\s+', ' ', html.unescape(value)).strip()[:limit] if isinstance(value, str) else ''
+
+
+def media(url):
+    return isinstance(url, str) and re.fullmatch(r'https://dl\.flathub\.org/[A-Za-z0-9._~/@+-]+\.png', url) is not None
+
+
+def colour(value):
+    return value if isinstance(value, str) and re.fullmatch(r'#[0-9a-fA-F]{6}', value) else None
+
+
+def appstream(appstream_id):
+    raw = fetch(FLATHUB + 'appstream/' + appstream_id)
+    if raw is None:
+        return None
+    data = json.loads(raw)
+    stats = json.loads(fetch(FLATHUB + 'stats/' + appstream_id) or b'{}')
+    per_day = stats.get('installs_per_day') if isinstance(stats, dict) else None
+    recent = sorted(per_day.items())[-30:] if isinstance(per_day, dict) else []
+    installs = sum(v for _, v in recent if isinstance(v, int))
+    screenshots = []
+    for shot in data.get('screenshots') or []:
+        sizes = [s for s in shot.get('sizes') or [] if isinstance(s, dict) and media(s.get('src'))]
+        preferred = [s['src'] for s in sizes if s.get('width') in ('752', '1248')]
+        if preferred:
+            screenshots.append(preferred[0])
+    brand = {}
+    branding = data.get('branding')
+    for entry in branding if isinstance(branding, list) else []:
+        if (isinstance(entry, dict) and entry.get('type') == 'primary' and colour(entry.get('value'))
+                and entry.get('scheme_preference') in ('light', 'dark')):
+            brand[entry['scheme_preference']] = entry['value']
+    launchable = data.get('launchable')
+    desktop = launchable.get('value') if isinstance(launchable, dict) and launchable.get('type') == 'desktop-id' else None
+    return {
+        'name': text(data.get('name'), 60), 'summary': text(data.get('summary'), 160),
+        'description': description(data.get('description')), 'developer': text(data.get('developer_name'), 80),
+        'license': text(data.get('project_license'), 120), 'icon': data.get('icon') if media(data.get('icon')) else None,
+        'screenshots': screenshots[:4], 'installs': installs, 'brand': brand,
+        'desktop': desktop if isinstance(desktop, str) and re.fullmatch(r'[A-Za-z0-9._-]+\.desktop', desktop) else None,
+    }
+
+
+def desktop_ids(path):
+    try:
+        listing = json.loads(subprocess.run(NIX + ['store', 'ls', '--store', CACHE, '--json', path + '/share/applications'],
+                                            check=True, capture_output=True, text=True, timeout=120).stdout)
+    except (subprocess.SubprocessError, ValueError):
+        return []
+    return sorted(name for name in (listing.get('entries') or {}) if name.endswith('.desktop'))
+
+
+def icon(app_id, url):
+    from PIL import Image  # provided by the nix shell in the module docstring
+    raw = fetch(url, 1024 * 1024)
+    if raw is None:
+        raise ValueError(f'{app_id}: icon unavailable')
+    image = Image.open(io.BytesIO(raw))
+    image.load()
+    image = image.convert('RGBA')
+    if image.size != (128, 128):
+        image = image.resize((128, 128), Image.LANCZOS)
+    output = io.BytesIO()
+    image.save(output, 'PNG', optimize=True)
+    (ICONS / f'{app_id}.png').write_bytes(output.getvalue())
+
+
+def closure(paths):
+    if not paths:
+        return {}
+    output = subprocess.run(NIX + ['path-info', '--json', '-r', '--store', CACHE, *paths],
+                            check=True, capture_output=True, text=True, timeout=1800).stdout
+    data = json.loads(output)
+    items = data.items() if isinstance(data, dict) else ((d['path'], d) for d in data)
+    return {path: (info or {}).get('downloadSize', 0) for path, info in items}
+
+
+def base_paths():
+    """The default installation's packages (ISO payload), already on the medium."""
+    expression = '''
+      let flake = builtins.getFlake (toString %s);
+      in map (p: builtins.unsafeDiscardStringContext (toString p))
+        flake.nixosConfigurations.installer.config.cybexos.installer.payload.config.environment.systemPackages
+    ''' % json.dumps(str(ROOT))
+    output = subprocess.run(NIX + ['eval', '--impure', '--json', '--expr', expression],
+                            check=True, capture_output=True, text=True).stdout
+    paths = [p for p in json.loads(output) if cached_quiet(p)]
+    return set(closure(paths))
+
+
+def cached_quiet(path):
+    try:
+        return cached(path)
+    except Exception:
+        return False
+
+
+def generate():
+    data = sources()
+    ICONS.mkdir(parents=True, exist_ok=True)
+    attributes = sorted({app[1] for app in data['apps']})
+    print(f'Evaluating {len(attributes)} attributes…', file=sys.stderr)
+    nix = evaluate(attributes)
+    revision = json.loads((ROOT / 'flake.lock').read_text())['nodes']['nixpkgs']['locked']['rev']
+    print('Checking the NixOS cache and Flathub…', file=sys.stderr)
+    with ThreadPoolExecutor(16) as pool:
+        streams = dict(zip([a[0] for a in data['apps']], pool.map(lambda a: appstream(a[2]), data['apps'])))
+        prebuilt = dict(zip(attributes, pool.map(
+            lambda a: nix[a].get('exists') and not nix[a]['unfree'] and cached_quiet(nix[a]['out']), attributes)))
+    print('Measuring downloads beyond the default installation…', file=sys.stderr)
+    base = base_paths()
+    apps, dropped = [], []
+    for app_id, attribute, appstream_id, category, subcategory in data['apps']:
+        meta, stream = nix.get(attribute, {}), streams[app_id]
+        reason = ('missing from Nixpkgs' if not meta.get('exists') else
+                  'broken or unsupported' if meta['broken'] or not meta['available'] else
+                  'not prebuilt by NixOS' if not meta['unfree'] and not prebuilt[attribute] else
+                  'no Flathub metadata' if not stream or not stream['icon'] else None)
+        if reason:
+            dropped.append((app_id, attribute, reason))
+            continue
+        apps.append({'id': app_id, 'attribute': attribute, 'appstream': appstream_id,
+                     'category': category, 'subcategory': subcategory, 'free': not meta['unfree'],
+                     'out': meta['out'], 'homepage': meta['homepage'] if isinstance(meta['homepage'], str) else '',
+                     **{k: stream[k] for k in ('name', 'summary', 'description', 'developer', 'license',
+                                               'screenshots', 'installs', 'brand')},
+                     **({'name': data['names'][app_id]} if app_id in data.get('names', {}) else {}),
+                     'desktop': stream['desktop'], 'icon': stream['icon']})
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(lambda app: icon(app['id'], app['icon']), apps))
+        found = list(pool.map(lambda app: desktop_ids(app['out']) if app['free'] else [], apps))
+        sizes = list(pool.map(lambda app: closure([app['out']]) if app['free'] else None, apps))
+    for app, ids, size in zip(apps, found, sizes):
+        guesses = ids or ([app['desktop']] if app['desktop'] else [])
+        app['desktopIds'] = guesses
+        app['downloadBytes'] = sum(v for p, v in size.items() if p not in base) if size is not None else None
+        del app['desktop'], app['icon'], app['out']
+    kept = {app['id']: app for app in apps}
+    profiles = []
+    for profile in data['profiles']:
+        members = [a for a in profile['apps'] if a in kept]
+        free = [kept[a] for a in members if kept[a]['free']]
+        union = {}
+        for app in free:
+            union |= {p: v for p, v in sizes[apps.index(app)].items() if p not in base}
+        profiles.append(profile | {'apps': members, 'downloadBytes': sum(union.values())})
+    catalogue = {'schema': 1, 'nixpkgs': revision, 'categories': [
+        c | {'subcategories': [{'id': s, 'name': n} for s, n in c['subcategories']]} for c in data['categories']],
+        'profiles': profiles, 'featured': [f for f in data['featured'] if f in kept], 'apps': apps}
+    CATALOGUE.write_text(json.dumps(catalogue, indent=1, ensure_ascii=False) + '\n')
+    stale = {p.stem for p in ICONS.glob('*.png')} - set(kept)
+    for name in stale:
+        (ICONS / f'{name}.png').unlink()
+    for app_id, attribute, reason in dropped:
+        print(f'  dropped {app_id} ({attribute}): {reason}', file=sys.stderr)
+    print(f'{len(apps)} apps, {len(dropped)} dropped, Nixpkgs {revision[:7]}', file=sys.stderr)
+
+
+def check():
+    data, catalogue = sources(), json.loads(CATALOGUE.read_text())
+    listed = {a[0]: a for a in data['apps']}
+    problems = []
+    for app in catalogue['apps']:
+        source = listed.get(app['id'])
+        if not source or [app['attribute'], app['appstream'], app['category'], app['subcategory']] != source[1:]:
+            problems.append(f'{app["id"]}: differs from sources.json')
+        if not (ICONS / f'{app["id"]}.png').is_file():
+            problems.append(f'{app["id"]}: icon missing')
+    extra = {p.stem for p in ICONS.glob('*.png')} - {a['id'] for a in catalogue['apps']}
+    problems += [f'{name}: icon without catalogue entry' for name in sorted(extra)]
+    if {p['id'] for p in catalogue['profiles']} != {p['id'] for p in data['profiles']}:
+        problems.append('profiles differ from sources.json')
+    for problem in problems:
+        print(problem, file=sys.stderr)
+    return 1 if problems else 0
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--check', action='store_true', help='verify without network access')
+    arguments = parser.parse_args()
+    sys.exit(check() if arguments.check else generate())

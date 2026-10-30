@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""List what a Cybex OS system would compile instead of downloading.
+
+Walks the system's derivation graph from its root, asking cache.nixos.org for
+each output, independent of what this computer's store already holds. A
+cached output covers its whole subtree. Configuration files (local-only by
+design), fixed-output downloads and the system's expected local builds
+(`system.build.cybexosExpectedBuilds`: Cybex OS's own packages, unfree vendor
+downloads, kernel modules) are allowed. Anything else is a Nixpkgs package
+that NixOS has not prebuilt, or a configuration that changed one; the command
+lists those and exits 1.
+
+    scripts/check-prebuilt                       # the default product system
+    scripts/check-prebuilt --nvidia              # with NVIDIA drivers
+    scripts/check-prebuilt --catalogue           # plus every Software profile app
+"""
+import argparse
+import json
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'lifecycle'))
+from cybexos.prebuilt import kind, name  # noqa: E402
+
+NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
+
+
+def evaluate(nvidia, packages):
+    expression = '''
+      let
+        flake = builtins.getFlake (toString %(root)s);
+        system = flake.inputs.nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [ flake.nixosModules.default (%(root)s + "/nix/tests/machine.nix") ({ lib, ... }: {
+            cybexos.features = { proprietary = lib.mkForce true; steam = lib.mkForce true; docker = lib.mkForce true; };
+            cybexos.hardware.nvidia = %(nvidia)s;
+            cybexos.software.packages = builtins.fromJSON %(packages)s;
+          }) ];
+        };
+      in { root = system.config.system.build.toplevel.drvPath;
+           expected = system.config.system.build.cybexosExpectedBuilds; }
+    ''' % {'root': json.dumps(str(ROOT)), 'nvidia': 'true' if nvidia else 'false',
+           'packages': json.dumps(json.dumps(packages))}
+    return json.loads(subprocess.run(NIX + ['eval', '--impure', '--json', '--expr', expression],
+                                     check=True, capture_output=True, text=True).stdout)
+
+
+def cached(path):
+    digest = Path(path).name.split('-', 1)[0]
+    try:
+        with urllib.request.urlopen(f'https://cache.nixos.org/{digest}.narinfo', timeout=30):
+            return True
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return False
+        raise
+
+
+def walk(root, expected):
+    graph = json.loads(subprocess.run(NIX + ['derivation', 'show', '-r', root],
+                                      check=True, capture_output=True, text=True).stdout)
+    graph = {k if k.startswith('/nix/store/') else '/nix/store/' + k: v for k, v in graph.items()}
+    expected, seen, frontier, found, local = set(expected), set(), [root], set(), 0
+    with ThreadPoolExecutor(32) as pool:
+        while frontier:
+            batch = [d for d in dict.fromkeys(frontier) if d not in seen and d not in expected]
+            seen.update(batch)
+            outputs = [next((o['path'] for o in graph[d]['outputs'].values() if 'path' in o), None) for d in batch]
+            present = list(pool.map(lambda path: path is not None and cached(path), outputs))
+            frontier = []
+            for drv, hit in zip(batch, present):
+                if hit:
+                    continue
+                local += 1
+                sort = kind(graph[drv])
+                if sort == 'compile':
+                    found.add(name(drv))
+                elif sort == 'trivial':
+                    frontier.extend(k if k.startswith('/nix/store/') else '/nix/store/' + k
+                                    for k in graph[drv].get('inputDrvs') or {})
+    return sorted(found), local
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--nvidia', action='store_true', help='include NVIDIA drivers')
+    parser.add_argument('--catalogue', action='store_true', help='add every Software profile app')
+    arguments = parser.parse_args()
+    packages = []
+    if arguments.catalogue:
+        catalogue = json.loads((ROOT / 'desktop/software/catalogue.json').read_text())
+        apps = {app['id']: app for app in catalogue['apps']}
+        packages = sorted({apps[i]['attribute'] for p in catalogue['profiles'] for i in p['apps']})
+    info = evaluate(arguments.nvidia, packages)
+    found, local = walk(info['root'], info['expected'])
+    print(f'{local} derivations build locally; {len(info["expected"])} expected local builds allowed.', file=sys.stderr)
+    for item in found:
+        print(item)
+    return 1 if found else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

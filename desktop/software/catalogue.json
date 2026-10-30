@@ -1,0 +1,4098 @@
+{
+ "schema": 1,
+ "nixpkgs": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+ "categories": [
+  {
+   "id": "create",
+   "name": "Create",
+   "summary": "Graphics, photography, 3D and publishing",
+   "icon": "palette",
+   "color": "#ff9f5a",
+   "subcategories": [
+    {
+     "id": "photo",
+     "name": "Photo"
+    },
+    {
+     "id": "drawing",
+     "name": "Drawing"
+    },
+    {
+     "id": "vector",
+     "name": "Vector"
+    },
+    {
+     "id": "3d",
+     "name": "3D"
+    },
+    {
+     "id": "publishing",
+     "name": "Publishing"
+    }
+   ]
+  },
+  {
+   "id": "work",
+   "name": "Work",
+   "summary": "Documents, mail, notes and tasks",
+   "icon": "briefcase",
+   "color": "#60a5fa",
+   "subcategories": [
+    {
+     "id": "office",
+     "name": "Office"
+    },
+    {
+     "id": "mail",
+     "name": "Mail & calendar"
+    },
+    {
+     "id": "notes",
+     "name": "Notes"
+    },
+    {
+     "id": "tasks",
+     "name": "Tasks"
+    },
+    {
+     "id": "finance",
+     "name": "Finance"
+    }
+   ]
+  },
+  {
+   "id": "develop",
+   "name": "Develop",
+   "summary": "Editors, databases, APIs and tools",
+   "icon": "code",
+   "color": "#a992e0",
+   "subcategories": [
+    {
+     "id": "editors",
+     "name": "Editors"
+    },
+    {
+     "id": "tools",
+     "name": "Tools"
+    },
+    {
+     "id": "data",
+     "name": "Databases & APIs"
+    },
+    {
+     "id": "games",
+     "name": "Game engines"
+    }
+   ]
+  },
+  {
+   "id": "play",
+   "name": "Play",
+   "summary": "Games, launchers and emulators",
+   "icon": "device-gamepad-2",
+   "color": "#63d68c",
+   "subcategories": [
+    {
+     "id": "launchers",
+     "name": "Launchers"
+    },
+    {
+     "id": "games",
+     "name": "Games"
+    },
+    {
+     "id": "emulators",
+     "name": "Emulators"
+    }
+   ]
+  },
+  {
+   "id": "media",
+   "name": "Watch & Listen",
+   "summary": "Video, music, podcasts and recording",
+   "icon": "music",
+   "color": "#ff8f8f",
+   "subcategories": [
+    {
+     "id": "players",
+     "name": "Players"
+    },
+    {
+     "id": "video",
+     "name": "Video editing"
+    },
+    {
+     "id": "audio",
+     "name": "Audio"
+    },
+    {
+     "id": "recording",
+     "name": "Recording"
+    }
+   ]
+  },
+  {
+   "id": "chat",
+   "name": "Chat",
+   "summary": "Messages, calls and meetings",
+   "icon": "messages",
+   "color": "#5ad1d1",
+   "subcategories": [
+    {
+     "id": "messaging",
+     "name": "Messaging"
+    },
+    {
+     "id": "meetings",
+     "name": "Meetings"
+    }
+   ]
+  },
+  {
+   "id": "learn",
+   "name": "Learn",
+   "summary": "Study, science and reading",
+   "icon": "school",
+   "color": "#ffc26e",
+   "subcategories": [
+    {
+     "id": "study",
+     "name": "Study"
+    },
+    {
+     "id": "science",
+     "name": "Science"
+    },
+    {
+     "id": "reading",
+     "name": "Reading"
+    }
+   ]
+  },
+  {
+   "id": "utilities",
+   "name": "Utilities",
+   "summary": "Web, security, backups and system",
+   "icon": "tool",
+   "color": "#b3afa4",
+   "subcategories": [
+    {
+     "id": "web",
+     "name": "Web browsers"
+    },
+    {
+     "id": "security",
+     "name": "Security"
+    },
+    {
+     "id": "files",
+     "name": "Files & backups"
+    },
+    {
+     "id": "system",
+     "name": "System"
+    }
+   ]
+  }
+ ],
+ "profiles": [
+  {
+   "id": "development",
+   "name": "Software Development",
+   "short": "Development",
+   "summary": "Code editors, AI coding agents and containers",
+   "icon": "code",
+   "default": true,
+   "features": {
+    "developer": true,
+    "docker": true,
+    "podman": true
+   },
+   "includes": [
+    "T3 Code",
+    "Claude Code",
+    "Codex",
+    "Docker",
+    "Podman",
+    "Node.js, Bun, Rust, Python, Java"
+   ],
+   "apps": [
+    "zed",
+    "dbeaver",
+    "bruno",
+    "meld"
+   ],
+   "downloadBytes": 912626845
+  },
+  {
+   "id": "office",
+   "name": "Office & Productivity",
+   "short": "Office",
+   "summary": "Documents, mail, notes and ebooks",
+   "icon": "briefcase",
+   "features": {},
+   "includes": [],
+   "apps": [
+    "libreoffice",
+    "obsidian",
+    "xournalpp",
+    "okular",
+    "foliate"
+   ],
+   "downloadBytes": 87386346
+  },
+  {
+   "id": "graphics",
+   "name": "Graphics & Design",
+   "short": "Graphics",
+   "summary": "Photos, drawing, vector art, layout and 3D",
+   "icon": "palette",
+   "features": {},
+   "includes": [],
+   "apps": [
+    "gimp",
+    "inkscape",
+    "krita",
+    "darktable",
+    "blender",
+    "scribus"
+   ],
+   "downloadBytes": 1577781783
+  },
+  {
+   "id": "media",
+   "name": "Audio & Video",
+   "short": "Audio & Video",
+   "summary": "Recording, streaming and editing",
+   "icon": "movie",
+   "features": {},
+   "includes": [],
+   "apps": [
+    "obs",
+    "kdenlive",
+    "audacity",
+    "shotcut",
+    "handbrake"
+   ],
+   "downloadBytes": 623784607
+  },
+  {
+   "id": "gaming",
+   "name": "Gaming",
+   "short": "Gaming",
+   "summary": "Steam, Proton and game launchers",
+   "icon": "device-gamepad-2",
+   "features": {
+    "steam": true
+   },
+   "includes": [
+    "Steam",
+    "MangoHud",
+    "ProtonUp-Qt",
+    "GameMode"
+   ],
+   "apps": [
+    "heroic",
+    "prismlauncher"
+   ],
+   "downloadBytes": 1193039047
+  },
+  {
+   "id": "chat",
+   "name": "Chat & Meetings",
+   "short": "Chat",
+   "summary": "Messaging and video calls",
+   "icon": "messages",
+   "features": {},
+   "includes": [],
+   "apps": [
+    "signal",
+    "telegram",
+    "discord",
+    "slack",
+    "zoom"
+   ],
+   "downloadBytes": 283620042
+  }
+ ],
+ "featured": [
+  "blender",
+  "obs",
+  "zed",
+  "krita",
+  "darktable",
+  "signal"
+ ],
+ "apps": [
+  {
+   "id": "gimp",
+   "attribute": "gimp",
+   "appstream": "org.gimp.GIMP",
+   "category": "create",
+   "subcategory": "photo",
+   "free": true,
+   "homepage": "https://www.gimp.org/",
+   "name": "GIMP",
+   "summary": "High-end image creation and manipulation",
+   "description": [
+    "GIMP is an acronym for GNU Image Manipulation Program. It is Community-driven Free Software for high-end image creation and manipulation.",
+    "It has many capabilities. It can be used as a paint program, an expert quality photo retouching program, image composition, an online batch processing system, a mass production image renderer, an image format converter, etc.",
+    "GIMP is expandable and extensible. It is designed to be augmented with plug-ins and extensions to do just about anything. The advanced scripting interface allows everything from the simplest task to the most complex image manipulation procedures to be easily scripted. GIMP is available for Linux, Microsoft Windows and macOS."
+   ],
+   "developer": "The GIMP team",
+   "license": "GPL-3.0+ AND LGPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-2_1248x681@1.png",
+    "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-3_1248x681@1.png",
+    "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 60529,
+   "brand": {
+    "light": "#f4e4cb",
+    "dark": "#293a56"
+   },
+   "desktopIds": [
+    "gimp.desktop"
+   ],
+   "downloadBytes": 181815830
+  },
+  {
+   "id": "krita",
+   "attribute": "krita",
+   "appstream": "org.kde.krita",
+   "category": "create",
+   "subcategory": "drawing",
+   "free": true,
+   "homepage": "https://krita.org/",
+   "name": "Krita",
+   "summary": "Digital Painting, Creative Freedom",
+   "description": [
+    "Krita is the full-featured digital art studio.",
+    "It is perfect for sketching and painting, and presents an end–to–end solution for creating digital painting files from scratch by masters.",
+    "Krita is a great choice for creating concept art, comics, textures for rendering and matte paintings. Krita supports many colorspaces like RGB and CMYK at 8 and 16 bits integer channels, as well as 16 and 32 bits floating point channels.",
+    "Have fun painting with the advanced brush engines, amazing filters and many handy features that make Krita enormously productive."
+   ],
+   "developer": "Krita Foundation",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-1_1248x677@1.png",
+    "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-2_1248x677@1.png",
+    "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-4_1248x677@1.png"
+   ],
+   "installs": 35335,
+   "brand": {},
+   "desktopIds": [
+    "krita_brush.desktop",
+    "krita_csv.desktop",
+    "krita_exr.desktop",
+    "krita_gif.desktop",
+    "krita_heif.desktop",
+    "krita_heightmap.desktop",
+    "krita_jp2.desktop",
+    "krita_jpeg.desktop",
+    "krita_jxl.desktop",
+    "krita_kra.desktop",
+    "krita_krz.desktop",
+    "krita_ora.desktop",
+    "krita_pdf.desktop",
+    "krita_png.desktop",
+    "krita_psd.desktop",
+    "krita_qimageio.desktop",
+    "krita_raw.desktop",
+    "krita_rgbe.desktop",
+    "krita_spriter.desktop",
+    "krita_svg.desktop",
+    "krita_tga.desktop",
+    "krita_tiff.desktop",
+    "krita_webp.desktop",
+    "org.kde.krita.desktop"
+   ],
+   "downloadBytes": 400748336
+  },
+  {
+   "id": "inkscape",
+   "attribute": "inkscape",
+   "appstream": "org.inkscape.Inkscape",
+   "category": "create",
+   "subcategory": "vector",
+   "free": true,
+   "homepage": "https://www.inkscape.org",
+   "name": "Inkscape",
+   "summary": "Vector Graphics Editor",
+   "description": [
+    "A Free and open source vector graphics editor. It offers a rich set of features and is widely used for both artistic and technical illustrations such as cartoons, clip art, logos, typography, diagramming and flowcharting.",
+    "It uses vector graphics to allow for sharp printouts and renderings at unlimited resolution and is not bound to a fixed number of pixels like raster graphics. Inkscape uses the standardized SVG file format as its main format, which is supported by many other applications including web browsers.",
+    "Inkscape supports many advanced SVG features (markers, clones, alpha blending, etc.) and great care is taken in designing a streamlined interface. It is very easy to edit nodes, perform complex path operations, trace bitmaps and much more. We also aim to maintain a thriving user and developer community by using open, community-oriented development."
+   ],
+   "developer": "The Inkscape Community",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-1_1248x767@1.png",
+    "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-2_1248x765@1.png",
+    "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-3_1248x764@1.png",
+    "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-4_1248x763@1.png"
+   ],
+   "installs": 21996,
+   "brand": {},
+   "desktopIds": [
+    "org.inkscape.Inkscape.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "darktable",
+   "attribute": "darktable",
+   "appstream": "org.darktable.Darktable",
+   "category": "create",
+   "subcategory": "photo",
+   "free": true,
+   "homepage": "https://www.darktable.org",
+   "name": "darktable",
+   "summary": "Organize and develop images from digital cameras",
+   "description": [
+    "darktable manages your camera raw files and images in a database, lets you view them through lighttable mode and develop/enhance them in darkroom mode.",
+    "Other modes besides lighttable and darkroom are a map for geotagging, tethering, print and a slideshow.",
+    "darktable supports most modern cameras' raw formats, and does all of its processing at very high precision."
+   ],
+   "developer": "darktable developers",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 247670,
+   "brand": {},
+   "desktopIds": [
+    "org.darktable.darktable.desktop"
+   ],
+   "downloadBytes": 61664100
+  },
+  {
+   "id": "blender",
+   "attribute": "blender",
+   "appstream": "org.blender.Blender",
+   "category": "create",
+   "subcategory": "3d",
+   "free": true,
+   "homepage": "https://www.blender.org",
+   "name": "Blender",
+   "summary": "Free and open source 3D creation suite",
+   "description": [
+    "Blender is the free and open source 3D creation suite. It supports the entirety of the 3D pipeline — modeling, rigging, animation, simulation, rendering, compositing, motion tracking, and video editing.",
+    "Blender is a public project, made by hundreds of people from around the world; by studios and individual artists, professionals and hobbyists, scientists, students, VFX experts, animators, game artists, modders, and the list goes on."
+   ],
+   "developer": "Blender Foundation",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-1_1248x703@1.png",
+    "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 24003,
+   "brand": {
+    "light": "#5ab3f6",
+    "dark": "#265787"
+   },
+   "desktopIds": [
+    "blender.desktop"
+   ],
+   "downloadBytes": 983445436
+  },
+  {
+   "id": "scribus",
+   "attribute": "scribus",
+   "appstream": "net.scribus.Scribus",
+   "category": "create",
+   "subcategory": "publishing",
+   "free": true,
+   "homepage": "https://www.scribus.net",
+   "name": "Scribus",
+   "summary": "Open Source Page Layout and Desktop Publishing (DTP)",
+   "description": [
+    "Scribus is a cross-platform open source page layout program which produces commercial grade output in PDF and Postscript.",
+    "While the goals of the program are ease of use and simple easy-to-understand tools, Scribus support for professional publishing features, such as CMYK and spot colors, easy PDF creation, Encapsulated Postscript import and export and creation of color separations."
+   ],
+   "developer": "Scribus developers",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/scribus/Scribus/48ad39685c76efc094f785ce90f3743e/screenshots/image-1_752x532@1.png",
+    "https://dl.flathub.org/media/net/scribus/Scribus/48ad39685c76efc094f785ce90f3743e/screenshots/image-2_752x527@1.png"
+   ],
+   "installs": 3819,
+   "brand": {},
+   "desktopIds": [
+    "scribus.desktop"
+   ],
+   "downloadBytes": 107189880
+  },
+  {
+   "id": "pinta",
+   "attribute": "pinta",
+   "appstream": "com.github.PintaProject.Pinta",
+   "category": "create",
+   "subcategory": "drawing",
+   "free": true,
+   "homepage": "https://www.pinta-project.com/",
+   "name": "Pinta",
+   "summary": "Edit images and paint digitally",
+   "description": [
+    "Pinta is a image editing, drawing and painting application with a simple yet powerful interface. Pinta has a wide range of drawing tools, including: freehand, rectangles, circles and lines. It also has over 35 effects to apply to your images, and also has the ability to create unlimited layers to help organize your creativity."
+   ],
+   "developer": "Jonathan Pobst",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/PintaProject.Pinta/6036b596f8f5a6ce7c2dc8a7d9c0565f/screenshots/image-1_1248x804@1.png"
+   ],
+   "installs": 16201,
+   "brand": {},
+   "desktopIds": [
+    "com.github.PintaProject.Pinta.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "rawtherapee",
+   "attribute": "rawtherapee",
+   "appstream": "com.rawtherapee.RawTherapee",
+   "category": "create",
+   "subcategory": "photo",
+   "free": true,
+   "homepage": "http://www.rawtherapee.com/",
+   "name": "RawTherapee",
+   "summary": "An advanced raw photo development program",
+   "description": [
+    "RawTherapee is a powerful, cross-platform raw photo processing program. It is written mostly in C++ using a GTK+ front-end. It uses a patched version of dcraw for reading raw files, with an in-house solution which adds the highest quality support for certain camera models unsupported by dcraw and enhances the accuracy of certain raw files already supported by dcraw. It is notable for the advanced control it gives the user over the demosaicing and development process.",
+    "RawTherapee is designed for developing raw files from a broad range of digital cameras, as well as HDR DNG files and non-raw image formats (JPEG, TIFF and PNG). The target audience ranges from enthusiast newcomers who wish to broaden their understanding of how digital imaging works to semi-professional photographers. Knowledge in color science is not compulsory, but it is recommended that you are eager to learn and ready to read our documentation (RawPedia) as well as look up basic concepts which lie outside the scope of RawPedia, such as color balance, elsewhere.",
+    "Of course, professionals may use RawTherapee too while enjoying complete freedom, but will probably lack some peripheral features such as Digital Asset Management, printing, uploading, etc. RawTherapee is not aimed at being an inclusive all-in-one program, and the open-source community is sufficiently developed by now to offer all those peripheral features in other specialized software."
+   ],
+   "developer": "The RawTherapee Team",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 2291,
+   "brand": {},
+   "desktopIds": [
+    "rawtherapee.desktop"
+   ],
+   "downloadBytes": 33689444
+  },
+  {
+   "id": "freecad",
+   "attribute": "freecad",
+   "appstream": "org.freecad.FreeCAD",
+   "category": "create",
+   "subcategory": "3d",
+   "free": true,
+   "homepage": "https://www.freecad.org",
+   "name": "FreeCAD",
+   "summary": "An open source parametric 3D CAD modeler",
+   "description": [
+    "FreeCAD is an open-source parametric 3D modeler built to help you design real-world objects of any size. With parametric modeling, you can easily modify your designs by adjusting parameters in the model history. FreeCAD is suitable for a wide range of uses, from product design and mechanical engineering to architecture and 3D printing.",
+    "The software allows you to create constrained 2D sketches, which can be used as the basis for more complex 3D models. It includes tools to adjust dimensions, extract design details, and produce production-ready technical drawings. FreeCAD is available on Windows, Mac, and Linux, and supports various file formats like STEP, IGES, STL, SVG, DXF, OBJ, IFC, and more, making it easy to fit into existing workflows. It also supports customization through Python scripting for those who want to automate tasks or develop custom features.",
+    "FreeCAD offers several specialized workbenches, including tools for Finite Element Analysis (FEA), Building Information Modeling (BIM), CAM / CNC and robot movement simulation. You can expand its capabilities with add-ons, plugins, and macros created by the FreeCAD community, which can be installed directly from the application. This flexibility makes it a practical choice for both professionals and hobbyists."
+   ],
+   "developer": "The FreeCAD Team",
+   "license": "LGPL-2.1",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-1_1248x767@1.png",
+    "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-2_1248x767@1.png",
+    "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-3_1248x766@1.png",
+    "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-4_1248x767@1.png"
+   ],
+   "installs": 31830,
+   "brand": {},
+   "desktopIds": [
+    "org.freecad.FreeCAD.desktop"
+   ],
+   "downloadBytes": 1018443805
+  },
+  {
+   "id": "mypaint",
+   "attribute": "mypaint",
+   "appstream": "org.mypaint.MyPaint",
+   "category": "create",
+   "subcategory": "drawing",
+   "free": true,
+   "homepage": "http://mypaint.org/",
+   "name": "MyPaint",
+   "summary": "Painting program for digital artists",
+   "description": [
+    "MyPaint is a fast, free, and easy graphics app for digital painters. It lets you focus on the art you make instead of the program you make it with. You can work on your canvas without clutter, and show the interface only when you need it. MyPaint works best with a graphics tablet.",
+    "MyPaint’s brush engine is fast and almost infinitely configurable to simulate many natural media brushes or experimental ‘unrealistic’ ones. It ships with a variety of pre-made brushes by prominent artists, so you don’t have to configure your own if you don’t want to."
+   ],
+   "developer": "MyPaint Developers",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/mypaint/MyPaint/7ae5ec387d1933b7b5e5ede0c53a9d32/screenshots/image-1_1248x702@1.png"
+   ],
+   "installs": 1485,
+   "brand": {},
+   "desktopIds": [
+    "mypaint.desktop"
+   ],
+   "downloadBytes": 7606234
+  },
+  {
+   "id": "synfig",
+   "attribute": "synfigstudio",
+   "appstream": "org.synfig.SynfigStudio",
+   "category": "create",
+   "subcategory": "drawing",
+   "free": true,
+   "homepage": "https://www.synfig.org",
+   "name": "Synfig Studio",
+   "summary": "Create and edit 2D animations and compositions",
+   "description": [
+    "Synfig Studio is a free and open-source 2D animation software, designed as powerful industrial-strength solution for creating film-quality animation using a vector and bitmap artwork. It eliminates the need to create animation frame-by frame, allowing you to produce 2D animation of a higher quality with fewer people and resources.",
+    "Features:",
+    "• Can manipulate vector and bitmap artwork",
+    "• Automatic tweening (independent from FPS)",
+    "• Multitude of layers of various types (geometry primitives, shapes, gradients, fratals)",
+    "• Full-featured bone system",
+    "• Filters and effects for compositing (blurs, distortions, color manipulation, masks)",
+    "• All color operations use High Dynamic-Range Imaging (HDRI)",
+    "• Pentablet-friendly tools",
+    "• Sound support",
+    "• Linking data on file or parameter-level",
+    "• Automatic animation using mathematical functions"
+   ],
+   "developer": "Synfig",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-1_752x468@1.png",
+    "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-2_752x468@1.png",
+    "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-3_752x477@1.png",
+    "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-4_752x515@1.png"
+   ],
+   "installs": 928,
+   "brand": {
+    "light": "#fafafa",
+    "dark": "#023b5f"
+   },
+   "desktopIds": [
+    "org.synfig.SynfigStudio.desktop"
+   ],
+   "downloadBytes": 51170030
+  },
+  {
+   "id": "fontforge",
+   "attribute": "fontforge-gtk",
+   "appstream": "org.fontforge.FontForge",
+   "category": "create",
+   "subcategory": "publishing",
+   "free": true,
+   "homepage": "https://fontforge.github.io",
+   "name": "FontForge",
+   "summary": "An outline font editor",
+   "description": [
+    "FontForge is a font editor for outline and bitmap fonts that lets you create, edit, or convert, a range of fonts, including PostScript, TrueType, OpenType, cid-keyed, multi-master, cff, SVG and BitMap (bdf, FON, NFNT) fonts.",
+    "FontForge is free Open Source Software written to run on various computer operating systems. You can use FontForge Graphically or as a command-line tool.",
+    "Learning to use FontForge is easy, and there are various tutorials available beginning with the basics up to more advanced features such as making and using scripts."
+   ],
+   "developer": "FontForge developers",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/fontforge/FontForge/2b9c2c6e74e1ae49618cc67bd81d693c/screenshots/image-1_752x423@1.png"
+   ],
+   "installs": 596,
+   "brand": {},
+   "desktopIds": [
+    "org.fontforge.FontForge.desktop"
+   ],
+   "downloadBytes": 9191013
+  },
+  {
+   "id": "curtail",
+   "attribute": "curtail",
+   "appstream": "com.github.huluti.Curtail",
+   "category": "create",
+   "subcategory": "photo",
+   "free": true,
+   "homepage": "https://github.com/Huluti/Curtail",
+   "name": "Curtail",
+   "summary": "Compress your images",
+   "description": [
+    "Optimize your images with Curtail, a useful image compressor that supports PNG, JPEG, WebP and SVG file types.",
+    "It supports both lossless and lossy compression modes with an option to whether keep or not metadata of images."
+   ],
+   "developer": "Hugo Posnic",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/huluti.Curtail/577552f7e8f21037288d25d01dfd857f/screenshots/image-1_752x598@1.png",
+    "https://dl.flathub.org/media/com/github/huluti.Curtail/577552f7e8f21037288d25d01dfd857f/screenshots/image-2_752x688@1.png"
+   ],
+   "installs": 2479,
+   "brand": {
+    "light": "#f66151",
+    "dark": "#a51d2d"
+   },
+   "desktopIds": [
+    "com.github.huluti.Curtail.desktop"
+   ],
+   "downloadBytes": 1744968
+  },
+  {
+   "id": "upscayl",
+   "attribute": "upscayl",
+   "appstream": "org.upscayl.Upscayl",
+   "category": "create",
+   "subcategory": "photo",
+   "free": true,
+   "homepage": "https://upscayl.github.io/",
+   "name": "Upscayl",
+   "summary": "Free and Open Source AI Image Upscaler",
+   "description": [
+    "Upscayl is a free and open source AI Image Upscaler."
+   ],
+   "developer": "Upscayl",
+   "license": "AGPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-1_1248x780@1.png",
+    "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-2_1248x780@1.png",
+    "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-3_1248x780@1.png",
+    "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-4_1248x780@1.png"
+   ],
+   "installs": 8646,
+   "brand": {},
+   "desktopIds": [
+    "upscayl.desktop"
+   ],
+   "downloadBytes": 381865932
+  },
+  {
+   "id": "penpot",
+   "attribute": "penpot-desktop",
+   "appstream": "com.authormore.penpotdesktop",
+   "category": "create",
+   "subcategory": "vector",
+   "free": true,
+   "homepage": "https://github.com/author-more/penpot-desktop",
+   "name": "Penpot Desktop",
+   "summary": "Design and code beautiful products together",
+   "description": [
+    "Penpot Desktop is an unofficial desktop application for the open-source design tool, Penpot.",
+    "It provides you with access to the functionality of the browser version of Penpot with an experience of a desktop application. It comes with",
+    "• system-level application experience e.g. a dedicated window, file extension association,",
+    "• versatile dark-light mode setup,",
+    "• tab interface for easy navigation between projects,",
+    "• ability to connect to different instances e.g. officially hosted, local for offline work,",
+    "• and more are coming."
+   ],
+   "developer": "Author More",
+   "license": "AGPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/authormore/penpotdesktop/a68b3bf181b38a781f54dd355a0c5214/screenshots/image-1_1248x809@1.png",
+    "https://dl.flathub.org/media/com/authormore/penpotdesktop/a68b3bf181b38a781f54dd355a0c5214/screenshots/image-2_1248x809@1.png"
+   ],
+   "installs": 1209,
+   "brand": {
+    "light": "#dde3e9",
+    "dark": "#34393c"
+   },
+   "desktopIds": [
+    "Penpot.desktop"
+   ],
+   "downloadBytes": 153545828
+  },
+  {
+   "id": "libreoffice",
+   "attribute": "libreoffice",
+   "appstream": "org.libreoffice.LibreOffice",
+   "category": "work",
+   "subcategory": "office",
+   "free": true,
+   "homepage": "https://libreoffice.org/",
+   "name": "LibreOffice",
+   "summary": "The LibreOffice productivity suite",
+   "description": [
+    "LibreOffice is a powerful office suite. Its clean interface and feature-rich tools help you unleash your creativity and enhance your productivity. LibreOffice includes several applications that make it the most powerful Free and Open Source office suite on the market: Writer (word processing), Calc (spreadsheets), Impress (presentations), Draw (vector graphics and flowcharts), Base (databases), and Math (formula editing).",
+    "LibreOffice supports opening and saving into a wide variety of formats, so you can easily share documents with users of other popular office suites without worrying about compatibility."
+   ],
+   "developer": "The Document Foundation",
+   "license": "MPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-1_1248x873@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-2_1248x724@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-3_1248x906@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-4_1248x826@1.png"
+   ],
+   "installs": 59578,
+   "brand": {},
+   "desktopIds": [
+    "base.desktop",
+    "calc.desktop",
+    "draw.desktop",
+    "impress.desktop",
+    "math.desktop",
+    "startcenter.desktop",
+    "writer.desktop",
+    "xsltfilter.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "onlyoffice",
+   "attribute": "onlyoffice-desktopeditors",
+   "appstream": "org.onlyoffice.desktopeditors",
+   "category": "work",
+   "subcategory": "office",
+   "free": true,
+   "homepage": "https://www.onlyoffice.com/",
+   "name": "ONLYOFFICE Desktop Editors",
+   "summary": "Office productivity suite",
+   "description": [
+    "ONLYOFFICE Desktop Editors is a free and open-source office suite pack that comprises editors for text documents, spreadsheets, presentations, PDFs and PDF forms, along with a Diagram Viewer. It allows you to create, view and edit office docs stored on your Windows/Linux PC or Mac without an Internet connection. The suite is fully compatible with Office Open XML formats: .docx, .xlsx, .pptx.",
+    "Thanks to the tab-based user interface, you can deal with multiple files within one and the same window. Multiple plugins allow adding any extra functionality you might need. Password protection and digital signatures ensure a higher level of security while working with files.",
+    "Boost productivity with AI integration. Connect any AI model (local or cloud-based) for tasks like chatbot requests, translation, OCR, etc. Use AI agents to generate new files, list folder contents, preview file details without opening them in the editor, auto-fill forms with provided data, and much more.",
+    "Switch between various interface themes to comfortably work in any environment. Extend your capabilities further with plugins to add any extra functionality you might need: edit images and photos, highlight code, convert docs to Markdown or HTML, etc.",
+    "Along with offline work, it’s possible to connect the application to the cloud for online document collaboration. Available options include ONLYOFFICE cloud, Moodle, Nextcloud, Seafile, ownCloud, kDrive, and Liferay."
+   ],
+   "developer": "ONLYOFFICE",
+   "license": "AGPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-1_1248x873@1.png",
+    "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-2_1248x873@1.png",
+    "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-3_1248x873@1.png",
+    "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-4_1248x873@1.png"
+   ],
+   "installs": 88326,
+   "brand": {},
+   "desktopIds": [
+    "onlyoffice-desktopeditors.desktop"
+   ],
+   "downloadBytes": 678810575
+  },
+  {
+   "id": "obsidian",
+   "attribute": "obsidian",
+   "appstream": "md.obsidian.Obsidian",
+   "category": "work",
+   "subcategory": "notes",
+   "free": false,
+   "homepage": "https://obsidian.md",
+   "name": "Obsidian",
+   "summary": "Markdown-based knowledge base",
+   "description": [
+    "Obsidian is a powerful knowledge base that works on top of a local folder of plain text Markdown files. In Obsidian, making and following connections is frictionless, and with the connections in place, you can explore all of your knowledge in the interactive graph view. Obsidian supports CommonMark and GitHub Flavored Markdown (GFM), along with other useful notetaking features such as tags, LaTeX mathematical expressions, mermaid diagrams, footnotes, internal links and embedding Obsidian notes or external files. Obsidian also has a plugin system with 20+ supported plugins to expand its capabil",
+    "The documentation can be accessed by opening the demo vault that is shipped in Obsidian.",
+    "Obsidian is free for all purposes, including personal, commercial, and non-profit use. No account or license is required for qualifying use cases described in the End User License Agreement. Users have the option to purchase a Catalyst license to get early access to insider builds and support the development. Additionally, Obsidian offers optional paid services for publishing and synchronizing your notes. Details about these optional hosted services can be found on the Obsidian website.",
+    "This distribution is verified by the Obsidian team but isn't supported",
+    "GPU acceleration can be disabled if necessary by setting OBSIDIAN_DISABLE_GPU=1 in Flatseal",
+    "Pdflatex support in pandoc currently requires installing the org.freedesktop.Sdk.Extension.texlive SDK"
+   ],
+   "developer": "Obsidian",
+   "license": "LicenseRef-proprietary=https://obsidian.md/eula",
+   "screenshots": [
+    "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-1_1248x661@1.png",
+    "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-2_752x863@1.png",
+    "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-3_1248x873@1.png",
+    "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-4_1248x835@1.png"
+   ],
+   "installs": 73292,
+   "brand": {},
+   "desktopIds": [
+    "md.obsidian.Obsidian.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "joplin",
+   "attribute": "joplin-desktop",
+   "appstream": "net.cozic.joplin_desktop",
+   "category": "work",
+   "subcategory": "notes",
+   "free": true,
+   "homepage": "https://joplinapp.org",
+   "name": "Joplin",
+   "summary": "open source note taking and to-do application",
+   "description": [
+    "Joplin is a free, open source note taking and to-do application, which can handle a large number of notes organised into notebooks. The notes are searchable, can be copied, tagged and modified either from the applications directly or from your own text editor. The notes are in Markdown format.",
+    "Notes exported from Evernote via .enex files can be imported into Joplin, including the formatted content (which is converted to Markdown), resources (images, attachments, etc.) and complete metadata (geolocation, updated time, created time, etc.). Plain Markdown files can also be imported.",
+    "The notes can be synchronised with various cloud services including Nextcloud, Dropbox, OneDrive, WebDAV or the file system (for example with a network directory). When synchronising the notes, notebooks, tags and other metadata are saved to plain text files which can be easily inspected, backed up and moved around.",
+    "The application is available for Windows, Linux, macOS, Android and iOS (the terminal app also works on FreeBSD). A Web Clipper, to save web pages and screenshots from your browser, is also available for Firefox and Chrome."
+   ],
+   "developer": "laurent22",
+   "license": "AGPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/cozic/joplin_desktop/0400efd10f68aa1b55f521ff7c205f74/screenshots/image-1_752x458@1.png",
+    "https://dl.flathub.org/media/net/cozic/joplin_desktop/0400efd10f68aa1b55f521ff7c205f74/screenshots/image-2_1248x1008@1.png",
+    "https://dl.flathub.org/media/net/cozic/joplin_desktop/0400efd10f68aa1b55f521ff7c205f74/screenshots/image-3_1248x972@1.png"
+   ],
+   "installs": 10172,
+   "brand": {},
+   "desktopIds": [
+    "appimagekit-joplin.desktop"
+   ],
+   "downloadBytes": 223304260
+  },
+  {
+   "id": "xournalpp",
+   "attribute": "xournalpp",
+   "appstream": "com.github.xournalpp.xournalpp",
+   "category": "work",
+   "subcategory": "notes",
+   "free": true,
+   "homepage": "https://xournalpp.github.io/",
+   "name": "Xournal++",
+   "summary": "Take handwritten notes",
+   "description": [
+    "Xournal++ is a hand note-taking software written in C++ with the target of flexibility, functionality and speed. Stroke recognizer and other parts are based on Xournal Code, which you can find at sourceforge. It supports GNU/Linux (e.g. Ubuntu, Debian, Arch, SUSE), macOS and Windows. Supports pen input from devices such as Wacom Tablets.",
+    "Xournal++ features:",
+    "• Supports pressure-sensitive styluses and digital pen tables (e.g. Wacom, Huion, XP Pen, etc. tablets)",
+    "• Paper backgrounds for note-taking, scratch paper, or whiteboarding",
+    "• Annotate on top of PDFs",
+    "• Select text from the background PDF, copy, highlight or underline it or strike it through",
+    "• Follow links from the background PDF",
+    "• Export to a variety of formats including SVG, PNG and PDF, both from the GUI and command line",
+    "• Different drawing tools (e.g. pen, highlighter) and stroke styles (e.g. solid, dotted)",
+    "• Shape drawing (line, arrow, circle, rectangle, spline)",
+    "• Use the set-square and compass tools for measurements or as a guide for drawing straight lines, circular arcs and radii",
+    "• Fill shape functionality",
+    "• Shape resizing and rotation",
+    "• Rotation and grid snapping for precise alignment of objects",
+    "• Input stabilization for smoother writing/drawing",
+    "• Text tool for adding text in different fonts, colors, and sizes",
+    "• Enhanced support for image insertion",
+    "• Eraser with multiple configurations",
+    "• LaTeX support (requires a working LaTeX installation) with customizable template and a resizable editor with syntax highlighting"
+   ],
+   "developer": "Xournalpp Developers",
+   "license": "GPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/xournalpp.xournalpp/f749561a6863b04f4890fe795ecb5183/screenshots/image-1_1248x657@1.png",
+    "https://dl.flathub.org/media/com/github/xournalpp.xournalpp/f749561a6863b04f4890fe795ecb5183/screenshots/image-2_1248x657@1.png",
+    "https://dl.flathub.org/media/com/github/xournalpp.xournalpp/f749561a6863b04f4890fe795ecb5183/screenshots/image-3_1248x657@1.png"
+   ],
+   "installs": 10853,
+   "brand": {
+    "light": "#77767b",
+    "dark": "#241f31"
+   },
+   "desktopIds": [
+    "com.github.xournalpp.xournalpp.desktop"
+   ],
+   "downloadBytes": 3221138
+  },
+  {
+   "id": "okular",
+   "attribute": "kdePackages.okular",
+   "appstream": "org.kde.okular",
+   "category": "work",
+   "subcategory": "office",
+   "free": true,
+   "homepage": "https://invent.kde.org/graphics/okular",
+   "name": "Okular",
+   "summary": "View and annotate documents",
+   "description": [
+    "Okular is a universal document viewer developed by KDE. Okular works on multiple platforms, including but not limited to Linux, Windows, Mac OS X, *BSD, etc.",
+    "Features:",
+    "• Supported Formats: PDF, PS, Tiff, DjVu, Images, DVI, XPS, Fiction Book, Comic Book, Plucker, EPub, Fax",
+    "• Sidebar with contents, thumbnails, reviews and bookmarks",
+    "• Annotations support"
+   ],
+   "developer": "KDE",
+   "license": "GPL-2.0+ and GFDL-1.3",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/okular.desktop/0317c20dc29e75b2c16aa725cce48672/screenshots/image-1_752x531@1.png",
+    "https://dl.flathub.org/media/org/kde/okular.desktop/0317c20dc29e75b2c16aa725cce48672/screenshots/image-2_752x531@1.png"
+   ],
+   "installs": 15988,
+   "brand": {},
+   "desktopIds": [
+    "okularApplication_comicbook.desktop",
+    "okularApplication_djvu.desktop",
+    "okularApplication_dvi.desktop",
+    "okularApplication_epub.desktop",
+    "okularApplication_fax.desktop",
+    "okularApplication_fb.desktop",
+    "okularApplication_ghostview.desktop",
+    "okularApplication_kimgio.desktop",
+    "okularApplication_md.desktop",
+    "okularApplication_mobi.desktop",
+    "okularApplication_pdf.desktop",
+    "okularApplication_tiff.desktop",
+    "okularApplication_txt.desktop",
+    "okularApplication_xps.desktop",
+    "org.kde.okular.desktop"
+   ],
+   "downloadBytes": 80131901
+  },
+  {
+   "id": "gnucash",
+   "attribute": "gnucash",
+   "appstream": "org.gnucash.GnuCash",
+   "category": "work",
+   "subcategory": "finance",
+   "free": true,
+   "homepage": "https://www.gnucash.org/",
+   "name": "GnuCash",
+   "summary": "Manage your finances, accounts, and investments",
+   "description": [
+    "GnuCash is a program for personal and small-business financial-accounting. Designed to be easy to use, yet powerful and flexible, GnuCash allows you to track bank accounts, stocks, income and expenses. As quick and intuitive to use as a checkbook register, it is based on professional accounting principles like double-entry accounting to ensure balanced books and accurate reports.",
+    "With GnuCash you can (but are not limited to):",
+    "• Keep track of your day to day personal income and expenses.",
+    "• Manage your stock, bond and mutual fund accounts with ease.",
+    "• Keep your small business' accounting up to date.",
+    "• Create accurate reports and graphs from your financial data.",
+    "• Set up scheduled transactions to avoid repeated data entry.",
+    "• Process your bank data via online banking using FinTS.",
+    "• Download Transactions and Balances and initiate various SEPA Actions using AqBanking.",
+    "• Import accounts, business data, prices, and transactions from CSV and transactions and balances from many formats including CAMT, SWIFT-MT9xx, and OFX.",
+    "• Export the account tree or transactions as CSV.",
+    "• Perform financial calculations, such as a loan repayment."
+   ],
+   "developer": "The GnuCash Project",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnucash/GnuCash/1a86a3cf1fcb0f8d45f915a88fa02491/screenshots/image-1_752x422@1.png",
+    "https://dl.flathub.org/media/org/gnucash/GnuCash/1a86a3cf1fcb0f8d45f915a88fa02491/screenshots/image-2_752x422@1.png",
+    "https://dl.flathub.org/media/org/gnucash/GnuCash/1a86a3cf1fcb0f8d45f915a88fa02491/screenshots/image-3_752x422@1.png"
+   ],
+   "installs": 1922,
+   "brand": {},
+   "desktopIds": [
+    "gnucash.desktop"
+   ],
+   "downloadBytes": 106241926
+  },
+  {
+   "id": "planify",
+   "attribute": "planify",
+   "appstream": "io.github.alainm23.planify",
+   "category": "work",
+   "subcategory": "tasks",
+   "free": true,
+   "homepage": "https://github.com/alainm23/planify",
+   "name": "Planify",
+   "summary": "Forget about forgetting things",
+   "description": [
+    "Planify is your modern and powerful task manager that helps you keep your life organized. With a clean and intuitive interface, cloud synchronization, and advanced features, you'll never forget what matters again.",
+    "✨ Core Features:",
+    "• Modern and clean interface designed with GTK4 and libadwaita",
+    "• Drag and drop to organize tasks and projects effortlessly",
+    "• Visual progress indicators for each project",
+    "• Smart organization with sections and custom labels",
+    "• Calendar integration to visualize your schedule",
+    "• Multiple reminders per task to never miss a deadline",
+    "• Dark mode with seamless system theme integration",
+    "• Quick and powerful search to find anything instantly",
+    "• Recurring tasks with flexible patterns",
+    "• Attachments and links in your tasks",
+    "☁️ Cloud Synchronization:",
+    "• Full synchronization with Todoist to access your tasks from anywhere",
+    "• Support for Nextcloud and CalDAV servers (Radicale, Baïkal) to keep your data private",
+    "• Offline mode: work without internet and sync when you're back online",
+    "• Cross-platform synchronization to access from any device",
+    "* Planify is not created by, affiliated with, or supported by Doist"
+   ],
+   "developer": "Alain",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-1_752x570@1.png",
+    "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-2_752x570@1.png",
+    "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-3_752x570@1.png",
+    "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-4_752x570@1.png"
+   ],
+   "installs": 13420,
+   "brand": {
+    "light": "#f9f06b",
+    "dark": "#9141ac"
+   },
+   "desktopIds": [
+    "io.github.alainm23.planify.desktop"
+   ],
+   "downloadBytes": 2840274
+  },
+  {
+   "id": "errands",
+   "attribute": "errands",
+   "appstream": "io.github.mrvladus.List",
+   "category": "work",
+   "subcategory": "tasks",
+   "free": true,
+   "homepage": "https://github.com/mrvladus/Errands",
+   "name": "Errands",
+   "summary": "Manage your tasks",
+   "description": [
+    "Todo application for those who prefer simplicity.",
+    "Features:",
+    "• Multiple task lists support",
+    "• Add, remove, edit tasks and sub-tasks",
+    "• Mark task and sub-tasks as completed",
+    "• Add accent color for each task",
+    "• Sync tasks with Nextcloud or other CalDAV providers",
+    "• Drag and Drop support",
+    "• Import .ics files"
+   ],
+   "developer": "Vlad Krupinskii",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/github/mrvladus.List/606615ffeaf2bb74496a387c4fba2f57/screenshots/image-1_752x550@1.png"
+   ],
+   "installs": 1959,
+   "brand": {
+    "light": "#a9a9da",
+    "dark": "#45457c"
+   },
+   "desktopIds": [
+    "io.github.mrvladus.List.desktop"
+   ],
+   "downloadBytes": 7659143
+  },
+  {
+   "id": "superproductivity",
+   "attribute": "super-productivity",
+   "appstream": "com.super_productivity.SuperProductivity",
+   "category": "work",
+   "subcategory": "tasks",
+   "free": true,
+   "homepage": "https://super-productivity.com",
+   "name": "Super Productivity",
+   "summary": "To-do list and time tracker",
+   "description": [
+    "Super Productivity is an open-source to-do list and time tracker for developers, freelancers, and anyone managing complex personal workflows. It works fully offline, with no account required.",
+    "Highlights",
+    "• Drag-and-drop daily planner, weekly schedule, and Kanban boards",
+    "• Built-in Pomodoro, timeboxing, and Flowtime modes with one-click time tracking and reports",
+    "• Integrations with Jira, GitHub, GitLab, Gitea, Redmine, OpenProject, and Google Calendar",
+    "• Optional sync via Nextcloud, WebDAV, Dropbox, or Super Sync; runs fully offline by default",
+    "• Automations: rule-based triggers that auto-tag, auto-move, or auto-start tracking",
+    "• Deadlines: sort, group, and filter tasks by deadline",
+    "• Procrastination helper with CBT techniques and a structured end-of-day review",
+    "• Plugin system with community plugins for Obsidian, Google Calendar, and more",
+    "• Onboarding presets at first launch: Simple Todo, Time Tracker, or full Productivity Suite",
+    "• Privacy by default: no sign-up, no tracking, no telemetry; MIT-licensed",
+    "Super Productivity has been in active development since 2016 and is supported entirely by community contributions and optional GitHub Sponsorships."
+   ],
+   "developer": "Johannes Millan",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-1_1248x812@1.png",
+    "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-2_1248x812@1.png",
+    "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-3_1248x812@1.png",
+    "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-4_1248x812@1.png"
+   ],
+   "installs": 4910,
+   "brand": {
+    "light": "#99c1f1",
+    "dark": "#0d47a1"
+   },
+   "desktopIds": [
+    "superproductivity.desktop"
+   ],
+   "downloadBytes": 179123496
+  },
+  {
+   "id": "evolution",
+   "attribute": "evolution",
+   "appstream": "org.gnome.Evolution",
+   "category": "work",
+   "subcategory": "mail",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/GNOME/evolution",
+   "name": "Evolution",
+   "summary": "Manage your email, contacts and schedule",
+   "description": [
+    "Evolution is a personal information management application that provides integrated mail, calendaring and address book functionality.",
+    "Evolution supports a wide range of industry standard data formats and network protocols for information exchange, with an emphasis on standards compliance and security. Evolution can also integrate smoothly with Microsoft Exchange by way of the “Exchange Web Services” (EWS) extension."
+   ],
+   "developer": "The Evolution Team",
+   "license": "GPL-2.0+ and GFDL-1.3",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-1_1248x724@1.png",
+    "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-2_1248x724@1.png",
+    "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-3_1248x728@1.png",
+    "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-4_1248x724@1.png"
+   ],
+   "installs": 6128,
+   "brand": {
+    "light": "#d6dfd9",
+    "dark": "#613583"
+   },
+   "desktopIds": [
+    "org.gnome.Evolution.desktop"
+   ],
+   "downloadBytes": 34121304
+  },
+  {
+   "id": "zed",
+   "attribute": "zed-editor",
+   "appstream": "dev.zed.Zed",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": true,
+   "homepage": "https://zed.dev",
+   "name": "Zed",
+   "summary": "High-performance code editor",
+   "description": [
+    "Productive coding starts with a tool that stays out of your way. Zed blends the power of an IDE with the speed of a lightweight editor for productivity you can feel under your fingertips.",
+    "Features:",
+    "• Performance: Efficiently uses every CPU core and your GPU for instant startup, quick file loading, and responsive keystrokes.",
+    "• Language-aware: Maintains a syntax tree for precise highlighting, and auto-indent, with LSP support for autocompletion and refactoring.",
+    "• Collaboration: Real-time editing and navigation for multiple developers in a shared workspace.",
+    "• AI Integration: Integrates GitHub Copilot and GPT-4 for natural language code generation."
+   ],
+   "developer": "Zed Industries, Inc.",
+   "license": "AGPL-3.0-or-later and Apache-2.0 and GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-1_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-2_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-3_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-4_752x575@1.png"
+   ],
+   "installs": 10670,
+   "brand": {},
+   "desktopIds": [
+    "dev.zed.Zed.desktop"
+   ],
+   "downloadBytes": 167628057
+  },
+  {
+   "id": "vscode",
+   "attribute": "vscode",
+   "appstream": "com.visualstudio.code",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": false,
+   "homepage": "https://code.visualstudio.com/",
+   "name": "Visual Studio Code",
+   "summary": "Code editing. Redefined.",
+   "description": [
+    "Visual Studio Code is a new choice of tool that combines the simplicity of a code editor with what developers need for the core edit-build-debug cycle.",
+    "IMPORTANT: To use certain features in this flatpacked version (like the integrated terminal), please read the linked documentation."
+   ],
+   "developer": "Microsoft Corporation",
+   "license": "LicenseRef-proprietary=https://code.visualstudio.com/license",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/visualstudio/code/929ab57f09f2d5a5bc7cea0648c9a332/screenshots/image-1_1248x678@1.png"
+   ],
+   "installs": 58470,
+   "brand": {},
+   "desktopIds": [
+    "com.visualstudio.code.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "vscodium",
+   "attribute": "vscodium",
+   "appstream": "com.vscodium.codium",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": true,
+   "homepage": "https://github.com/VSCodium/vscodium",
+   "name": "VSCodium",
+   "summary": "Telemetry-less code editing",
+   "description": [
+    "VSCodium combines the simplicity of a code editor with what developers need for the core edit-build-debug cycle.",
+    "This repackaging is not supported by Microsoft."
+   ],
+   "developer": "The VSCodium team",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-1_1248x840@1.png",
+    "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-2_1248x840@1.png",
+    "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-3_1248x798@1.png",
+    "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-4_1248x840@1.png"
+   ],
+   "installs": 24753,
+   "brand": {
+    "light": "#e0ecfb",
+    "dark": "#144d92"
+   },
+   "desktopIds": [
+    "codium-url-handler.desktop",
+    "codium.desktop"
+   ],
+   "downloadBytes": 198618478
+  },
+  {
+   "id": "kate",
+   "attribute": "kdePackages.kate",
+   "appstream": "org.kde.kate",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": true,
+   "homepage": "https://invent.kde.org/utilities/kate",
+   "name": "Kate",
+   "summary": "Advanced text editor",
+   "description": [
+    "Kate is a fast multi-document, multi-view text editor for programmers by KDE. It features stuff like LSP (Language Server Protocol) support, projects, multiple cursors and selections, git integration, folder wide search, horizontal and vertical splits, vi mode, syntax highlighting for 300+ languages, built-in terminal, dynamic word wrap and much more. It is available on Linux, BSD, Windows and MacOS.",
+    "Features:",
+    "• MDI, window splitting, window tabbing",
+    "• Spell checking",
+    "• CR, CRLF, LF newline support",
+    "• Encoding support (utf-8, utf-16, ascii etc.)",
+    "• Encoding conversion",
+    "• Regular expression based find & replace",
+    "• Syntax highlighting for 300+ languages",
+    "• Code and text folding",
+    "• Multiple cursors and multiple selections",
+    "• Block selection mode",
+    "• Auto indentation",
+    "• Auto completion support",
+    "• Shell integration",
+    "• Wide protocol support (http, ftp, ssh, webdav etc.)",
+    "• Extensible via plugins",
+    "• Integrated terminal",
+    "• Scriptable using JavaScript",
+    "• Vi mode",
+    "• Intellisense support using LSP (Language Server Protocol)",
+    "• DAP (Debug Adapter Protocol) support",
+    "• Vertical tabs/document list",
+    "• Lightweight project support. Kate can open folders as projects",
+    "• Code formatting using native formatters such as clang-format, prettier etc",
+    "• Built in filesystem browser",
+    "• CTags support",
+    "• Project wide and folder wide search",
+    "• Git integration"
+   ],
+   "developer": "KDE",
+   "license": "LGPL-2.1+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/kate.desktop/1b02a095b526381010dd92d6c64b1911/screenshots/image-1_1248x926@1.png"
+   ],
+   "installs": 8263,
+   "brand": {
+    "light": "#cdecfc",
+    "dark": "#17529b"
+   },
+   "desktopIds": [
+    "org.kde.kate.desktop",
+    "org.kde.kwrite.desktop"
+   ],
+   "downloadBytes": 89235502
+  },
+  {
+   "id": "neovide",
+   "attribute": "neovide",
+   "appstream": "dev.neovide.neovide",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": true,
+   "homepage": "https://neovide.dev/",
+   "name": "neovide",
+   "summary": "Advanced graphical interface for Neovim",
+   "description": [
+    "Fully-featured Neovim GUI with some visual upgrades:",
+    "• Animated cursor",
+    "• Smooth scrolling",
+    "• Animated windows",
+    "• Blurred floating windows",
+    "• Emoji support"
+   ],
+   "developer": "Kaylee Simmons",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/dev/neovide/neovide/5b731c50346bce7495824eed65971b11/screenshots/image-1_1248x785@1.png"
+   ],
+   "installs": 468,
+   "brand": {
+    "light": "#79b242",
+    "dark": "#4d8a3b"
+   },
+   "desktopIds": [
+    "neovide.desktop"
+   ],
+   "downloadBytes": 13927260
+  },
+  {
+   "id": "builder",
+   "attribute": "gnome-builder",
+   "appstream": "org.gnome.Builder",
+   "category": "develop",
+   "subcategory": "editors",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Builder/",
+   "name": "Builder",
+   "summary": "Create applications for GNOME",
+   "description": [
+    "Builder is an actively developed Integrated Development Environment for GNOME. It combines integrated support for essential GNOME technologies such as GTK+, GLib, and GNOME APIs with features that any developer will appreciate, like syntax highlighting and snippets.",
+    "You can rely on predictable releases of Builder with each new release of GNOME every six months.",
+    "Features:",
+    "• Built in syntax highlighting for many languages",
+    "• Side-by-side code editors",
+    "• Multi-monitor support",
+    "• Code overview mini-map",
+    "• Integration with Git",
+    "• Integration with Autotools, Cargo, CMake, Gradle, Meson, Maven, Make, PHPize, and Waf",
+    "• Clang based auto-completion, semantic highlighting, and diagnostics",
+    "• Python based auto-completion, semantic highlighting, and diagnostics",
+    "• Vala based auto-completion and diagnostics",
+    "• Auto indentation support for C, Python, Vala, and XML",
+    "• HTML, Markdown, and reStructuredText, and Sphinx live preview",
+    "• Optional Vim, Emacs, and SublimeText style editing",
+    "• An integrated software profiler for native applications",
+    "• An integrated debugger for native applications",
+    "• Support for viewing TODOs found within your code base",
+    "• Fast fuzzy text search across files and symbols",
+    "• Arduino integration with arduino-cli"
+   ],
+   "developer": "Christian Hergert",
+   "license": "GPL-3.0+ and GPL-2.0+ and LGPL-3.0+ and LGPL-2.0+ and MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-1_1248x782@1.png",
+    "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-2_1248x1025@1.png",
+    "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-3_1248x1025@1.png",
+    "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-4_1248x1025@1.png"
+   ],
+   "installs": 2498,
+   "brand": {
+    "light": "#ffa348",
+    "dark": "#e66100"
+   },
+   "desktopIds": [
+    "org.gnome.Builder.desktop"
+   ],
+   "downloadBytes": 8672413
+  },
+  {
+   "id": "dbeaver",
+   "attribute": "dbeaver-bin",
+   "appstream": "io.dbeaver.DBeaverCommunity",
+   "category": "develop",
+   "subcategory": "data",
+   "free": true,
+   "homepage": "https://dbeaver.io/",
+   "name": "DBeaver Community",
+   "summary": "Free Universal Database Tool",
+   "description": [
+    "Free multi-platform database tool for developers, SQL programmers, database administrators and analysts. Supports all popular databases: MySQL, PostgreSQL, MariaDB, SQLite, Oracle, DB2, SQL Server, Sybase, MS Access, Teradata, Firebird, Derby, etc."
+   ],
+   "developer": "DBeaver Corporation",
+   "license": "Apache-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-1_1248x674@1.png",
+    "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-2_1248x669@1.png",
+    "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-3_1248x668@1.png",
+    "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-4_1248x669@1.png"
+   ],
+   "installs": 14201,
+   "brand": {
+    "light": "#6e98bf",
+    "dark": "#324658"
+   },
+   "desktopIds": [
+    "dbeaver.desktop"
+   ],
+   "downloadBytes": 528686137
+  },
+  {
+   "id": "bruno",
+   "attribute": "bruno",
+   "appstream": "com.usebruno.Bruno",
+   "category": "develop",
+   "subcategory": "data",
+   "free": true,
+   "homepage": "https://www.usebruno.com",
+   "name": "Bruno",
+   "summary": "Fast and Git-Friendly API Client",
+   "description": [
+    "Bruno is a Fast and Git-Friendly API client. Bruno stores your collections directly in a folder on your filesystem. We use a plain text markup language, Bru, to save information about API requests.",
+    "• Stores your collections in a folder on your filesystem",
+    "• Use git for collaboration",
+    "• No cloud sync. Fully offline.",
+    "• Majority of our features are free and have been opensourced under the MIT license."
+   ],
+   "developer": "Bruno",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/usebruno/Bruno/85e912642ffa669e17f176926c671c1d/screenshots/image-1_1248x793@1.png"
+   ],
+   "installs": 5763,
+   "brand": {},
+   "desktopIds": [
+    "bruno.desktop"
+   ],
+   "downloadBytes": 215147331
+  },
+  {
+   "id": "postman",
+   "attribute": "postman",
+   "appstream": "com.getpostman.Postman",
+   "category": "develop",
+   "subcategory": "data",
+   "free": false,
+   "homepage": "https://www.getpostman.com",
+   "name": "Postman",
+   "summary": "Platform for building and using APIs",
+   "description": [
+    "Postman is the complete toolchain for API developers, used by 5 million developers and more than 100,000 companies worldwide to access 130 million APIs every month. Postman makes working with APIs faster and easier by supporting developers at every stage of their workflow, and is available for macOS, Windows, Linux and Chrome users."
+   ],
+   "developer": "Postman Inc.",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/getpostman/Postman/c0cca027c0a0895212ba276b04b7714b/screenshots/image-1_1248x780@1.png"
+   ],
+   "installs": 10384,
+   "brand": {},
+   "desktopIds": [
+    "com.getpostman.Postman.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "insomnia",
+   "attribute": "insomnia",
+   "appstream": "rest.insomnia.Insomnia",
+   "category": "develop",
+   "subcategory": "data",
+   "free": true,
+   "homepage": "https://insomnia.rest",
+   "name": "Insomnia",
+   "summary": "Open-source API client",
+   "description": [
+    "Insomnia is an open-source, cross-platform API client for GraphQL, REST, WebSockets, Server-sent events (SSE), gRPC and any other HTTP compatible protocol.",
+    "With Insomnia you can:",
+    "• Debug APIs using the most popular protocols and formats.",
+    "• Design APIs using the native OpenAPI editor and visual preview.",
+    "• Test APIs using native test suites.",
+    "• Mock APIs will be coming soon in November 2023.",
+    "• Build CI/CD pipelines using the native Insomnia CLI for linting and testing.",
+    "• Collaborate with others using the many collaboration features to share your projects.",
+    "And a lot more! The following storage options are supported for your projects, collections, specs and all other files:",
+    "• Local Vault: for local storage of collections, design specs and every other resource.",
+    "• Cloud Sync: for cloud collaboration, encrypted and free.",
+    "• Git Sync: for Git storage of all files using any 3rd party Git repository."
+   ],
+   "developer": "Kong",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/rest/insomnia/Insomnia/022bfa713b450b74d4f42f9e453dc497/screenshots/image-1_1248x701@1.png"
+   ],
+   "installs": 2208,
+   "brand": {},
+   "desktopIds": [
+    "insomnia.desktop"
+   ],
+   "downloadBytes": 608474497
+  },
+  {
+   "id": "githubdesktop",
+   "attribute": "github-desktop",
+   "appstream": "io.github.shiftey.Desktop",
+   "category": "develop",
+   "subcategory": "tools",
+   "free": true,
+   "homepage": "https://desktop.github.com",
+   "name": "GitHub Desktop",
+   "summary": "Simple collaboration from your desktop",
+   "description": [
+    "Focus on what matters instead of fighting with Git. Whether you're new to Git or a seasoned user, GitHub Desktop simplifies your development workflow.",
+    "Attribute commits with collaborators easily. Quickly add co-authors to your commit. Great for pairing and excellent for sending a little love/credit to that special someone who helped fix that gnarly bug of yours. See the attribution on the history page, undo an accidental attribution, and see the co-authors on github.com",
+    "Checkout branches with pull requests and view CI statuses. See all open pull requests for your repositories and check them out as if they were a local branch, even if they're from upstream branches or forks. See which pull requests pass commit status checks, too!]",
+    "Syntax highlighted diffs. The new GitHub Desktop supports syntax highlighting when viewing diffs for a variety of different languages.",
+    "Expanded image diff support. Easily compare changed images. See the before and after, swipe or fade between the two, or look at just the changed parts.",
+    "Extensive editor & shell integrations. Open your favorite editor or shell from the app, or jump back to GitHub Desktop from your shell. GitHub Desktop is your springboard for work.",
+    "Community supported. GitHub Desktop is open source now! Check out our roadmap, contribute, and help us make collaboration even easier.",
+    "This version of GitHub Desktop is a fork that adds support for Linux."
+   ],
+   "developer": "shiftkey",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/github/shiftey.Desktop/8d98948ef8d3ac80c55f4ef46a38d2d9/screenshots/image-1_1248x898@1.png"
+   ],
+   "installs": 11056,
+   "brand": {},
+   "desktopIds": [
+    "github-desktop.desktop"
+   ],
+   "downloadBytes": 259705522
+  },
+  {
+   "id": "meld",
+   "attribute": "meld",
+   "appstream": "org.gnome.meld",
+   "category": "develop",
+   "subcategory": "tools",
+   "free": true,
+   "homepage": "https://meld.app/",
+   "name": "Meld",
+   "summary": "Compare and merge your files",
+   "description": [
+    "Meld is a visual diff and merge tool targeted at developers. Meld helps you compare files, directories, and version controlled projects. It provides two- and three-way comparison of both files and directories, and supports many version control systems including Git, Mercurial, Bazaar and Subversion.",
+    "Meld helps you review code changes, understand patches, and makes enormous merge conflicts slightly less painful."
+   ],
+   "developer": "Kai Willadsen",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/meld/8a8b4b0e10bf2716239ac1f332e36279/screenshots/image-1_752x489@1.png",
+    "https://dl.flathub.org/media/org/gnome/meld/8a8b4b0e10bf2716239ac1f332e36279/screenshots/image-2_752x488@1.png",
+    "https://dl.flathub.org/media/org/gnome/meld/8a8b4b0e10bf2716239ac1f332e36279/screenshots/image-3_752x489@1.png"
+   ],
+   "installs": 3046,
+   "brand": {},
+   "desktopIds": [
+    "org.gnome.Meld.desktop"
+   ],
+   "downloadBytes": 1165320
+  },
+  {
+   "id": "wireshark",
+   "attribute": "wireshark",
+   "appstream": "org.wireshark.Wireshark",
+   "category": "develop",
+   "subcategory": "tools",
+   "free": true,
+   "homepage": "https://www.wireshark.org",
+   "name": "Wireshark",
+   "summary": "Network protocol analyzer (without capture support)",
+   "description": [
+    "**NOTE: This version of Wireshark does not support capturing data.**",
+    "Wireshark allows you to examine protocol data stored in files. It supports dozens of protocol capture file formats and understands thousands of protocols.",
+    "It has many powerful features including a rich display filter language and the ability to reassemble multiple protocol packets in order to, for example, view a complete TCP stream, save the contents of a file which was transferred over HTTP or CIFS, or play back an RTP audio stream."
+   ],
+   "developer": "The Wireshark developer community",
+   "license": "GPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-1_752x558@1.png",
+    "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-2_1248x769@1.png",
+    "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-3_1248x676@1.png"
+   ],
+   "installs": 4832,
+   "brand": {},
+   "desktopIds": [
+    "org.wireshark.Wireshark.desktop"
+   ],
+   "downloadBytes": 81527805
+  },
+  {
+   "id": "podmandesktop",
+   "attribute": "podman-desktop",
+   "appstream": "io.podman_desktop.PodmanDesktop",
+   "category": "develop",
+   "subcategory": "tools",
+   "free": true,
+   "homepage": "https://podman-desktop.io",
+   "name": "Podman Desktop",
+   "summary": "Manage Podman and other container engines from a single UI",
+   "description": [
+    "Podman Desktop is an open source graphical tool enabling you to seamlessly work with containers and Kubernetes from your local environment.",
+    "Build, run and manage containers:",
+    "• Build images from Containerfile or Dockerfile.",
+    "• Pull images from remote registries.",
+    "• Start, Stop, Restart containers and pods.",
+    "• Easily get a terminal in your container.",
+    "• Inspect container logs.",
+    "• Push images to OCI registries.",
+    "• Deploy and test images on Kubernetes.",
+    "Multiple configuration options",
+    "• Manage OCI registries; add, edit, or delete registries.",
+    "• Configure your proxy settings (work in progress.)",
+    "• Configure CPU, memory, and disk of Podman machines (work in progress.)",
+    "• Handle multiple container engines at the same time (Podman, Docker, Lima...)",
+    "You can also bring new features with Podman Desktop plug-ins or Docker Desktop extensions."
+   ],
+   "developer": "Red Hat, Inc.",
+   "license": "Apache-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-1_1248x832@1.png",
+    "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-2_1248x834@1.png",
+    "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-3_1248x832@1.png",
+    "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-4_1248x834@1.png"
+   ],
+   "installs": 13252,
+   "brand": {},
+   "desktopIds": [
+    "podman-desktop.desktop"
+   ],
+   "downloadBytes": 241282159
+  },
+  {
+   "id": "devtoolbox",
+   "attribute": "devtoolbox",
+   "appstream": "me.iepure.devtoolbox",
+   "category": "develop",
+   "subcategory": "tools",
+   "free": true,
+   "homepage": "https://github.com/aleiepure/devtoolbox",
+   "name": "Dev Toolbox",
+   "summary": "Dev tools at your fingertips",
+   "description": [
+    "If you're tired of endlessly looking online for the right tool, or to find again that website of which you don't recall the name just for a quick conversion, this is the right app for you.",
+    "This is a collection of powerful yet simple-to-use tools to solve the most common daily development problems.",
+    "Includes:",
+    "• JSON to YAML converter and vice-versa",
+    "• CRON expressions parser",
+    "• GZip compressor and decompressor",
+    "• Formatters for common programming languages",
+    "• Hash generators",
+    "• Regex tester",
+    "• Markdown Previewer",
+    "• Image converters",
+    "• Much more..."
+   ],
+   "developer": "Alessandro Iepure",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/me/iepure/devtoolbox/640a058cc8ec23f49c5b63ac55b669d0/screenshots/image-1_752x550@1.png",
+    "https://dl.flathub.org/media/me/iepure/devtoolbox/640a058cc8ec23f49c5b63ac55b669d0/screenshots/image-2_752x550@1.png",
+    "https://dl.flathub.org/media/me/iepure/devtoolbox/640a058cc8ec23f49c5b63ac55b669d0/screenshots/image-3_752x550@1.png"
+   ],
+   "installs": 3659,
+   "brand": {
+    "light": "#99c1f1",
+    "dark": "#061d39"
+   },
+   "desktopIds": [
+    "me.iepure.devtoolbox.desktop"
+   ],
+   "downloadBytes": 11488377
+  },
+  {
+   "id": "godot",
+   "attribute": "godot",
+   "appstream": "org.godotengine.Godot",
+   "category": "develop",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://godotengine.org",
+   "name": "Godot Engine",
+   "summary": "Easily create 2D and 3D games",
+   "description": [
+    "The feature-packed, cross-platform game engine to create 2D and 3D games from a unified interface. Godot Engine provides a comprehensive set of common tools, so that you can focus on making games without having to reinvent the wheel. Games can be exported in one click to a number of platforms, including the major desktop platforms (Linux, macOS, Windows) as well as mobile (Android, iOS), web-based (HTML5) platforms and consoles (Switch, PS4 and Xbox One - via thirdparty publishers).",
+    "Completely free and open source under the very permissive MIT license. No strings attached, no royalties, nothing. Your game is yours down to the last line of engine code. Godot's development is fully independent and community-driven, empowering you to help shape the engine to match your expectations. It is supported by the non-profit Godot Foundation.",
+    "Create games with ease, using Godot's unique approach to game development:",
+    "• Nodes for all your needs. Godot comes with hundreds of built-in nodes that make game design a breeze. You can also create your own for custom behaviors, editors and much more.",
+    "• Flexible scene system. Create node compositions with support for instancing and inheritance.",
+    "• Visual editor with all the tools you need packed into a beautiful and uncluttered context-sensitive UI.",
+    "• Friendly content creation pipeline for artists, level designers, animators and everything in between.",
+    "• Persistent live editing where changes are not lost after stopping the game. It even works on mobile devices!",
+    "• Create your own custom tools with ease using the incredible tool system."
+   ],
+   "developer": "The Godot Engine Community",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/godotengine/Godot.desktop/7d0473583b3a7a60927f7e289669a20c/screenshots/image-1_1248x717@1.png",
+    "https://dl.flathub.org/media/org/godotengine/Godot.desktop/7d0473583b3a7a60927f7e289669a20c/screenshots/image-2_1248x702@1.png"
+   ],
+   "installs": 9612,
+   "brand": {
+    "light": "#a5d7ff",
+    "dark": "#2d3c67"
+   },
+   "desktopIds": [
+    "org.godotengine.Godot4.7.desktop"
+   ],
+   "downloadBytes": 99077532
+  },
+  {
+   "id": "heroic",
+   "attribute": "heroic",
+   "appstream": "com.heroicgameslauncher.hgl",
+   "category": "play",
+   "subcategory": "launchers",
+   "free": true,
+   "homepage": "https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher",
+   "name": "Heroic",
+   "summary": "Play Epic, GOG and Amazon Games",
+   "description": [
+    "Heroic is an Open Source Games Launcher. Right now it supports launching games from the Epic Games Store using Legendary, GOG Games using our custom implementation with gogdl and Amazon Games using Nile.",
+    "Main Features:",
+    "• Have access to your Epic, GOG and Amazon Games in a intuitive User Interface.",
+    "• Add Games outside GOG, Amazon or Epic Games Store native or not. Even Browser apps are supported",
+    "• A Download queue to download multiple games at once.",
+    "• Install and launch your Windows Games using Wine or Proton. Or Launch your Native GOG Games.",
+    "• Cloud Saves support for GOG and Epic Games.",
+    "• Import Games installed through the Epic Store or GOG Galaxy.",
+    "• Verify and Repair corrupted installations or even move your installation to different folders.",
+    "• Integrated Proton/Wine Manager for easy installation of new and updated ones",
+    "• Integrated Winetricks",
+    "• Support for install and uninstall of Games DLCs",
+    "• Access the Epic and GOG store and also Heroic Wiki directly from the App.",
+    "• Check Metacritic, IGCB or OpenCritic score for the game.",
+    "• And many more features",
+    "• For now would be better to use the Built-in Wine Manager to download and install Wine and Proton Versions.",
+    "• Heroic cannot access /usr/bin so it won't be able to find any wine or proton isntalled there for now."
+   ],
+   "developer": "Heroic Games Launcher",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-1_1248x873@1.png",
+    "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-2_1248x873@1.png",
+    "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-3_1248x873@1.png",
+    "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-4_1248x873@1.png"
+   ],
+   "installs": 91685,
+   "brand": {
+    "light": "#ac9aac",
+    "dark": "#1c202c"
+   },
+   "desktopIds": [
+    "com.heroicgameslauncher.hgl.desktop"
+   ],
+   "downloadBytes": 294473608
+  },
+  {
+   "id": "prismlauncher",
+   "attribute": "prismlauncher",
+   "appstream": "org.prismlauncher.PrismLauncher",
+   "category": "play",
+   "subcategory": "launchers",
+   "free": true,
+   "homepage": "https://prismlauncher.org/",
+   "name": "Prism Launcher",
+   "summary": "Custom Minecraft Launcher to easily manage multiple Minecraft installations at once",
+   "description": [
+    "Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity.",
+    "Features:",
+    "• Easily install game modifications, such as Fabric, Forge and Quilt",
+    "• Easily install and update modpacks from the Launcher",
+    "• Control your Java settings, and enable Mangohud or Gamemode with a toggle",
+    "• Manage worlds and resource packs from the launcher",
+    "• See logs and other details easily through a dashboard",
+    "• Kill Minecraft in case of a crash/freeze",
+    "• Isolate Minecraft instances to keep everything clean",
+    "• Install and update mods directly from the launcher",
+    "• Customize the launcher with themes, and more",
+    "• And cat :3"
+   ],
+   "developer": "Prism Launcher Contributors",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-1_752x557@1.png",
+    "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-2_752x567@1.png",
+    "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_752x547@1.png",
+    "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_752x494@1.png"
+   ],
+   "installs": 85817,
+   "brand": {},
+   "desktopIds": [
+    "org.prismlauncher.PrismLauncher.desktop"
+   ],
+   "downloadBytes": 898565439
+  },
+  {
+   "id": "retroarch",
+   "attribute": "retroarch",
+   "appstream": "org.libretro.RetroArch",
+   "category": "play",
+   "subcategory": "emulators",
+   "free": true,
+   "homepage": "https://libretro.com",
+   "name": "RetroArch",
+   "summary": "Frontend for emulators, game engines and media players",
+   "description": [
+    "RetroArch enables you to run classic games on a wide range of computers and consoles through its slick graphical interface. Settings are also unified so configuration is done once and for all.",
+    "It enables you to run classic games on a wide range of computers and consoles through its slick graphical interface. Settings are also unified so configuration is done once and for all. RetroArch has advanced features like shaders, netplay, rewinding, next-frame response times, runahead, and more!"
+   ],
+   "developer": "libretro",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-1_1248x686@1.png",
+    "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-2_752x658@1.png",
+    "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-3_752x563@1.png",
+    "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-4_752x470@1.png"
+   ],
+   "installs": 64446,
+   "brand": {
+    "light": "#cfd8dc",
+    "dark": "#37474f"
+   },
+   "desktopIds": [
+    "com.libretro.RetroArch.desktop"
+   ],
+   "downloadBytes": 203553745
+  },
+  {
+   "id": "dolphin",
+   "attribute": "dolphin-emu",
+   "appstream": "org.DolphinEmu.dolphin-emu",
+   "category": "play",
+   "subcategory": "emulators",
+   "free": true,
+   "homepage": "https://dolphin-emu.org",
+   "name": "Dolphin",
+   "summary": "GameCube / Wii / Triforce Emulator",
+   "description": [
+    "Dolphin is an emulator for two recent Nintendo video game consoles: the GameCube and the Wii. It allows PC gamers to enjoy games for these two consoles in full HD (1080p) with several enhancements: compatibility with all PC controllers, turbo speed, networked multiplayer, and even more!"
+   ],
+   "developer": "Dolphin Emulator Project",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-1_752x564@1.png",
+    "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-2_752x572@1.png",
+    "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-4_752x683@1.png"
+   ],
+   "installs": 57120,
+   "brand": {},
+   "desktopIds": [
+    "dolphin-emu.desktop"
+   ],
+   "downloadBytes": 27383268
+  },
+  {
+   "id": "pcsx2",
+   "attribute": "pcsx2",
+   "appstream": "net.pcsx2.PCSX2",
+   "category": "play",
+   "subcategory": "emulators",
+   "free": true,
+   "homepage": "https://pcsx2.net",
+   "name": "PCSX2",
+   "summary": "PlayStation 2 emulator",
+   "description": [
+    "PCSX2 is a free and open-source PlayStation 2 (PS2) emulator. Its purpose is to emulate the PS2's hardware, using a combination of MIPS CPU Interpreters, Recompilers, and a Virtual Machine which manages hardware states and PS2 system memory. This allows you to play PS2 games on your PC, with many additional features and benefits.",
+    "PlayStation 2 and PS2 are registered trademarks of Sony Interactive Entertainment. This application is not affiliated in any way with Sony Interactive Entertainment."
+   ],
+   "developer": "PCSX2 Team",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/pcsx2/PCSX2/374d48f39b8b90c9f400fdfe2d0b0595/screenshots/image-1_1248x953@1.png",
+    "https://dl.flathub.org/media/net/pcsx2/PCSX2/374d48f39b8b90c9f400fdfe2d0b0595/screenshots/image-2_1248x953@1.png"
+   ],
+   "installs": 23602,
+   "brand": {
+    "light": "#3584e4",
+    "dark": "#241f31"
+   },
+   "desktopIds": [
+    "PCSX2.desktop"
+   ],
+   "downloadBytes": 39562278
+  },
+  {
+   "id": "supertuxkart",
+   "attribute": "superTuxKart",
+   "appstream": "net.supertuxkart.SuperTuxKart",
+   "category": "play",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://supertuxkart.net/",
+   "name": "SuperTuxKart",
+   "summary": "A 3D open-source kart racing game",
+   "description": [
+    "Karts. Nitro. Action! SuperTuxKart is a 3D open-source arcade racer with a variety of characters, tracks, and modes to play. Our aim is to create a game that is more fun than realistic, and provide an enjoyable experience for all ages.",
+    "We have several tracks with various themes for players to enjoy, from driving underwater, rural farmlands, jungles or even in space! Try your best while avoiding other karts as they may overtake you, but don't eat the bananas! Watch for bowling balls, plungers, bubble gum, and cakes thrown by your opponents.",
+    "You can do a single race against other karts, compete in one of several Grand Prix, try to beat the high score in time trials on your own, play battle mode against the computer or your friends, and more! For a greater challenge, join online and meet players from all over the world and prove your racing skills!"
+   ],
+   "developer": "SuperTuxKart Team",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/supertuxkart/SuperTuxKart/ed6e8f73eecfb93757794648174bcf0e/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/net/supertuxkart/SuperTuxKart/ed6e8f73eecfb93757794648174bcf0e/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/net/supertuxkart/SuperTuxKart/ed6e8f73eecfb93757794648174bcf0e/screenshots/image-3_1248x702@1.png"
+   ],
+   "installs": 7304,
+   "brand": {},
+   "desktopIds": [
+    "supertuxkart.desktop"
+   ],
+   "downloadBytes": 725104960
+  },
+  {
+   "id": "mindustry",
+   "attribute": "mindustry",
+   "appstream": "com.github.Anuken.Mindustry",
+   "category": "play",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://mindustrygame.github.io/",
+   "name": "Mindustry",
+   "summary": "Mindustry: A sandbox tower-defense game",
+   "description": [
+    "Create elaborate supply chains of conveyor belts to feed ammo into your turrets, produce materials to use for building, and defend your structures from waves of enemies. Play with your friends in cross-platform multiplayer co-op games, or challenge them in team-based PvP matches."
+   ],
+   "developer": "Anuken et al.",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 1900,
+   "brand": {},
+   "desktopIds": [
+    "Mindustry.desktop"
+   ],
+   "downloadBytes": 453772278
+  },
+  {
+   "id": "chess",
+   "attribute": "gnome-chess",
+   "appstream": "org.gnome.Chess",
+   "category": "play",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/GNOME/gnome-chess",
+   "name": "GNOME Chess",
+   "summary": "Play the classic two-player board game of chess",
+   "description": [
+    "GNOME Chess is a simple chess game. You can play against your computer at three different difficulty levels, or against a friend at your computer.",
+    "Computer chess enthusiasts will appreciate GNOME Chess’s compatibility with nearly all modern computer chess engines, and its ability to detect several popular engines automatically if installed."
+   ],
+   "developer": "The GNOME Project",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Chess/0714dad21a5aad8667d9ddc5df3d6f38/screenshots/image-1_752x614@1.png"
+   ],
+   "installs": 3296,
+   "brand": {},
+   "desktopIds": [
+    "org.gnome.Chess.desktop"
+   ],
+   "downloadBytes": 858302
+  },
+  {
+   "id": "twentyfortyeight",
+   "attribute": "gnome-2048",
+   "appstream": "org.gnome.TwentyFortyEight",
+   "category": "play",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/GNOME/gnome-2048",
+   "name": "2048",
+   "summary": "Obtain the 2048 tile",
+   "description": [
+    "Play the highly addictive 2048 game. 2048 is a clone of the popular single-player puzzle game. Gameplay consists of joining numbers in a grid and obtain the 2048 tile.",
+    "Use your keyboard's arrow keys to slide all tiles in the desired direction. Be careful: all tiles slide to their farthest possible positions, you cannot slide just one tile or one row or column. Tiles with the same value are joined when slided one over the other.",
+    "With every new tile obtained you increase your score. If you think you can easily get the 2048 tile, do not let it stop you, the game does not end there, you can continue joining tiles and improving your score.",
+    "Originally created by Gabriele Cirulli, 2048 has gained much popularity due to it being highly addictive. Cirulli's 2048 is in turn a clone of the 1024 game and includes ideas from other clones."
+   ],
+   "developer": "Andrey Kutejko",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/TwentyFortyEight/5a4a70b070010784c32fa1a14c07a39a/screenshots/image-1_752x813@1.png"
+   ],
+   "installs": 759,
+   "brand": {},
+   "desktopIds": [
+    "org.gnome.TwentyFortyEight.desktop"
+   ],
+   "downloadBytes": 618374
+  },
+  {
+   "id": "aisleriot",
+   "attribute": "aisleriot",
+   "appstream": "org.gnome.Aisleriot",
+   "category": "play",
+   "subcategory": "games",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/GNOME/aisleriot",
+   "name": "Aisleriot Solitaire",
+   "summary": "Play many different solitaire games",
+   "description": [
+    "Aisleriot — also known as sol or solitaire — is a card game application that features over 80 different solitaire-type card games which are designed to play using a mouse, keyboard, or trackpad."
+   ],
+   "developer": "The GNOME Project",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Aisleriot/df1127e0cceaf8fe12bf84fc1c96063c/screenshots/image-1_752x423@1.png"
+   ],
+   "installs": 5040,
+   "brand": {},
+   "desktopIds": [
+    "sol.desktop"
+   ],
+   "downloadBytes": 22611500
+  },
+  {
+   "id": "vlc",
+   "attribute": "vlc",
+   "appstream": "org.videolan.VLC",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://www.videolan.org/vlc/",
+   "name": "VLC",
+   "summary": "VLC media player, the open-source multimedia player",
+   "description": [
+    "VLC is a free and open source cross-platform multimedia player and framework that plays most multimedia files as well as DVDs, Audio CDs, VCDs, and various streaming protocols."
+   ],
+   "developer": "VideoLAN et al.",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_1248x702@1.png"
+   ],
+   "installs": 109963,
+   "brand": {},
+   "desktopIds": [
+    "vlc-openbd.desktop",
+    "vlc-opencda.desktop",
+    "vlc-opendvd.desktop",
+    "vlc-openvcd.desktop",
+    "vlc.desktop"
+   ],
+   "downloadBytes": 68350612
+  },
+  {
+   "id": "mpv",
+   "attribute": "mpv",
+   "appstream": "io.mpv.Mpv",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://mpv.io",
+   "name": "mpv",
+   "summary": "A free, open source, and cross-platform media player",
+   "description": [
+    "Mpv is a movie player based on MPlayer and mplayer2. It supports a wide variety of video file formats, audio and video codecs, and subtitle types. Special input URL types are available to read input from a variety of sources other than disk files. Depending on platform, a variety of different video and audio output methods are supported.",
+    "Features:",
+    "• Drag and drop playlist",
+    "• Loading external configuration files"
+   ],
+   "developer": "The mpv player contributors",
+   "license": "GPL-2.0+ AND LGPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/mpv/Mpv/4021dec7d90c2c9591fef27ba6a04f5b/screenshots/image-1_752x473@1.png"
+   ],
+   "installs": 10859,
+   "brand": {},
+   "desktopIds": [
+    "mpv.desktop",
+    "umpv.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "celluloid",
+   "attribute": "celluloid",
+   "appstream": "io.github.celluloid_player.Celluloid",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://github.com/celluloid-player/celluloid",
+   "name": "Celluloid",
+   "summary": "Plays videos",
+   "description": [
+    "Celluloid is a simple media player that can play virtually all video and audio formats. It supports playlists and MPRIS2 media player controls. The design of Celluloid follows the GNOME Human Interface Guidelines, but can also be adapted for other systems that don't use client-side decorations (CSD). It is based on the mpv library and GTK.",
+    "Features:",
+    "• Drag and drop playlist",
+    "• Loading external mpv configuration files",
+    "• MPRIS2 D-Bus interface"
+   ],
+   "developer": "The Celluloid Developers",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-1_752x423@1.png",
+    "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-2_752x423@1.png",
+    "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-3_752x423@1.png"
+   ],
+   "installs": 6974,
+   "brand": {},
+   "desktopIds": [
+    "io.github.celluloid_player.Celluloid.desktop"
+   ],
+   "downloadBytes": 396885
+  },
+  {
+   "id": "spotify",
+   "attribute": "spotify",
+   "appstream": "com.spotify.Client",
+   "category": "media",
+   "subcategory": "players",
+   "free": false,
+   "homepage": "https://www.spotify.com/",
+   "name": "Spotify",
+   "summary": "Online music streaming service",
+   "description": [
+    "Access all of your favorite music, discover new songs, and share music online with your friends - all in one place. Create shared playlists or share individual songs with your Facebook friends with just a click of a button. Follow your favorite artists or friends to know what they are listening to, and then save the songs to your own playlists. Spotify is the best way to have access to millions of songs and all the latest hits."
+   ],
+   "developer": "Spotify",
+   "license": "LicenseRef-proprietary=https://www.spotify.com/us/legal/end-user-agreement/",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 114552,
+   "brand": {},
+   "desktopIds": [
+    "com.spotify.Client.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "strawberry",
+   "attribute": "strawberry",
+   "appstream": "org.strawberrymusicplayer.strawberry",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://www.strawberrymusicplayer.org/",
+   "name": "Strawberry Music Player",
+   "summary": "A music player and collection organizer",
+   "description": [
+    "Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using the Qt framework and GStreamer.",
+    "Features:",
+    "• Play and organize music",
+    "• Supports most popular audio formats and CD playback",
+    "• Native desktop notifications",
+    "• Playlist management and playlists in multiple formats",
+    "• Smart and dynamic playlists",
+    "• Advanced audio output and device configuration for bit-perfect playback on Linux",
+    "• Edit tags on audio files",
+    "• Automatically retrieve tags from MusicBrainz",
+    "• Album cover art from Last.fm, Musicbrainz, Discogs, Musixmatch, Deezer, Tidal, Qobuz and Spotify",
+    "• Lyrics from multiple sources",
+    "• Audio analyzer and equalizer",
+    "• Transfer music to mass-storage USB players, MTP compatible devices and iPod Nano/Classic",
+    "• Scrobbler with support for Last.fm and ListenBrainz",
+    "• Streaming support for Subsonic-compatible servers",
+    "• Unofficial streaming support for Tidal, Spotify and Qobuz"
+   ],
+   "developer": "Jonas Kvinge",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/strawberrymusicplayer/strawberry/89842dfbeda78c0ef4513ed8c232bac3/screenshots/image-1_1248x726@1.png",
+    "https://dl.flathub.org/media/org/strawberrymusicplayer/strawberry/89842dfbeda78c0ef4513ed8c232bac3/screenshots/image-2_1248x726@1.png"
+   ],
+   "installs": 9509,
+   "brand": {},
+   "desktopIds": [
+    "org.strawberrymusicplayer.strawberry.desktop"
+   ],
+   "downloadBytes": 69262825
+  },
+  {
+   "id": "shortwave",
+   "attribute": "shortwave",
+   "appstream": "de.haeckerfelix.Shortwave",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/World/Shortwave",
+   "name": "Shortwave",
+   "summary": "Listen to internet radio",
+   "description": [
+    "Shortwave is an internet radio player that provides access to a station database with over 50,000 stations.",
+    "Features:",
+    "• Create your own library where you can add your favorite stations",
+    "• Easily search and discover new radio stations",
+    "• Automatic recognition of tracks, with the possibility to save them individually",
+    "• Responsive application layout, compatible for small and large screens",
+    "• Play audio on supported network devices (e.g. Google Chromecasts)",
+    "• Seamless integration into the GNOME desktop environment"
+   ],
+   "developer": "Felix Häcker",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/de/haeckerfelix/Shortwave/57e51d0b06c9f8331965986ea910b4ed/screenshots/image-1_752x534@1.png",
+    "https://dl.flathub.org/media/de/haeckerfelix/Shortwave/57e51d0b06c9f8331965986ea910b4ed/screenshots/image-2_752x534@1.png"
+   ],
+   "installs": 19113,
+   "brand": {
+    "light": "#fcd85e",
+    "dark": "#865e3c"
+   },
+   "desktopIds": [
+    "de.haeckerfelix.Shortwave.desktop"
+   ],
+   "downloadBytes": 6369738
+  },
+  {
+   "id": "podcasts",
+   "attribute": "gnome-podcasts",
+   "appstream": "org.gnome.Podcasts",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Podcasts/",
+   "name": "Podcasts",
+   "summary": "Listen to your favorite shows",
+   "description": [
+    "Play, update, and manage your podcasts from a lightweight interface that seamlessly integrates with GNOME. Podcasts can play various audio formats and remember where you stopped listening. You can subscribe to shows via RSS/Atom, iTunes, and Soundcloud links. Subscriptions from other apps can be imported via OPML files."
+   ],
+   "developer": "The Podcasts developers",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-1_1248x891@1.png",
+    "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-2_1248x891@1.png",
+    "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-3_1248x891@1.png",
+    "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-4_1248x891@1.png"
+   ],
+   "installs": 2435,
+   "brand": {
+    "light": "#fb6969",
+    "dark": "#7b1824"
+   },
+   "desktopIds": [
+    "org.gnome.Podcasts.desktop"
+   ],
+   "downloadBytes": 7999263
+  },
+  {
+   "id": "freetube",
+   "attribute": "freetube",
+   "appstream": "io.freetubeapp.FreeTube",
+   "category": "media",
+   "subcategory": "players",
+   "free": true,
+   "homepage": "https://freetubeapp.io/",
+   "name": "FreeTube",
+   "summary": "Watch YouTube privately",
+   "description": [
+    "FreeTube is an open source desktop YouTube player built with privacy in mind. Use YouTube without advertisements and prevent Google from tracking you with their cookies and JavaScript. Available for Windows, Mac & Linux thanks to Electron.",
+    "Please note that FreeTube is currently in Beta. While it should work well for most users, there are still bugs and missing features that need to be addressed."
+   ],
+   "developer": "FreeTube Team",
+   "license": "AGPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-1_752x527@1.png",
+    "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-2_752x527@1.png",
+    "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-3_752x527@1.png",
+    "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-4_752x527@1.png"
+   ],
+   "installs": 37245,
+   "brand": {
+    "light": "#f06a73",
+    "dark": "#8b1e2d"
+   },
+   "desktopIds": [
+    "freetube.desktop"
+   ],
+   "downloadBytes": 165439205
+  },
+  {
+   "id": "obs",
+   "attribute": "obs-studio",
+   "appstream": "com.obsproject.Studio",
+   "category": "media",
+   "subcategory": "recording",
+   "free": true,
+   "homepage": "https://obsproject.com",
+   "name": "OBS Studio",
+   "summary": "Live stream and record videos",
+   "description": [
+    "Free and open source software for video capturing, recording, and live streaming.",
+    "Features:",
+    "• High performance real time video/audio capturing and mixing. Create scenes made up of multiple sources including window captures, images, text, browser windows, webcams, capture cards and more.",
+    "• Set up an unlimited number of scenes you can switch between seamlessly via custom transitions.",
+    "• Intuitive audio mixer with per-source filters such as noise gate, noise suppression, and gain. Take full control with VST plugin support.",
+    "• Powerful and easy to use configuration options. Add new Sources, duplicate existing ones, and adjust their properties effortlessly.",
+    "• Streamlined Settings panel gives you access to a wide array of configuration options to tweak every aspect of your broadcast or recording.",
+    "• Modular 'Dock' UI allows you to rearrange the layout exactly as you like. You can even pop out each individual Dock to its own window.",
+    "Create Professional Productions:",
+    "• Choose from a number of different and customizable transitions for when you switch between your scenes or add your own stinger video files.",
+    "• Set hotkeys for nearly every sort of action, such as switching between scenes, starting/stopping streams or recordings, muting audio sources, push to talk, and more.",
+    "• Studio Mode lets you preview your scenes and sources before pushing them live. Adjust your scenes and sources or create new ones and ensure they're perfect before your viewers ever see them."
+   ],
+   "developer": "OBS Project",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/obsproject/Studio/d95756e227c3b10951a83e14e063c185/screenshots/image-1_752x526@1.png"
+   ],
+   "installs": 91847,
+   "brand": {},
+   "desktopIds": [
+    "com.obsproject.Studio.desktop"
+   ],
+   "downloadBytes": 253900540
+  },
+  {
+   "id": "kdenlive",
+   "attribute": "kdePackages.kdenlive",
+   "appstream": "org.kde.kdenlive",
+   "category": "media",
+   "subcategory": "video",
+   "free": true,
+   "homepage": "https://invent.kde.org/multimedia/kdenlive",
+   "name": "Kdenlive",
+   "summary": "Video editor",
+   "description": [
+    "Kdenlive is a video editing application with support for many audio and video formats. It offers advanced editing features, a variety of effects and transitions, color correction, audio post-production and subtitling tools. Additionally, it provides the flexibility to render into practically any format of your choice.",
+    "Features:",
+    "• Nested Sequences",
+    "• Configurable interface and shortcuts",
+    "• Scopes: Histogram, Vectorscope, RGB Parade, Waveform and Audio Meter",
+    "• Proxy editing",
+    "• Free online assets and templates",
+    "• Motion tracking",
+    "• AI powered tools"
+   ],
+   "developer": "KDE",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-1_1248x738@1.png",
+    "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-2_1248x712@1.png",
+    "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-3_1248x716@1.png",
+    "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-4_1248x734@1.png"
+   ],
+   "installs": 39609,
+   "brand": {
+    "light": "#CAE3FC",
+    "dark": "#315C7F"
+   },
+   "desktopIds": [
+    "org.kde.kdenlive.desktop"
+   ],
+   "downloadBytes": 276607972
+  },
+  {
+   "id": "shotcut",
+   "attribute": "shotcut",
+   "appstream": "org.shotcut.Shotcut",
+   "category": "media",
+   "subcategory": "video",
+   "free": true,
+   "homepage": "https://shotcut.org",
+   "name": "Shotcut",
+   "summary": "Video editor",
+   "description": [
+    "Shotcut is a free and open-source cross-platform video editing application for Windows, macOS, and Linux.",
+    "Shotcut supports many video, audio, and image formats via FFmpeg and screen, webcam, and audio capture. It uses a time-line for non-linear video editing of multiple tracks that may be composed of various file formats. Scrubbing and transport control are assisted by OpenGL GPU-based processing and a number of video and audio filters are available."
+   ],
+   "developer": "Meltytech, LLC",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/shotcut/Shotcut/6740996b9caf645b4d2d71211d68fd3f/screenshots/image-1_1248x770@1.png",
+    "https://dl.flathub.org/media/org/shotcut/Shotcut/6740996b9caf645b4d2d71211d68fd3f/screenshots/image-3_752x629@1.png"
+   ],
+   "installs": 16332,
+   "brand": {},
+   "desktopIds": [
+    "org.shotcut.Shotcut.desktop"
+   ],
+   "downloadBytes": 104358072
+  },
+  {
+   "id": "handbrake",
+   "attribute": "handbrake",
+   "appstream": "fr.handbrake.ghb",
+   "category": "media",
+   "subcategory": "video",
+   "free": true,
+   "homepage": "https://handbrake.fr/",
+   "name": "HandBrake",
+   "summary": "Video Transcoder",
+   "description": [
+    "HandBrake is a tool for converting video from nearly any format to a selection of modern, widely supported codecs.",
+    "Reasons you'll love Handbrake:",
+    "• Convert video from nearly any format",
+    "• Free and Open Source",
+    "• Multi-Platform (Windows, Mac and Linux)"
+   ],
+   "developer": "HandBrake Team",
+   "license": "GPL-2.0-only",
+   "screenshots": [],
+   "installs": 24999,
+   "brand": {
+    "light": "#87ceeb",
+    "dark": "#205c8d"
+   },
+   "desktopIds": [
+    "fr.handbrake.ghb.desktop"
+   ],
+   "downloadBytes": 123958505
+  },
+  {
+   "id": "losslesscut",
+   "attribute": "losslesscut-bin",
+   "appstream": "no.mifi.losslesscut",
+   "category": "media",
+   "subcategory": "video",
+   "free": true,
+   "homepage": "https://losslesscut.app/",
+   "name": "LosslessCut",
+   "summary": "Losslessly trim audio and video",
+   "description": [
+    "Simple and ultra fast cross platform tool for lossless trimming/cutting of video and audio files. Great for saving space by rough cutting your large video files taken from a video camera, GoPro, drone, etc. It lets you quickly extract the good parts from your videos and discard many gigabytes of data without doing a slow re-encode and thereby losing quality. It extremely fast because it does an almost direct data copy. It is fueled by the awesome ffmpeg (included) for doing the grunt work. It also features some other lossless operations on videos."
+   ],
+   "developer": "Mikael Finstad",
+   "license": "GPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/no/mifi/losslesscut/24400b33bf25ed472706fb8c50663d5e/screenshots/image-1_752x475@1.png"
+   ],
+   "installs": 6929,
+   "brand": {},
+   "desktopIds": [
+    "losslesscut.desktop"
+   ],
+   "downloadBytes": 290156324
+  },
+  {
+   "id": "audacity",
+   "attribute": "audacity",
+   "appstream": "org.audacityteam.Audacity",
+   "category": "media",
+   "subcategory": "audio",
+   "free": true,
+   "homepage": "https://www.audacityteam.org",
+   "name": "Audacity",
+   "summary": "Audacity is the world's most popular audio editing and recording app",
+   "description": [
+    "Audacity is the world's most popular audio editing and recording app.",
+    "You can use Audacity to:",
+    "• Record live audio",
+    "• Convert tapes and records into digital recordings or CDs",
+    "• Edit WAV, AIFF, FLAC, MP2, MP3 or Ogg Vorbis sound files",
+    "• Cut, copy, splice or mix sounds together",
+    "• Change the speed or pitch of a recording",
+    "• Apply a wide range of other effects to audio recordings",
+    "• and much more!"
+   ],
+   "developer": "Muse Group",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/audacityteam/Audacity/0ad4a24524b6c06220649dc83a08ae81/screenshots/image-1_752x473@1.png"
+   ],
+   "installs": 20952,
+   "brand": {},
+   "desktopIds": [
+    "org.audacityteam.Audacity.desktop"
+   ],
+   "downloadBytes": 39862273
+  },
+  {
+   "id": "ardour",
+   "attribute": "ardour",
+   "appstream": "org.ardour.Ardour",
+   "category": "media",
+   "subcategory": "audio",
+   "free": true,
+   "homepage": "https://ardour.org/",
+   "name": "Ardour",
+   "summary": "Digital Audio Workstation",
+   "description": [
+    "Ardour is a multi-channel digital audio workstation, allowing you to record, edit, mix and master audio and MIDI projects.",
+    "It is targeted at audio engineers, musicians, soundtrack editors and composers."
+   ],
+   "developer": "Ardour Developers",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/ardour/Ardour/86d74e929c58446380c839eb12b20846/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/ardour/Ardour/86d74e929c58446380c839eb12b20846/screenshots/image-2_1248x702@1.png"
+   ],
+   "installs": 5056,
+   "brand": {},
+   "desktopIds": [
+    "ardour9.desktop"
+   ],
+   "downloadBytes": 35501363
+  },
+  {
+   "id": "lmms",
+   "attribute": "lmms",
+   "appstream": "io.lmms.LMMS",
+   "category": "media",
+   "subcategory": "audio",
+   "free": true,
+   "homepage": "https://lmms.io",
+   "name": "LMMS",
+   "summary": "A music production application",
+   "description": [
+    "LMMS is a music production application. It allows the creation of loops, synthesizing and mixing sounds, arranging samples having fun with your MIDI-keyboard and much more... It combines the features of a tracker-/sequencer-program and those of powerful synthesizers, samplers, effects etc. in a modern, user-friendly and easy to use graphical user-interface."
+   ],
+   "developer": "LMMS Developers",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/lmms/LMMS/6107ab24d0136ed99fbf3d732992e171/screenshots/image-1_orig.png"
+   ],
+   "installs": 3536,
+   "brand": {},
+   "desktopIds": [
+    "lmms.desktop"
+   ],
+   "downloadBytes": 75358685
+  },
+  {
+   "id": "easyeffects",
+   "attribute": "easyeffects",
+   "appstream": "com.github.wwmm.easyeffects",
+   "category": "media",
+   "subcategory": "audio",
+   "free": true,
+   "homepage": "https://github.com/wwmm/easyeffects",
+   "name": "Easy Effects",
+   "summary": "Simple audio effects",
+   "description": [
+    "Easy Effects is an advanced audio manipulation tool. It includes an equalizer, limiter, compressor and a reverberation tool, just to mention a few. To complement this there is also a built in spectrum analyzer.",
+    "Easy Effects is the successor to PulseEffects. Easy Effects only supports PipeWire's audio server. PulseAudio users should instead use PulseEffects.",
+    "Because Easy Effects uses the default PipeWire sound server it will work with most, if not all, applications you use. All supported applications are presented in the main window, where each can be enabled individually.",
+    "Besides manipulating sound output, Easy Effects is able to apply effects to an input device, such as a microphone. This is, for example, useful in audio recording, but it also works well during voice conversations.",
+    "When Easy Effects is launched it will conveniently remember the configuration used in the last session. It is also possible to save all the current settings as profiles."
+   ],
+   "developer": "Wellington Wallace",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/wwmm.easyeffects.desktop/50fb3b40504f5faa5e94e44d27401d0d/screenshots/image-1_1248x782@1.png",
+    "https://dl.flathub.org/media/com/github/wwmm.easyeffects.desktop/50fb3b40504f5faa5e94e44d27401d0d/screenshots/image-2_1248x782@1.png",
+    "https://dl.flathub.org/media/com/github/wwmm.easyeffects.desktop/50fb3b40504f5faa5e94e44d27401d0d/screenshots/image-3_1248x782@1.png"
+   ],
+   "installs": 30029,
+   "brand": {
+    "light": "#1c71d8",
+    "dark": "#004079"
+   },
+   "desktopIds": [
+    "com.github.wwmm.easyeffects.desktop"
+   ],
+   "downloadBytes": 329397526
+  },
+  {
+   "id": "signal",
+   "attribute": "signal-desktop",
+   "appstream": "org.signal.Signal",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://signal.org/",
+   "name": "Signal Desktop",
+   "summary": "Private messenger",
+   "description": [
+    "To use the Signal desktop app, Signal must first be installed on your phone.",
+    "Millions of people use Signal every day for free and instantaneous communication anywhere in the world. Send and receive high-fidelity messages, participate in HD voice/video calls, and explore a growing set of new features that help you stay connected. Signal’s advanced privacy-preserving technology is always enabled, so you can focus on sharing the moments that matter with the people who matter to you.",
+    "Signal is an independent 501c3 nonprofit. The complete source code for the Signal clients and the Signal server is available on GitHub."
+   ],
+   "developer": "Signal Foundation",
+   "license": "AGPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/signal/Signal/32b3cf3838234b30b8d28f854e4fb3b8/screenshots/image-1_752x458@1.png"
+   ],
+   "installs": 26687,
+   "brand": {},
+   "desktopIds": [
+    "signal.desktop"
+   ],
+   "downloadBytes": 176948313
+  },
+  {
+   "id": "telegram",
+   "attribute": "telegram-desktop",
+   "appstream": "org.telegram.desktop",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://desktop.telegram.org/",
+   "name": "Telegram",
+   "summary": "New era of messaging",
+   "description": [
+    "Pure instant messaging — simple, fast, secure, and synced across all your devices. One of the world's top 10 most downloaded apps with over 500 million active users.",
+    "FAST: Telegram is the fastest messaging app on the market, connecting people via a unique, distributed network of data centers around the globe.",
+    "SYNCED: You can access your messages from all your phones, tablets and computers at once. Telegram apps are standalone, so you don’t need to keep your phone connected. Start typing on one device and finish the message from another. Never lose your data again.",
+    "UNLIMITED: You can send media and files, without any limits on their type and size. Your entire chat history will require no disk space on your device, and will be securely stored in the Telegram cloud for as long as you need it.",
+    "SECURE: We made it our mission to provide the best security combined with ease of use. Everything on Telegram, including chats, groups, media, etc. is encrypted using a combination of 256-bit symmetric AES encryption, 2048-bit RSA encryption, and Diffie–Hellman secure key exchange.",
+    "100% FREE & OPEN: Telegram has a fully documented and free API for developers, open source apps and verifiable builds to prove the app you download is built from the exact same source code that is published.",
+    "POWERFUL: You can create group chats with up to 200,000 members, share large videos, documents of any type (.DOCX, .MP3, .ZIP, etc.) up to 2 GB each, and even set up bots for specific tasks. Telegram is the perfect tool for hosting online communities and coordinating teamwork."
+   ],
+   "developer": "Telegram FZ-LLC",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-1_1248x862@1.png",
+    "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-2_1248x780@1.png",
+    "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-3_1248x780@1.png",
+    "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-4_1248x780@1.png"
+   ],
+   "installs": 92804,
+   "brand": {
+    "light": "#edf0f2",
+    "dark": "#2d363f"
+   },
+   "desktopIds": [
+    "org.telegram.desktop.desktop"
+   ],
+   "downloadBytes": 106671729
+  },
+  {
+   "id": "discord",
+   "attribute": "discord",
+   "appstream": "com.discordapp.Discord",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": false,
+   "homepage": "https://discordapp.com/",
+   "name": "Discord",
+   "summary": "Talk, play, hang out",
+   "description": [
+    "Discord is a free all in one messaging, voice, and video client thats available on your computer and phone.",
+    "Whether you’re part of a school club, gaming group, worldwide art community, or just a handful of friends that want to spend time together, Discord makes it easy to talk every day and hang out more often.",
+    "• Talk to your friends with messaging, voice, and video in a \"Direct Message\" (1 other person), group chat (up to 10 people), or a multi-channel server (practically infinite maximum members).",
+    "• Discord servers are organized into topic-based channels where you can collaborate, share, and just talk about your day without clogging up a group chat.",
+    "• Grab a seat in a voice channel when you’re free. Friends in your server can see you’re around and instantly pop in to talk without having to call.",
+    "• Get a community of any size running with moderation tools and custom member access. Give members special powers, set up private channels, and more.",
+    "• Low-latency voice and video feels like you’re in the same room. Wave hello over video, watch friends stream their games, or gather up and have a drawing session with screen share.",
+    "• Available on Linux, macOS, Windows, iOS, Android, and your web browser.",
+    "Discord is written in Javascript, React, Elixir, and Rust. The desktop application uses the electron framework."
+   ],
+   "developer": "Discord Inc.",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/discordapp/Discord/0080992ea88490f6950b84fa4ae759a1/screenshots/image-1_1248x957@1.png",
+    "https://dl.flathub.org/media/com/discordapp/Discord/0080992ea88490f6950b84fa4ae759a1/screenshots/image-2_1248x957@1.png"
+   ],
+   "installs": 172785,
+   "brand": {
+    "light": "#a0aaf3",
+    "dark": "#3831a8"
+   },
+   "desktopIds": [
+    "com.discordapp.Discord.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "vesktop",
+   "attribute": "vesktop",
+   "appstream": "dev.vencord.Vesktop",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://github.com/Vencord/Vesktop",
+   "name": "Vesktop",
+   "summary": "Customizable Discord client",
+   "description": [
+    "Vesktop is a customizable and privacy friendly Discord desktop app!",
+    "Vesktop comes bundled with Venmic, a purpose-built library to provide functioning audio screenshare."
+   ],
+   "developer": "Vencord Contributors",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/dev/vencord/Vesktop/1295762b6142d0f41c4a334f40945860/screenshots/image-1_1248x842@1.png",
+    "https://dl.flathub.org/media/dev/vencord/Vesktop/1295762b6142d0f41c4a334f40945860/screenshots/image-2_1248x842@1.png"
+   ],
+   "installs": 34651,
+   "brand": {
+    "light": "#f5edca",
+    "dark": "#282828"
+   },
+   "desktopIds": [
+    "vesktop.desktop"
+   ],
+   "downloadBytes": 139362279
+  },
+  {
+   "id": "element",
+   "attribute": "element-desktop",
+   "appstream": "im.riot.Riot",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://element.io/",
+   "name": "Element",
+   "summary": "Secure communications platform built around you",
+   "description": [
+    "More than group chat: communication",
+    "• Communicate with your team and out of network colleagues more efficiently: use dedicated rooms which persist information from their creation and forever.",
+    "• Forget group emails: join or create rooms per topic, per team, per event… Decide the level of transparency you want to provide across the organisation or project.",
+    "• Cut through the noise by creating notifications that are customised by you and for you.",
+    "• Grab the attention of your colleague by calling out their name and don’t miss a thing with keyword alerts.",
+    "• Deploy bots for fun or practical use with our integrations store.",
+    "Preliminary Wayland support since 1.7.25.",
+    "To try running Element natively under Wayland, run:",
+    "For GNOME, window decorations are currently missing and you'll have to use keyboard shortcuts instead to resize the window."
+   ],
+   "developer": "Element Creations Ltd",
+   "license": "AGPL-3.0-only OR GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/im/riot/Riot/2c7c157fb4b4fe0c57e84ec63e19f082/screenshots/image-1_1248x679@1.png"
+   ],
+   "installs": 8050,
+   "brand": {
+    "light": "#71d7ae",
+    "dark": "#004832"
+   },
+   "desktopIds": [
+    "element-desktop.desktop"
+   ],
+   "downloadBytes": 191780955
+  },
+  {
+   "id": "fractal",
+   "attribute": "fractal",
+   "appstream": "org.gnome.Fractal",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/World/fractal",
+   "name": "Fractal",
+   "summary": "Chat on Matrix",
+   "description": [
+    "Fractal is a Matrix messaging app for GNOME written in Rust. Its interface is optimized for collaboration in large groups, such as free software projects, and will fit all screens, big or small.",
+    "Highlights:",
+    "• Find rooms to discuss your favorite topics, or talk privately to people, securely thanks to end-to-end encryption",
+    "• Send rich formatted messages, files, or your current location",
+    "• Reply to specific messages, react with emoji, mention users or rooms, edit or remove messages",
+    "• View images, and play audio and video directly in the conversation",
+    "• See who has read messages, and who is typing",
+    "• Log into multiple accounts at once (with Single-Sign On support)"
+   ],
+   "developer": "The Fractal Team",
+   "license": "GPL-3.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Fractal/19ef4d8b6cd6656e77b056a7ee55bc53/screenshots/image-1_752x557@1.png"
+   ],
+   "installs": 1674,
+   "brand": {
+    "light": "#bdfbff",
+    "dark": "#1a5fb4"
+   },
+   "desktopIds": [
+    "org.gnome.Fractal.desktop"
+   ],
+   "downloadBytes": 80505208
+  },
+  {
+   "id": "dino",
+   "attribute": "dino",
+   "appstream": "im.dino.Dino",
+   "category": "chat",
+   "subcategory": "messaging",
+   "free": true,
+   "homepage": "https://github.com/dino/dino",
+   "name": "Dino",
+   "summary": "Modern XMPP chat client",
+   "description": [
+    "Dino is a modern open-source chat client for the desktop. It focuses on providing a clean and reliable Jabber/XMPP experience while having your privacy in mind.",
+    "It supports end-to-end encryption with OMEMO and OpenPGP and allows configuring privacy-related features such as read receipts and typing notifications.",
+    "Dino fetches history from the server and synchronizes messages with other devices."
+   ],
+   "developer": "Dino Development Team",
+   "license": "GPL-3.0+",
+   "screenshots": [],
+   "installs": 842,
+   "brand": {
+    "light": "#B2DFDB",
+    "dark": "#004D40"
+   },
+   "desktopIds": [
+    "im.dino.Dino.desktop"
+   ],
+   "downloadBytes": 2813586
+  },
+  {
+   "id": "slack",
+   "attribute": "slack",
+   "appstream": "com.slack.Slack",
+   "category": "chat",
+   "subcategory": "meetings",
+   "free": false,
+   "homepage": "https://slack.com",
+   "name": "Slack",
+   "summary": "Business communication",
+   "description": [
+    "Caution: Slack for Linux is in beta. We’re still busy adding features and ironing out potential issues.",
+    "Slack brings team communication and collaboration into one place so you can get more work done, whether you belong to a large enterprise or a small business. Check off your to-do list and move your projects forward by bringing the right people, conversations, tools, and information you need together. Slack is available on any device, so you can find and access your team and your work, whether you’re at your desk or on the go.",
+    "Scientifically proven (or at least rumored) to make your working life simpler, more pleasant, and more productive. We hope you’ll give Slack a try."
+   ],
+   "developer": "Slack Technologies Inc.",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/slack/Slack/812f3bcc954054b233164bd98afd78e5/screenshots/image-1_1248x902@1.png",
+    "https://dl.flathub.org/media/com/slack/Slack/812f3bcc954054b233164bd98afd78e5/screenshots/image-2_1248x902@1.png"
+   ],
+   "installs": 10903,
+   "brand": {
+    "light": "#7e547e",
+    "dark": "#4a154b"
+   },
+   "desktopIds": [
+    "com.slack.Slack.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "zoom",
+   "attribute": "zoom-us",
+   "appstream": "us.zoom.Zoom",
+   "category": "chat",
+   "subcategory": "meetings",
+   "free": false,
+   "homepage": "https://zoom.us/",
+   "name": "Zoom",
+   "summary": "Video Conferencing, Web Conferencing, Webinars, Screen Sharing",
+   "description": [
+    "Award winning Zoom brings video conferencing, online meetings, and group messaging into one easy-to-use application.",
+    "• One consistent enterprise experience for all use cases",
+    "• Engineered and optimized to work reliably",
+    "• Up to 500 video participants and 10,000 viewers",
+    "• Easy-to-use, buy and scale",
+    "• Most affordable, straightforward pricing"
+   ],
+   "developer": "zoom.us",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/us/zoom/Zoom/58282a0f461c5b2c1f503aa027e8e052/screenshots/image-1_752x443@1.png"
+   ],
+   "installs": 27419,
+   "brand": {},
+   "desktopIds": [
+    "us.zoom.Zoom.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "teams",
+   "attribute": "teams-for-linux",
+   "appstream": "com.github.IsmaelMartinez.teams_for_linux",
+   "category": "chat",
+   "subcategory": "meetings",
+   "free": true,
+   "homepage": "https://github.com/IsmaelMartinez/teams-for-linux",
+   "name": "Teams for Linux",
+   "summary": "Unofficial Microsoft Teams client for Linux",
+   "description": [
+    "Experience seamless integration with the Microsoft Teams Web App in a standalone Electron application.",
+    "This application is an unofficial client for Microsoft Teams."
+   ],
+   "developer": "Ismael Martinez",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-1_1248x858@1.png",
+    "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-2_1248x858@1.png",
+    "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-3_752x590@1.png",
+    "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-4_1248x858@1.png"
+   ],
+   "installs": 19879,
+   "brand": {},
+   "desktopIds": [
+    "teams-for-linux.desktop"
+   ],
+   "downloadBytes": 137712564
+  },
+  {
+   "id": "mumble",
+   "attribute": "mumble",
+   "appstream": "info.mumble.Mumble",
+   "category": "chat",
+   "subcategory": "meetings",
+   "free": true,
+   "homepage": "https://mumble.info",
+   "name": "Mumble",
+   "summary": "Low latency encrypted VoIP client",
+   "description": [
+    "Open source, low-latency, high quality voice chat."
+   ],
+   "developer": "The Mumble Developers",
+   "license": "BSD-3-Clause",
+   "screenshots": [
+    "https://dl.flathub.org/media/info/mumble/Mumble/4ce88a4ed6fafacca1e1197fb30a31d9/screenshots/image-1_1248x737@1.png"
+   ],
+   "installs": 1414,
+   "brand": {},
+   "desktopIds": [
+    "info.mumble.Mumble.desktop"
+   ],
+   "downloadBytes": 17586886
+  },
+  {
+   "id": "anki",
+   "attribute": "anki",
+   "appstream": "net.ankiweb.Anki",
+   "category": "learn",
+   "subcategory": "study",
+   "free": true,
+   "homepage": "https://apps.ankiweb.net",
+   "name": "Anki",
+   "summary": "Powerful, intelligent flash cards",
+   "description": [
+    "Anki is a program which makes remembering things easy. Because it's a lot more efficient than traditional study methods, you can either greatly decrease your time spent studying, or greatly increase the amount you learn.",
+    "Anyone who needs to remember things in their daily life can benefit from Anki. Since it is content-agnostic and supports images, audio, videos and scientific markup (via LaTeX), the possibilities are endless."
+   ],
+   "developer": "Damien Elmes",
+   "license": "AGPL-3.0+",
+   "screenshots": [],
+   "installs": 11836,
+   "brand": {
+    "light": "#9dc3db",
+    "dark": "#5d90b2"
+   },
+   "desktopIds": [
+    "anki.desktop"
+   ],
+   "downloadBytes": 204601323
+  },
+  {
+   "id": "gcompris",
+   "attribute": "gcompris",
+   "appstream": "org.kde.gcompris",
+   "category": "learn",
+   "subcategory": "study",
+   "free": true,
+   "homepage": "https://gcompris.net/",
+   "name": "GCompris",
+   "summary": "Educational game for children",
+   "description": [
+    "GCompris is a high quality educational software suite, including a large number of activities for children aged 2 to 10.",
+    "Some of the activities are game orientated, but nonetheless still educational.",
+    "Below you can find a list of categories with some of the activities available in that category.",
+    "• computer discovery: keyboard, mouse, different mouse gestures, etc.",
+    "• arithmetic: table memory, enumeration, mirror image, balance the scale, change giving, etc.",
+    "• science: the canal lock, color mixing, gravity concept, etc.",
+    "• games: memory, connect 4, tic tac toe, sudoku, hanoi tower, etc.",
+    "• reading: reading practice, etc.",
+    "• other: learn to tell time, the braille system, maze, music instruments, etc.",
+    "Currently GCompris offers in excess of 100 activities and more are being developed. GCompris is free software, that means that you can adapt it to your own needs, improve it and, most importantly, share it with children everywhere."
+   ],
+   "developer": "KDE",
+   "license": "AGPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-2_1248x821@1.png",
+    "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-3_1248x811@1.png",
+    "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-4_1248x811@1.png"
+   ],
+   "installs": 4612,
+   "brand": {
+    "light": "#85d8f6",
+    "dark": "#16b8ea"
+   },
+   "desktopIds": [
+    "org.kde.gcompris.desktop"
+   ],
+   "downloadBytes": 79092115
+  },
+  {
+   "id": "klavaro",
+   "attribute": "klavaro",
+   "appstream": "net.sourceforge.Klavaro",
+   "category": "learn",
+   "subcategory": "study",
+   "free": true,
+   "homepage": "http://klavaro.sourceforge.net/",
+   "name": "Klavaro",
+   "summary": "A touch typing tutor",
+   "description": [
+    "Klavaro is a very flexible touch typing tutor, supporting customizable keyboard layouts. You can edit and save new or unknown keyboard layouts, as the basic course was designed to not depend on specific ones. Also, there are some charts about the learning process, and for advanced users an online ranking scheme, comparing your typing proficiency with others.",
+    "Its interface is very simple, without artifacts to distract the user, and some may find this boring, but we think keyboard memorization requires a high level of concentration, and must be done by touch, not visually."
+   ],
+   "developer": "Felipe E. F. de Castro",
+   "license": "GPL-3.0+ and GFDL-1.3",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/sourceforge/Klavaro/057dfa0ae2c56afd3b1ee4b9247b6884/screenshots/image-1_752x545@1.png"
+   ],
+   "installs": 735,
+   "brand": {},
+   "desktopIds": [
+    "klavaro.desktop"
+   ],
+   "downloadBytes": 1036409
+  },
+  {
+   "id": "stellarium",
+   "attribute": "stellarium",
+   "appstream": "org.stellarium.Stellarium",
+   "category": "learn",
+   "subcategory": "science",
+   "free": true,
+   "homepage": "https://stellarium.org/",
+   "name": "Stellarium",
+   "summary": "Desktop Planetarium",
+   "description": [
+    "Stellarium renders 3D photo-realistic skies in real time with OpenGL. It displays stars, constellations, planets and nebulae, and has many other features including multiple panoramic landscapes, fog, light pollution simulation and a built-in scripting engine.",
+    "Stellarium comes with a star catalogue of about 600 thousand stars and it is possible to download extra catalogues with up to 220 million stars.",
+    "Stellarium has multiple sky cultures - see the constellations from the traditions of Polynesian, Inuit, Navajo, Korean, Greek and Chinese astronomers, as well as the traditional Western or official modern constellations.",
+    "It is also possible to visit other planets in the solar system - see what the sky looked like to the Apollo astronauts, or what the rings of Saturn looks like from Titan."
+   ],
+   "developer": "Stellarium team",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [],
+   "installs": 4185,
+   "brand": {
+    "light": "#cfcfcf",
+    "dark": "#464646"
+   },
+   "desktopIds": [
+    "org.stellarium.Stellarium.desktop"
+   ],
+   "downloadBytes": 671733680
+  },
+  {
+   "id": "marble",
+   "attribute": "kdePackages.marble",
+   "appstream": "org.kde.marble",
+   "category": "learn",
+   "subcategory": "science",
+   "free": true,
+   "homepage": "https://invent.kde.org/education/marble",
+   "name": "Marble",
+   "summary": "Virtual Globe",
+   "description": [
+    "Marble is a virtual globe and world atlas — your swiss army knife for maps that you can use to learn more about the Earth and other planets.",
+    "Explore the neighborhood with Marble's rich set of city and street level maps. Search for addresses and places of interest. Marble takes care of querying various search backends and presents their results in a unified view. Calculate pedestrian, bike and motorcar routes with ease — online and offline, with an arbitrary number of via points.",
+    "Start exploring the world. View clouds and sun shadow, follow satellites and space stations and display their orbits, all updated in real-time. Travel back in time and learn about historic views of our planet using maps from past centuries. Earth is not enough? Marble also offers maps of the moon and other planets."
+   ],
+   "developer": "KDE",
+   "license": "LGPL-2.1-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/marble.desktop/6661b8efffb5bfb586d460aff8607cc6/screenshots/image-1_752x607@1.png"
+   ],
+   "installs": 1095,
+   "brand": {},
+   "desktopIds": [
+    "marble_geojson.desktop",
+    "marble_gpx.desktop",
+    "marble_kml.desktop",
+    "marble_kmz.desktop",
+    "marble_shp.desktop",
+    "org.kde.marble.behaim.desktop",
+    "org.kde.marble.desktop",
+    "org.kde.marble.maps.desktop"
+   ],
+   "downloadBytes": 294273036
+  },
+  {
+   "id": "kalzium",
+   "attribute": "kdePackages.kalzium",
+   "appstream": "org.kde.kalzium",
+   "category": "learn",
+   "subcategory": "science",
+   "free": true,
+   "homepage": "https://invent.kde.org/education/kalzium",
+   "name": "Kalzium",
+   "summary": "Periodic Table of Elements",
+   "description": [
+    "Kalzium is a program that shows you the Periodic Table of Elements. You can use Kalzium to search for information about the elements or to learn facts about the periodic table. It provides an overview of the important data (like melting points, electron affinity, electron negativity, electron configuration, radii, mass, ionisation energy), an isotope table, and different colored views of the periodic table (separation of the different blocks, year simulator, temperature simulator). It contains tools to visualize the spectral lines of each element, a molecular weight calculator, a 3D molecule e"
+   ],
+   "developer": "KDE",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/kde/kalzium.desktop/9aa4138bce0c0abfbd8148b53cb3f5f0/screenshots/image-1_1248x901@1.png"
+   ],
+   "installs": 1229,
+   "brand": {},
+   "desktopIds": [
+    "org.kde.kalzium.desktop",
+    "org.kde.kalzium_cml.desktop"
+   ],
+   "downloadBytes": 101376319
+  },
+  {
+   "id": "foliate",
+   "attribute": "foliate",
+   "appstream": "com.github.johnfactotum.Foliate",
+   "category": "learn",
+   "subcategory": "reading",
+   "free": true,
+   "homepage": "https://johnfactotum.github.io/foliate",
+   "name": "Foliate",
+   "summary": "Read e-books in style",
+   "description": [
+    "Discover a new chapter in reading with Foliate, the modern e-book reader tailored for GNOME. Immerse yourself in a distraction-free interface, with customization features designed to match your unique preferences.",
+    "Features include:",
+    "• Open EPUB, Mobipocket, Kindle, FB2, CBZ, and PDF files",
+    "• Paginated mode and scrolled mode",
+    "• Customize font and line-spacing",
+    "• Light, sepia, dark, and invert mode",
+    "• Reading progress slider with chapter marks",
+    "• Bookmarks and annotations",
+    "• Find in book",
+    "• Quick dictionary lookup"
+   ],
+   "developer": "John Factotum",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-1_1248x794@1.png",
+    "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-2_1248x794@1.png",
+    "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-3_1248x794@1.png",
+    "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-4_1248x794@1.png"
+   ],
+   "installs": 13728,
+   "brand": {
+    "light": "#7bf1d9",
+    "dark": "#0b6275"
+   },
+   "desktopIds": [
+    "com.github.johnfactotum.Foliate.desktop"
+   ],
+   "downloadBytes": 4033307
+  },
+  {
+   "id": "calibre",
+   "attribute": "calibre",
+   "appstream": "com.calibre_ebook.calibre",
+   "category": "learn",
+   "subcategory": "reading",
+   "free": true,
+   "homepage": "https://calibre-ebook.com",
+   "name": "calibre",
+   "summary": "The one stop solution to all your e-book needs",
+   "description": [
+    "calibre is the one stop solution to all your e-book needs.",
+    "You can use calibre to catalog your books, fetch metadata for them automatically, convert them from and to all the various e-book formats, send them to your e-book reader devices, read the books on your computer, edit the books in a dedicated e-book editor and even make them available over the network with the built-in Content server. You can also download news and periodicals in e-book format from over a thousand different news and magazine websites."
+   ],
+   "developer": "Kovid Goyal",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/calibre_ebook/calibre/2ac083fe30ac8e892f25412b0f652fca/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/calibre_ebook/calibre/2ac083fe30ac8e892f25412b0f652fca/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/calibre_ebook/calibre/2ac083fe30ac8e892f25412b0f652fca/screenshots/image-3_1248x702@1.png"
+   ],
+   "installs": 11571,
+   "brand": {},
+   "desktopIds": [
+    "calibre-ebook-edit.desktop",
+    "calibre-ebook-viewer.desktop",
+    "calibre-gui.desktop",
+    "calibre-lrfviewer.desktop"
+   ],
+   "downloadBytes": 248636900
+  },
+  {
+   "id": "chromium",
+   "attribute": "chromium",
+   "appstream": "org.chromium.Chromium",
+   "category": "utilities",
+   "subcategory": "web",
+   "free": true,
+   "homepage": "https://www.chromium.org/",
+   "name": "Chromium Web Browser",
+   "summary": "The web browser from Chromium project",
+   "description": [
+    "Chromium is an open-source browser project that aims to build a safer, faster, and more stable way to experience the web.",
+    "We invite you to join our effort to build a powerful platform for developing a new generation of web applications."
+   ],
+   "developer": "The Chromium Authors",
+   "license": "BSD-3-Clause and LGPL-2.1+ and Apache-2.0 and IJG and MIT and GPL-2.0+ and ISC and OpenSSL and (MPL-1.1 or GPL-2.0 or LG",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/chromium/Chromium/21bf2825ed26a799f0f3ccaf3208b807/screenshots/image-1_1248x702@1.png"
+   ],
+   "installs": 55169,
+   "brand": {},
+   "desktopIds": [
+    "org.chromium.Chromium.desktop"
+   ],
+   "downloadBytes": 218107109
+  },
+  {
+   "id": "chrome",
+   "attribute": "google-chrome",
+   "appstream": "com.google.Chrome",
+   "category": "utilities",
+   "subcategory": "web",
+   "free": false,
+   "homepage": "https://www.google.com/chrome/browser/",
+   "name": "Google Chrome",
+   "summary": "The browser built to be yours",
+   "description": [
+    "Google Chrome is a browser that combines a minimal design with sophisticated technology to make the web faster, safer, and easier."
+   ],
+   "developer": "Google",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/google/Chrome/ec2d2d7c360a795bfb10be534c4dd9e4/screenshots/image-1_752x438@1.png",
+    "https://dl.flathub.org/media/com/google/Chrome/ec2d2d7c360a795bfb10be534c4dd9e4/screenshots/image-2_752x438@1.png",
+    "https://dl.flathub.org/media/com/google/Chrome/ec2d2d7c360a795bfb10be534c4dd9e4/screenshots/image-3_752x438@1.png"
+   ],
+   "installs": 179524,
+   "brand": {},
+   "desktopIds": [
+    "com.google.Chrome.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "librewolf",
+   "attribute": "librewolf",
+   "appstream": "io.gitlab.librewolf-community",
+   "category": "utilities",
+   "subcategory": "web",
+   "free": true,
+   "homepage": "https://librewolf.net/",
+   "name": "LibreWolf",
+   "summary": "LibreWolf Web Browser",
+   "description": [
+    "LibreWolf",
+    "This project is an independent fork of Firefox, with the primary goals of privacy security and user freedom. It is the community run successor to LibreFox.",
+    "LibreWolf uses more than 500 privacy/security/performance settings, patches, LibreWolf-Addons (optional) and is designed to minimize data collection and telemetry as much as possible (updater, crashreporter and Firefox’s integrated addons that don’t respect privacy are removed).",
+    "LibreWolf is NOT associated with Mozilla or its products.",
+    "Features:",
+    "• Latest Version of Firefox: LibreWolf is compiled directly from the latest build of Firefox Stable. You will have the the latest features, and security updates.",
+    "• Completely Independent Build: LibreWolf uses a completely independent build from Firefox and has its own settings, profile folder and installation path. As a result, it can be installed alongside Firefox or any other browser.",
+    "• Settings protection: important settings are enforced/locked within librewolf.cfg and policies.json, those settings cannot be changed by addons/updates/LibreWolf itself or unwanted/accidental manipulation; To change those settings you can easily do it by editing librewolf.cfg and policies.json.",
+    "• LibreWolf-addons: set of optional LibreWolf extensions",
+    "• Statistics disabled: telemetry and similar functions are disabled",
+    "• Tested settings: settings are performance aware",
+    "• Recommended and code reviewed addons list",
+    "• Community-Driven",
+    "• And much more…"
+   ],
+   "developer": "LibreWolf Community",
+   "license": "MPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/gitlab/librewolf-community/84e1e5d25d9a293332c618fa37cb22e8/screenshots/image-1_752x604@1.png"
+   ],
+   "installs": 51963,
+   "brand": {},
+   "desktopIds": [
+    "librewolf.desktop"
+   ],
+   "downloadBytes": 128640552
+  },
+  {
+   "id": "vivaldi",
+   "attribute": "vivaldi",
+   "appstream": "com.vivaldi.Vivaldi",
+   "category": "utilities",
+   "subcategory": "web",
+   "free": false,
+   "homepage": "https://vivaldi.com",
+   "name": "Vivaldi",
+   "summary": "Feature-packed web browser",
+   "description": [
+    "The web browser for techies and people who need a browser that helps them get things done. The user interface is fully customizable, including keyboard shortcuts, mouse gestures, and programmable macros.",
+    "• Seize back control of your tabs with features like Workspaces, Tab Stacks, and Tab Tiling.",
+    "• Stay on top of all your emails, appointments, to-dos, and news with Mail, Calendar, Tasks, and Feed Reader. (Compatible with IMAP, POP3, CalDAV, and Atom/RSS.)",
+    "• Jot down ideas and inspiration with the integrated Notes manager.",
+    "• End-to-end encrypted (E2EE) sync of bookmarks, passwords, notes, and more with Vivaldi for desktop, iOS, and Android.",
+    "• Efficient built-in Tracker and Ad Blocker.",
+    "• Proton VPN.",
+    "• Compatible with most browser extensions from the Google Chrome Web Store."
+   ],
+   "developer": "Vivaldi Technologies",
+   "license": "LicenseRef-proprietary",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 18217,
+   "brand": {},
+   "desktopIds": [
+    "com.vivaldi.Vivaldi.desktop"
+   ],
+   "downloadBytes": null
+  },
+  {
+   "id": "firefox",
+   "attribute": "firefox",
+   "appstream": "org.mozilla.firefox",
+   "category": "utilities",
+   "subcategory": "web",
+   "free": true,
+   "homepage": "http://www.mozilla.com/en-US/firefox/",
+   "name": "Firefox",
+   "summary": "Fast, Private & Safe Web Browser",
+   "description": [
+    "When it comes to your life online, you have a choice: accept the factory settings or put your privacy first. When you choose Firefox as your default browser, you’re choosing to protect your data while supporting an independent tech company. Firefox is also the only major browser backed by a non-profit fighting to give you more openness, transparency and control of your life online. Join hundreds of millions of people who choose to protect what's important by choosing Firefox - a web browser designed to be fast, easy to use, customizable and private."
+   ],
+   "developer": "Mozilla",
+   "license": "MPL-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+    "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+    "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png"
+   ],
+   "installs": 208756,
+   "brand": {},
+   "desktopIds": [
+    "firefox.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "bitwarden",
+   "attribute": "bitwarden-desktop",
+   "appstream": "com.bitwarden.desktop",
+   "category": "utilities",
+   "subcategory": "security",
+   "free": true,
+   "homepage": "https://bitwarden.com",
+   "name": "Bitwarden",
+   "summary": "A secure and free password manager for all of your devices",
+   "description": [
+    "Bitwarden is the easiest and safest way to store all of your logins and passwords while conveniently keeping them synced between all of your devices.",
+    "Password theft is a serious problem. The websites and apps that you use are under attack every day. Security breaches occur and your passwords are stolen. When you reuse the same passwords across apps and websites hackers can easily access your email, bank, and other important accounts.",
+    "Security experts recommend that you use a different, randomly generated password for every account that you create. But how do you manage all those passwords? Bitwarden makes it easy for you to create, store, and access your passwords.",
+    "Bitwarden stores all of your logins in an encrypted vault that syncs across all of your devices. Since it's fully encrypted before it ever leaves your device, only you have access to your data. Not even the team at Bitwarden can read your data, even if we wanted to. Your data is sealed with AES-256 bit encryption, salted hashing, and PBKDF2 SHA-256.",
+    "Bitwarden is 100% open source software. The source code for Bitwarden is hosted on GitHub and everyone is free to review, audit, and contribute to the Bitwarden codebase."
+   ],
+   "developer": "Bitwarden Inc.",
+   "license": "LicenseRef-proprietary=https://raw.githubusercontent.com/bitwarden/clients/refs/heads/main/LICENSE_BITWARDEN.txt",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/bitwarden/desktop/d6040b1641ce50b86ec5ff97358f1399/screenshots/image-1_1248x748@1.png"
+   ],
+   "installs": 43814,
+   "brand": {},
+   "desktopIds": [
+    "bitwarden.desktop"
+   ],
+   "downloadBytes": 178039881
+  },
+  {
+   "id": "keepassxc",
+   "attribute": "keepassxc",
+   "appstream": "org.keepassxc.KeePassXC",
+   "category": "utilities",
+   "subcategory": "security",
+   "free": true,
+   "homepage": "https://keepassxc.org/",
+   "name": "KeePassXC",
+   "summary": "Secure and Full-featured Password Manager",
+   "description": [
+    "KeePassXC is a modern, secure, and open-source password manager for your most sensitive information. Designed for people with extremely high demands of secure personal data management. You can store many different types of information, such as usernames, passwords, URLs, attachments, and notes in an offline, encrypted file. Major features include: Auto-Type into any window, browser integration, password generator, advanced search, comprehensive reports, FDO Secret Service integration, SSH agent key management, and many more!"
+   ],
+   "developer": "KeePassXC Team",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-1_1248x949@1.png",
+    "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-2_1248x888@1.png",
+    "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-3_1248x890@1.png",
+    "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-4_1248x949@1.png"
+   ],
+   "installs": 27482,
+   "brand": {
+    "light": "#5b982a",
+    "dark": "#5b982a"
+   },
+   "desktopIds": [
+    "org.keepassxc.KeePassXC.desktop"
+   ],
+   "downloadBytes": 25137224
+  },
+  {
+   "id": "protonvpn",
+   "attribute": "protonvpn-gui",
+   "appstream": "com.protonvpn.www",
+   "category": "utilities",
+   "subcategory": "security",
+   "free": true,
+   "homepage": "https://protonvpn.com/",
+   "name": "Proton VPN",
+   "summary": "Secures your internet and protects your online privacy",
+   "description": [
+    "**NOTE: This app is built from Proton VPN's official open-source code, but it is not an official Proton app. It is not affiliated with or supported by Proton AG.**",
+    "Browse privately and take back control of your personal information with Proton VPN. Connect to one of our high-speed servers to hide your IP address, bypass digital borders, and stream from popular websites and platforms.",
+    "Used by millions worldwide, our secure no-logs VPN does not record your browsing history, display ads, sell your data to third parties, or limit downloads.",
+    "Proton VPN is brought to you by the CERN scientists behind Proton Mail — the world's largest encrypted email service.",
+    "Free VPN features",
+    "• Strict no-logs policy",
+    "• Zero-access, end-to-end encryption",
+    "• Full-disk encrypted servers",
+    "• No bandwidth restrictions",
+    "• Strong, secure protocols: WireGuard and OpenVPN",
+    "• IPv6 support",
+    "• Perfect forward secrecy: Encrypted traffic cannot be captured and decrypted later",
+    "• DNS leak protection: Ensures DNS queries are never accidentally sent to third-party resolvers",
+    "• Kill switch: Protects you against IP leaks caused by accidental disconnections",
+    "Premium VPN features",
+    "• Connect to 8500+ high speed servers across 110+ countries",
+    "• Lightning-fast VPN speeds (up to 10 Gbps)",
+    "• Connect up to 10 devices at the same time",
+    "• Stream films, sports events, and videos on any streaming service (Netflix, Hulu, Amazon Prime Video, Disney+, BBC iplayer, and more)",
+    "• P2P (peer-to-peer) servers: Fast torrenting, gaming, and file sharing",
+    "• Secure Core servers: Enhance your protection with double hop VPN"
+   ],
+   "developer": "Proton AG",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/protonvpn/www/9482c813425d1462ae1200edd35d3c14/screenshots/image-1_752x389@1.png"
+   ],
+   "installs": 49967,
+   "brand": {},
+   "desktopIds": [
+    "proton.vpn.app.gtk.desktop"
+   ],
+   "downloadBytes": 8944109
+  },
+  {
+   "id": "pikabackup",
+   "attribute": "pika-backup",
+   "appstream": "org.gnome.World.PikaBackup",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://apps.gnome.org/app/org.gnome.World.PikaBackup",
+   "name": "Pika Backup",
+   "summary": "Keep your data safe",
+   "description": [
+    "Doing backups the easy way. Plugin your USB drive and let the Pika do the rest for you.",
+    "• Create backups locally and remotely",
+    "• Set a schedule for regular backups",
+    "• Save time and disk space because Pika Backup does not need to copy known data again",
+    "• Encrypt your backups",
+    "• List created archives and browse through their contents",
+    "• Recover files or folders via your file browser",
+    "Pika Backup is designed to save your personal data and does not support complete system recovery. Pika Backup is powered by the well-tested BorgBackup software."
+   ],
+   "developer": "Small Mammal Collective",
+   "license": "GPL-3.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/World.PikaBackup/bed402ded7f6226f1c6d7fc1f72fec9f/screenshots/image-1_752x646@1.png",
+    "https://dl.flathub.org/media/org/gnome/World.PikaBackup/bed402ded7f6226f1c6d7fc1f72fec9f/screenshots/image-2_752x646@1.png",
+    "https://dl.flathub.org/media/org/gnome/World.PikaBackup/bed402ded7f6226f1c6d7fc1f72fec9f/screenshots/image-3_752x646@1.png"
+   ],
+   "installs": 7543,
+   "brand": {
+    "light": "#d790de",
+    "dark": "#4a2b64"
+   },
+   "desktopIds": [
+    "org.gnome.World.PikaBackup.Monitor.desktop",
+    "org.gnome.World.PikaBackup.desktop"
+   ],
+   "downloadBytes": 12325912
+  },
+  {
+   "id": "dejadup",
+   "attribute": "deja-dup",
+   "appstream": "org.gnome.DejaDup",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://apps.gnome.org/DejaDup/",
+   "name": "Déjà Dup Backups",
+   "summary": "Protect yourself from data loss",
+   "description": [
+    "Déjà Dup is a simple backup tool. It hides the complexity of backing up the Right Way (encrypted, off-site, and regular) and uses Restic behind the scenes.",
+    "• Support for local, remote, or cloud backup locations such as Google Drive",
+    "• Securely encrypts and compresses your data",
+    "• Incrementally backs up, letting you restore from any particular backup",
+    "• Schedules regular backups",
+    "• Integrates well into your GNOME desktop",
+    "Déjà Dup focuses on ease of use and recovering from personal, accidental data loss. If you need a full system backup or an archival program, you may prefer other backup apps."
+   ],
+   "developer": "Michael Terry",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-1_752x639@1.png",
+    "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-2_752x639@1.png",
+    "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-3_752x639@1.png",
+    "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-4_752x639@1.png"
+   ],
+   "installs": 6524,
+   "brand": {
+    "dark": "#304d64",
+    "light": "#7bc9ff"
+   },
+   "desktopIds": [
+    "org.gnome.DejaDup.desktop"
+   ],
+   "downloadBytes": 24325603
+  },
+  {
+   "id": "vorta",
+   "attribute": "vorta",
+   "appstream": "com.borgbase.Vorta",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://vorta.borgbase.com/",
+   "name": "Vorta",
+   "summary": "Backup client",
+   "description": [
+    "Vorta is a backup client for macOS and Linux desktops. It integrates the mighty BorgBackup with your desktop environment to protect your data from disk failure, ransomware and theft.",
+    "Why is this great?",
+    "• Encrypted, deduplicated and compressed backups using Borg as backend.",
+    "• No vendor lock-in – back up to local drives, your own server or BorgBase, a hosting service for Borg backups.",
+    "• Open source – free to use, modify, improve and audit.",
+    "• Flexible profiles to group source folders, backup destinations and schedules.",
+    "• One place to view all point-in-time archives and restore individual files."
+   ],
+   "developer": "Vorta contributors",
+   "license": "GPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-1_752x509@1.png",
+    "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-2_752x509@1.png",
+    "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-3_752x509@1.png",
+    "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-4_752x509@1.png"
+   ],
+   "installs": 1418,
+   "brand": {},
+   "desktopIds": [
+    "com.borgbase.Vorta.desktop"
+   ],
+   "downloadBytes": 192124183
+  },
+  {
+   "id": "localsend",
+   "attribute": "localsend",
+   "appstream": "org.localsend.localsend_app",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://localsend.org/",
+   "name": "LocalSend",
+   "summary": "Share files to nearby devices",
+   "description": [
+    "This app allows you to send files and messages over the local LAN network.",
+    "In contrast to most alternatives, no external servers are needed. Everything happens locally in the wifi network."
+   ],
+   "developer": "Tien Do Nam",
+   "license": "Apache-2.0",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/localsend/localsend_app/e1bb6e9a29b498c0a48de1a5683c652a/screenshots/image-1_1248x915@1.png",
+    "https://dl.flathub.org/media/org/localsend/localsend_app/e1bb6e9a29b498c0a48de1a5683c652a/screenshots/image-2_1248x915@1.png",
+    "https://dl.flathub.org/media/org/localsend/localsend_app/e1bb6e9a29b498c0a48de1a5683c652a/screenshots/image-3_1248x915@1.png"
+   ],
+   "installs": 70654,
+   "brand": {},
+   "desktopIds": [
+    "LocalSend.desktop"
+   ],
+   "downloadBytes": 0
+  },
+  {
+   "id": "warp",
+   "attribute": "warp",
+   "appstream": "app.drey.Warp",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Warp/",
+   "name": "Warp",
+   "summary": "Fast and secure file transfer",
+   "description": [
+    "Warp allows you to securely send files to each other via the internet or local network by exchanging a word-based code.",
+    "The best transfer method will be determined using the “Magic Wormhole” protocol which includes local network transfer if possible.",
+    "Features",
+    "• Send files between multiple devices",
+    "• Every file transfer is encrypted",
+    "• Directly transfer files on the local network if possible",
+    "• An internet connection is required",
+    "• QR Code support",
+    "• Compatibility with the Magic Wormhole command line client and all other compatible apps"
+   ],
+   "developer": "Fina Wilke",
+   "license": "GPL-3.0-only",
+   "screenshots": [],
+   "installs": 3773,
+   "brand": {
+    "light": "#ce9eff",
+    "dark": "#2a1179"
+   },
+   "desktopIds": [
+    "app.drey.Warp.desktop"
+   ],
+   "downloadBytes": 54124230
+  },
+  {
+   "id": "qbittorrent",
+   "attribute": "qbittorrent",
+   "appstream": "org.qbittorrent.qBittorrent",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://www.qbittorrent.org",
+   "name": "qBittorrent",
+   "summary": "An open-source Bittorrent client",
+   "description": [
+    "The qBittorrent project aims to provide an open-source software alternative to µTorrent. Additionally, qBittorrent runs and provides the same features on all major platforms (FreeBSD, Linux, macOS, OS/2, Windows). qBittorrent is based on the Qt toolkit and libtorrent-rasterbar library.",
+    "• Polished µTorrent-like User Interface",
+    "• Well-integrated and extensible Search Engine",
+    "• RSS feed support with advanced download filters (incl. regex)",
+    "• Many Bittorrent extensions supported",
+    "• Remote control through Web user interface, written with AJAX",
+    "• Sequential downloading (Download in order)",
+    "• Advanced control over torrents, trackers and peers",
+    "• Bandwidth scheduler",
+    "• Torrent creation tool",
+    "• IP Filtering (eMule & PeerGuardian format compatible)",
+    "• IPv6 compliant",
+    "• UPnP / NAT-PMP port forwarding support",
+    "• Available on all platforms: Windows, Linux, macOS, FreeBSD, OS/2",
+    "• Available in ~70 languages"
+   ],
+   "developer": "The qBittorrent Project",
+   "license": "GPL-3.0-or-later and OpenSSL",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-1_752x495@1.png",
+    "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-2_752x495@1.png",
+    "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-3_752x639@1.png",
+    "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-4_752x495@1.png"
+   ],
+   "installs": 59212,
+   "brand": {},
+   "desktopIds": [
+    "org.qbittorrent.qBittorrent.desktop"
+   ],
+   "downloadBytes": 23766815
+  },
+  {
+   "id": "filezilla",
+   "attribute": "filezilla",
+   "appstream": "org.filezillaproject.Filezilla",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://filezilla-project.org/",
+   "name": "FileZilla",
+   "summary": "Fast and reliable FTP client",
+   "description": [
+    "FileZilla is a graphical FTP, FTPS and SFTP client. It is platform independent and supports all major desktop operating systems.",
+    "• Easy to use",
+    "• Supports FTP, FTP over SSL/TLS (FTPS) and SSH File Transfer Protocol (SFTP)",
+    "• Cross-platform. Runs on Windows, Linux, *BSD, OSX and more",
+    "• IPv6 support",
+    "• Available in many languages",
+    "• Supports resume and transfer of large files >4GB",
+    "• Powerful Site Manager and transfer queue",
+    "• Bookmark",
+    "• Drag and drop support",
+    "• Configurable Speed limits",
+    "• Filename filters",
+    "• Directory Comparison",
+    "• Network configuration wizard",
+    "• The ability to use Notepad or any other program to edit a file online",
+    "• HTTP/1.1, SOCKS5 and FTP Proxy support",
+    "• Logging to file",
+    "• Synchronized directory browsing",
+    "• Remote file search"
+   ],
+   "developer": "Tim Kosse",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/filezillaproject/Filezilla/5160b88ed6c01ce752c9e46f86093d6e/screenshots/image-1_1248x702@1.png"
+   ],
+   "installs": 12087,
+   "brand": {
+    "light": "#FF69B4",
+    "dark": "#6A1B4E"
+   },
+   "desktopIds": [
+    "filezilla.desktop"
+   ],
+   "downloadBytes": 18565107
+  },
+  {
+   "id": "czkawka",
+   "attribute": "czkawka",
+   "appstream": "com.github.qarmin.czkawka",
+   "category": "utilities",
+   "subcategory": "files",
+   "free": true,
+   "homepage": "https://github.com/qarmin/czkawka",
+   "name": "Czkawka",
+   "summary": "Multi functional app to find duplicates, empty folders, similar images, broken files etc.",
+   "description": [
+    "Czkawka is simple, fast and easy to use app to remove unnecessary files from your computer."
+   ],
+   "developer": "Rafał Mikrut",
+   "license": "MIT",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-1_1248x682@1.png",
+    "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-2_1248x683@1.png",
+    "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-3_1248x929@1.png"
+   ],
+   "installs": 5679,
+   "brand": {},
+   "desktopIds": [
+    "com.github.qarmin.czkawka.desktop",
+    "io.github.qarmin.krokiet.desktop"
+   ],
+   "downloadBytes": 80000670
+  },
+  {
+   "id": "boxes",
+   "attribute": "gnome-boxes",
+   "appstream": "org.gnome.Boxes",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Boxes/",
+   "name": "Boxes",
+   "summary": "Virtualization made simple",
+   "description": [
+    "Select an operating system and let Boxes download and install it for you in a virtual machine.",
+    "Features:",
+    "• Download freely available operating systems",
+    "• Automatically install CentOS Stream, Debian, Fedora, Microsoft Windows, OpenSUSE, Red Hat Enterprise Linux, and Ubuntu",
+    "• Create virtual machines from operating system images with a couple of clicks",
+    "• Limit the resources (memory and storage) your virtual machines consume from your system",
+    "• Take snapshots of virtual machines to restore to previous states",
+    "• Redirect USB devices from your physical machine into virtual machines",
+    "• 3D acceleration for some of the supported operating systems",
+    "• Automatically resize virtual machines displays to the window size",
+    "• Share clipboard between your system and virtual machines",
+    "• Share files to virtual machines by dropping them from your file manager into the Boxes window",
+    "• Setup Shared Folders between your system and virtual machines"
+   ],
+   "developer": "The GNOME Project",
+   "license": "LGPL-2.1+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 17017,
+   "brand": {
+    "light": "#c061cb",
+    "dark": "#813d9c"
+   },
+   "desktopIds": [
+    "org.gnome.Boxes.desktop"
+   ],
+   "downloadBytes": 58842688
+  },
+  {
+   "id": "impression",
+   "attribute": "impression",
+   "appstream": "io.gitlab.adhami3310.Impression",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://gitlab.com/adhami3310/Impression",
+   "name": "Impression",
+   "summary": "Create bootable drives",
+   "description": [
+    "Write disk images to your drives with ease. Select an image, insert your drive, and you're good to go! Impression is a useful tool for both avid distro-hoppers and casual computer users."
+   ],
+   "developer": "Khaleel Al-Adhami",
+   "license": "GPL-3.0",
+   "screenshots": [],
+   "installs": 22131,
+   "brand": {
+    "light": "#ffb63f",
+    "dark": "#c54400"
+   },
+   "desktopIds": [
+    "io.gitlab.adhami3310.Impression.desktop"
+   ],
+   "downloadBytes": 5681389
+  },
+  {
+   "id": "missioncenter",
+   "attribute": "mission-center",
+   "appstream": "io.missioncenter.MissionCenter",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://gitlab.com/mission-center-devs/mission-center",
+   "name": "Mission Center",
+   "summary": "Monitor system resource usage",
+   "description": [
+    "Monitor your CPU, Memory, Disk, Network and GPU usage, accompanied by a per app and process breakdown of these statistics",
+    "Features:",
+    "• Monitor overall or per-thread CPU usage",
+    "• See system process, thread, and handle count, uptime, clock speed (base and current), cache sizes",
+    "• Monitor RAM and Swap usage",
+    "• See a breakdown how the memory is being used by the system",
+    "• Monitor Disk utilization and transfer rates",
+    "• Monitor network utilization and transfer speeds",
+    "• See network interface information such as network card name, connection type (Wi-Fi or Ethernet), wireless speeds and frequency, hardware address, IP address",
+    "• Monitor overall GPU usage, video encoder and decoder usage, memory usage and power consumption, powered by the popular NVTOP project",
+    "• Monitor system fans",
+    "• See a breakdown of resource usage by app and process",
+    "• Supports a minified summary view for simple monitoring",
+    "• Use hardware accelerated rendering for all the graphs in an effort to reduce CPU and overall resource usage",
+    "• Uses GTK4 and Libadwaita",
+    "• Written in Rust",
+    "Limitations (there is ongoing work to overcome all of these):",
+    "• Intel GPU monitoring is only supported for Broadwell and later GPUs; and does not support VRAM, power, or temperature monitoring",
+    "• When using Linux Mint/Cinnamon, launched applications may not show up in the \"Applications\" section (Upstream issue: https://github.com/linuxmint/cinnamon/issues/12015)",
+    "Comments, suggestions, bug reports and contributions welcome"
+   ],
+   "developer": "Mission Center Developers",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-1_1248x857@1.png",
+    "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-2_1248x857@1.png",
+    "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-3_1248x857@1.png",
+    "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-4_1248x810@1.png"
+   ],
+   "installs": 43985,
+   "brand": {
+    "light": "#91b3c3",
+    "dark": "#071f2b"
+   },
+   "desktopIds": [
+    "io.missioncenter.MissionCenter.desktop"
+   ],
+   "downloadBytes": 14485462
+  },
+  {
+   "id": "resources",
+   "attribute": "resources",
+   "appstream": "net.nokyan.Resources",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://gitlab.gnome.org/GNOME/Incubator/resources",
+   "name": "Resources",
+   "summary": "Keep an eye on system resources",
+   "description": [
+    "Resources allows you to check the utilization of your system resources and control your running processes and apps. It’s designed to be user-friendly and feel right at home on a modern desktop by using GNOME’s libadwaita.",
+    "Resources supports monitoring the following components:",
+    "• CPU",
+    "• Memory",
+    "• GPU",
+    "• Network Interfaces",
+    "• Storage Devices",
+    "• Batteries"
+   ],
+   "developer": "nokyan",
+   "license": "GPL-3.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-1_752x550@1.png",
+    "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-2_752x550@1.png",
+    "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-3_752x550@1.png",
+    "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-4_752x550@1.png"
+   ],
+   "installs": 25577,
+   "brand": {
+    "light": "#94c4ff",
+    "dark": "#2d5e9a"
+   },
+   "desktopIds": [
+    "org.gnome.Resources.desktop"
+   ],
+   "downloadBytes": 3369383
+  },
+  {
+   "id": "baobab",
+   "attribute": "baobab",
+   "appstream": "org.gnome.baobab",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Baobab/",
+   "name": "Disk Usage Analyzer",
+   "summary": "Check folder sizes and available disk space",
+   "description": [
+    "A simple application to keep your disk usage and available space under control.",
+    "Disk Usage Analyzer can scan specific folders, storage devices and online accounts. It provides both a tree and a graphical representation showing the size of each folder, making it easy to identify where disk space is wasted."
+   ],
+   "developer": "The GNOME Project",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/baobab/dd1f4020a8309f35facb5ffb316648bc/screenshots/image-1_752x501@1.png",
+    "https://dl.flathub.org/media/org/gnome/baobab/dd1f4020a8309f35facb5ffb316648bc/screenshots/image-2_752x501@1.png"
+   ],
+   "installs": 14753,
+   "brand": {
+    "light": "#a1e9bb",
+    "dark": "#3c8658"
+   },
+   "desktopIds": [
+    "org.gnome.baobab.desktop"
+   ],
+   "downloadBytes": 427097
+  },
+  {
+   "id": "remmina",
+   "attribute": "remmina",
+   "appstream": "org.remmina.Remmina",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://gitlab.com/Remmina/Remmina",
+   "name": "Remmina",
+   "summary": "Remote Desktop Client",
+   "description": [
+    "Remmina is a remote-desktop client written in GTK, to use other desktops remotely, from a tiny screen or large monitors.",
+    "Remmina supports multiple network protocols in an integrated and consistent user interface. The protocols currently supported are: X2Go, RDP (Remote Desktop Protocol), VNC (Virtual Network Computing), and SSH (Secure Shell / Open SSH).",
+    "External plugins are also supported to add new protocols and features."
+   ],
+   "developer": "Hiroyuki_Tanaka",
+   "license": "GPL-2.0+",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-1_752x423@1.png",
+    "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-4_1248x702@1.png"
+   ],
+   "installs": 18588,
+   "brand": {},
+   "desktopIds": [
+    "org.remmina.Remmina-file.desktop",
+    "org.remmina.Remmina.desktop"
+   ],
+   "downloadBytes": 12249000
+  },
+  {
+   "id": "rustdesk",
+   "attribute": "rustdesk-flutter",
+   "appstream": "com.rustdesk.RustDesk",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://rustdesk.com",
+   "name": "RustDesk",
+   "summary": "Secure remote desktop access",
+   "description": [
+    "RustDesk is a full-featured open source remote control alternative for self-hosting and security with minimal configuration.",
+    "• Works on Windows, macOS, Linux, iOS, Android, Web.",
+    "• Supports VP8 / VP9 / AV1 software codecs, and H264 / H265 hardware codecs.",
+    "• Own your data, easily set up self-hosting solution on your infrastructure.",
+    "• P2P connection with end-to-end encryption based on NaCl.",
+    "• No administrative privileges or installation needed for Windows, elevate privilege locally or from remote on demand.",
+    "• We like to keep things simple and will strive to make simpler where possible.",
+    "For self-hosting setup instructions please go to our home page."
+   ],
+   "developer": "RustDesk",
+   "license": "AGPL-3.0-only",
+   "screenshots": [
+    "https://dl.flathub.org/media/com/rustdesk/RustDesk/cdcf62c519fde533907a1e84a8e5b069/screenshots/image-1_752x376@1.png"
+   ],
+   "installs": 34307,
+   "brand": {
+    "light": "#d9eaf8",
+    "dark": "#0160ee"
+   },
+   "desktopIds": [
+    "rustdesk-link.desktop",
+    "rustdesk.desktop"
+   ],
+   "downloadBytes": 518452531
+  },
+  {
+   "id": "clocks",
+   "attribute": "gnome-clocks",
+   "appstream": "org.gnome.clocks",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Clocks/",
+   "name": "Clocks",
+   "summary": "Keep track of time",
+   "description": [
+    "A simple and elegant clock application. It includes world clocks, alarms, a stopwatch, and timers.",
+    "• Show the time in different cities around the world",
+    "• Set alarms to wake you up",
+    "• Measure elapsed time with an accurate stopwatch",
+    "• Set timers to properly cook your food"
+   ],
+   "developer": "The GNOME Project",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-1_752x615@1.png",
+    "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-2_752x615@1.png",
+    "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-3_752x615@1.png",
+    "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-4_752x615@1.png"
+   ],
+   "installs": 10128,
+   "brand": {
+    "light": "#b3adbf",
+    "dark": "#59526c"
+   },
+   "desktopIds": [
+    "org.gnome.clocks.desktop"
+   ],
+   "downloadBytes": 2077159
+  },
+  {
+   "id": "weather",
+   "attribute": "gnome-weather",
+   "appstream": "org.gnome.Weather",
+   "category": "utilities",
+   "subcategory": "system",
+   "free": true,
+   "homepage": "https://apps.gnome.org/Weather/",
+   "name": "Weather",
+   "summary": "Show weather conditions and forecast",
+   "description": [
+    "A small application that allows you to monitor the current weather conditions for your city, or anywhere in the world.",
+    "It provides access to detailed forecasts, up to 7 days, with hourly details for the current and next day, using various internet services.",
+    "It also optionally integrates with the GNOME Shell, allowing you to see the current conditions of the most recently searched cities by just typing the name in the Activities Overview."
+   ],
+   "developer": "The GNOME Project",
+   "license": "GPL-2.0-or-later",
+   "screenshots": [
+    "https://dl.flathub.org/media/org/gnome/Weather/e718a6da7f664cb622c882e538821ae6/screenshots/image-1_752x569@1.png",
+    "https://dl.flathub.org/media/org/gnome/Weather/e718a6da7f664cb622c882e538821ae6/screenshots/image-2_752x569@1.png"
+   ],
+   "installs": 9804,
+   "brand": {
+    "light": "#81d2f5",
+    "dark": "#1a5fb4"
+   },
+   "desktopIds": [
+    "org.gnome.Weather.desktop"
+   ],
+   "downloadBytes": 187953
+  }
+ ]
+}

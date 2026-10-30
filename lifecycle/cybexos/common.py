@@ -102,7 +102,7 @@ class Runner:
         self.log = log
         self.observer = None
 
-    def __call__(self, *args, cwd=None, capture=True, timeout=7200, input=None, sensitive=False):
+    def __call__(self, *args, cwd=None, capture=True, timeout=7200, input=None, sensitive=False, diagnostics=False):
         # A fixed system PATH is supplied by the package wrapper; callers never
         # pass shell text or include credentials in argv.
         def observe(data):
@@ -119,7 +119,7 @@ class Runner:
                 process.stdin.write(input)
                 process.stdin.close()
             output = bytearray()
-            diagnostics = bytearray()
+            wanted, diagnostics = diagnostics, bytearray()
             started = time.monotonic()
             with contextlib.ExitStack() as stack:
                 log = stack.enter_context(Path(self.log).open('ab')) if self.log and not sensitive else None
@@ -153,4 +153,5 @@ class Runner:
                     raise
             if code:
                 raise CommandFailure(args[0], code, diagnostics.decode(errors='replace'))
-            return output.decode()
+            # Some answers (e.g. `nix build --dry-run`) are written to stderr.
+            return (diagnostics if wanted else output).decode()
