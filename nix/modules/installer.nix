@@ -204,10 +204,6 @@ in {
     };
 
     # ── hardware and boot ───────────────────────────────────────────────────
-    # New hardware needs a current kernel. The pinned ZFS driver supports through
-    # 7.2; linuxPackages_latest is 7.3 and fails the all-filesystems live profile.
-    # Keep ZFS support and use the newest supported series from the same pin.
-    boot.kernelPackages = pkgs.linuxPackages_7_2;
     # iVentoy's upstream NixOS hook inserts network-disk setup into the scripted
     # stage-one init. It cannot patch systemd's binary init: that ISO boots Linux
     # but then waits forever for the network-backed installation medium. Use the

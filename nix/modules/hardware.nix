@@ -44,7 +44,7 @@ in {
     # when the open kernel module is selected. Permit only these drivers.
     nixpkgs.config = lib.mkIf (options.nixpkgs.config.type.name != "unique") {
       allowUnfreePredicate = lib.mkDefault (package:
-        lib.elem (lib.getName package) [ "nvidia-x11" "nvidia-settings" "nvidia-persistenced" ]);
+        lib.elem (lib.getName package) [ "nvidia-x11" "nvidia-kernel-modules" "nvidia-settings" "nvidia-persistenced" ]);
     };
     services.xserver.videoDrivers = [ "nvidia" ];
     hardware.nvidia = {
@@ -67,9 +67,6 @@ in {
       };
   }) (lib.mkIf xps.enable {
     assertions = [ { assertion = lib.elem xps.sku [ "0DB9" "0DBA" ]; message = "XPS quirks require the exact supported SKU."; } ];
-    # IPU7 base/ISYS and Panther Lake graphics need the supported stable input's
-    # current kernel series, not the LTS kernel. This is still Nixpkgs-owned.
-    boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
     boot.kernelParams = lib.optional (lib.hasPrefix "30e4" xps.panel) "xe.enable_dpcd_backlight=1"
       ++ lib.optional (xps.sku == "0DB9" && xps.panel == "30e4c607") "xe.enable_psr=0";
     environment.sessionVariables.CYBEXOS_XPS_2026 = "1";

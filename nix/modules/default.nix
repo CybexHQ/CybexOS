@@ -104,6 +104,9 @@ in {
     i18n.defaultLocale = lib.mkOverride 1100 "en_US.UTF-8";
     console.keyMap = mkDefault "us";
     hardware.enableRedistributableFirmware = mkDefault true;
+    # The installer and every installed hardware profile share the current
+    # kernel from the machine's stable Nixpkgs, including its module packages.
+    boot.kernelPackages = mkDefault (import ../kernel-packages.nix { inherit pkgs; });
     boot.plymouth.enable = mkDefault true;
     boot.plymouth.theme = mkDefault "cybexos";
     boot.plymouth.themePackages = [ (pkgs.callPackage ../packages/plymouth.nix { inherit source; }) ];

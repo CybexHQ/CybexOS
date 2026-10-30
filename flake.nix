@@ -115,6 +115,15 @@
               cybexos.hardware.nvidia = true;
             } ];
           }).config.system.build.toplevel.drvPath));
+        # Compile both supported NVIDIA module families against the selected
+        # kernel, with matching userspace. Evaluation alone misses build failures.
+        nvidia-kernels = pkgs.linkFarmFromDrvs "cybexos-nvidia-kernels"
+          (nixpkgs.lib.concatMap (open: let config = (nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [ module ./nix/tests/machine.nix {
+              cybexos.hardware = { nvidia = true; nvidiaOpen = open; };
+            } ];
+          }).config; in config.boot.extraModulePackages ++ [ config.hardware.nvidia.package ]) [ true false ]);
         # Build the complete matched hardware profile: generic product builds
         # cannot detect camera-module, LPMd or hardware-unit packaging failures.
         # This remains a source/build check, never physical qualification.

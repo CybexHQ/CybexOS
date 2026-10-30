@@ -23,6 +23,7 @@ let
   };
   contract = c: {
     inherit (c.cybexos) features authentication hardware installation;
+    kernel = toString c.boot.kernelPackages.kernel;
     runtime = toString c.environment.etc."cybexos/runtime".source;
     updates = builtins.fromJSON c.environment.etc."cybexos/update.json".text;
     maintenance = {
@@ -149,6 +150,16 @@ let
   ui = installer.systemd.services.cybexos-installer-ui;
 in
 assert live == installed;
+# All default profiles, including the live medium, must boot the same latest
+# kernel. Force the ZFS module's compatibility check, not just kernel scalars.
+assert lib.all (c: c.boot.kernelPackages.kernel == pkgs.linuxPackages_latest.kernel)
+  [ installer payload generic xps secureBoot encrypted ];
+assert installer.boot.supportedFilesystems.zfs;
+assert !installer.boot.kernelPackages.zfs_2_4.meta.broken;
+assert builtins.isString installer.boot.kernelPackages.zfs_2_4.drvPath;
+# A machine-owned kernel selection still wins over the vendor default.
+assert (regional [ { boot.kernelPackages = pkgs.linuxPackages; } ]).boot.kernelPackages.kernel
+  == pkgs.linuxPackages.kernel;
 assert regionValues (regional [ ]) == { timezone = "UTC"; locale = "en_US.UTF-8"; };
 assert regionValues (regional [ dutchInstall ]) == { timezone = "Europe/Amsterdam"; locale = "nl_NL.UTF-8"; };
 assert regionValues (regional [ englishInstall ]) == { timezone = "Europe/London"; locale = "en_GB.UTF-8"; };

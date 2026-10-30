@@ -954,6 +954,51 @@ TEXT
     vm.command("python3 - <<'QA'\n" + code.replace('TEXT', action) + '\nQA')
 
 
+def qualify_kernel_update(vm, encrypted):
+    """Stage a real LTS-to-latest kernel change, confirm it and roll it back."""
+    latest = vm.command('uname -r').strip()
+    edit_import(vm, 'qualification-kernel.nix',
+                '{ pkgs, ... }: { boot.kernelPackages = pkgs.linuxPackages; }')
+    baseline = stage(vm)
+    apply(vm, baseline)
+    authenticated_boot(vm, encrypted)
+    confirm(vm)
+    previous = vm.command('uname -r').strip()
+    if previous == latest:
+        raise RuntimeError('Kernel update qualification requires distinct LTS and latest kernels')
+
+    # Remove only our own temporary override to exercise the vendor default.
+    edit_import(vm, 'qualification-kernel.nix')
+    candidate = stage(vm)
+    if 'kernel' not in [row['id'] for row in candidate['highlights']['components']]:
+        raise RuntimeError('The update review omits the changed kernel')
+    apply(vm, candidate)
+    authenticated_boot(vm, encrypted)
+    confirm(vm)
+    if vm.command('uname -r').strip() != latest:
+        raise RuntimeError('Confirmed kernel update did not boot the latest kernel')
+
+    vm.command('cybex update rollback ' + candidate['transaction'])
+    wait_state(vm, ('rolled-back',), timeout=180)
+    vm.reboot(encrypted)
+    vm.login_desktop()
+    if vm.command('uname -r').strip() != previous:
+        raise RuntimeError('Kernel rollback did not boot the previous kernel')
+
+    # Rollback restored our baseline module. Leave subsequent tests on latest.
+    edit_import(vm, 'qualification-kernel.nix')
+    restored = stage(vm)
+    apply(vm, restored)
+    authenticated_boot(vm, encrypted)
+    confirm(vm)
+    if vm.command('uname -r').strip() != latest:
+        raise RuntimeError('Kernel qualification did not restore the latest kernel')
+    return {'result': 'passed', 'previous': previous, 'latest': latest,
+            'transaction': candidate['transaction'], 'checks': [
+                'staged kernel review', 'trial boot', 'desktop confirmation',
+                'rollback booted previous kernel', 'latest kernel restored']}
+
+
 def qualify_lifecycle(vm, encrypted, checks=None):
     """Deploy a personal known-good baseline before testing candidate rollback.
 
@@ -1011,6 +1056,7 @@ QA
         'upstreamBefore': before['nixpkgs'], 'upstreamAfter': upstream['inputs']['nixpkgs'],
         'upstreamChanged': before['nixpkgs'] != upstream['inputs']['nixpkgs'], 'applied': False,
         'scope': 'actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification'}
+    checks['kernelUpdateAndRollback'] = qualify_kernel_update(vm, encrypted)
     edit_import(vm, 'qualification.nix', PERSONAL_MODULE)
     vm.command('''python3 - <<'QA'
 from pathlib import Path
@@ -1137,6 +1183,38 @@ cybexos-health desktop-required
     return checks
 
 
+def qualify_installer_kernel(vm):
+    """Exercise the live kernel and ZFS against disposable files inside the guest."""
+    kernel = vm.command('uname -r').strip()
+    vm.command('''modprobe zfs
+mkdir /run/cybexos-kernel-qa
+truncate -s 512M /run/cybexos-kernel-qa/vdev
+zpool create -f -o cachefile=none -O compression=zstd -m /run/cybexos-kernel-qa/data cybexos-kernel-qa /run/cybexos-kernel-qa/vdev
+dd if=/dev/urandom of=/run/cybexos-kernel-qa/reference bs=1M count=8 status=none
+cp /run/cybexos-kernel-qa/reference /run/cybexos-kernel-qa/data/probe
+zfs snapshot cybexos-kernel-qa@before
+printf changed > /run/cybexos-kernel-qa/data/probe
+zfs rollback cybexos-kernel-qa@before
+cmp /run/cybexos-kernel-qa/reference /run/cybexos-kernel-qa/data/probe
+zfs create -V 32M cybexos-kernel-qa/block
+udevadm settle
+dd if=/run/cybexos-kernel-qa/reference of=/dev/zvol/cybexos-kernel-qa/block bs=128K conv=fsync status=none
+dd if=/dev/zvol/cybexos-kernel-qa/block of=/run/cybexos-kernel-qa/readback bs=128K count=64 status=none
+cmp /run/cybexos-kernel-qa/reference /run/cybexos-kernel-qa/readback
+zpool scrub -w cybexos-kernel-qa
+zpool export cybexos-kernel-qa
+zpool import -d /run/cybexos-kernel-qa cybexos-kernel-qa
+cmp /run/cybexos-kernel-qa/reference /run/cybexos-kernel-qa/data/probe
+zpool status -x cybexos-kernel-qa | grep -q 'is healthy'
+zpool destroy cybexos-kernel-qa
+unlink /run/cybexos-kernel-qa/vdev
+unlink /run/cybexos-kernel-qa/reference
+unlink /run/cybexos-kernel-qa/readback''', timeout=300)
+    return {'result': 'passed', 'kernel': kernel, 'checks': [
+        'ZFS module loaded', 'file-backed pool with compression', 'file I/O',
+        'snapshot and rollback', 'zvol block I/O', 'scrub', 'export and import']}
+
+
 def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=False, applications='minimal', screenshots=None):
     evidence = {} if evidence is None else evidence
     milestones = evidence.setdefault('milestones', {})
@@ -1162,6 +1240,7 @@ def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=
             raise RuntimeError('ISO release identity differs from its installer source NAR')
         evidence['isoReleaseIdentity'] = identity
         milestones['isoSourceIdentity'] = {'result': 'passed'}
+        milestones['installerKernelAndZfs'] = qualify_installer_kernel(vm)
         vm.command(f'printf %s {plan64} | base64 -d > /run/qa-plan.json')
         try:
             if interactive:
@@ -1180,6 +1259,10 @@ def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=
             vm.boot_screenshots(screenshots / 'installed-boot')
         vm.login(encrypted=encrypted)
         milestones['installedBootAndSerialPasswordLogin'] = {'result': 'passed'}
+        installed_kernel = vm.command('uname -r').strip()
+        if installed_kernel != milestones['installerKernelAndZfs']['kernel']:
+            raise RuntimeError('Default installation did not retain the installer kernel: ' + installed_kernel)
+        milestones['installedKernel'] = {'result': 'passed', 'kernel': installed_kernel}
         # Background preparation waits ten minutes after sign-in and for the
         # boot timer. Keep the run deterministic; the lifecycle scenario
         # exercises it explicitly.

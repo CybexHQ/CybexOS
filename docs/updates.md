@@ -11,6 +11,20 @@ inputs.cybexos.inputs.nixpkgs.follows = "nixpkgs";
 Add personal inputs explicitly and make their Nixpkgs follow the same root.
 The updater rejects duplicate Nixpkgs universes and unrelated lock changes.
 Upstream binaries use `cache.nixos.org`; no extra cache key is implicitly trusted.
+
+The installer and every installed hardware profile default to
+`linuxPackages_latest` from that same stable Nixpkgs input. Upstream staging
+therefore advances the kernel with Nixpkgs, without a separate kernel input or
+a hardware-specific series pin. Personal `boot.kernelPackages` declarations
+remain machine-owned. The narrow Linux 7.3 ZFS backport in
+`nix/kernel-packages.nix` keeps the installation medium's filesystem support
+enabled until Nixpkgs supplies a compatible ZFS release; unsupported future
+kernel/module combinations still fail their normal compatibility checks.
+For Linux 7.3, the same package set uses upstream Nixpkgs' production NVIDIA
+595.112.07 point release until stable supplies it. The machine's own driver
+recipe builds its matching userspace and kernel modules; the supported
+580 closed branch remains independently selected.
+
 The 26.05 package set needs a narrowly scoped Hyprland 0.56.2/hyprutils 0.14
 compatibility overlay for the existing Lua desktop and native titlebars, plus a
 scoped build-time Wayland protocol pin and the required Aquamarine source fix.
