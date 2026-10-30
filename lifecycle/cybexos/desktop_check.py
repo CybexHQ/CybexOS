@@ -35,6 +35,10 @@ def compositor_command(system, check):
             '--setenv', 'XDG_STATE_HOME', '/home/check/.local/state',
             '--setenv', 'XDG_DATA_HOME', '/home/check/.local/share',
             '--setenv', 'HYPRLAND_NO_RT', '1', '--chdir', '/tmp',
+            # Config verification needs no writable filesystem root or IPC.
+            # Hyprland 0.57 attempts /.socket2.sock before creating an event
+            # loop; denying that bind keeps its native verifier operational.
+            '--remount-ro', '/',
             '--', executable, '--i-am-really-stupid', '--verify-config', '--config', '/tmp/verify.lua']
     return args
 
