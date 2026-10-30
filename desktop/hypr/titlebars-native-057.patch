@@ -1,18 +1,9 @@
 --- a/main.cpp
 +++ b/main.cpp
-@@ -20,6 +20,8 @@
- 
- #include <algorithm>
- 
+@@ -22,0 +23,2 @@
 +#include "cybexosBuildId.hpp"
 +
- #include "barDeco.hpp"
- #include "globals.hpp"
- 
-@@ -140,7 +142,25 @@
-   return 0;
- }
- 
+@@ -142,0 +145,13 @@
 +// Configuration/theme hooks can replace the complete button set without
 +// accumulating duplicates or retaining textures from the previous theme.
 +static int clearOmarchyFloatingLuaButtons(lua_State *L) {
@@ -26,36 +17,21 @@
 +  return 0;
 +}
 +
- static PLUGIN_DESCRIPTION_INFO initializeOmarchyFloating(HANDLE handle) {
+@@ -143,0 +159,5 @@
 +  // A Nixpkgs rebuild may keep the source/API hash while changing
 +  // the executable ABI. Never enter plugin state against another ELF build.
 +  if (cybexosHyprlandBuildId() != CYBEXOS_HYPRLAND_BUILD_ID)
 +    throw std::runtime_error("[hyprbars] Nixpkgs Hyprland build ID mismatch; rebuild native titlebars");
 +
-   OMARCHY_FLOATING_PHANDLE = handle;
- 
-   const std::string HASH = __hyprland_api_get_hash();
-@@ -226,6 +246,7 @@
-   HyprlandAPI::addConfigValueV2(OMARCHY_FLOATING_PHANDLE, g_pOmarchyFloatingGlobalState->config.onDoubleClick);
- 
-   HyprlandAPI::addLuaFunction(OMARCHY_FLOATING_PHANDLE, "hyprbars", "add_button", ::newOmarchyFloatingLuaButton);
+@@ -228,0 +249 @@
 +  HyprlandAPI::addLuaFunction(OMARCHY_FLOATING_PHANDLE, "hyprbars", "clear_buttons", ::clearOmarchyFloatingLuaButtons);
-   static auto P4 = Event::bus()->m_events.config.preReload.listen([&] { onPreConfigReload(); });
-   static auto P5 = Event::bus()->m_events.config.reloaded.listen([&] { onConfigReloaded(); });
- 
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -18,6 +18,10 @@
- # Hyprland exposes inline globals through its headers, so whole-library hidden
- # visibility breaks the host API. Our own types/globals have unique OmarchyFloating names.
- target_compile_options(titlebars PRIVATE -fno-gnu-unique)
+@@ -20,0 +21,4 @@
 +if(NOT CYBEXOS_HYPRLAND_BUILD_ID MATCHES "^[0-9a-f]+$")
 +  message(FATAL_ERROR "CYBEXOS_HYPRLAND_BUILD_ID must identify the installed Nixpkgs Hyprland executable")
 +endif()
 +target_compile_definitions(titlebars PRIVATE CYBEXOS_HYPRLAND_BUILD_ID="${CYBEXOS_HYPRLAND_BUILD_ID}")
- 
- find_package(PkgConfig REQUIRED)
- pkg_check_modules(deps REQUIRED IMPORTED_TARGET
 --- /dev/null
 +++ b/cybexosBuildId.hpp
 @@ -0,0 +1,44 @@
