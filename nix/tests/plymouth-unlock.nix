@@ -23,7 +23,6 @@ pkgs.testers.runNixOSTest {
   # The console waits have no timeouts of their own.
   globalTimeout = 1200;
   nodes.machine = { lib, ... }: {
-    boot.initrd.systemd.enable = true;
     boot.plymouth = { enable = true; theme = "cybexos"; themePackages = [ plymouth ]; };
     boot.kernelParams = [
       "quiet" "udev.log_level=3" "rd.udev.log_level=3"

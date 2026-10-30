@@ -1,0 +1,9 @@
+[Plymouth Theme]
+Name=Cybex OS installer
+Description=Cybex OS splash screen with the installation medium's boot progress.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/cybexos
+ScriptFile=/usr/share/plymouth/themes/cybexos-installer/cybexos-installer.script
+ConsoleLogBackgroundColor=0x000000

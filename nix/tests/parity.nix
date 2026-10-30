@@ -187,6 +187,9 @@ assert !installer.users.users.nixos.enable && !installer.security.sudo.enable &&
 assert installer.specialisation == { };
 assert ui.serviceConfig.User == "cybexos-installer" && ui.serviceConfig.TTYPath == "/dev/tty1";
 assert ui.serviceConfig.PAMName == "cybexos-installer";
+# The splash stays until the screen's first frame (Type=notify).
+assert ui.serviceConfig.Type == "notify" && builtins.elem "cybexos-installer-splash.service" ui.after;
+assert builtins.elem "cybexos-installer-ui.service" installer.systemd.services.plymouth-quit.after;
 assert installer.systemd.services.cybexos-installerd.serviceConfig.KillMode == "process";
 assert installer.systemd.services.cybexos-installerd.serviceConfig.OOMPolicy == "continue";
 # It authenticates and installs with the same release, trust and update policy.
@@ -215,7 +218,11 @@ assert builtins.sort builtins.lessThan inputNarHashes == builtins.sort builtins.
 assert builtins.length inputSources == builtins.length (nixpkgs.lib.unique inputSources);
 assert builtins.all (path: builtins.elem path installer.system.extraDependencies) inputSources;
 assert builtins.fromJSON installer.environment.etc."cybexos/installer-inputs.json".text == inputSources;
-assert installer.boot.plymouth.theme == "cybexos";
+# The medium's splash is the installed theme's variant that shows its boot
+# progress, drawn on the firmware framebuffer until the GPU driver loads.
+assert installer.boot.plymouth.theme == "cybexos-installer";
+assert map toString installer.boot.plymouth.themePackages == installed.bootBrand.packages;
+assert lib.elem "plymouth.use-simpledrm" installer.boot.kernelParams;
 # The installed menu has the medium's own theme and is selected by exact system.
 assert installed.bootBrand.menu.theme == toString installer.isoImage.grubTheme;
 assert installed.bootBrand.menu.enable && installed.bootBrand.menu.efiSupport;

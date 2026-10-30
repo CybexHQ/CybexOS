@@ -27,6 +27,7 @@ let
   reservedNames = lib.optionals (payload != null) (lib.subtractLists [ payload.config.cybexos.primaryUser ]
     (lib.unique (builtins.attrNames payload.config.users.users ++ builtins.attrNames payload.config.users.groups)));
   text = lib.getExe' updater "cybexos-install";
+  plymouth = lib.getExe' config.boot.plymouth.package "plymouth";
 in {
   imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ./iso-boot.nix ];
 
@@ -129,17 +130,47 @@ in {
       };
     };
 
+    # The boot splash and its progress bar stay until the screen has drawn,
+    # as with a display manager. Just before the screen starts, the splash
+    # completes its bar and releases the display, its last frame still shown.
+    # The screen reports its first frame (Type=notify), then plymouth-quit ends
+    # Plymouth without clearing it. Plymouth is driven from its own units:
+    # each command of the screen's unit hangs up and resets tty1.
+    systemd.services.cybexos-installer-splash = {
+      description = "Hand the boot splash's display to the Cybex OS installer screen";
+      after = [ "cybexos-installerd.service" "systemd-user-sessions.service" "systemd-logind.service" ];
+      unitConfig.ConditionKernelCommandLine = "!cybexos.text";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = [
+          # Native display drivers can still be binding when boot finishes.
+          "-${config.systemd.package}/bin/udevadm settle --timeout=15"
+          # The bar fills in a quarter of a second (desktop/plymouth/cybexos.script).
+          "-${plymouth} update --status=cybexos-installer-ready"
+          "${pkgs.coreutils}/bin/sleep 0.3"
+          "-${plymouth} deactivate"
+        ];
+      };
+    };
+    systemd.services.plymouth-quit = {
+      after = [ "cybexos-installer-ui.service" ];
+      serviceConfig.ExecStart = [ "" "-${plymouth} quit --retain-splash" ];
+    };
+
     systemd.services.cybexos-installer-ui = {
       description = "Cybex OS installer screen";
       wantedBy = [ "multi-user.target" ];
-      wants = [ "cybexos-installerd.service" ];
-      after = [ "cybexos-installerd.service" "systemd-user-sessions.service" "plymouth-quit-wait.service" "systemd-logind.service" ];
+      wants = [ "cybexos-installerd.service" "cybexos-installer-splash.service" ];
+      after = [ "cybexos-installerd.service" "systemd-user-sessions.service" "systemd-logind.service" "cybexos-installer-splash.service" ];
       unitConfig = {
         ConditionKernelCommandLine = "!cybexos.text";
         # A keyboard change restarts the screen; it must never give up.
         StartLimitIntervalSec = 0;
       };
       serviceConfig = {
+        # Started once its first frame is on the screen.
+        Type = "notify";
         User = "cybexos-installer";
         PAMName = "cybexos-installer";
         TTYPath = "/dev/tty1";
@@ -152,8 +183,6 @@ in {
         UtmpIdentifier = "tty1";
         UtmpMode = "user";
         IgnoreSIGPIPE = false;
-        # Native display drivers can still be binding when boot finishes.
-        ExecStartPre = "+${config.systemd.package}/bin/udevadm settle --timeout=15";
         ExecStart = lib.getExe installer;
         EnvironmentFile = "-/run/cybexos-installer/keyboard.env";
         Environment = [ "XDG_SESSION_TYPE=wayland" "XDG_SESSION_CLASS=user" ];
@@ -243,7 +272,20 @@ in {
       "tg3" "bnx2" "atlantic" "ax88179_178a" "cdc_ether" "cdc_ncm"
     ];
     # Keep serial diagnostics, but send /dev/console prompts to the local screen.
-    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" ];
+    # The medium's initrd has no native display driver, so the splash draws on
+    # the firmware framebuffer (simpledrm) from the start; Plymouth would
+    # otherwise wait eight seconds for another device, with the screen dark.
+    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" "plymouth.use-simpledrm" ];
+    # The splash's variant with the medium's boot progress (nix/packages/plymouth.nix).
+    boot.plymouth.theme = "cybexos-installer";
+    # When stage two loads the native driver, Plymouth opens its new device at
+    # once. Not being its DRM master, it gets a read-only probe, and before the
+    # kernel's first probe every output reads as disconnected; Plymouth gives
+    # up on the device until a change event. The driver adds its framebuffer
+    # console after that probe, so report a change on the DRM devices then.
+    services.udev.extraRules = ''
+      ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="${config.systemd.package}/bin/udevadm trigger --action=change --subsystem-match=drm --property-match=DEVTYPE=drm_minor"
+    '';
     # The medium supports ZFS but never boots from a pool: take NixOS's
     # forthcoming default rather than forcibly importing a root pool.
     boot.zfs.forceImportRoot = false;

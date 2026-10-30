@@ -29,8 +29,17 @@ installing.
 The installed system's boot menu uses the same theme (see
 [recovery](recovery.md)); the firmware lists it as **CybexOS**. Installed
 systems boot quietly behind the Plymouth splash, whose logo stays where the
-menu drew it. PXE uses the same ISO and shows the same menu. The medium boots
-with systemd stage one like installed machines. iVentoy's NixOS hook was
+menu drew it. The medium's splash (the `cybexos-installer` variant) also shows
+a progress bar from the start of stage one until the installer screen has
+drawn. It draws on the firmware framebuffer (`plymouth.use-simpledrm`) until
+stage two loads the native display driver. Plymouth tries the new device before
+the kernel has probed its outputs and finds none connected; a udev rule reports
+a change on the DRM devices once the driver's framebuffer console is added, and
+Plymouth then takes it over. The bar follows the medium's own milestones:
+finding the medium, mounting its store, the started system, the network, the
+installer service and the screen. Between milestones it eases on without
+reaching the next. PXE uses the same ISO and shows the same menu. The medium
+boots with systemd stage one like installed machines. iVentoy's NixOS hook was
 written for the removed scripted initrd; the medium runs that hook itself when
 iVentoy injected it (`cybexos-network-medium` in the initrd), with iVentoy's
 DHCP client on its path. A successful virtual-CD boot does not establish a
@@ -47,6 +56,14 @@ zoomed to the largest connected mode (1920×1200 → 1.5, 2880×1800 → 2.25) a
 centred. It runs as the unprivileged `cybexos-installer` user in a logind session
 on seat0, the same unit shape as NixOS's `services.cage`. If no display device
 works after a few attempts, it switches tty1 to the text installer.
+
+The boot splash hands over the display without a blank screen, as a display
+manager does. `cybexos-installer-splash` waits for udev, completes the bar and
+runs `plymouth deactivate`: Plymouth releases the display but its last frame
+stays on it. The screen's unit is `Type=notify`; the screen reports ready once
+its first frame is shown. Only then does `plymouth-quit` run `plymouth quit
+--retain-splash`. Plymouth is driven from separate units because each command
+of the screen's unit hangs up and resets tty1.
 
 The screen owns no state. `cybexos-installerd` (root) keeps the non-secret draft,
 Wi-Fi, time zone detection, the keyboard layout and diagnostics, and drives the
