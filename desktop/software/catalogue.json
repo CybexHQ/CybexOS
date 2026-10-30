@@ -210,8 +210,6 @@
    },
    "includes": [
     "T3 Code",
-    "Claude Code",
-    "Codex",
     "Docker",
     "Podman",
     "Node.js, Bun, Rust, Python, Java"
@@ -222,7 +220,7 @@
     "bruno",
     "meld"
    ],
-   "downloadBytes": 912626845
+   "downloadBytes": 0
   },
   {
    "id": "office",
@@ -239,7 +237,7 @@
     "okular",
     "foliate"
    ],
-   "downloadBytes": 87386346
+   "downloadBytes": 621721417
   },
   {
    "id": "graphics",
@@ -257,7 +255,7 @@
     "blender",
     "scribus"
    ],
-   "downloadBytes": 1577781783
+   "downloadBytes": 1686629863
   },
   {
    "id": "media",
@@ -274,7 +272,7 @@
     "shotcut",
     "handbrake"
    ],
-   "downloadBytes": 623784607
+   "downloadBytes": 644793377
   },
   {
    "id": "gaming",
@@ -295,7 +293,7 @@
     "heroic",
     "prismlauncher"
    ],
-   "downloadBytes": 1193039047
+   "downloadBytes": 564822236
   },
   {
    "id": "chat",
@@ -355,7 +353,7 @@
    "desktopIds": [
     "gimp.desktop"
    ],
-   "downloadBytes": 181815830
+   "downloadBytes": 232559758
   },
   {
    "id": "krita",
@@ -409,7 +407,7 @@
     "krita_webp.desktop",
     "org.kde.krita.desktop"
    ],
-   "downloadBytes": 400748336
+   "downloadBytes": 406895130
   },
   {
    "id": "inkscape",
@@ -439,7 +437,7 @@
    "desktopIds": [
     "org.inkscape.Inkscape.desktop"
    ],
-   "downloadBytes": 0
+   "downloadBytes": 117044389
   },
   {
    "id": "darktable",
@@ -469,7 +467,7 @@
    "desktopIds": [
     "org.darktable.darktable.desktop"
    ],
-   "downloadBytes": 61664100
+   "downloadBytes": 81896283
   },
   {
    "id": "blender",
@@ -493,7 +491,7 @@
     "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 24003,
+   "installs": 23984,
    "brand": {
     "light": "#5ab3f6",
     "dark": "#265787"
@@ -501,7 +499,7 @@
    "desktopIds": [
     "blender.desktop"
    ],
-   "downloadBytes": 983445436
+   "downloadBytes": 1030900128
   },
   {
    "id": "scribus",
@@ -528,7 +526,7 @@
    "desktopIds": [
     "scribus.desktop"
    ],
-   "downloadBytes": 107189880
+   "downloadBytes": 106926716
   },
   {
    "id": "pinta",
@@ -583,7 +581,7 @@
    "desktopIds": [
     "rawtherapee.desktop"
    ],
-   "downloadBytes": 33689444
+   "downloadBytes": 36861136
   },
   {
    "id": "freecad",
@@ -608,12 +606,12 @@
     "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-3_1248x766@1.png",
     "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-4_1248x767@1.png"
    ],
-   "installs": 31830,
+   "installs": 31824,
    "brand": {},
    "desktopIds": [
     "org.freecad.FreeCAD.desktop"
    ],
-   "downloadBytes": 1018443805
+   "downloadBytes": 1074783423
   },
   {
    "id": "mypaint",
@@ -639,7 +637,7 @@
    "desktopIds": [
     "mypaint.desktop"
    ],
-   "downloadBytes": 7606234
+   "downloadBytes": 66526633
   },
   {
    "id": "synfig",
@@ -681,7 +679,7 @@
    "desktopIds": [
     "org.synfig.SynfigStudio.desktop"
    ],
-   "downloadBytes": 51170030
+   "downloadBytes": 67595964
   },
   {
    "id": "fontforge",
@@ -708,7 +706,7 @@
    "desktopIds": [
     "org.fontforge.FontForge.desktop"
    ],
-   "downloadBytes": 9191013
+   "downloadBytes": 12362705
   },
   {
    "id": "curtail",
@@ -738,7 +736,7 @@
    "desktopIds": [
     "com.github.huluti.Curtail.desktop"
    ],
-   "downloadBytes": 1744968
+   "downloadBytes": 1871478
   },
   {
    "id": "upscayl",
@@ -761,12 +759,12 @@
     "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-3_1248x780@1.png",
     "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-4_1248x780@1.png"
    ],
-   "installs": 8646,
+   "installs": 8631,
    "brand": {},
    "desktopIds": [
     "upscayl.desktop"
    ],
-   "downloadBytes": 381865932
+   "downloadBytes": 322606851
   },
   {
    "id": "penpot",
@@ -837,7 +835,7 @@
     "writer.desktop",
     "xsltfilter.desktop"
    ],
-   "downloadBytes": 0
+   "downloadBytes": 543991389
   },
   {
    "id": "onlyoffice",
@@ -869,7 +867,7 @@
    "desktopIds": [
     "onlyoffice-desktopeditors.desktop"
    ],
-   "downloadBytes": 678810575
+   "downloadBytes": 619551494
   },
   {
    "id": "obsidian",
@@ -932,7 +930,7 @@
    "desktopIds": [
     "appimagekit-joplin.desktop"
    ],
-   "downloadBytes": 223304260
+   "downloadBytes": 223617863
   },
   {
    "id": "xournalpp",
@@ -1024,7 +1022,7 @@
     "okularApplication_xps.desktop",
     "org.kde.okular.desktop"
    ],
-   "downloadBytes": 80131901
+   "downloadBytes": 70701480
   },
   {
    "id": "gnucash",
@@ -1062,7 +1060,7 @@
    "desktopIds": [
     "gnucash.desktop"
    ],
-   "downloadBytes": 106241926
+   "downloadBytes": 107191977
   },
   {
    "id": "planify",
@@ -1146,7 +1144,7 @@
    "desktopIds": [
     "io.github.mrvladus.List.desktop"
    ],
-   "downloadBytes": 7659143
+   "downloadBytes": 9977804
   },
   {
    "id": "superproductivity",
@@ -1189,7 +1187,7 @@
    "desktopIds": [
     "superproductivity.desktop"
    ],
-   "downloadBytes": 179123496
+   "downloadBytes": 153897087
   },
   {
    "id": "evolution",
@@ -1254,7 +1252,7 @@
    "desktopIds": [
     "dev.zed.Zed.desktop"
    ],
-   "downloadBytes": 167628057
+   "downloadBytes": 0
   },
   {
    "id": "vscode",
@@ -1370,7 +1368,7 @@
     "org.kde.kate.desktop",
     "org.kde.kwrite.desktop"
    ],
-   "downloadBytes": 89235502
+   "downloadBytes": 79805081
   },
   {
    "id": "neovide",
@@ -1463,7 +1461,7 @@
    "subcategory": "data",
    "free": true,
    "homepage": "https://dbeaver.io/",
-   "name": "DBeaver Community",
+   "name": "DBeaver",
    "summary": "Free Universal Database Tool",
    "description": [
     "Free multi-platform database tool for developers, SQL programmers, database administrators and analysts. Supports all popular databases: MySQL, PostgreSQL, MariaDB, SQLite, Oracle, DB2, SQL Server, Sybase, MS Access, Teradata, Firebird, Derby, etc."
@@ -1484,7 +1482,7 @@
    "desktopIds": [
     "dbeaver.desktop"
    ],
-   "downloadBytes": 528686137
+   "downloadBytes": 0
   },
   {
    "id": "bruno",
@@ -1513,7 +1511,7 @@
    "desktopIds": [
     "bruno.desktop"
    ],
-   "downloadBytes": 215147331
+   "downloadBytes": 0
   },
   {
    "id": "postman",
@@ -1574,7 +1572,7 @@
    "desktopIds": [
     "insomnia.desktop"
    ],
-   "downloadBytes": 608474497
+   "downloadBytes": 549215416
   },
   {
    "id": "githubdesktop",
@@ -1606,7 +1604,7 @@
    "desktopIds": [
     "github-desktop.desktop"
    ],
-   "downloadBytes": 259705522
+   "downloadBytes": 127848170
   },
   {
    "id": "meld",
@@ -1634,7 +1632,7 @@
    "desktopIds": [
     "org.gnome.Meld.desktop"
    ],
-   "downloadBytes": 1165320
+   "downloadBytes": 0
   },
   {
    "id": "wireshark",
@@ -1658,12 +1656,12 @@
     "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-2_1248x769@1.png",
     "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-3_1248x676@1.png"
    ],
-   "installs": 4832,
+   "installs": 4827,
    "brand": {},
    "desktopIds": [
     "org.wireshark.Wireshark.desktop"
    ],
-   "downloadBytes": 81527805
+   "downloadBytes": 71871487
   },
   {
    "id": "podmandesktop",
@@ -1705,7 +1703,7 @@
    "desktopIds": [
     "podman-desktop.desktop"
    ],
-   "downloadBytes": 241282159
+   "downloadBytes": 108994817
   },
   {
    "id": "devtoolbox",
@@ -1746,7 +1744,7 @@
    "desktopIds": [
     "me.iepure.devtoolbox.desktop"
    ],
-   "downloadBytes": 11488377
+   "downloadBytes": 72880258
   },
   {
    "id": "godot",
@@ -1830,7 +1828,7 @@
    "desktopIds": [
     "com.heroicgameslauncher.hgl.desktop"
    ],
-   "downloadBytes": 294473608
+   "downloadBytes": 104446719
   },
   {
    "id": "prismlauncher",
@@ -1869,7 +1867,7 @@
    "desktopIds": [
     "org.prismlauncher.PrismLauncher.desktop"
    ],
-   "downloadBytes": 898565439
+   "downloadBytes": 460375517
   },
   {
    "id": "retroarch",
@@ -1923,7 +1921,7 @@
     "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-2_752x572@1.png",
     "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-4_752x683@1.png"
    ],
-   "installs": 57120,
+   "installs": 57222,
    "brand": {},
    "desktopIds": [
     "dolphin-emu.desktop"
@@ -1958,11 +1956,11 @@
    "desktopIds": [
     "PCSX2.desktop"
    ],
-   "downloadBytes": 39562278
+   "downloadBytes": 29905960
   },
   {
    "id": "supertuxkart",
-   "attribute": "superTuxKart",
+   "attribute": "supertuxkart",
    "appstream": "net.supertuxkart.SuperTuxKart",
    "category": "play",
    "subcategory": "games",
@@ -2115,7 +2113,7 @@
     "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_1248x702@1.png",
     "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_1248x702@1.png"
    ],
-   "installs": 109963,
+   "installs": 109654,
    "brand": {},
    "desktopIds": [
     "vlc-openbd.desktop",
@@ -2179,7 +2177,7 @@
     "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-2_752x423@1.png",
     "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-3_752x423@1.png"
    ],
-   "installs": 6974,
+   "installs": 6941,
    "brand": {},
    "desktopIds": [
     "io.github.celluloid_player.Celluloid.desktop"
@@ -2254,7 +2252,7 @@
    "desktopIds": [
     "org.strawberrymusicplayer.strawberry.desktop"
    ],
-   "downloadBytes": 69262825
+   "downloadBytes": 59606507
   },
   {
    "id": "shortwave",
@@ -2384,12 +2382,12 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/obsproject/Studio/d95756e227c3b10951a83e14e063c185/screenshots/image-1_752x526@1.png"
    ],
-   "installs": 91847,
+   "installs": 91752,
    "brand": {},
    "desktopIds": [
     "com.obsproject.Studio.desktop"
    ],
-   "downloadBytes": 253900540
+   "downloadBytes": 253896508
   },
   {
    "id": "kdenlive",
@@ -2428,7 +2426,7 @@
    "desktopIds": [
     "org.kde.kdenlive.desktop"
    ],
-   "downloadBytes": 276607972
+   "downloadBytes": 297620774
   },
   {
    "id": "shotcut",
@@ -2455,7 +2453,7 @@
    "desktopIds": [
     "org.shotcut.Shotcut.desktop"
    ],
-   "downloadBytes": 104358072
+   "downloadBytes": 107955996
   },
   {
    "id": "handbrake",
@@ -2485,7 +2483,7 @@
    "desktopIds": [
     "fr.handbrake.ghb.desktop"
    ],
-   "downloadBytes": 123958505
+   "downloadBytes": 154264408
   },
   {
    "id": "losslesscut",
@@ -2510,7 +2508,7 @@
    "desktopIds": [
     "losslesscut.desktop"
    ],
-   "downloadBytes": 290156324
+   "downloadBytes": 230897243
   },
   {
    "id": "audacity",
@@ -2570,7 +2568,7 @@
    "desktopIds": [
     "ardour9.desktop"
    ],
-   "downloadBytes": 35501363
+   "downloadBytes": 36779765
   },
   {
    "id": "lmms",
@@ -2595,7 +2593,7 @@
    "desktopIds": [
     "lmms.desktop"
    ],
-   "downloadBytes": 75358685
+   "downloadBytes": 75672241
   },
   {
    "id": "easyeffects",
@@ -2629,7 +2627,7 @@
    "desktopIds": [
     "com.github.wwmm.easyeffects.desktop"
    ],
-   "downloadBytes": 329397526
+   "downloadBytes": 321976475
   },
   {
    "id": "signal",
@@ -2639,7 +2637,7 @@
    "subcategory": "messaging",
    "free": true,
    "homepage": "https://signal.org/",
-   "name": "Signal Desktop",
+   "name": "Signal",
    "summary": "Private messenger",
    "description": [
     "To use the Signal desktop app, Signal must first be installed on your phone.",
@@ -2788,7 +2786,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/im/riot/Riot/2c7c157fb4b4fe0c57e84ec63e19f082/screenshots/image-1_1248x679@1.png"
    ],
-   "installs": 8050,
+   "installs": 8095,
    "brand": {
     "light": "#71d7ae",
     "dark": "#004832"
@@ -2949,7 +2947,7 @@
    "desktopIds": [
     "teams-for-linux.desktop"
    ],
-   "downloadBytes": 137712564
+   "downloadBytes": 5855212
   },
   {
    "id": "mumble",
@@ -3041,7 +3039,7 @@
    "desktopIds": [
     "org.kde.gcompris.desktop"
    ],
-   "downloadBytes": 79092115
+   "downloadBytes": 69435797
   },
   {
    "id": "klavaro",
@@ -3096,7 +3094,7 @@
    "desktopIds": [
     "org.stellarium.Stellarium.desktop"
    ],
-   "downloadBytes": 671733680
+   "downloadBytes": 664086732
   },
   {
    "id": "marble",
@@ -3130,7 +3128,7 @@
     "org.kde.marble.desktop",
     "org.kde.marble.maps.desktop"
    ],
-   "downloadBytes": 294273036
+   "downloadBytes": 285046159
   },
   {
    "id": "kalzium",
@@ -3156,7 +3154,7 @@
     "org.kde.kalzium.desktop",
     "org.kde.kalzium_cml.desktop"
    ],
-   "downloadBytes": 101376319
+   "downloadBytes": 91945898
   },
   {
    "id": "foliate",
@@ -3227,7 +3225,7 @@
     "calibre-gui.desktop",
     "calibre-lrfviewer.desktop"
    ],
-   "downloadBytes": 248636900
+   "downloadBytes": 254857871
   },
   {
    "id": "chromium",
@@ -3409,7 +3407,7 @@
    "desktopIds": [
     "bitwarden.desktop"
    ],
-   "downloadBytes": 178039881
+   "downloadBytes": 46182529
   },
   {
    "id": "keepassxc",
@@ -3432,7 +3430,7 @@
     "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-3_1248x890@1.png",
     "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-4_1248x949@1.png"
    ],
-   "installs": 27482,
+   "installs": 27615,
    "brand": {
     "light": "#5b982a",
     "dark": "#5b982a"
@@ -3440,11 +3438,11 @@
    "desktopIds": [
     "org.keepassxc.KeePassXC.desktop"
    ],
-   "downloadBytes": 25137224
+   "downloadBytes": 25171562
   },
   {
    "id": "protonvpn",
-   "attribute": "protonvpn-gui",
+   "attribute": "proton-vpn",
    "appstream": "com.protonvpn.www",
    "category": "utilities",
    "subcategory": "security",
@@ -3485,7 +3483,7 @@
    "desktopIds": [
     "proton.vpn.app.gtk.desktop"
    ],
-   "downloadBytes": 8944109
+   "downloadBytes": 9257712
   },
   {
    "id": "pikabackup",
@@ -3523,7 +3521,7 @@
     "org.gnome.World.PikaBackup.Monitor.desktop",
     "org.gnome.World.PikaBackup.desktop"
    ],
-   "downloadBytes": 12325912
+   "downloadBytes": 12763417
   },
   {
    "id": "dejadup",
@@ -3560,7 +3558,7 @@
    "desktopIds": [
     "org.gnome.DejaDup.desktop"
    ],
-   "downloadBytes": 24325603
+   "downloadBytes": 24763108
   },
   {
    "id": "vorta",
@@ -3594,7 +3592,7 @@
    "desktopIds": [
     "com.borgbase.Vorta.desktop"
    ],
-   "downloadBytes": 192124183
+   "downloadBytes": 192561688
   },
   {
    "id": "localsend",
@@ -3648,7 +3646,7 @@
    "developer": "Fina Wilke",
    "license": "GPL-3.0-only",
    "screenshots": [],
-   "installs": 3773,
+   "installs": 3806,
    "brand": {
     "light": "#ce9eff",
     "dark": "#2a1179"
@@ -3698,7 +3696,7 @@
    "desktopIds": [
     "org.qbittorrent.qBittorrent.desktop"
    ],
-   "downloadBytes": 23766815
+   "downloadBytes": 14110497
   },
   {
    "id": "filezilla",
@@ -3744,7 +3742,7 @@
    "desktopIds": [
     "filezilla.desktop"
    ],
-   "downloadBytes": 18565107
+   "downloadBytes": 18599445
   },
   {
    "id": "czkawka",
@@ -3766,7 +3764,7 @@
     "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-2_1248x683@1.png",
     "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-3_1248x929@1.png"
    ],
-   "installs": 5679,
+   "installs": 5704,
    "brand": {},
    "desktopIds": [
     "com.github.qarmin.czkawka.desktop",
@@ -3815,7 +3813,7 @@
    "desktopIds": [
     "org.gnome.Boxes.desktop"
    ],
-   "downloadBytes": 58842688
+   "downloadBytes": 58666405
   },
   {
    "id": "impression",

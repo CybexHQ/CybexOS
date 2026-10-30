@@ -20,15 +20,24 @@ test('a successful status containing a domain error still settles and publishes 
     assert.deepEqual(failures, ['Authentication cancelled']);
 });
 
-test('refreshing Software preserves an edited draft and detects an external baseline change', () => {
+test('a catalogue refresh drops satisfied requests and forgets checks from an older configuration', () => {
     const source = read('Common/Software.qml');
-    const handler = source.match(/id: loader\s+onCompleted: (value => \{[\s\S]*?)\n        }\n    }/)[1] + '\n}';
-    const root = {dirty:true, conflict:false, inventory:{desired:[]}, draft:['hello']};
-    const complete = vm.runInNewContext('(' + handler + ')', {root});
-    complete({desired:['git'], packages:[]});
-    assert.equal(root.conflict, true);
-    assert.deepEqual(root.draft, ['hello']);
-    assert.deepEqual(Array.from(root.inventory.desired), ['git']);
+    const handler = source.match(/id: loader\s+onCompleted: (\(\) => \{[\s\S]*?)\n        }\n/)[1] + '\n}';
+    const Helpers = require(path.join(shellDir, 'Common/SoftwareHelpers.js'));
+    const root = {catalogue: {identity: 'old'}, checks: {gimp: {state: 'prebuilt'}}, loaded: false, loadError: '',
+        queue: [{attribute: 'gimp', action: 'install'}, {attribute: 'krita', action: 'install'}]};
+    // The handler reads loader.result: a `var` signal argument would carry
+    // sequence-wrapped arrays.
+    const loader = {result: null};
+    const run = vm.runInNewContext('(' + handler + ')', {root, loader, Helpers, I18n: {tr: text => text}});
+    const complete = value => { loader.result = value; run(); };
+    complete({schema: 1, identity: 'new', desired: ['gimp'], apps: []});
+    assert.equal(root.loaded, true);
+    assert.deepEqual(Object.keys(root.checks), []);
+    assert.deepEqual(Array.from(root.queue, row => row.attribute), ['krita']);
+    complete({schema: 2});
+    assert.match(root.loadError, /invalid catalogue/);
+    assert.equal(root.catalogue.identity, 'new', 'an invalid answer keeps the last good catalogue');
 });
 
 test('cleanup preference drafts retain their original policy until explicitly discarded', () => {

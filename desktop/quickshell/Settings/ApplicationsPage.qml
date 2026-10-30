@@ -45,11 +45,11 @@ SettingsPage {
         }
         SettingsGroup {
             width: parent.width; title: I18n.tr("Software")
+            SettingsHint { width: parent.width; text: I18n.tr("Software installs prebuilt apps from NixOS. Each change is checked first and keeps your current system as a fallback.") }
             ValueRow {
                 width: parent.width; label: I18n.tr("Install and remove applications")
                 SettingsAction { text: I18n.tr("Open Software…"); glyph: "apps"; onTriggered: Software.show() }
             }
         }
-        DeploymentReview { width: parent.width; kind: "software" }
     }
 }

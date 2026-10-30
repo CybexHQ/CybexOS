@@ -48,7 +48,7 @@ var VERBS = [
 // Factory reset is deliberately absent: it stays behind Settings' own
 // confirmation and is never one mistyped Enter away.
 var BUILTIN_ACTIONS = [
-    { id: "software", verb: "install", name: "Open Software…", subtitle: "Search and review native package changes", keywords: ["install", "remove", "packages", "applications"], glyph: "apps", command: ["cybexos-software"] },
+    { id: "software", verb: "install", name: "Open Software…", subtitle: "Discover and install prebuilt apps", keywords: ["install", "remove", "packages", "applications"], glyph: "apps", command: ["cybexos-software"] },
     {
         id: "webapp-install",
         verb: "install",
@@ -470,7 +470,7 @@ function parsePins(text) {
     } catch (error) {
         return [];
     }
-    var list = value && Array.isArray(value.pins) ? value.pins : [];
+    var list = value && (Array.isArray(value.pins) || value.pins instanceof Array) ? value.pins : [];
     var seen = {};
     return list.slice(0, PIN_LIMIT).map(function(pin) {
         if (!pin || typeof pin !== "object")
@@ -501,7 +501,7 @@ function parsePins(text) {
 // costs a decode and a thumbnail on the helper's side.
 function clipboardPreviewTargets(lines, limit) {
     var max = Math.max(0, Number(limit) || 0);
-    return (Array.isArray(lines) ? lines : []).filter(function(raw) {
+    return ((Array.isArray(lines) || lines instanceof Array) ? lines : []).filter(function(raw) {
         return isClipboardImage(clipboardDisplay(raw));
     }).slice(0, max).map(String);
 }
@@ -512,7 +512,7 @@ function clipboardPreviewTargets(lines, limit) {
 function clipboardRows(lines, query, limit, options) {
     var max = Math.max(0, Number(limit) || 0);
     var opts = options || {};
-    var pins = Array.isArray(opts.pins) ? opts.pins : [];
+    var pins = (Array.isArray(opts.pins) || opts.pins instanceof Array) ? opts.pins : [];
     var previews = opts.previews && typeof opts.previews === "object" ? opts.previews : {};
     var pinDir = String(opts.pinDir || "");
     var pinnedText = {};
@@ -546,7 +546,7 @@ function clipboardRows(lines, query, limit, options) {
     }).filter(Boolean).sort(function(a, b) {
         return b.score - a.score || a.sourceIndex - b.sourceIndex;
     });
-    var history = (Array.isArray(lines) ? lines : []).map(function(raw, index) {
+    var history = ((Array.isArray(lines) || lines instanceof Array) ? lines : []).map(function(raw, index) {
         var value = String(raw);
         var tab = value.indexOf("\t");
         var identifier = tab === -1 ? "" : value.slice(0, tab).trim();
@@ -591,7 +591,7 @@ function emojiRows(entries, query, limit) {
     var max = Math.max(0, Math.floor(Number(limit) || 0));
     if (max === 0)
         return [];
-    var source = Array.isArray(entries) ? entries : [];
+    var source = (Array.isArray(entries) || entries instanceof Array) ? entries : [];
     var needle = String(query || "").trim().toLowerCase();
     // textScore has five fixed relevance levels. Retain at most the visible
     // limit from each, in source order, then materialize just the winning
@@ -631,14 +631,14 @@ function cleanString(value, maxLength) {
 }
 
 function sanitizeActions(value) {
-    if (!Array.isArray(value))
+    if (!(Array.isArray(value) || value instanceof Array))
         return [];
     var seen = {};
     return value.map(function(action, index) {
         if (!action || typeof action !== "object")
             return null;
         var name = cleanString(action.name, 100);
-        var command = Array.isArray(action.command)
+        var command = (Array.isArray(action.command) || action.command instanceof Array)
             ? action.command.slice(0, 32).map(function(part) {
                 return cleanString(part, 1000);
             }).filter(Boolean)
@@ -650,7 +650,7 @@ function sanitizeActions(value) {
         if (seen[id])
             return null;
         seen[id] = true;
-        var keywordValues = Array.isArray(action.keywords) ? action.keywords : [action.keywords];
+        var keywordValues = (Array.isArray(action.keywords) || action.keywords instanceof Array) ? action.keywords : [action.keywords];
         return {
             id: id,
             name: name,
@@ -668,7 +668,7 @@ function sanitizeActions(value) {
 function parseActions(text) {
     try {
         var value = JSON.parse(String(text || "[]"));
-        if (!Array.isArray(value))
+        if (!(Array.isArray(value) || value instanceof Array))
             return { actions: [], error: "launcher-actions.json must contain an array" };
         return { actions: sanitizeActions(value), error: "" };
     } catch (error) {
@@ -713,7 +713,7 @@ function tokenScore(value, query) {
 function actionScore(action, query) {
     if (String(query || "").trim() === "")
         return 1;
-    var keywords = Array.isArray(action.keywords) ? action.keywords.join(" ") : "";
+    var keywords = (Array.isArray(action.keywords) || action.keywords instanceof Array) ? action.keywords.join(" ") : "";
     var scores = [
         tokenScore(action.name, query),
         tokenScore(keywords + " " + verbLabel(action.verb), query) - 1000,
@@ -726,7 +726,7 @@ function actionScore(action, query) {
 // Entries whose installation feature is off stay out of every list.
 function availableActions(actions, flags) {
     var features = flags || {};
-    return (Array.isArray(actions) ? actions : []).filter(function(action) {
+    return ((Array.isArray(actions) || actions instanceof Array) ? actions : []).filter(function(action) {
         return !action.requires || features[action.requires] === true;
     });
 }
@@ -751,7 +751,7 @@ function actionRow(action, score, index, blended) {
 // catalogue order; a query ranks by match quality, then by group.
 function actionRows(actions, query, limit) {
     var max = Math.max(0, Number(limit) || 0);
-    return (Array.isArray(actions) ? actions : []).map(function(action, index) {
+    return ((Array.isArray(actions) || actions instanceof Array) ? actions : []).map(function(action, index) {
         var score = actionScore(action, query);
         return score < 0 ? null : actionRow(action, score, index, false);
     }).filter(Boolean).sort(function(a, b) {
@@ -773,7 +773,7 @@ function blendedActionRows(actions, query, limit) {
     if (term.length < 2)
         return [];
     var max = Math.min(BLEND_LIMIT, Math.max(0, Number(limit === undefined ? BLEND_LIMIT : limit) || 0));
-    return (Array.isArray(actions) ? actions : []).map(function(action, index) {
+    return ((Array.isArray(actions) || actions instanceof Array) ? actions : []).map(function(action, index) {
         var score = actionScore(action, term);
         return score < BLEND_MIN_SCORE ? null : actionRow(action, score, index, true);
     }).filter(Boolean).sort(function(a, b) {
@@ -782,7 +782,7 @@ function blendedActionRows(actions, query, limit) {
 }
 
 function blendRows(appRows, actions, query) {
-    var apps = Array.isArray(appRows) ? appRows : [];
+    var apps = (Array.isArray(appRows) || appRows instanceof Array) ? appRows : [];
     return apps.concat(blendedActionRows(actions, query, BLEND_LIMIT));
 }
 
@@ -906,7 +906,7 @@ function parseWebApps(text) {
     } catch (error) {
         return [];
     }
-    if (!Array.isArray(value))
+    if (!(Array.isArray(value) || value instanceof Array))
         return [];
     var seen = {};
     return value.map(function(app) {
@@ -930,7 +930,7 @@ function parseWebApps(text) {
 // Settings: the chosen row turns into its own confirmation.
 function webAppChoiceRows(apps, query, limit, confirmId) {
     var max = Math.max(0, Number(limit) || 0);
-    return (Array.isArray(apps) ? apps : []).map(function(app, index) {
+    return ((Array.isArray(apps) || apps instanceof Array) ? apps : []).map(function(app, index) {
         var score = Math.max(textScore(app.name, query), textScore(app.url, query) - 2000);
         if (String(query || "").trim() !== "" && score < 0)
             return null;
@@ -956,7 +956,7 @@ function webAppChoiceRows(apps, query, limit, confirmId) {
 // directory, and an element that is exactly "{argument}" becomes the
 // argument, whole. The argument is never expanded or split itself.
 function expandCommand(command, home, argument) {
-    if (!Array.isArray(command) || command.length === 0)
+    if (!(Array.isArray(command) || command instanceof Array) || command.length === 0)
         return [];
     var base = String(home || "");
     var hasArgument = command.indexOf("{argument}") !== -1;

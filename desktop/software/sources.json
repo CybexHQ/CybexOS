@@ -21,7 +21,7 @@
   "profiles": [
     {"id": "development", "name": "Software Development", "short": "Development", "summary": "Code editors, AI coding agents and containers",
      "icon": "code", "default": true, "features": {"developer": true, "docker": true, "podman": true},
-     "includes": ["T3 Code", "Claude Code", "Codex", "Docker", "Podman", "Node.js, Bun, Rust, Python, Java"],
+     "includes": ["T3 Code", "Docker", "Podman", "Node.js, Bun, Rust, Python, Java"],
      "apps": ["zed", "dbeaver", "bruno", "meld"]},
     {"id": "office", "name": "Office & Productivity", "short": "Office", "summary": "Documents, mail, notes and ebooks",
      "icon": "briefcase", "features": {},
@@ -39,7 +39,7 @@
      "icon": "messages", "features": {},
      "includes": [], "apps": ["signal", "telegram", "discord", "slack", "zoom"]}
   ],
-  "names": {"gimp": "GIMP", "kdenlive": "Kdenlive", "obs": "OBS Studio", "okular": "Okular", "dolphin": "Dolphin", "teams": "Teams for Linux", "githubdesktop": "GitHub Desktop", "missioncenter": "Mission Center", "pikabackup": "Pika Backup"},
+  "names": {"gimp": "GIMP", "dbeaver": "DBeaver", "signal": "Signal", "kdenlive": "Kdenlive", "obs": "OBS Studio", "okular": "Okular", "dolphin": "Dolphin", "teams": "Teams for Linux", "githubdesktop": "GitHub Desktop", "missioncenter": "Mission Center", "pikabackup": "Pika Backup"},
   "featured": ["blender", "obs", "zed", "krita", "darktable", "signal"],
   "apps": [
     ["gimp", "gimp", "org.gimp.GIMP", "create", "photo"],
@@ -98,7 +98,7 @@
     ["retroarch", "retroarch", "org.libretro.RetroArch", "play", "emulators"],
     ["dolphin", "dolphin-emu", "org.DolphinEmu.dolphin-emu", "play", "emulators"],
     ["pcsx2", "pcsx2", "net.pcsx2.PCSX2", "play", "emulators"],
-    ["supertuxkart", "superTuxKart", "net.supertuxkart.SuperTuxKart", "play", "games"],
+    ["supertuxkart", "supertuxkart", "net.supertuxkart.SuperTuxKart", "play", "games"],
     ["zeroad", "zeroad", "com.play0ad.zeroad", "play", "games"],
     ["mindustry", "mindustry", "com.github.Anuken.Mindustry", "play", "games"],
     ["chess", "gnome-chess", "org.gnome.Chess", "play", "games"],
@@ -154,7 +154,7 @@
     ["firefox", "firefox", "org.mozilla.firefox", "utilities", "web"],
     ["bitwarden", "bitwarden-desktop", "com.bitwarden.desktop", "utilities", "security"],
     ["keepassxc", "keepassxc", "org.keepassxc.KeePassXC", "utilities", "security"],
-    ["protonvpn", "protonvpn-gui", "com.protonvpn.www", "utilities", "security"],
+    ["protonvpn", "proton-vpn", "com.protonvpn.www", "utilities", "security"],
     ["pikabackup", "pika-backup", "org.gnome.World.PikaBackup", "utilities", "files"],
     ["dejadup", "deja-dup", "org.gnome.DejaDup", "utilities", "files"],
     ["vorta", "vorta", "com.borgbase.Vorta", "utilities", "files"],

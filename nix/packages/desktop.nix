@@ -46,6 +46,8 @@ in stdenv.mkDerivation {
     inherit lib source;
     paths = [
       "desktop/quickshell" "desktop/hypr" "desktop/defaults" "desktop/fastfetch"
+      # Software's app catalogue and icons; not its maintainer sources.
+      "desktop/software/catalogue.json" "desktop/software/icons"
       "desktop/icons/hicolor" "desktop/bin" "assets/brand"
       "assets/EDM115-newline2.omp.json" "assets/scripts" "agent-skills/cybexos"
       "nix/tests/desktop-runtime.py"
@@ -63,6 +65,11 @@ in stdenv.mkDerivation {
     cp -r desktop/hypr $out/share/cybexos/runtime/
     cp -r desktop/defaults $out/share/cybexos/
     cp -r desktop/fastfetch $out/share/cybexos/
+    # /share/cybexos is linked into the system profile: Software reads
+    # /run/current-system/sw/share/cybexos/software, following the generation.
+    mkdir -p $out/share/cybexos/software
+    cp desktop/software/catalogue.json $out/share/cybexos/software/
+    cp -r desktop/software/icons $out/share/cybexos/software/
     cp -r assets/brand $out/share/cybexos/
     mkdir -p $out/share/icons $out/share/applications
     cp -r desktop/icons/hicolor $out/share/icons/
@@ -102,6 +109,8 @@ in stdenv.mkDerivation {
     for module in Keybindings.qml KeybindingsModel.js KeybindEditor.js; do
       test -r "$out/share/cybexos/runtime/quickshell/Common/$module"
     done
+    test -r $out/share/cybexos/software/catalogue.json
+    test -r $out/share/cybexos/software/icons/firefox.png
     for module in system_settings_keybindings system_settings_keymap; do
       test -r "$out/share/cybexos/runtime/quickshell/scripts/$module.py"
     done

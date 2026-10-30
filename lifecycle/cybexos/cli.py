@@ -184,7 +184,10 @@ def main():
     software = commands.add_parser('software')
     software_sub = software.add_subparsers(dest='software_action', required=True)
     software_sub.add_parser('list')
+    software_sub.add_parser('catalogue', help='The app catalogue with what is installed here, and by whom')
     search = software_sub.add_parser('search'); search.add_argument('query', nargs='?', default='')
+    software_check = software_sub.add_parser('check', help='Whether installing packages would compile anything')
+    software_check.add_argument('attributes', nargs='+', metavar='ATTRIBUTE')
     software_request = software_sub.add_parser('request'); software_request.add_argument('identifier')
     software_stage = software_sub.add_parser('stage'); software_stage.add_argument('request')
     maintenance = commands.add_parser('maintenance')
@@ -233,8 +236,12 @@ def main():
         from . import software as native
         if args.software_action == 'list':
             print(json.dumps(native.inventory())); return
+        if args.software_action == 'catalogue':
+            print(json.dumps(native.catalogue())); return
         if args.software_action == 'search':
             print(json.dumps(native.search(args.query))); return
+        if args.software_action == 'check':
+            print(json.dumps(native.check(args.attributes))); return
         if args.software_action == 'request':
             print(json.dumps(request_status(args.identifier))); return
         os.execv(PKEXEC, [PKEXEC, '/run/current-system/sw/bin/cybexos-request', 'software', args.request])

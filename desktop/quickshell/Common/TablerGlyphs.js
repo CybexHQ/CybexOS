@@ -35,6 +35,7 @@ var ALIASES = {
     "bluetooth": "bluetooth",
     "bluetooth_disabled": "bluetooth-off",
     "bolt": "bolt",
+    "briefcase": "briefcase",
     "calculate": "calculator",
     "call_split": "arrows-split",
     "cancel": "circle-x",
@@ -194,6 +195,7 @@ var ALIASES = {
     "scale": "scale",
     "scan": "scan",
     "schedule": "clock",
+    "school": "school",
     "search": "search",
     "search_off": "search-off",
     "security": "shield-lock",
@@ -231,6 +233,7 @@ var ALIASES = {
     "thunderstorm": "cloud-storm",
     "title": "heading",
     "today": "calendar",
+    "tool": "tool",
     "tooltip": "message",
     "tune": "adjustments-horizontal",
     "tv": "device-tv",
@@ -369,6 +372,9 @@ var GLYPHS = {
     },
     "brain": {
         "outline": "\uf59f"
+    },
+    "briefcase": {
+        "outline": "\uea46"
     },
     "browser": {
         "outline": "\uebb7"
@@ -781,6 +787,9 @@ var GLYPHS = {
     "scan": {
         "outline": "\uebc8"
     },
+    "school": {
+        "outline": "\uecf7"
+    },
     "search": {
         "outline": "\ueb1c"
     },
@@ -825,6 +834,9 @@ var GLYPHS = {
     },
     "terminal-2": {
         "outline": "\uebef"
+    },
+    "tool": {
+        "outline": "\ueb40"
     },
     "trash": {
         "outline": "\ueb41"

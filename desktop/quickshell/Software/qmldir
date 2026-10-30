@@ -1,0 +1,33 @@
+# The Software app: Explore, Installed and Updates, category and app pages,
+# search and the install queue, opened from the launcher, Settings and IPC.
+# Sibling types resolve through this explicit index; list every file.
+AppAction AppAction.qml
+AppCard AppCard.qml
+AppIcon AppIcon.qml
+AppPage AppPage.qml
+AppRow AppRow.qml
+CategoryPage CategoryPage.qml
+CategoryTile CategoryTile.qml
+CollectionCard CollectionCard.qml
+ExplorePage ExplorePage.qml
+FactRow FactRow.qml
+GroupLabel GroupLabel.qml
+MediaFrame MediaFrame.qml
+HeaderBar HeaderBar.qml
+HeroCarousel HeroCarousel.qml
+InstalledPage InstalledPage.qml
+InstalledRow InstalledRow.qml
+Notice Notice.qml
+PackageRow PackageRow.qml
+PageScroll PageScroll.qml
+PickCard PickCard.qml
+QueueBar QueueBar.qml
+ScreenshotTile ScreenshotTile.qml
+ScreenshotViewer ScreenshotViewer.qml
+SearchPage SearchPage.qml
+SectionTitle SectionTitle.qml
+SoftwareButton SoftwareButton.qml
+SoftwareView SoftwareView.qml
+Spinner Spinner.qml
+Tag Tag.qml
+UpdatesPage UpdatesPage.qml
