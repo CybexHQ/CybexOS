@@ -922,7 +922,11 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         shot('software.png')
         if applications == 'standard':
             evidence['installerScrolling'] = self.installer_scrolling(size)
-        self.press('ret')
+            # Closing Customize restores its launcher focus. Select Continue
+            # explicitly instead of expecting Enter to activate another control.
+            self.click(1140, 756, size)
+        else:
+            self.press('ret')
         state = self.wait_installer(lambda s: s.get('phase') == 'review' and not s.get('reviewPending'), 'the review')
         plan = state['review']
         expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': '/dev/vda'}
