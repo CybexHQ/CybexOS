@@ -304,11 +304,11 @@ fn hardware_preflight_distinguishes_detection_and_blocks_unsupported_graphics() 
     let mut ready = State {
         phase: "setup".into(),
         memory: 16 << 30,
-        hardware: serde_json::json!({
+        hardware: serde_json::from_value(serde_json::json!({
             "nvidia": true, "nvidiaSelection": {"open": false, "closed": true},
             "graphicsDetail": "Driver selected for the detected IDs",
             "networkIssues": ["Network adapter 14e4:43a0 has no active driver"], "blockers": []
-        }),
+        })).unwrap(),
         ..State::default()
     };
     ready.firmware.uefi = true;
@@ -325,7 +325,7 @@ fn hardware_preflight_distinguishes_detection_and_blocks_unsupported_graphics() 
     assert!(store.get_nvidia_closed_available());
     assert!(store.get_can_start());
 
-    ready.hardware["blockers"] = serde_json::json!(["No packaged NVIDIA driver supports all detected GPUs"]);
+    ready.hardware.insert("blockers".into(), serde_json::json!(["No packaged NVIDIA driver supports all detected GPUs"]));
     app.borrow_mut().apply_state(ready.clone());
     assert!(!store.get_can_start());
     let graphics = store.get_checks().iter().find(|c| c.label == "Graphics").unwrap();
