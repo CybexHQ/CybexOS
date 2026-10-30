@@ -244,7 +244,9 @@ def main():
     parser.add_argument('--unifont', required=True, help="GRUB's unicode.pf2, for the terminal and missing glyphs")
     options = parser.parse_args()
 
-    theme = Theme(options.out, options.fonts, options.version)
+    # The installer shows the release without its prerelease suffix.
+    version = options.version.partition('-')[0]
+    theme = Theme(options.out, options.fonts, version)
     fonts = {'item': theme.pf2(21, 'entries'), 'count': theme.pf2(15, 'countdown')}
     shutil.copy(options.unifont, theme.out / 'unicode.pf2')
     shutil.copy(options.logo, theme.out / 'logo.png')
@@ -252,7 +254,7 @@ def main():
     theme.icons(paths, options.symbol)
     theme.background()
     theme.boxes()
-    theme.eyebrow('installer', f'Cybex OS Installer · {options.version}')
+    theme.eyebrow('installer', f'Cybex OS Installer · {version}')
     theme.eyebrow('troubleshooting', 'Troubleshooting')
     theme.eyebrow('rotate', 'Rotate the screen')
     theme.eyebrow('startup', 'Startup options')

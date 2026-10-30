@@ -190,7 +190,7 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
 
     async def setup_phase(self):
         static = await self.until(lambda m: m['type'] == 'static')
-        self.assertEqual(static['version'], '1.0.0-test')
+        self.assertEqual(static['version'], '1.0.0')
         self.assertIn('messagebus', static['reserved'])
         return await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'setup' and m['draft']['timezone'] == 'Europe/Amsterdam')
 

@@ -946,7 +946,8 @@ class MediaAuthenticationTests(unittest.TestCase):
         self.assertEqual(args[2:5], ('github:DigitalPals/CybexOS/' + REVISION, REVISION, NAR))
         self.assertEqual(kwargs['channel'], 'beta')
         self.assertEqual(args[0], plan())
-        self.assertIn('Authenticated Cybex OS 1.0.0-beta.1 • beta channel • exact revision ' + REVISION, output)
+        self.assertIn('Authenticated Cybex OS 1.0.0 • exact revision ' + REVISION, output)
+        self.assertNotIn('beta', output.lower())
         # Only this medium's immutable manifest is consulted; the moved
         # channel and its newer release are never fetched or selected.
         self.assertEqual(self.requests, [RELEASES + 'v1.0.0-beta.1/manifest.json', RELEASES + 'v1.0.0-beta.1/manifest.json.sig'])

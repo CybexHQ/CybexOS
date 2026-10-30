@@ -338,7 +338,8 @@ class Daemon:
                                       for key, app in catalogue['apps'].items()
                                       if any(key in profile['apps'] for profile in catalogue['profiles'])}},
                 'reserved': sorted({'root', 'nixos', *[name for name in reserved if isinstance(name, str)]}),
-                'version': str(release.get('version', '')), 'layout': layout}
+                # The installer shows the release without its prerelease suffix.
+                'version': str(release.get('version', '')).partition('-')[0], 'layout': layout}
 
     # ── snapshots ────────────────────────────────────────────────────────────
     def snapshot(self):

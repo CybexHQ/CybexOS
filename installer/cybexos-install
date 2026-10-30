@@ -885,7 +885,8 @@ def resolve_source(args, runner):
     else:
         source = f'github:{REPO}/' + release['revision']
         revision, nar_hash = release['revision'], release['narHash']
-        label = f'Authenticated Cybex OS {release["version"]} • {channel} channel • exact revision {revision}'
+        # The installer shows the release without its prerelease suffix or channel.
+        label = f'Authenticated Cybex OS {release["version"].partition("-")[0]} • exact revision {revision}'
     if channel not in ('stable', 'beta'):
         raise Failure('Installation requires a supported release channel. Nothing has been erased')
     return source, revision, nar_hash, channel, label

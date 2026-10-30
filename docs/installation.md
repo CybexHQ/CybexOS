@@ -321,7 +321,10 @@ applies (stable rejects a prerelease medium). Any mismatch stops before disk
 erasure and vendor evaluation. The medium's channel is written to `machine.nix`
 as an explicit `cybexos.updates.channel`, so a later stable vendor release does
 not move a beta machine; the vendor default is `beta` for prerelease versions and
-`stable` otherwise, and the administrator may change it.
+`stable` otherwise, and the administrator may change it. The boot menu and
+installer screens show the version without its prerelease suffix (`1.0.0` for
+`1.0.0-beta.25`) and no channel; the ISO name, release metadata and installed
+system keep the full version.
 
 Production installation is blocked until owner-controlled trust keys and an
 authenticated published release exist. For isolated development qualification,

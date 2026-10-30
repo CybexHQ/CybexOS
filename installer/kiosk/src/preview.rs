@@ -46,7 +46,7 @@ fn base_state() -> Value {
     json!({
         "type": "state", "schema": "cybexos.installer-state.v1", "phase": "setup",
         "message": "", "error": "", "stage": 0, "stages": 6, "elapsed": 0,
-        "release": "Authenticated Cybex OS 1.0.0-beta.2 • beta channel • exact revision 9dce94a", "development": false,
+        "release": "Authenticated Cybex OS 1.0.0 • exact revision 9dce94a", "development": false,
         "disks": [
             {"path": "/dev/nvme0n1", "serial": "S6Z1NJ0W812345L", "model": "Samsung SSD 990 PRO 1TB", "size": 1000204886016u64,
              "available": true, "reason": "", "filesystems": ["ntfs", "vfat"], "bus": "NVMe"},
