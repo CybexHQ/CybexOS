@@ -22,6 +22,15 @@ stdenvNoCC.mkDerivation {
     for pose in asleep listening sorry happy; do
       rsvg-convert --height 84 --output "$theme/wiz-$pose.png" "assets/wiz/$pose.svg"
     done
+    # The installation medium's variant: the same pictures and script, which
+    # shows the medium's boot progress once the first line flags it.
+    installer=$out/share/plymouth/themes/cybexos-installer
+    mkdir -p "$installer"
+    { echo 'global.installation_medium = 1;'; cat desktop/plymouth/cybexos.script; } > "$installer/cybexos-installer.script"
+    cp desktop/plymouth/cybexos-installer.plymouth "$installer/"
+    substituteInPlace "$installer/cybexos-installer.plymouth" \
+      --replace-fail /usr/share/plymouth/themes/cybexos-installer "$installer" \
+      --replace-fail /usr/share/plymouth/themes/cybexos "$theme"
     runHook postInstall
   '';
   meta = { description = "Cybex OS boot splash and encrypted-disk unlock theme"; license = lib.licenses.mit; platforms = lib.platforms.linux; };

@@ -52,12 +52,20 @@ test('Hyprland openwindow data names the window class even when the title has co
     assert.equal(W.openedWindow('55d1c0a0'), null);
     assert.equal(W.openedWindow(undefined), null);
 });
+test('1Password is known by its desktop entry id from 8.12.42 on, and before', () => {
+    assert.equal(W.isPassword('com.onepassword.OnePassword'), true);
+    assert.equal(W.isPassword('1password'), true);
+    assert.equal(W.isPassword('1password-beta'), false);
+    assert.equal(W.isPassword(undefined), false);
+});
 test('a sign-in owns every window it opens; 1Password only its own', () => {
     assert.deepEqual(W.connectWindow('a1,1,kitty,claude auth login', 'sign-in'), {address: 'a1', signIn: true});
     assert.deepEqual(W.connectWindow('b2,1,brave-browser,Claude', 'sign-in'), {address: 'b2', signIn: true});
     assert.deepEqual(W.connectWindow('c3,1,1Password,Lock Screen, 1Password', 'password'), {address: 'c3', signIn: false});
     assert.deepEqual(W.connectWindow('c4,1,1password,1Password', 'password'), {address: 'c4', signIn: false});
+    assert.deepEqual(W.connectWindow('c5,1,com.onepassword.OnePassword,1Password', 'password'), {address: 'c5', signIn: false});
     assert.equal(W.connectWindow('d4,1,thunderbird,Inbox', 'password'), null, 'mail opened for a code stays');
+    assert.equal(W.connectWindow('d5,1,com.onepassword.OnePassword.Helper,1Password', 'password'), null);
     assert.equal(W.connectWindow('e5,1,1Password,1Password', ''), null, 'not while the guide shows');
     assert.equal(W.connectWindow('f6', 'sign-in'), null);
 });

@@ -20,6 +20,11 @@ the ISO and installed system. Its wordmark is 189×44 (378×88 at double
 density), approximately 66% of the 286-pixel password field width and retaining
 the source aspect ratio. Password masking, callback, display recentering and boot
 progress behavior are preserved. Progress and selected items are blue.
+Installed systems show the progress bar only after a disk unlock. The
+installation medium's variant, `cybexos-installer`, is the same script and
+pictures with one line prepended (`nix/packages/plymouth.nix`). It shows the bar
+from its first frame, where the passphrase field would be
+([installation](installation.md)).
 
 The boot menus share that wordmark and keep its centre 38% from the top, where
 Plymouth draws it too, so the logo does not move from menu to splash. Both

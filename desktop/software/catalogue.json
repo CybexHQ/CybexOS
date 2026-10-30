@@ -209,10 +209,21 @@
     "podman": true
    },
    "includes": [
-    "T3 Code",
-    "Docker",
-    "Podman",
-    "Node.js, Bun, Rust, Python, Java"
+    {
+     "id": "t3code",
+     "name": "T3 Code"
+    },
+    {
+     "id": "docker",
+     "name": "Docker"
+    },
+    {
+     "id": "podman",
+     "name": "Podman"
+    },
+    {
+     "name": "Node.js, Bun, Rust, Python, Java"
+    }
    ],
    "apps": [
     "zed",
@@ -284,10 +295,21 @@
     "steam": true
    },
    "includes": [
-    "Steam",
-    "MangoHud",
-    "ProtonUp-Qt",
-    "GameMode"
+    {
+     "id": "steam",
+     "name": "Steam"
+    },
+    {
+     "id": "mangohud",
+     "name": "MangoHud"
+    },
+    {
+     "id": "protonupqt",
+     "name": "ProtonUp-Qt"
+    },
+    {
+     "name": "GameMode"
+    }
    ],
    "apps": [
     "heroic",

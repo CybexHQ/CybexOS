@@ -21,7 +21,8 @@
   "profiles": [
     {"id": "development", "name": "Software Development", "short": "Development", "summary": "Code editors, AI coding agents and containers",
      "icon": "code", "default": true, "features": {"developer": true, "docker": true, "podman": true},
-     "includes": ["T3 Code", "Docker", "Podman", "Node.js, Bun, Rust, Python, Java"],
+     "includes": [{"id": "t3code", "name": "T3 Code"}, {"id": "docker", "name": "Docker"}, {"id": "podman", "name": "Podman"},
+                  {"name": "Node.js, Bun, Rust, Python, Java"}],
      "apps": ["zed", "dbeaver", "bruno", "meld"]},
     {"id": "office", "name": "Office & Productivity", "short": "Office", "summary": "Documents, mail, notes and ebooks",
      "icon": "briefcase", "features": {},
@@ -34,7 +35,9 @@
      "includes": [], "apps": ["obs", "kdenlive", "audacity", "shotcut", "handbrake"]},
     {"id": "gaming", "name": "Gaming", "short": "Gaming", "summary": "Steam, Proton and game launchers",
      "icon": "device-gamepad-2", "features": {"steam": true},
-     "includes": ["Steam", "MangoHud", "ProtonUp-Qt", "GameMode"], "apps": ["heroic", "lutris", "prismlauncher"]},
+     "includes": [{"id": "steam", "name": "Steam", "appstream": "com.valvesoftware.Steam"}, {"id": "mangohud", "name": "MangoHud"},
+                  {"id": "protonupqt", "name": "ProtonUp-Qt", "appstream": "net.davidotek.pupgui2"}, {"name": "GameMode"}],
+     "apps": ["heroic", "lutris", "prismlauncher"]},
     {"id": "chat", "name": "Chat & Meetings", "short": "Chat", "summary": "Messaging and video calls",
      "icon": "messages", "features": {},
      "includes": [], "apps": ["signal", "telegram", "discord", "slack", "zoom"]}

@@ -3,28 +3,32 @@
 # then Brave Origin starts an extension with 1Password's extension id and
 # asks for 1Password's native messaging host.
 #
-# 1Password writes that host only into the browser profiles it knows; Origin
-# reads its own profile and Chromium's system directory, where Cybex OS puts
-# the same entry. The host must be found, start through the NixOS setgid
-# helper, accept Brave Origin's executable and reach the running app, and the
-# entry must match the one this 1Password writes for its own browsers.
+# 1Password writes that host into the browser profiles it knows, Origin's
+# only since 8.12.42; Origin also reads Chromium's system directory, where
+# Cybex OS puts the same entry. The host must be found, start through the
+# NixOS setgid helper, accept Brave Origin's executable and reach the running
+# app, and the entry must match the ones this 1Password writes.
 #
 # The guide's 1Password card counts the accounts in 1Password's own database:
 # there are none before a sign-in, so it shows no tick. With 1Password
 # stopped, the check then adds an account row, and the card must show one.
 #
-# Coming back to the guide from 1Password closes 1Password's window, so it
-# does not cover the assistant sign-in that follows. That sign-in runs in the
-# background and opens only Brave, no terminal. Leaving the guide then closes
-# what Connect opened, while a window the person opened stays. The guide stays
-# up until they are gone.
+# The guide finds 1Password by its desktop entry, com.onepassword.OnePassword
+# since 8.12.42, although its windows keep the app id 1password. Coming back
+# to the guide from 1Password closes 1Password's window, so it does not cover
+# the assistant sign-in that follows. That sign-in runs in the background and
+# opens only Brave, no terminal. Leaving the guide then closes what Connect
+# opened, while a window the person opened stays. The guide stays up until
+# they are gone.
 #
 # Test-only settings: SDDM signs the user in directly, Brave does not fetch
 # the store extension (the VM has no network), and the probe carries the
 # store extension's public key, which gives an unpacked extension the same
 # id. 1Password is not signed in, and its main window does not draw in this
-# VM; the browser link needs neither, and a window of its class stands in
-# for it.
+# VM; the browser link needs neither. Started again after the check stopped
+# it, 1Password shows its crash reporter, a window of its own process, and
+# that is the window Resume closes. Past it, the added row stops 1Password
+# with a dialog saying it cannot start.
 # Claude Code is a script that opens its sign-in page with xdg-open, as the
 # real one does, and is signed in once the check says so. The added row is
 # not a real account. This is VM qualification of the browser link and of
@@ -82,10 +86,6 @@ let
       *) exit 2 ;;
     esac
   '';
-  # A window of 1Password's class, closing at once as its own does.
-  passwordWindow = pkgs.writeShellScript "cybexos-1password-window" ''
-    exec ${pkgs.kitty}/bin/kitty -o confirm_os_window_close=0 --class 1Password ${pkgs.coreutils}/bin/sleep 1777
-  '';
   ownWindow = pkgs.writeShellScript "cybexos-own-window" ''
     exec ${pkgs.kitty}/bin/kitty --class cxo-own ${pkgs.coreutils}/bin/sleep 1555
   '';
@@ -114,6 +114,8 @@ in pkgs.testers.runNixOSTest {
     import json
 
     HOST = "com.1password.1password.json"
+    # What 1Password 8.12.42's windows are called, Wayland and XWayland alike.
+    APP_ID = "1password"
     LOGS = "/home/tester/.config/1Password/logs"
 
     machine.start()
@@ -157,12 +159,11 @@ in pkgs.testers.runNixOSTest {
     assert user("cybexos-runtime ipc welcome connect password").strip() == "ok"
     machine.wait_until_succeeds(f"grep -q 'Starting IPC listener on 1Password-BrowserSupport' {LOGS}/1Password_rCURRENT.log", timeout=180)
 
-    # 1Password's own entries leave Origin's profile out; the system one is the same entry.
-    machine.succeed(f"test -f /home/tester/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/{HOST}")
-    machine.fail(f"test -e /home/tester/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts/{HOST}")
+    # 1Password's own entries, Origin's profile among them; the system one is the same entry.
     ours = host(f"/etc/chromium/native-messaging-hosts/{HOST}")
-    theirs = host(f"/home/tester/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/{HOST}")
-    assert ours == theirs, (ours, theirs)
+    for profile in ("Brave-Browser", "Brave-Origin"):
+        theirs = host(f"/home/tester/.config/BraveSoftware/{profile}/NativeMessagingHosts/{HOST}")
+        assert ours == theirs, (profile, ours, theirs)
     machine.succeed("test -g /run/wrappers/bin/1Password-BrowserSupport")
 
     # Brave Origin finds the host, 1Password accepts the browser, and the app answers.
@@ -190,13 +191,19 @@ in pkgs.testers.runNixOSTest {
     retry(lambda _: welcome()["connect"]["password"] == "ready", timeout_seconds=30)
     machine.screenshot("connect-signed-in")
 
-    # 1Password again, left open: coming back to the guide closes it.
+    # 1Password again, left open: coming back to the guide closes the window it opened.
     assert user("cybexos-runtime ipc welcome connect password").strip() == "ok"
-    run("${passwordWindow}")
-    retry(lambda _: "1Password" in classes(), timeout_seconds=60)
+    retry(lambda _: APP_ID in classes(), timeout_seconds=120)
+    reporter = welcome()["connectWindows"]
+    machine.log("windows: " + json.dumps(clients()) + ", the guide's: " + json.dumps(reporter))
+    assert reporter and all(clients().get(address) == APP_ID for address in reporter), (reporter, clients())
+    machine.screenshot("connect-1password")
+    assert user("cybexos-runtime ipc welcome open connect").strip() == "ok"
+    # 1Password then goes on starting, and its dialog about the added row
+    # steps the guide aside as any new window does.
+    retry(lambda _: not set(reporter) & set(clients()) and APP_ID in classes(), timeout_seconds=30)
     assert user("cybexos-runtime ipc welcome open connect").strip() == "ok"
     retry(lambda _: not welcome()["aside"], timeout_seconds=15)
-    retry(lambda _: "1Password" not in classes(), timeout_seconds=15)
     # A window the person opens while the guide shows is theirs.
     run("${ownWindow}")
     retry(lambda _: "cxo-own" in classes(), timeout_seconds=60)
@@ -214,11 +221,9 @@ in pkgs.testers.runNixOSTest {
     opened = welcome()["connectWindows"]
     windows = clients()
     machine.log("windows: " + json.dumps(windows) + ", the guide's: " + json.dumps(opened))
-    # The real 1Password may show a window too: here, under its Wayland app
-    # id, the dialog saying the made-up account stops it from starting. The
-    # keyring prompt Brave raises is this VM's: its sign-in leaves the
-    # keyring locked.
-    assert {"brave"} <= set(kinds(opened, windows)) <= {"1password", "brave", "gcr-prompter"}, (opened, windows)
+    # The real 1Password may show a window too. The keyring prompt Brave
+    # raises is this VM's: its sign-in leaves the keyring locked.
+    assert {"brave"} <= set(kinds(opened, windows)) <= {APP_ID, "brave", "gcr-prompter"}, (opened, windows)
 
     # Leaving closes them before the desktop shows; the person's own stays.
     user("cybexos-runtime ipc welcome close")

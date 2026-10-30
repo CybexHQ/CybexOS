@@ -441,7 +441,7 @@ const SOFTWARE: &str = r#"{"type":"static","schema":"cybexos.installer-state.v1"
     "features":[["docker","Docker","Container engine"],["proprietary","Proprietary applications","Vendor apps"]],
     "software":{"profiles":[
         {"id":"development","name":"Software Development","short":"Development","icon":"code","default":true,"onMedium":true,
-         "includes":["Docker"],"apps":["zed"],"features":["developer","docker"],"downloadBytes":0,"vendor":0},
+         "includes":[{"name":"Docker","icon":""}],"apps":["zed"],"features":["developer","docker"],"downloadBytes":0,"vendor":0},
         {"id":"office","name":"Office & Productivity","short":"Office","icon":"briefcase","apps":["writer"],"downloadBytes":90000000,"vendor":0},
         {"id":"chat","name":"Chat & Meetings","short":"Chat","icon":"messages","apps":["slack"],"downloadBytes":5,"vendor":1}],
      "apps":{"zed":{"name":"Zed","free":true,"icon":"","downloadBytes":1},

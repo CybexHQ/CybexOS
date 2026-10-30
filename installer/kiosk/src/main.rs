@@ -59,6 +59,24 @@ fn request_text_installer() {
     }
 }
 
+/// Tell systemd (Type=notify) that the first frame is on the screen: the boot
+/// splash stays until then (nix/modules/installer.nix).
+fn notify_ready() {
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::net::{SocketAddr, UnixDatagram};
+    let Some(path) = std::env::var_os("NOTIFY_SOCKET") else {
+        return;
+    };
+    let address = match path.as_encoded_bytes().strip_prefix(b"@") {
+        Some(name) => SocketAddr::from_abstract_name(name),
+        None => SocketAddr::from_pathname(&path),
+    };
+    let sent = UnixDatagram::unbound().and_then(|socket| socket.send_to_addr(b"READY=1", &address?));
+    if let Err(error) = sent {
+        eprintln!("cybexos-installer: could not notify systemd ({error})");
+    }
+}
+
 fn main() {
     configure_display();
     // A native GPU driver can still be binding when the unit starts; retry
@@ -90,6 +108,9 @@ fn main() {
     });
     let app = App::new(&window, client);
     APP.with(|slot| *slot.borrow_mut() = Some(Rc::clone(&app)));
+    // Each pass of the event loop fires due timers, then draws. A timer started
+    // by the first pass's timer fires in the second, after the first frame.
+    slint::Timer::single_shot(Duration::ZERO, || slint::Timer::single_shot(Duration::ZERO, notify_ready));
     if let Err(error) = window.run() {
         eprintln!("cybexos-installer: event loop stopped ({error})");
         std::process::exit(1);

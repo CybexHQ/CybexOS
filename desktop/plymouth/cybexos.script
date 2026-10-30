@@ -1,4 +1,8 @@
 # Cybex OS Plymouth Theme Script
+#
+# The installation medium's variant, cybexos-installer, is this script after
+# one line that sets global.installation_medium (nix/packages/plymouth.nix):
+# its boot shows a progress bar from the start (see "Installation medium").
 
 # Black, like the boot menu and GRUB's screen while it loads the system.
 Window.SetBackgroundTopColor(0, 0, 0);
@@ -42,6 +46,9 @@ fun refresh_callback ()
         else if (frames_left < 20)
           wiz.sprite.SetOpacity(frames_left / 20);
       }
+
+    if (global.medium_active == 1)
+      medium_refresh();
 
     # Animate fake progress to limit over time with easing
     if (global.fake_progress_active == 1)
@@ -229,6 +236,7 @@ fun display_password_callback (prompt, bullets)
     global.password_shown = 1;  # Mark that password dialog has been shown
 
     # Reset progress when password dialog appears
+    global.medium_active = 0;
     stop_fake_progress();
     hide_progress_bar();
     global.max_progress = 0.0;
@@ -282,6 +290,9 @@ fun display_password_callback (prompt, bullets)
 # systemd sends the name of each unit that has started.
 fun update_status_callback (status)
   {
+    if (global.medium_active == 1)
+      medium_status(status);
+
     if (global.wiz_checking == 1 && String(status).SubString(0, 19) == "systemd-cryptsetup@")
       {
         global.wiz_checking = 0;
@@ -355,6 +366,10 @@ fun update_layout ()
 
 fun progress_callback (duration, progress)
   {
+    # Plymouth's own estimate learns from earlier boots, which a medium lacks.
+    if (global.medium_active == 1)
+      return;
+
     global.real_progress = progress;
 
     # If real progress is above limit, stop fake progress and use real progress
@@ -363,6 +378,64 @@ fun progress_callback (duration, progress)
         stop_fake_progress();
         update_progress_bar(progress);
       }
+  }
+
+#----------------------------------------- Installation medium --------------------------------
+
+# The medium boots for longer than an installed system, longest from a network
+# or a slow USB stick, and has no earlier boot to estimate from. Its bar shows
+# from the first frame and follows the medium's own milestones in boot order:
+# systemd reports each unit that has started, and cybexos-installer-splash
+# reports cybexos-installer-ready just before the installer screen takes over
+# the display (nix/modules/installer.nix). Between two milestones the bar
+# eases towards the next without reaching it; it never moves back.
+medium.units = [];
+medium.marks = [];
+medium.units[0] = "sysroot-iso.mount";             medium.marks[0] = 0.25;  # the medium is found
+medium.units[1] = "sysroot-nix-store.mount";       medium.marks[1] = 0.4;   # its store is mounted
+medium.units[2] = "systemd-journal-flush.service"; medium.marks[2] = 0.55;  # the system has started
+medium.units[3] = "NetworkManager.service";        medium.marks[3] = 0.7;
+medium.units[4] = "cybexos-installerd.service";    medium.marks[4] = 0.85;
+medium.units[5] = "cybexos-installer-ready";       medium.marks[5] = 1;
+global.medium_active = 0;    # the bar follows the medium's boot
+global.medium_reached = -1;  # the latest milestone reached
+global.medium_since = 0;     # the frame it was reached
+global.medium_frame = 0;     # refresh frames, 50 a second
+global.medium_shown = 0;     # the bar as drawn
+
+fun medium_status (status)
+  {
+    for (index = global.medium_reached + 1; medium.units[index]; index++)
+      if (status == medium.units[index])
+        {
+          global.medium_reached = index;
+          global.medium_since = global.medium_frame;
+        }
+  }
+
+fun medium_refresh ()
+  {
+    global.medium_frame++;
+    floor = 0;
+    if (global.medium_reached >= 0)
+      floor = medium.marks[global.medium_reached];
+    ahead = medium.marks[global.medium_reached + 1];
+    if (!ahead)
+      ahead = 1;
+
+    # Halfway to the next milestone after four seconds.
+    seconds = (global.medium_frame - global.medium_since) / 50;
+    goal = floor + (ahead - floor) * seconds / (seconds + 4);
+
+    # The bar fills within a quarter of a second after the last milestone,
+    # before the display changes hands.
+    if (floor == 1)
+      global.medium_shown += (1 - global.medium_shown) / 3;
+    else
+      global.medium_shown += (goal - global.medium_shown) / 6;
+    if (global.medium_shown > 0.99)
+      global.medium_shown = 1;
+    update_progress_bar(global.medium_shown);
   }
 
 #----------------------------------------- Quit --------------------------------
@@ -389,6 +462,12 @@ fun hide_message_callback (text)
 }
 
 update_layout();
+# Shutdown and restart show only the logo.
+if (global.installation_medium && Plymouth.GetMode() == "boot")
+  {
+    global.medium_active = 1;
+    show_progress_bar();
+  }
 Plymouth.SetRefreshFunction(refresh_callback);
 Plymouth.SetDisplayNormalFunction(display_normal_callback);
 Plymouth.SetDisplayPasswordFunction(display_password_callback);

@@ -57,7 +57,11 @@ pub fn monogram(name: &str) -> String {
 /// A card's tiles, at most five: what the profile brings (includes) and its
 /// apps, alternately, leading with the first include.
 pub fn tiles<'a>(profile: &'a Profile, software: &'a Software) -> Vec<Tile<'a>> {
-    let mut includes = profile.includes.iter().map(|name| Tile { name, icon: "", mono: true });
+    let mut includes = profile.includes.iter().map(|item| Tile {
+        name: &item.name,
+        icon: &item.icon,
+        mono: item.icon.is_empty(),
+    });
     let mut apps = profile.apps.iter().filter_map(|id| software.apps.get(id)).map(|app| Tile {
         name: &app.name,
         icon: &app.icon,
@@ -180,10 +184,11 @@ pub fn customized<'a>(software: &'a Software, draft: &Draft, online: bool) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::SoftwareApp;
+    use crate::protocol::{Included, SoftwareApp};
 
     fn catalogue() -> Software {
         let app = |name: &str, free: bool, icon: &str| SoftwareApp { name: name.into(), free, icon: icon.into(), download_bytes: 1 };
+        let include = |name: &str, icon: &str| Included { name: name.into(), icon: icon.into() };
         let mut software = Software::default();
         software.apps.insert("zed".into(), app("Zed", true, "/icons/zed.png"));
         software.apps.insert("dbeaver".into(), app("DBeaver Community", true, "/icons/dbeaver.png"));
@@ -191,7 +196,8 @@ mod tests {
         software.profiles = vec![
             Profile {
                 id: "development".into(), name: "Software Development".into(), short: "Development".into(),
-                on_medium: true, includes: vec!["T3 Code".into(), "Claude Code".into(), "Codex".into(), "Docker".into()],
+                on_medium: true,
+                includes: vec![include("T3 Code", ""), include("Claude Code", ""), include("Codex", ""), include("Docker", "/icons/docker.png")],
                 apps: vec!["zed".into(), "dbeaver".into()], ..Profile::default()
             },
             Profile {
@@ -207,6 +213,9 @@ mod tests {
         let software = catalogue();
         let names: Vec<&str> = tiles(&software.profiles[0], &software).iter().map(|t| t.name).collect();
         assert_eq!(names, ["T3 Code", "Zed", "Claude Code", "DBeaver Community", "Codex"]);
+        let docker = Profile { includes: software.profiles[0].includes[3..].to_vec(), ..Profile::default() };
+        assert_eq!(tiles(&docker, &software), [Tile { name: "Docker", icon: "/icons/docker.png", mono: false }],
+                   "what a profile includes shows its icon too");
         let gimp = tiles(&software.profiles[1], &software);
         assert_eq!(gimp, [Tile { name: "GIMP", icon: "", mono: true }], "an app without an icon gets a monogram");
     }

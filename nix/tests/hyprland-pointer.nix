@@ -11,8 +11,9 @@
 # receive clicks once it is put away.
 #
 # First, the welcome guide's Connect step on the same session: a stand-in
-# 1Password (a terminal window of class 1Password) must make the guide step
-# aside on Hyprland's openwindow event and return on its closewindow event.
+# 1Password (a terminal window of its app id) must make the guide step
+# aside on Hyprland's openwindow event and return on its closewindow event,
+# and a click on the resume pill's Resume must close its window.
 # The real `cybex doctor` runs inside the session, and Ready reports it.
 #
 # Test-only settings: SDDM signs the user in directly (Cybex OS's own
@@ -71,11 +72,12 @@ in pkgs.testers.runNixOSTest {
     networking.hostName = "machine";
     users.users.tester.initialPassword = "qualification-only";
     services.displayManager.autoLogin = { enable = true; user = "tester"; };
-    # 1Password's desktop entry id, opening a window of its class.
+    # 1Password's desktop entry id since 8.12.42, opening a window of the app
+    # id its windows keep.
     environment.systemPackages = [ (pkgs.makeDesktopItem {
-      name = "1password";
+      name = "com.onepassword.OnePassword";
       desktopName = "1Password";
-      exec = "${pkgs.kitty}/bin/kitty --class 1Password ${pkgs.coreutils}/bin/sleep 1777";
+      exec = "${pkgs.kitty}/bin/kitty -o confirm_os_window_close=0 --class 1password ${pkgs.coreutils}/bin/sleep 1777";
     }) ];
     # The character's place before the first sign-in, right of the probe
     # window and below the bar, as tests/assistant-overlay.py seeds it.
@@ -104,6 +106,7 @@ in pkgs.testers.runNixOSTest {
     QML_ERRORS = re.compile(r"TypeError|ReferenceError|Binding loop|is not a type|Type \w+ unavailable"
                             r"|Cannot assign|Unable to assign|Illegal method name|Failed to load configuration")
     TOLERANCE = 3
+    PASSWORD = "1password"
     out = machine.out_dir
 
     machine.start()
@@ -192,7 +195,7 @@ in pkgs.testers.runNixOSTest {
     assert connect["password"] == "available" and connect["assistant"] in ("required", "ready"), connect
     machine.screenshot("connect")
     assert user("cybexos-runtime ipc welcome connect password").strip() == "ok"
-    assert wait(lambda: any(c["class"] == "1Password" for c in hypr("clients")), 60), hypr("clients")
+    assert wait(lambda: any(c["class"] == PASSWORD for c in hypr("clients")), 60), hypr("clients")
     assert wait(lambda: welcome()["aside"] and "qs-welcome-resume" in layer_names(), 15), (welcome(), layer_names())
     machine.screenshot("connect-1password")
     # Another window closing leaves the guide aside; the 1Password one brings it back.
@@ -206,6 +209,18 @@ in pkgs.testers.runNixOSTest {
     assert wait(lambda: not welcome()["aside"] and "qs-welcome" in layer_names(), 15), (welcome(), layer_names())
     assert welcome()["step"] == "connect" and welcome()["connect"]["password"] == "opened", welcome()
     machine.screenshot("connect-returned")
+    # Opened again and left by Resume, clicked on the pill: its window closes.
+    assert user("cybexos-runtime ipc welcome connect password").strip() == "ok"
+    assert wait(lambda: any(c["class"] == PASSWORD for c in hypr("clients")), 60), hypr("clients")
+    assert wait(lambda: welcome()["aside"] and "qs-welcome-resume" in layer_names(), 15), (welcome(), layer_names())
+    pill = next(layer for monitor in hypr("layers").values() for level in monitor.get("levels", {}).values()
+                for layer in level if layer.get("namespace") == "qs-welcome-resume")
+    machine.screenshot("connect-1password-again")
+    # Resume ends 14 pixels left of the 40-pixel close button, 10 from the pill's end.
+    click(pill["x"] + pill["w"] - 10 - 40 - 14 - 20, pill["y"] + pill["h"] // 2)
+    assert wait(lambda: not welcome()["aside"] and "qs-welcome" in layer_names(), 15), (welcome(), layer_names())
+    assert wait(lambda: not any(c["class"] == PASSWORD for c in hypr("clients")), 15), hypr("clients")
+    machine.screenshot("connect-resumed")
 
     # The system check the guide runs, in this session, and Ready's report of it.
     IDS = ["graphics", "drivers", "firmware-files", "services", "audio", "secure-boot", "firmware-updates",

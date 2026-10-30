@@ -188,6 +188,12 @@ def full_name_problem(name):
     return ''
 
 
+def software_include(item, directory):
+    """What a profile brings besides its apps, such as Docker. An id names its icon."""
+    icon = directory / 'icons' / f'{item["id"]}.png' if isinstance(item.get('id'), str) and ID.fullmatch(item['id']) else None
+    return {'name': item['name'][:64], 'icon': str(icon) if icon and icon.is_file() else ''}
+
+
 def software_catalogue(directory=None):
     """The software profiles and their apps, from the release's catalogue.
 
@@ -221,7 +227,8 @@ def software_catalogue(directory=None):
             'short': str(profile.get('short') or profile.get('name') or profile['id'])[:32],
             'summary': str(profile.get('summary') or '')[:120], 'icon': str(profile.get('icon') or '')[:64],
             'default': profile.get('default') is True, 'onMedium': profile.get('default') is True,
-            'includes': [str(item)[:64] for item in profile.get('includes') or [] if isinstance(item, str)][:12],
+            'includes': [software_include(item, directory) for item in profile.get('includes') or []
+                         if isinstance(item, dict) and isinstance(item.get('name'), str)][:12],
             'apps': list(dict.fromkeys(members)),
             'features': sorted(key for key, value in features.items() if key in FEATURES and value is True),
             'downloadBytes': size if type(size) is int and size >= 0 else 0})

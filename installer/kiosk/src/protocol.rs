@@ -53,14 +53,22 @@ pub struct Profile {
     /// The medium carries this profile's free apps.
     #[serde(rename = "onMedium")]
     pub on_medium: bool,
-    /// What the profile brings besides its apps, such as "Docker" or "Steam".
-    pub includes: Vec<String>,
+    /// What the profile brings besides its apps, such as Docker or Steam.
+    pub includes: Vec<Included>,
     pub apps: Vec<String>,
     pub features: Vec<String>,
     #[serde(rename = "downloadBytes")]
     pub download_bytes: u64,
     /// Apps and software that come from their vendors under unfree licenses.
     pub vendor: u32,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct Included {
+    pub name: String,
+    /// An absolute path to its 128 px PNG icon, or empty.
+    pub icon: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -340,12 +348,15 @@ mod tests {
         let line = r#"{"type":"static","schema":"cybexos.installer-state.v1",
             "features":[["docker","Docker","Container engine"]],
             "software":{"profiles":[{"id":"development","name":"Software Development","short":"Development","icon":"code",
-                "default":true,"onMedium":true,"includes":["Docker"],"apps":["zed"],"features":["developer"],"downloadBytes":5,"vendor":0}],
+                "default":true,"onMedium":true,"includes":[{"name":"Docker","icon":"/share/icons/docker.png"},{"name":"Rust","icon":""}],
+                "apps":["zed"],"features":["developer"],"downloadBytes":5,"vendor":0}],
                 "apps":{"zed":{"name":"Zed","free":true,"icon":"/share/icons/zed.png","downloadBytes":5}}}}"#;
         let Some(Message::Static(statics)) = parse(line) else { panic!("static") };
         let profile = &statics.software.profiles[0];
         assert!(profile.on_medium && profile.default);
         assert_eq!(profile.apps, ["zed"]);
+        assert_eq!(profile.includes[0].icon, "/share/icons/docker.png");
+        assert_eq!(profile.includes[1].name, "Rust");
         assert_eq!(statics.software.apps["zed"].icon, "/share/icons/zed.png");
         assert_eq!(statics.features[0].0, "docker");
         let line = r#"{"type":"state","schema":"cybexos.installer-state.v1","phase":"setup",

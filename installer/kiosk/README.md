@@ -76,10 +76,12 @@ reference's icon table.
 
 ## Runtime contract
 
-- Software: the static message carries the catalogue's profiles and their apps,
-  each with the absolute path of its 128 px icon in the installer package
-  (`share/cybexos-installer/software`). The screen loads those PNGs once; the
-  service decides what installs and summarizes it in each snapshot's `software`.
+- Software: the static message carries the catalogue's profiles, their apps
+  and what they include besides them (Docker, Steam), each with the absolute
+  path of its 128 px icon in the installer package
+  (`share/cybexos-installer/software`), or none. The screen loads those PNGs
+  once and shows a two-letter monogram where there is no icon; the service
+  decides what installs and summarizes it in each snapshot's `software`.
 - Socket: `CYBEXOS_INSTALLER_SOCKET`, default `/run/cybexos-installer/control.sock`.
   On every connection the screen sends `{"action":"hello","client":"screen"}`;
   snapshots count the attached screens in `screens`, which automation waits for.

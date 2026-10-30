@@ -47,7 +47,7 @@ in stdenv.mkDerivation {
     paths = [
       "desktop/quickshell" "desktop/hypr" "desktop/defaults" "desktop/fastfetch"
       # Software's app catalogue and icons; not its maintainer sources.
-      "desktop/software/catalogue.json" "desktop/software/icons"
+      "desktop/software/catalogue.json" "desktop/software/icons" "desktop/software/marks/THIRD_PARTY_LICENSES.md"
       "desktop/icons/hicolor" "desktop/bin" "assets/brand" "assets/wiz"
       "assets/EDM115-newline2.omp.json" "assets/scripts" "agent-skills/cybexos"
       "nix/tests/desktop-runtime.py"
@@ -70,6 +70,7 @@ in stdenv.mkDerivation {
     mkdir -p $out/share/cybexos/software
     cp desktop/software/catalogue.json $out/share/cybexos/software/
     cp -r desktop/software/icons $out/share/cybexos/software/
+    cp desktop/software/marks/THIRD_PARTY_LICENSES.md $out/share/cybexos/software/
     cp -r assets/brand $out/share/cybexos/
     mkdir -p $out/share/icons $out/share/applications
     cp -r desktop/icons/hicolor $out/share/icons/
