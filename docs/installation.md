@@ -126,10 +126,11 @@ installer, restart into firmware settings, restart and power off.
 The profiles come from `desktop/software/catalogue.json` (see
 `desktop/software/README.md`): Software Development, Office & Productivity,
 Graphics & Design, Audio & Video, Gaming, and Chat & Meetings. Each card shows
-up to five of its apps and what it brings besides them, whether it is on this
-USB stick or roughly how much it downloads, and how many of its apps come from
-their vendors under proprietary licenses. Every app is prebuilt: by NixOS in
-cache.nixos.org, or by its vendor. Nothing compiles on the computer.
+the icons of up to five of its apps and what it brings besides them (such as
+T3 Code, Docker, Podman or Steam), whether it is on this USB stick or roughly
+how much it downloads, and how many of its apps come from their vendors under
+proprietary licenses. Every app is prebuilt: by NixOS in cache.nixos.org, or by
+its vendor. Nothing compiles on the computer.
 
 The service turns the choice into the plan. Its `features` switch on what the
 chosen profiles bring (Development: `developer`, `docker`, `podman`; Gaming:

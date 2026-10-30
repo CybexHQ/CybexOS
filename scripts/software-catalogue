@@ -6,9 +6,12 @@ resolves each entry against the repository's locked Nixpkgs, keeps only apps
 that NixOS has prebuilt (or that are unfree vendor downloads, which NixOS never
 caches), and adds metadata from Flathub's public AppStream API: name, summary,
 description, developer, brand colours, screenshot URLs, monthly installs (the
-"Popular" ranking) and a 128 px icon, re-encoded locally.
+"Popular" ranking) and a 128 px icon, re-encoded locally. What a profile
+includes besides its apps (Docker, Steam) gets an icon too: from Flathub when
+it names an AppStream ID, otherwise rendered from desktop/software/marks.
 
-    nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux.python3.withPackages (p: [ p.pillow ])' \
+    nix shell --impure --expr 'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux;
+        buildEnv { name = "software-catalogue"; paths = [ (python3.withPackages (p: [ p.pillow ])) librsvg ]; }' \
         -c scripts/software-catalogue            # regenerate
     scripts/software-catalogue --check          # offline: catalogue matches sources and icons
 
@@ -36,6 +39,7 @@ SOFTWARE = ROOT / 'desktop/software'
 SOURCES = SOFTWARE / 'sources.json'
 CATALOGUE = SOFTWARE / 'catalogue.json'
 ICONS = SOFTWARE / 'icons'
+MARKS = SOFTWARE / 'marks'
 FLATHUB = 'https://flathub.org/api/v2/'
 CACHE = 'https://cache.nixos.org'
 ID = re.compile(r'[a-z0-9]{2,32}')
@@ -58,7 +62,35 @@ def sources():
             raise SystemExit(f'sources.json: profile {profile["id"]} lists unknown apps {sorted(missing)}')
     if set(data['featured']) - set(ids):
         raise SystemExit('sources.json: featured lists unknown apps')
+    extras(data)
     return data
+
+
+def extras(data):
+    """What the profiles include besides their apps and has an icon, by id.
+
+    An entry with an AppStream ID takes its icon from Flathub; one without
+    takes it from marks/<id>.svg. Entries without an id have no icon.
+    """
+    found = {}
+    for profile in data['profiles']:
+        for item in profile['includes']:
+            if not isinstance(item, dict) or not isinstance(item.get('name'), str):
+                raise SystemExit(f'sources.json: profile {profile["id"]} has an include without a name')
+            if 'id' not in item:
+                continue
+            if not ID.fullmatch(item['id']) or item['id'] in {app[0] for app in data['apps']}:
+                raise SystemExit(f'sources.json: include id {item["id"]!r} is invalid or an app id')
+            if found.setdefault(item['id'], item) != item:
+                raise SystemExit(f'sources.json: include {item["id"]} differs between profiles')
+            if 'appstream' not in item and not (MARKS / f'{item["id"]}.svg').is_file():
+                raise SystemExit(f'sources.json: include {item["id"]} needs an AppStream ID or marks/{item["id"]}.svg')
+    return found
+
+
+def catalogued(item):
+    """An include as the catalogue lists it."""
+    return {key: item[key] for key in ('id', 'name') if key in item}
 
 
 def evaluate(attributes):
@@ -223,9 +255,38 @@ def icon(app_id, url):
     image = image.convert('RGBA')
     if image.size != (128, 128):
         image = image.resize((128, 128), Image.LANCZOS)
+    save(app_id, image)
+
+
+def mark(item_id):
+    """A local mark, framed like a Flathub icon: at most 112 px, centred in 128."""
+    from PIL import Image
+    raw = subprocess.run(['rsvg-convert', '--width', '112', '--height', '112', '--keep-aspect-ratio',
+                          str(MARKS / f'{item_id}.svg')], check=True, capture_output=True).stdout
+    image = Image.open(io.BytesIO(raw)).convert('RGBA')
+    canvas = Image.new('RGBA', (128, 128))
+    canvas.alpha_composite(image, ((128 - image.width) // 2, (128 - image.height) // 2))
+    save(item_id, canvas)
+
+
+def save(icon_id, image):
     output = io.BytesIO()
     image.save(output, 'PNG', optimize=True)
-    (ICONS / f'{app_id}.png').write_bytes(output.getvalue())
+    (ICONS / f'{icon_id}.png').write_bytes(output.getvalue())
+
+
+def extra_icons(data):
+    """Write the includes' icons; returns their ids."""
+    found = extras(data)
+    for item_id, item in found.items():
+        if 'appstream' not in item:
+            mark(item_id)
+            continue
+        stream = appstream(item['appstream'])
+        if not stream or not stream['icon']:
+            raise SystemExit(f'{item_id}: no Flathub icon for {item["appstream"]}')
+        icon(item_id, stream['icon'])
+    return set(found)
 
 
 def closure(paths):
@@ -289,6 +350,7 @@ def generate():
                                                'screenshots', 'installs', 'brand')},
                      **({'name': data['names'][app_id]} if app_id in data.get('names', {}) else {}),
                      'desktop': stream['desktop'], 'icon': stream['icon']})
+    included = extra_icons(data)
     with ThreadPoolExecutor(8) as pool:
         list(pool.map(lambda app: icon(app['id'], app['icon']), apps))
         found = list(pool.map(lambda app: desktop_ids(app['out']) if app['free'] else [], apps))
@@ -306,12 +368,13 @@ def generate():
         union = {}
         for app in free:
             union |= {p: v for p, v in sizes[apps.index(app)].items() if p not in base}
-        profiles.append(profile | {'apps': members, 'downloadBytes': sum(union.values())})
+        profiles.append(profile | {'includes': [catalogued(item) for item in profile['includes']],
+                                   'apps': members, 'downloadBytes': sum(union.values())})
     catalogue = {'schema': 1, 'nixpkgs': revision, 'categories': [
         c | {'subcategories': [{'id': s, 'name': n} for s, n in c['subcategories']]} for c in data['categories']],
         'profiles': profiles, 'featured': [f for f in data['featured'] if f in kept], 'apps': apps}
     CATALOGUE.write_text(json.dumps(catalogue, indent=1, ensure_ascii=False) + '\n')
-    stale = {p.stem for p in ICONS.glob('*.png')} - set(kept)
+    stale = {p.stem for p in ICONS.glob('*.png')} - set(kept) - included
     for name in stale:
         (ICONS / f'{name}.png').unlink()
     for app_id, attribute, reason in dropped:
@@ -329,9 +392,12 @@ def check():
             problems.append(f'{app["id"]}: differs from sources.json')
         if not (ICONS / f'{app["id"]}.png').is_file():
             problems.append(f'{app["id"]}: icon missing')
-    extra = {p.stem for p in ICONS.glob('*.png')} - {a['id'] for a in catalogue['apps']}
+    included = extras(data)
+    problems += [f'{name}: include icon missing' for name in sorted(included) if not (ICONS / f'{name}.png').is_file()]
+    extra = {p.stem for p in ICONS.glob('*.png')} - {a['id'] for a in catalogue['apps']} - set(included)
     problems += [f'{name}: icon without catalogue entry' for name in sorted(extra)]
-    if {p['id'] for p in catalogue['profiles']} != {p['id'] for p in data['profiles']}:
+    if ({p['id']: p['includes'] for p in catalogue['profiles']}
+            != {p['id']: [catalogued(item) for item in p['includes']] for p in data['profiles']}):
         problems.append('profiles differ from sources.json')
     for problem in problems:
         print(problem, file=sys.stderr)

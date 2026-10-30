@@ -528,10 +528,11 @@ impl App {
     fn load_software(&mut self) {
         let software = &self.statics.software;
         let mut icons = HashMap::new();
-        for app in software.apps.values() {
-            if app.icon.starts_with('/') && app.icon.ends_with(".png") {
-                if let Ok(image) = Image::load_from_path(std::path::Path::new(&app.icon)) {
-                    icons.insert(app.icon.clone(), image);
+        let included = software.profiles.iter().flat_map(|profile| profile.includes.iter().map(|item| &item.icon));
+        for icon in software.apps.values().map(|app| &app.icon).chain(included) {
+            if icon.starts_with('/') && icon.ends_with(".png") && !icons.contains_key(icon) {
+                if let Ok(image) = Image::load_from_path(std::path::Path::new(icon)) {
+                    icons.insert(icon.clone(), image);
                 }
             }
         }
@@ -626,7 +627,8 @@ impl App {
                 });
             }
             if !profile.includes.is_empty() {
-                rows.push(row(3, "", format!("Also includes {}.", profile.includes.join(" · ")), String::new()));
+                let names: Vec<&str> = profile.includes.iter().map(|item| item.name.as_str()).collect();
+                rows.push(row(3, "", format!("Also includes {}.", names.join(" · ")), String::new()));
             }
         }
         rows.push(row(0, "", "SYSTEM FEATURES".into(), String::new()));

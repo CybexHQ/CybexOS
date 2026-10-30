@@ -63,7 +63,8 @@ in stdenvNoCC.mkDerivation {
   src = import ../package-source.nix {
     inherit lib source;
     paths = [ "installer/cybexos-installerd" "desktop/quickshell/scripts/network-tool.py"
-              "desktop/software/catalogue.json" "desktop/software/icons" ];
+              "desktop/software/catalogue.json" "desktop/software/icons"
+              "desktop/software/marks/THIRD_PARTY_LICENSES.md" ];
   };
   nativeBuildInputs = [ makeWrapper ];
   dontBuild = true;
@@ -72,6 +73,7 @@ in stdenvNoCC.mkDerivation {
     cp installer/cybexos-installerd $out/libexec/cybexos-installerd
     cp desktop/quickshell/scripts/network-tool.py $out/libexec/network-tool.py
     cp -r desktop/software/catalogue.json desktop/software/icons $out/share/cybexos-installer/software/
+    cp desktop/software/marks/THIRD_PARTY_LICENSES.md $out/share/cybexos-installer/software/
     patchShebangs $out/libexec
     makeWrapper ${screen}/bin/cybexos-installer $out/bin/cybexos-installer \
       --set-default FONTCONFIG_FILE ${fonts} \

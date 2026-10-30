@@ -548,13 +548,16 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory)
             (root / 'icons').mkdir()
             (root / 'icons/good.png').write_bytes(b'png')
+            (root / 'icons/tool.png').write_bytes(b'png')
             (root / 'catalogue.json').write_text(json.dumps({'schema': 1, 'apps': [
                 {'id': 'good', 'attribute': 'kdePackages.good', 'name': 'Good', 'free': True, 'downloadBytes': 10},
                 {'id': 'vendor', 'attribute': 'vendor-bin', 'name': 'Vendor', 'free': False, 'downloadBytes': None},
                 {'id': 'evil', 'attribute': 'pkgs.${x}', 'name': 'Evil', 'free': True},
                 {'id': '../escape', 'attribute': 'escape', 'name': 'Escape', 'free': True}],
                 'profiles': [
-                    {'id': 'mine', 'name': 'Mine', 'short': 'Mine', 'icon': 'code', 'default': True, 'includes': ['Tool', 3],
+                    {'id': 'mine', 'name': 'Mine', 'short': 'Mine', 'icon': 'code', 'default': True,
+                     'includes': [{'id': 'tool', 'name': 'Tool'}, {'id': 'gone', 'name': 'Gone'}, {'name': 'Plain'},
+                                  {'id': '../icons/tool', 'name': 'Escape'}, 'Old', {'id': 'tool'}],
                      'features': {'developer': True, 'steam': True, 'unknown': True, 'docker': 'yes'},
                      'apps': ['good', 'vendor', 'evil', 'missing', 'good'], 'downloadBytes': 99},
                     {'id': 'Bad Id', 'apps': ['good']}, 'not a profile']}))
@@ -566,7 +569,9 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         [profile] = catalogue['profiles']
         self.assertEqual(profile['apps'], ['good', 'vendor'])
         self.assertEqual(profile['features'], ['developer', 'steam'])
-        self.assertEqual(profile['includes'], ['Tool'])
+        self.assertEqual(profile['includes'], [{'name': 'Tool', 'icon': str(root / 'icons/tool.png')},
+                                               {'name': 'Gone', 'icon': ''}, {'name': 'Plain', 'icon': ''},
+                                               {'name': 'Escape', 'icon': ''}])
         self.assertTrue(profile['onMedium'])
         self.assertEqual(profile['vendor'], 2, 'the vendor app and Steam')
         with tempfile.TemporaryDirectory() as directory:
@@ -581,6 +586,9 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         listed = {app for profile in software['profiles'] for app in profile['apps']}
         self.assertEqual(set(software['apps']), listed)
         self.assertTrue(all(Path(app['icon']).is_file() for app in software['apps'].values()))
+        included = {item['name']: item['icon'] for profile in software['profiles'] for item in profile['includes']}
+        for name in ('T3 Code', 'Docker', 'Podman', 'Steam', 'MangoHud', 'ProtonUp-Qt'):
+            self.assertTrue(Path(included[name]).is_file(), f'{name} shows its icon, not a monogram')
         self.assertNotIn('attribute', software['apps']['gimp'])
         self.assertEqual([entry[0] for entry in static['features']],
                          ['docker', 'podman', 'tailscale', 'localNetworkServices', 'connectedWidgets', 'proprietary'])
