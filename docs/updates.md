@@ -268,8 +268,24 @@ version. Never change `system.stateVersion` as part of a routine update.
 ## Prebuilt packages only
 
 Every Nixpkgs package comes prebuilt from the configured cache
-(`cache.nixos.org`); the updater holds back a Nixpkgs revision that NixOS has
-not finished building (`lifecycle/cybexos/prebuilt.py`). Cybex OS's modules
+(`cache.nixos.org`). Before it builds a candidate, preparation of a NixOS
+package update, a Cybex OS update or a Software change dry-runs the complete
+system against this computer's store and caches
+(`lifecycle/cybexos/prebuilt.py`). If anything beyond the expected builds below
+would compile, it stops before building: the status is `failed`, its phase
+"Waiting for NixOS to finish building this change", `notPrebuilt` names the
+packages, and nothing changes. NixOS builds nixos-unstable continuously, so a
+later revision normally passes; background preparation tries again for the
+next revision or after a day. Personal configuration previews (`local`) are
+not checked.
+
+A Software change that only alters the installed packages, with the same
+kernel, initrd, boot parameters and personal configuration apart from
+`local/software.json`, becomes the default generation once activation and its
+health checks pass. It needs no trial boot, so the next app can be installed
+straight away. Every other change keeps the trial boot.
+
+Cybex OS's modules
 use NixOS's cached default builds: Hyprland and its portal as Nixpkgs builds
 them, Xwayland without a font path, and every glibc locale. What builds on the
 computer by design:

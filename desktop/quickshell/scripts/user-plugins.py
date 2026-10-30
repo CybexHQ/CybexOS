@@ -451,6 +451,32 @@ def write_revision_cache(runtime: Path, cache: dict) -> None:
             os.unlink(temporary)
 
 
+# QtQuick 6.12 adds a `Color` type that takes precedence over the Omarchy
+# palette singleton from qs.Commons, even when that import comes later, so an
+# Omarchy plugin's `Color.foreground` reads QtQuick's object. In the private
+# runtime copy only, files that import qs.Commons reach the palette through a
+# qualified import instead. The installed package is never modified.
+PALETTE_USE = re.compile(r"(?<![A-Za-z0-9_.$])Color\.(?=[A-Za-z_])")
+COMMONS_IMPORT = re.compile(r"^[ \t]*import[ \t]+qs\.Commons[ \t]*;?[ \t]*(?://[^\n]*)?$", re.M)
+PALETTE_ALIAS = "CybexOmarchyCommons"
+
+
+def qualify_palette(root: Path) -> None:
+    for path in root.rglob("*.qml"):
+        if path.is_symlink() or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        anchor = COMMONS_IMPORT.search(text)
+        if not anchor or not PALETTE_USE.search(text):
+            continue
+        text = (text[:anchor.end()] + f"\nimport qs.Commons as {PALETTE_ALIAS}"
+                + PALETTE_USE.sub(PALETTE_ALIAS + ".Color.", text[anchor.end():]))
+        path.write_text(text, encoding="utf-8")
+
+
 def snapshot(source: Path, plugin_root: Path, remembered: object, now: int) -> tuple[str, dict | None, bool]:
     """Return (revision, cache entry or None, whether a new snapshot was made)."""
     signature, newest = plugin_packages.stat_signature(source)
@@ -469,6 +495,7 @@ def snapshot(source: Path, plugin_root: Path, remembered: object, now: int) -> t
             shutil.copytree(source, staged, symlinks=True, ignore=plugin_packages.ignore_special)
             if plugin_packages.fingerprint(source) != revision:
                 raise ValueError("Plugin changed during scan; retrying on next refresh")
+            qualify_palette(staged)
             staged.rename(destination)
         created = True
     entry = {"stat": signature, "revision": revision} if newest < now - SETTLE_NS else None

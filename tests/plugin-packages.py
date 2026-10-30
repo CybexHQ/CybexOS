@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Git transactions and cache identity, using only disposable local repositories."""
 import json
+from urllib.parse import unquote
 import os
 from pathlib import Path
 import shutil
@@ -57,7 +58,8 @@ with tempfile.TemporaryDirectory(prefix="cybex-plugin-packages-") as temporary:
     cli("layout-edit", "move", "example.git", '{"section":"bad"}', ok=False)
     assert before_invalid == (base / "config/plugins.json").read_bytes()
     before = json.loads(cli("list", "--runtime-root", base / "runtime"))["plugins"][0]["source"]
-    (source / "Sibling.qml").write_text('import QtQuick\nItem { property int answer: 42 }\n')
+    (source / "Sibling.qml").write_text('import QtQuick\nimport qs.Commons\n'
+                                        'Item { property int answer: 42; property color tint: Color.accent }\n')
     git("add", ".")
     git("commit", "-m", "valid update")
     registry = base / "config/plugins.json"
@@ -73,6 +75,12 @@ with tempfile.TemporaryDirectory(prefix="cybex-plugin-packages-") as temporary:
     assert registry.read_bytes() == registry_bytes
     after = json.loads(cli("list", "--runtime-root", base / "runtime"))["plugins"][0]["source"]
     assert before != after, "Sibling edits must change the entrypoint's cache identity"
+    # Qt 6.12's QtQuick Color shadows the qs.Commons palette: the runtime copy,
+    # never the installed package, reaches it through a qualified import.
+    staged = Path(unquote(after.removeprefix("file://"))).parent / "Sibling.qml"
+    assert "import qs.Commons as CybexOmarchyCommons" in staged.read_text()
+    assert "tint: CybexOmarchyCommons.Color.accent" in staged.read_text()
+    assert "CybexOmarchyCommons" not in (packages / "example.git/Sibling.qml").read_text()
     installed_head = subprocess.check_output(["git", "-C", str(packages / "example.git"), "rev-parse", "HEAD"])
     manifest["entryPoints"]["barWidget"] = "Missing.qml"
     (source / "manifest.json").write_text(json.dumps(manifest))

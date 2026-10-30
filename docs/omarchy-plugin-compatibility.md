@@ -284,12 +284,15 @@ retain their status indications.
 
 - Qt 6.12, which nixos-unstable ships, adds a QtQuick `Color` type that takes
   precedence over the `Color` singleton from `qs.Commons`, even when that
-  import comes later. A plugin that writes `Color.foreground` or
-  `Color.popups.background` then reads QtQuick's object and logs TypeErrors.
-  The built-in components use a qualified import (`import qs.Commons as
-  Commons`, then `Commons.Color`); third-party plugins need the same change.
-  Qt 6.12 also passes arrays through a QML signal's `var` argument as
-  sequences, for which `Array.isArray()` is false. Accept them with
+  import comes later. The built-in components use a qualified import
+  (`import qs.Commons as Commons`, then `Commons.Color`). For plugins, the
+  private runtime copy the shell loads (`user-plugins.py`) adds
+  `import qs.Commons as CybexOmarchyCommons` to each QML file that imports
+  `qs.Commons` and rewrites its `Color.` references to use it; the installed
+  package is unchanged. A plugin that reaches the palette some other way, for
+  example through its own `Color` alias, still needs adapting. Qt 6.12 also
+  passes arrays through a QML signal's `var` argument as sequences, for which
+  `Array.isArray()` is false; accept them with
   `Array.isArray(x) || x instanceof Array`.
 - No automatic emulation of Arch packages, Omarchy's general command suite,
   Hyprland scripts, system paths, or external backends. Plugins depending on
