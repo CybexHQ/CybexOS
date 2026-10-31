@@ -578,6 +578,58 @@ QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
                 'defaultBrowser': found['defaultBrowser'], 'xdgBrowser': found['xdgBrowser'],
                 'vendorApps': sorted(found['packages'])}
 
+    def flathub_apps(self, app='org.vim.Vim'):
+        """Flathub is Software's second source. After the first sign-in this
+        account has the flathub remote; Software's own commands find and
+        describe an app on flathub.org, install it through the transient user
+        service, the shell's data path holds its launcher, it runs in its
+        sandbox, and removing it takes its unused runtimes along."""
+        session = ('runuser -u cybexqa -- env HOME=/home/cybexqa XDG_RUNTIME_DIR=/run/user/1000 '
+                   'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus ')
+        def cybex(arguments, timeout=300):
+            return json.loads(self.command(session + 'cybex software flathub ' + arguments, timeout=timeout).strip().splitlines()[-1])
+        def finished(action, timeout):
+            deadline = time.monotonic() + timeout
+            while True:
+                task = cybex('status')['task']
+                if task and task['action'] == action and task['state'] in ('done', 'failed'):
+                    return task
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f'Flathub {action} did not finish: ' + json.dumps(task))
+                time.sleep(5)
+        first = cybex('status')
+        if not (first['enabled'] and first['available'] and first['remote'] and not first['installed']):
+            raise RuntimeError('Flathub after the first sign-in: ' + json.dumps(first))
+        found = [row['id'] for row in cybex('search vim')['results']]
+        if app not in found:
+            raise RuntimeError(f'Flathub search lacks {app}: {found}')
+        details = cybex('app ' + app)
+        started = time.monotonic()
+        cybex('install ' + app)
+        task = finished('install', 1500)
+        seconds = round(time.monotonic() - started)
+        if task['state'] != 'done':
+            raise RuntimeError('Flathub install failed: ' + task['error'])
+        row = next((row for row in cybex('status')['installed'] if row['id'] == app), None)
+        if not row or row['installation'] != 'user' or not row['desktop'] or not row['icon']:
+            raise RuntimeError('Installed Flathub app: ' + json.dumps(row))
+        shell = self.command(session + 'systemctl --user show quickshell.service -p MainPID --value').strip()
+        data_dirs = self.command(f"tr '\\0' '\\n' < /proc/{shell}/environ | sed -n 's/^XDG_DATA_DIRS=//p'").strip().split(':')
+        if '/home/cybexqa/.local/share/flatpak/exports/share' not in data_dirs:
+            raise RuntimeError('The shell cannot see Flathub launchers: ' + json.dumps(data_dirs))
+        runs = self.command(session + f'flatpak run --command=vim {app} --version', timeout=300).strip().splitlines()[0]
+        if 'VIM' not in runs:
+            raise RuntimeError('The sandboxed app did not run: ' + runs)
+        cybex('remove ' + app)
+        removal = finished('remove', 600)
+        left = [row['id'] for row in cybex('status')['installed']]
+        runtimes = self.command(session + 'flatpak list --user --runtime --columns=application').split()
+        if removal['state'] != 'done' or left or runtimes:
+            raise RuntimeError(f'Flathub removal left apps {left} and runtimes {runtimes}: ' + json.dumps(removal))
+        return {'result': 'passed', 'app': app, 'version': row['version'], 'downloadBytes': details['downloadBytes'],
+                'permissions': details['permissions'], 'installSeconds': seconds, 'runs': runs,
+                'scope': 'flathub.org over the guest network; no theming or portal checks'}
+
     def authorize(self, command, *, payload=None, approve=True):
         """Run the desktop's unprivileged path and answer its real Polkit UI.
 
@@ -1482,6 +1534,11 @@ QA_SOURCE''').strip())
             milestones['proprietaryApplications'] = vm.proprietary_applications(applications == 'standard')
         except (RuntimeError, ValueError, KeyError) as error:
             milestones['proprietaryApplications'] = {'result': 'failed', 'error': str(error)[-4000:]}
+        # A failure here fails the case after the remaining checks have run.
+        try:
+            milestones['flathubApps'] = vm.flathub_apps()
+        except (RuntimeError, ValueError, KeyError, StopIteration) as error:
+            milestones['flathubApps'] = {'result': 'failed', 'error': str(error)[-4000:]}
         vm.wait_welcome_layers(['qs-welcome'])
         if screenshots:
             vm.screenshot(screenshots / 'welcome-first-login.png')
@@ -1529,6 +1586,8 @@ QA_SOURCE''').strip())
             raise RuntimeError('Keyboard shortcuts runtime check failed: ' + milestones['keyboardShortcutsRuntime']['error'][-2000:])
         if milestones['proprietaryApplications']['result'] != 'passed':
             raise RuntimeError(milestones['proprietaryApplications']['error'][-2000:])
+        if milestones['flathubApps']['result'] != 'passed':
+            raise RuntimeError('Flathub apps: ' + milestones['flathubApps']['error'][-2000:])
         if not lifecycle:
             evidence.update(result='passed', scope='actual ISO install, installed boot/login, encryption; no update application')
         else:
