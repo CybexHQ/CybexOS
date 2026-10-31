@@ -262,6 +262,9 @@ assert lib.elem "plymouth.ignore-serial-consoles" installer.boot.kernelParams;
 # it boots through stays connected when the driver loads (installer.nix).
 assert lib.elem "thunderbolt.host_reset=0" installer.boot.kernelParams;
 assert lib.all (c: !(lib.elem "thunderbolt.host_reset=0" c.boot.kernelParams)) [ payload generic ];
+# A medium that never appears is explained before the emergency shell.
+assert lib.elem "emergency.target" installer.boot.initrd.systemd.services.cybexos-medium-missing.wantedBy;
+assert installer.boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec == "2min";
 # A screen that keeps failing asks for the text installer instead of looping.
 assert lib.hasInfix "cybexos-installer-screen-failed"
   installer.systemd.services.cybexos-installer-ui.serviceConfig.ExecStopPost;

@@ -498,11 +498,22 @@ class Daemon:
 
     @staticmethod
     def disk_view(disk):
-        return {'path': str(disk.get('path', '')), 'serial': str(disk.get('serial') or ''),
+        path = str(disk.get('path', ''))
+        bus = 'NVMe' if '/nvme' in path else 'Virtual' if '/vd' in path else 'Disk'
+        if '/mmcblk' in path:
+            # The MMC core reports built-in eMMC as MMC and a card in a reader as SD.
+            try:
+                kind = Path(f'/sys/block/{Path(path).name}/device/type').read_text().strip()
+            except OSError:
+                kind = ''
+            bus = 'SD card' if kind == 'SD' else 'eMMC'
+        return {'path': path, 'serial': str(disk.get('serial') or ''),
+                # What the plan carries for the disk check: the serial, else the
+                # WWN or device path for disks without one (cybexos-install).
+                'identity': str(disk.get('identity') or disk.get('serial') or '')[:256],
                 'model': str(disk.get('model') or '').strip()[:80], 'size': int(disk.get('size') or 0),
                 'available': bool(disk.get('available')), 'reason': str(disk.get('reason') or '')[:200],
-                'filesystems': [str(f) for f in disk.get('filesystems') or []][:8],
-                'bus': 'NVMe' if '/nvme' in str(disk.get('path', '')) else 'Virtual' if '/vd' in str(disk.get('path', '')) else 'Disk'}
+                'filesystems': [str(f) for f in disk.get('filesystems') or []][:8], 'bus': bus}
 
     @staticmethod
     def public_plan(plan):
@@ -587,7 +598,7 @@ class Daemon:
         if zone is None:
             raise Failure('Choose a time zone from the list.')
         console = next(entry[2] for entry in LAYOUTS if entry[0] == draft['layout'])
-        plan = {'disk': disk['path'], 'serial': disk['serial'], 'hostname': hostname, 'username': draft['username'],
+        plan = {'disk': disk['path'], 'serial': disk['identity'], 'hostname': hostname, 'username': draft['username'],
                 'timezone': zone, 'locale': draft['locale'], 'keyboard': console, 'desktopKeyboard': draft['layout'],
                 'encrypted': bool(draft['encrypted']), 'autoLogin': bool(draft['encrypted']), 'secureBoot': False,
                 'nvidiaOpen': bool(draft['nvidiaOpen'])}

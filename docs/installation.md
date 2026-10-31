@@ -1,5 +1,27 @@
 # Fresh installation
 
+## Writing the installation medium
+
+Write the ISO to a USB stick of 8 GB or more as a raw disk image, with
+balenaEtcher, Fedora Media Writer, GNOME Disks' *Restore Disk Image*, `dd`
+(`sudo dd if=cybexos-1.0.0.iso of=/dev/sdX bs=4M conv=fsync status=progress`)
+or Rufus in **DD Image** mode. Tools that copy the ISO's files onto a
+FAT-formatted stick, such as Rufus's *ISO Image* mode, cannot work: the image
+holds `nix-store.squashfs`, a file larger than FAT32's 4 GB limit. Booting the
+ISO file from another boot manager (Ventoy, a GRUB `loopback` entry) is not
+qualified. A DVD needs a dual-layer disc.
+
+Plug the stick into the computer itself rather than a hub, dock or monitor.
+If the installer cannot find its medium within two minutes, it explains the
+likely causes and opens a maintenance shell instead of waiting on the splash.
+
+**Turn Secure Boot off** in the firmware settings before starting the stick.
+The installation medium is not signed, so firmware with Secure Boot on refuses
+to start it, and the installer stops before touching a disk while Secure Boot
+is on. Cybex OS does not yet sign its installed system for Secure Boot either.
+
+## Starting the installer
+
 Boot a completed Cybex OS x86_64 ISO in UEFI mode. The ISO starts only the
 installer: there is no live desktop, display manager, live account or sudo. The
 boot menu (`nix/modules/iso-boot.nix`) starts the default after ten seconds and

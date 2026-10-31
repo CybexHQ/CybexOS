@@ -448,3 +448,66 @@
                          _ => {}
                      }
                  }
+--- a/i-slint-backend-linuxkms-1.18.1/calloop_backend.rs
++++ b/i-slint-backend-linuxkms-1.18.1/calloop_backend.rs
+@@ -131,19 +131,25 @@
+                     *seat_active.borrow_mut() = true;
+                 }
+                 libseat::SeatEvent::Disable => {
+-                    unimplemented!("Seat deactivation is not implemented");
++                    // The session lost its VT, for example to the recovery
++                    // shell. Release the seat by exiting cleanly: the unit
++                    // restarts the screen, which waits for its VT below and
++                    // draws the current state again. Before the first Enable
++                    // a Disable only means the VT is not shown yet.
++                    if *seat_active.borrow() {
++                        eprintln!("slint linuxkms backend: the session lost its seat; exiting to be restarted");
++                        std::process::exit(0);
++                    }
+                 }
+             })
+             .map_err(|e| format!("Error opening session with libseat: {e}"))?
+         };
+ 
++        // A screen started while another VT is shown waits for its own,
++        // rather than failing as though there were no display.
+         #[cfg(feature = "libseat")]
+         while !(*seat_active.borrow()) {
+-            if seat.dispatch(5000).map_err(|e| format!("Error waiting for seat activation: {e}"))?
+-                == 0
+-            {
+-                return Err("Timeout while waiting to activate session".to_string().into());
+-            }
++            seat.dispatch(-1).map_err(|e| format!("Error waiting for seat activation: {e}"))?;
+         }
+ 
+         Ok(Backend {
+@@ -235,6 +241,28 @@
+         }
+         let quit_loop = self.proxy.quit_loop.clone();
+ 
++        // Deliver seat events while running, so a VT switch reaches the
++        // Disable handler above instead of revoking devices unnoticed.
++        #[cfg(feature = "libseat")]
++        {
++            let seat_fd = {
++                let mut seat = self.seat.borrow_mut();
++                let fd = seat.get_fd().map_err(|e| format!("Error reading the seat's file descriptor: {e}"))?;
++                fd.try_clone_to_owned().map_err(|e| format!("Error duplicating the seat's file descriptor: {e}"))?
++            };
++            let seat = self.seat.clone();
++            event_loop
++                .handle()
++                .insert_source(
++                    calloop::generic::Generic::new(seat_fd, calloop::Interest::READ, calloop::Mode::Level),
++                    move |_, _, _| {
++                        let _ = seat.borrow_mut().dispatch(0);
++                        Ok(calloop::PostAction::Continue)
++                    },
++                )
++                .map_err(|e| format!("Error registering the seat source: {e}"))?;
++        }
++
+         #[cfg(feature = "libinput")]
+         let mouse_position_property = input::LibInputHandler::init(
+             &self.window,

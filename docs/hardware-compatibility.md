@@ -110,11 +110,13 @@ working installed Hyprland graphics stack.
    enable. This does not exclude either CPU vendor, but leaves the installer
    reliant on platform-provided early microcode. Presence of `amd-ucode/` in
    the firmware tree is not evidence of an early microcode update.
-6. **Some common small-device storage is excluded by the installer.** Accepted
-   whole-disk paths are `/dev/sd*`, `/dev/vd*` and `/dev/nvme*n*`.
-   `/dev/mmcblk*` eMMC/SD targets are excluded despite kernel support. A disk
-   also needs a stable serial, at least **64 GiB** (not a marketed 64 GB), no
-   mounts/swap/active mappings, and is fully erased. The layout reserves a
+6. **The installer takes whole disks only.** Accepted whole-disk paths are
+   `/dev/sd*`, `/dev/vd*`, `/dev/nvme*n*` and eMMC/SD `/dev/mmcblk*` (never
+   their boot or RPMB areas). The review and the erase check the same disk by
+   its serial number, else its WWN, else its kernel device path and size, so
+   disks without a serial (most virtual disks) are accepted. A disk needs at
+   least **64 GiB** (not a marketed 64 GB), no mounts/swap/active mappings,
+   and is fully erased. The layout reserves a
    16 GiB ESP. RAID/LVM/multipath targets and dual-boot partitioning are not
    provided by the guided fresh installer. See [disk validation](../installer/cybexos-install)
    and [shared layout](../nix/modules/default.nix).

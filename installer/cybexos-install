@@ -5,6 +5,7 @@ import contextlib
 from contextlib import contextmanager
 import fcntl
 import getpass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -30,7 +31,8 @@ from cybexos.trust import REPO, Fetcher, validate_release, verify, version
 ETC = Path('/etc/cybexos')
 CACHE = Path('/run/cybexos-installer-cache')
 LOCK = Path('/run/cybexos-installer.lock')
-DISK_PATTERN = r'/dev/(sd[a-z]+|vd[a-z]+|nvme[0-9]+n[0-9]+)'
+# Whole disks only: eMMC boot and RPMB areas (mmcblk0boot0, mmcblk0rpmb) never match.
+DISK_PATTERN = r'/dev/(sd[a-z]+|vd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)'
 JSON_UI = False
 INSTALL_LOG = Path('/run/cybexos-installer.log')
 MAX_DETAILS = 256 * 1024
@@ -122,6 +124,10 @@ class UnreleasedMedia(Failure):
     """There is no publisher trust for a production installation."""
 
 
+class ReleaseUnavailable(UnreleasedMedia):
+    """The medium's signed release could not be read: not published yet, or offline."""
+
+
 def ask(label, default=None, check=None):
     """Keep a correctable answer on its current step."""
     while True:
@@ -201,7 +207,10 @@ def authenticate_media(fetch, etc, recover_network=None):
         raise Failure('Installation medium was not built from an exact committed release source. Nothing has been erased')
     try:
         version(media.get('version'))
-        url = f'https://github.com/{REPO}/releases/download/v{media["version"]}/manifest.json'
+    except Failure as error:
+        raise Failure(f'{str(error).rstrip(".")}. The installation medium was not authenticated; nothing has been erased') from error
+    url = f'https://github.com/{REPO}/releases/download/v{media["version"]}/manifest.json'
+    try:
         try:
             document, signature = fetch.get(url), fetch.get(url + '.sig')
         except Failure as error:
@@ -213,6 +222,13 @@ def authenticate_media(fetch, etc, recover_network=None):
                 raise
             recover_network()
             document, signature = fetch.get(url), fetch.get(url + '.sig')
+    except Failure as error:
+        # Unpublished or unreachable: nothing read contradicts the medium, so
+        # resolve_source may install its content-verified bundle. A release
+        # that is read must verify and match; that never falls back.
+        raise ReleaseUnavailable(f'Release v{media["version"]} could not be read ({str(error).rstrip(".")}). '
+                                 'Nothing has been erased') from error
+    try:
         release = verify(document, signature, trust, 'release')
         # The medium's own version is the floor, so the channel policy also
         # rejects a stable-channel installation of a prerelease medium.
@@ -401,7 +417,25 @@ def check_platform(secure_boot=False):
 def disks():
     # PATH alone does not enable lsblk's JSON children. The safety checks must
     # see mounted partitions and open mappings beneath each whole disk.
-    return parse(subprocess.check_output(['lsblk', '--json', '--tree', '--bytes', '--output', 'PATH,TYPE,SIZE,MODEL,SERIAL,FSTYPE,MOUNTPOINTS,RO']))['blockdevices']
+    return parse(subprocess.check_output(['lsblk', '--json', '--tree', '--bytes', '--output', 'PATH,TYPE,SIZE,MODEL,SERIAL,WWN,FSTYPE,MOUNTPOINTS,RO']))['blockdevices']
+
+
+def disk_identity(disk):
+    """What the review and the erase compare. Disks without a serial number
+    (common virtual disks) use their WWN, else the kernel device path and size,
+    which hold for this boot. An empty identity is never usable."""
+    for key in ('serial', 'wwn'):
+        value = str(disk.get(key) or '').strip()
+        if value and not any(ord(c) < 32 for c in value):
+            return value[:256]
+    name = Path(str(disk.get('path') or '')).name
+    device = os.path.realpath(f'/sys/class/block/{name}') if name else ''
+    if not device.startswith('/sys/devices/'):
+        return ''
+    identity = f'{device.removeprefix("/sys")} {disk.get("size")} bytes'
+    if len(identity) > 256 or any(ord(c) < 32 for c in identity):
+        return 'device ' + hashlib.sha256(identity.encode()).hexdigest()
+    return identity
 
 
 def layout():
@@ -417,7 +451,7 @@ def layout():
 def disk_guard(plan):
     minimum = layout()['minimumDiskGiB']
     found = next((d for d in disks() if d['path'] == plan['disk'] and d['type'] == 'disk'), None)
-    if not found or found['ro'] or not found.get('serial') or found['serial'] != plan['serial']:
+    if not found or found['ro'] or not disk_identity(found) or disk_identity(found) != plan['serial']:
         raise Failure('Disk identity changed or is unavailable. Nothing has been erased.')
     def mounted(node):
         return any(node.get('mountpoints', [])) or any(mounted(c) for c in node.get('children', []))
@@ -517,10 +551,10 @@ def interactive(release):
                            if answer in (str(index), disk['path'])), None)
             if choice is None:
                 raise Failure('Choose a listed disk number or its complete /dev path')
-            disk_guard({'disk': choice['path'], 'serial': choice.get('serial')})
+            disk_guard({'disk': choice['path'], 'serial': disk_identity(choice)})
         selected = ask('Disk number or path', plan.get('disk'), select)
         disk = next(disk for index, disk in enumerate(available, 1) if selected in (str(index), disk['path']))
-        plan.update(disk=disk['path'], serial=disk['serial'])
+        plan.update(disk=disk['path'], serial=disk_identity(disk))
         print('\n2 of 5 · Make it yours\n')
         for key, label in (('username', 'Your username'), ('hostname', 'Computer name'),
                            ('timezone', 'Timezone (for example Europe/Amsterdam)'), ('locale', 'System language / locale'),
@@ -567,7 +601,7 @@ def interactive(release):
         print('\n5 of 5 · Review your installation\n')
         model = (disk.get('model') or '').strip()
         print(f"  Erase disk: {plan['disk']} · {disk['size'] // 1024**3} GiB" + (f' · {model}' if model else ''))
-        print(f"  Disk serial: {plan['serial']}\n  Account: {plan['username']} on {plan['hostname']}")
+        print(f"  Disk identity: {plan['serial']}\n  Account: {plan['username']} on {plan['hostname']}")
         print(f"  Region: {plan['timezone']} · {plan['locale']}")
         print(f"  Keyboard: console {plan['keyboard']} · desktop {plan['desktopKeyboard']}")
         print(f"  Encryption: {'LUKS2' if plan['encrypted'] else 'OFF — files are not encrypted'}")
@@ -609,7 +643,7 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
     if not source.startswith('path:'):
         if (not re.fullmatch('[0-9a-f]{40}', revision)
                 or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', nar_hash)
-                or source != 'github:DigitalPals/CybexOS/' + revision):
+                or source != f'github:{REPO}/' + revision):
             raise Failure('Installation requires an authenticated exact release source')
         # Lock generation evaluates vendor flake metadata. Authenticate its
         # downloaded bytes before that evaluation and before touching the disk.
@@ -678,7 +712,7 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
             atomic(config / 'local/software.json', {'schema': 1, 'packages': software_packages(
                 plan.get('software', {'packages': []})['packages'])}, 0o644)
             stage(3, 'Recording hardware and your machine configuration…')
-            flake = (config / 'flake.nix').read_text().replace('github:DigitalPals/CybexOS/REPLACE_WITH_AUTHENTICATED_REVISION', source)
+            flake = (config / 'flake.nix').read_text().replace(f'github:{REPO}/REPLACE_WITH_AUTHENTICATED_REVISION', source)
             atomic(config / 'flake.nix', flake.encode(), 0o644)
             run('nixos-generate-config', '--root', target, '--dir', config)
             (config / 'configuration.nix').unlink(missing_ok=True)
@@ -821,15 +855,17 @@ def resolve_source(args, runner):
     if not args.development_source:
         try:
             release, channel = authenticate_media(Fetcher(CACHE), ETC, lambda: ensure_network(runner))
-        except UnreleasedMedia:
-            trust = read(ETC / 'trust.json')
-            if not isinstance(trust, dict) or trust.get('keys') != {}:
-                raise Failure('Installation medium has invalid publisher trust configuration. Nothing has been erased')
+        except UnreleasedMedia as unreleased:
+            if not isinstance(unreleased, ReleaseUnavailable):
+                trust = read(ETC / 'trust.json')
+                if not isinstance(trust, dict) or trust.get('keys') != {}:
+                    raise Failure('Installation medium has invalid publisher trust configuration. Nothing has been erased')
             media = read(ETC / 'release.json')
             # Final media install the exact bundled source without a testing
             # opt-in. This proves content identity, not a publisher signature.
-            # A configured publisher still takes the signed path above and
-            # authentication failures never fall back to the bundled source.
+            # With a configured publisher, that is only while the medium's
+            # release cannot be read (not published yet, or offline); a release
+            # that is read must verify and match it (authenticate_media).
             version(media.get('version'))
             if '-' not in media['version']:
                 source_path = Path((ETC / 'installer-source').read_text().strip()).resolve()
@@ -842,6 +878,9 @@ def resolve_source(args, runner):
                 if channel not in ('stable', 'beta'):
                     raise Failure('Installation requires a supported release channel. Nothing has been erased')
                 args.bundled_source = True
+                if isinstance(unreleased, ReleaseUnavailable):
+                    print(f'Cybex OS {media["version"]}: its signed release could not be read ({unreleased.__cause__}); '
+                          'installing the medium\'s own verified source.', file=sys.stderr, flush=True)
                 return (f'path:{metadata["path"]}', media['revision'], nar_hash, channel,
                         f'Cybex OS {media["version"]} • bundled source verified')
             if getattr(args, 'json_ui', False):
@@ -923,10 +962,10 @@ def graphical_session(args, runner):
                 continue
             reason = ''
             try:
-                disk_guard({'disk': disk['path'], 'serial': disk.get('serial')})
+                disk_guard({'disk': disk['path'], 'serial': disk_identity(disk)})
             except Failure as error:
                 reason = str(error)
-            choices.append({key: disk.get(key) for key in ('path', 'serial', 'model', 'size')} | {
+            choices.append({key: disk.get(key) for key in ('path', 'serial', 'model', 'size')} | {'identity': disk_identity(disk),
                 'available': not reason, 'reason': reason,
                 'filesystems': sorted({node.get('fstype') for node in disk.get('children', []) if node.get('fstype')})})
         event('ready', disks=choices, defaults=defaults, region=regions, layout=layout(),

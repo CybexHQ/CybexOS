@@ -462,6 +462,36 @@ class DiskSafetyTests(unittest.TestCase):
             with self.subTest(change=change), patch.object(installer, 'disks', return_value=[disk]), self.assertRaises(installer.Failure):
                 installer.disk_guard(plan())
 
+    def test_disks_without_a_serial_number_are_identified_by_wwn_or_device_path(self):
+        device = '/sys/devices/pci0000:00/0000:00:04.0/virtio1/block/vda'
+        disk = self.disk(); disk['serial'] = None
+        real = installer.os.path.realpath
+        sysfs = lambda path, *args, **kwargs: device if path == '/sys/class/block/vda' else real(path, *args, **kwargs)
+        with patch.object(installer.os.path, 'realpath', side_effect=sysfs):
+            identity = installer.disk_identity(disk)
+            self.assertEqual(identity, f'/devices/pci0000:00/0000:00:04.0/virtio1/block/vda {80 * 1024**3} bytes')
+            self.assertEqual(installer.disk_identity({**disk, 'wwn': ' 0x5000c500a1b2c3d4 '}), '0x5000c500a1b2c3d4')
+            with patch.object(installer, 'disks', return_value=[disk]), \
+                    patch.object(installer.subprocess, 'check_output', return_value='/dev/vda\n'):
+                installer.disk_guard({**plan(), 'serial': identity})
+                with self.assertRaisesRegex(installer.Failure, 'identity changed'):
+                    installer.disk_guard(plan())
+        # Without a kernel device, a disk has no usable identity at all.
+        with patch.object(installer.os.path, 'realpath', return_value='/elsewhere'):
+            self.assertEqual(installer.disk_identity(disk), '')
+            with patch.object(installer, 'disks', return_value=[disk]), self.assertRaisesRegex(installer.Failure, 'identity changed'):
+                installer.disk_guard({**plan(), 'serial': ''})
+
+    def test_whole_emmc_disks_are_targets_but_their_boot_areas_are_not(self):
+        for path in ('/dev/mmcblk0', '/dev/mmcblk12', '/dev/nvme0n1', '/dev/sda', '/dev/vda'):
+            self.assertTrue(installer.re.fullmatch(installer.DISK_PATTERN, path), path)
+        for path in ('/dev/mmcblk0boot0', '/dev/mmcblk0rpmb', '/dev/mmcblk0p1', '/dev/nvme0n1p1', '/dev/sr0'):
+            self.assertIsNone(installer.re.fullmatch(installer.DISK_PATTERN, path), path)
+        disk = {**self.disk(), 'path': '/dev/mmcblk0', 'serial': '0x8f2a71c4'}
+        with patch.object(installer, 'disks', return_value=[disk]), \
+                patch.object(installer.subprocess, 'check_output', return_value='/dev/mmcblk0\n'):
+            installer.disk_guard({**plan(), 'disk': '/dev/mmcblk0', 'serial': '0x8f2a71c4'})
+
     def test_active_swap_is_rejected(self):
         swap = Mock(); swap.read_text.return_value = 'Filename Type Size Used Priority\n/dev/vda2 partition 100 0 -2\n'
         real_path = Path
@@ -499,7 +529,7 @@ class DiskSafetyTests(unittest.TestCase):
             return {'/sys/firmware/efi':efi, '/sys/firmware/efi/efivars':variables, STORE_SOURCE:ROOT}.get(value, real_path(value, *args))
         revision = 'a' * 40
         nar = 'sha256-' + 'A' * 43 + '='
-        source = 'github:DigitalPals/CybexOS/' + revision
+        source = 'github:CybexHQ/CybexOS/' + revision
         choice = plan(); choice.update(encrypted=False, autoLogin=False)
         for fetched in ({'hash': nar, 'storePath': STORE_SOURCE}, {'hash': nar}, {'hash': nar, 'storePath': '../source'},
                         {'hash': 'sha256-' + 'B' * 43 + '='}, {}):
@@ -822,7 +852,7 @@ class TestedNixpkgsTests(unittest.TestCase):
 
 REVISION, OTHER_REVISION = '1' * 40, '3' * 40
 NAR, OTHER_NAR = 'sha256-' + 'A' * 43 + '=', 'sha256-' + 'B' * 43 + '='
-RELEASES = 'https://github.com/DigitalPals/CybexOS/releases/download/'
+RELEASES = 'https://github.com/CybexHQ/CybexOS/releases/download/'
 
 
 def manifest(version='1.0.0-beta.1', **changes):
@@ -865,7 +895,7 @@ class MediaAuthenticationTests(unittest.TestCase):
         moved = json.dumps({'schema':1, 'channel':'beta', 'sequence':9, 'expires':'2099-01-01T00:00:00Z',
                             'manifest':RELEASES + 'v1.0.0-beta.2/manifest.json',
                             'sha256':hashlib.sha256(json.dumps(newer).encode()).hexdigest()}).encode()
-        channel = 'https://digitalpals.github.io/CybexOS/channels/beta.json'
+        channel = 'https://cybexhq.github.io/CybexOS/channels/beta.json'
         self.served[channel], self.served[channel + '.sig'] = moved, self.sign(moved)
         self.transport()
 
@@ -955,7 +985,7 @@ class MediaAuthenticationTests(unittest.TestCase):
         install, output = self.main()
         install.assert_called_once()
         args, kwargs = install.call_args
-        self.assertEqual(args[2:5], ('github:DigitalPals/CybexOS/' + REVISION, REVISION, NAR))
+        self.assertEqual(args[2:5], ('github:CybexHQ/CybexOS/' + REVISION, REVISION, NAR))
         self.assertEqual(kwargs['channel'], 'beta')
         self.assertEqual(args[0], plan())
         self.assertIn('Authenticated Cybex OS 1.0.0 • exact revision ' + REVISION, output)
@@ -1078,11 +1108,42 @@ class MediaAuthenticationTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs'):
                 self.main(runner=runner)
 
-    def test_final_signed_medium_never_falls_back_to_an_unsigned_bundle(self):
+    def test_final_signed_medium_installs_its_verified_bundle_until_its_release_is_published(self):
         self.medium(version='1.0.0', channel='stable')
         (self.etc / 'installer-source').write_text(str(self.base))
         self.served.clear()
-        self.assert_rejected('not authenticated')
+        runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
+        install, output = self.main(runner=runner)
+        self.assertEqual(install.call_args.args[2:5], ('path:' + STORE_SOURCE, REVISION, NAR))
+        self.assertEqual(install.call_args.kwargs['channel'], 'stable')
+        self.assertIn('bundled source verified', output)
+        self.assertNotIn('TEST', output)
+        # It looked for its own signed release first, and only that.
+        self.assertEqual(self.requests, [RELEASES + 'v1.0.0/manifest.json'])
+        # The bundle must still be this medium's exact content.
+        self.medium(version='1.0.0', channel='stable', narHash=OTHER_NAR)
+        with self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs'):
+            self.main(runner=runner)
+
+    def test_final_signed_medium_offline_installs_its_verified_bundle(self):
+        self.medium(version='1.0.0', channel='stable')
+        fetch = Mock()
+        fetch.get.side_effect = installer.Failure('Release endpoint unreachable; its status is unknown. Retry when connected.')
+        with self.assertRaisesRegex(installer.ReleaseUnavailable, 'could not be read') as raised:
+            installer.authenticate_media(fetch, self.etc)
+        self.assertIn('erased', str(raised.exception))
+
+    def test_final_signed_medium_blocks_a_published_release_that_does_not_verify(self):
+        self.medium(version='1.0.0', channel='stable')
+        (self.etc / 'installer-source').write_text(str(self.base))
+        body = json.dumps(manifest('1.0.0')).encode()
+        for options, pattern in ((dict(signature=self.sign(body, key='untrusted')), 'Invalid publisher signature'),
+                                 (dict(body=json.dumps(manifest('1.0.0', revision=OTHER_REVISION)).encode()),
+                                  'differs from this installation medium')):
+            with self.subTest(pattern=pattern):
+                self.requests.clear()
+                self.publish(manifest('1.0.0'), **options)
+                self.assert_rejected(pattern)
 
     def test_interactive_unreleased_medium_requires_explicit_consent_before_choices(self):
         self.trust['keys'] = {}

@@ -291,7 +291,45 @@ in {
         TimeoutStartSec = "5min";
       };
     };
-    boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec = "5min";
+    # The iVentoy hook attached its ISO in about 13 s on real hardware, even
+    # after its DHCP client failed; two minutes leaves room for slow links.
+    boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec = "2min";
+    # A medium that never appears (a stick written by copying files, a hub or
+    # dock that drops it, a failing stick) ends stage 1 in emergency mode.
+    # Explain that instead of a splash that eases on, then a bare shell.
+    boot.initrd.systemd.contents."/etc/cybexos/medium-missing.txt".text = ''
+
+      Cybex OS could not find its installation medium.
+
+      The installer started, but the USB stick or network image labelled
+      CYBEXOS_INSTALL did not appear within two minutes.
+
+      - Write the image again as a raw disk image: balenaEtcher, Fedora Media
+        Writer, dd, or Rufus in "DD Image" mode. Copying files onto a stick
+        (Rufus "ISO Image" mode) cannot work: the image holds a file larger
+        than 4 GB.
+      - Plug the stick into the computer itself, not a hub, dock or monitor,
+        and try another USB port or another stick of 8 GB or more.
+      - For a network boot, check the cable and that the boot server is on.
+
+      A maintenance shell follows. Turn the computer off to try again.
+
+    '';
+    boot.initrd.systemd.services.cybexos-medium-missing = {
+      description = "Explain a missing Cybex OS installation medium";
+      wantedBy = [ "emergency.target" ];
+      before = [ "emergency.service" ];
+      unitConfig = {
+        DefaultDependencies = false;
+        ConditionPathExists = "!/dev/disk/by-label/CYBEXOS_INSTALL";
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStartPre = "-/bin/plymouth quit";
+        ExecStart = "/bin/cat /etc/cybexos/medium-missing.txt";
+        StandardOutput = "journal+console";
+      };
+    };
     # A network-medium hook needs the wired NIC in stage 1; the ordinary CD
     # profile only carries storage drivers there. In particular, the X1 Pro's
     # RTL8125 (10ec:8125) uses r8169.

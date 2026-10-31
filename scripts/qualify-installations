@@ -196,9 +196,16 @@ def shortcuts_script():
 
 
 class VM:
-    def __init__(self, directory, disk, iso=None, *, extra_qemu_args=(), display=(1280, 800)):
+    # The target disk: QEMU device arguments and the guest's device name.
+    TARGETS = {'virtio': (['virtio-blk-pci,drive=systemdisk,serial=CYBEXOS-QA-DISK'], '/dev/vda'),
+               'virtio-without-serial': (['virtio-blk-pci,drive=systemdisk'], '/dev/vda'),
+               'emmc': (['sdhci-pci,sd-spec-version=3', 'emmc,drive=systemdisk'], '/dev/mmcblk0')}
+
+    def __init__(self, directory, disk, iso=None, *, extra_qemu_args=(), display=(1280, 800), target='virtio'):
         self.directory, self.disk, self.iso = directory, disk, iso
-        self.display = display
+        self.display, self.target = display, target
+        self.target_disk = self.TARGETS[target][1]
+        self.root_partition = self.target_disk + ('p2' if self.target_disk[-1].isdigit() else '2')
         self.extra_qemu_args = list(extra_qemu_args)
         self.process = None
         self.control_directory = None
@@ -221,7 +228,8 @@ class VM:
                 '-cpu','host' if os.access('/dev/kvm',os.R_OK|os.W_OK) else 'max', '-m','12288','-smp','4',
                 '-drive',f'if=pflash,format=raw,readonly=on,file={self.firmware / "OVMF_CODE.fd"}',
                 '-drive',f'if=pflash,format=raw,file={self.vars}',
-                '-drive',f'file={self.disk},if=none,id=systemdisk,format=qcow2','-device','virtio-blk-pci,drive=systemdisk,serial=CYBEXOS-QA-DISK',
+                '-drive',f'file={self.disk},if=none,id=systemdisk,format=qcow2',
+                *[argument for device in self.TARGETS[self.target][0] for argument in ('-device', device)],
                 '-netdev','user,id=net','-device','virtio-net-pci,netdev=net',
                 '-device',f'virtio-vga,xres={self.display[0]},yres={self.display[1]}',
                 # An absolute pointer lets QMP click the installer screen exactly.
@@ -734,8 +742,8 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
                 raise RuntimeError('Installed password worker: ' + json.dumps(result))
             evidence['accountChanges'] = evidence.get('accountChanges', 0) + 1
             if encrypted:
-                self.command('printf %s ' + shlex.quote(new) + ' | cryptsetup open --test-passphrase --key-file - /dev/vda2\n' +
-                             '! printf %s ' + shlex.quote(current) + ' | cryptsetup open --test-passphrase --key-file - /dev/vda2', timeout=90)
+                self.command('printf %s ' + shlex.quote(new) + ' | cryptsetup open --test-passphrase --key-file - ' + self.root_partition + '\n' +
+                             '! printf %s ' + shlex.quote(current) + ' | cryptsetup open --test-passphrase --key-file - ' + self.root_partition, timeout=90)
             self.command('test ! -e /var/lib/cybexos/password-change.json')
             self.reboot(encrypted, password=new)
             self.login_desktop(password=new)
@@ -994,7 +1002,7 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
             self.press('ret')
         state = self.wait_installer(lambda s: s.get('phase') == 'review' and not s.get('reviewPending'), 'the review')
         plan = state['review']
-        expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': '/dev/vda'}
+        expected = {'username': 'cybexqa', 'fullName': 'Cybex QA', 'hostname': 'cybexqa-cybexos', 'encrypted': encrypted, 'autoLogin': encrypted, 'disk': self.target_disk}
         if {key: plan.get(key) for key in expected} != expected:
             raise RuntimeError('Reviewed plan differs from the screen input: ' + json.dumps(plan))
         # Proprietary applications (1Password, vendor apps) are on by default.
@@ -1418,7 +1426,7 @@ unlink /run/cybexos-kernel-qa/readback''', timeout=300)
 
 
 def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=False, applications='minimal', screenshots=None,
-            display=(1280, 800)):
+            display=(1280, 800), target='virtio'):
     evidence = {} if evidence is None else evidence
     milestones = evidence.setdefault('milestones', {})
     case=base/('encrypted' if encrypted else 'plain');case.mkdir()
@@ -1433,7 +1441,9 @@ def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=
     import base64
     plan64=base64.b64encode(json.dumps(plan).encode()).decode()
     secrets=json.dumps({'password':PASSWORD})
-    vm=VM(case,disk,iso,display=display)
+    if target != 'virtio' and not interactive:
+        raise RuntimeError('A target without the fixed QA serial needs --interactive: the screen reads its identity')
+    vm=VM(case,disk,iso,display=display,target=target)
     vm.autologin = encrypted
     try:
         vm.start();vm.login(live=True)
@@ -1618,6 +1628,9 @@ def main():
                         type=lambda value: tuple(int(part) for part in value.split('x', 1)),
                         help='Virtual display size. A frame that is not a whole number of memory pages, such as '
                              '1440x900, also checks that the screen handles display buffers padded by the driver')
+    parser.add_argument('--disk', choices=tuple(VM.TARGETS), default='virtio',
+                        help='Target disk: virtio with a serial number, virtio without one (like most virtual '
+                             'machines), or eMMC on an SD host controller')
     parser.add_argument('--scenario', choices=('install', 'lifecycle'), default='lifecycle',
                         help='install stops after actual installed desktop login; lifecycle additionally exercises local deployments and recovery')
     args=parser.parse_args();iso=args.iso.resolve()
@@ -1631,7 +1644,7 @@ def main():
             screenshots = args.screenshots.resolve() / name if args.screenshots else None
             try:qualify(iso,encrypted,Path(temporary), args.scenario == 'lifecycle', evidence,
                         interactive=args.interactive, applications=args.applications, screenshots=screenshots,
-                        display=args.display)
+                        display=args.display, target=args.disk)
             except Exception as error:evidence.update(result='failed', error=str(error))
             if args.output:
                 args.output.write_text(json.dumps(result, indent=2) + '\n')

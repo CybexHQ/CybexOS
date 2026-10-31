@@ -107,6 +107,9 @@ reference's icon table.
   repeated activation keys. A dumb buffer's mapping is cut to its pitch ×
   height rows: drivers round the allocation up to whole pages (64 KiB on
   some), and a 2880×1800 or 1440×900 frame is not a whole number of pages.
+  Losing the VT (the recovery shell) exits the screen cleanly instead of
+  panicking; the unit restarts it, and it waits for tty1 before drawing the
+  service's current state again.
   Test the packaged KMS backend through Nix; plain Cargo uses the upstream
   dependencies without this patch.
 - KMS software frames render in cached RAM instead of blending in uncached
