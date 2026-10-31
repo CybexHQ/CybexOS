@@ -107,10 +107,11 @@
 - Refresh normally keeps the service running. If it fails or leaves stale
   entries/counts, use `sudo systemctl restart iventoy.service`, then repeat
   the status/list checks.
-  A restart can start iVentoy while the stopping process is still rewriting
-  `/opt/iventoy/data/config.dat`; it then comes up with defaults (DHCP server
-  `0.0.0.0`), cannot start PXE and loops (2026-10-31). Copy `config.dat` aside
-  first, and afterwards require the log's `Recover: ip:10.10.0.7` line. If it
+  A restart can bring iVentoy up with defaults (DHCP server `0.0.0.0`): it
+  cannot start PXE and loops. This happened on both restarts on 2026-10-31.
+  Once `/opt/iventoy/data/config.dat` was missing at start; once the stopping
+  process itself saved it without the network settings. Copy `config.dat`
+  aside first, and afterwards require the log's `Recover: ip:10.10.0.7` line. If it
   is missing, stop the unit, put the copy (or the one in
   `/data/pxe/config-backups/initial-config.tar.gz`) back, and start it.
   Use systemd rather than launching a second `iventoy.sh` process. The unit's
