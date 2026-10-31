@@ -66,16 +66,17 @@
   an established connection to iVentoy's port 10809: they never block
   removing an older image, a refresh or a restart, so don't check for them or
   wait on them. Local staging copies follow the cleanup rules below.
-- Each new testing ISO takes the next beta number. Before freezing its source,
-  increment the prerelease number in `VERSION` (for example `1.0.0-beta.2` to
-  `1.0.0-beta.3`) past the highest number in `VERSION` and `/data/pxe/iso`, so
-  the boot menu, release metadata and file name agree. `VERSION` is the only
-  file to change; test fixtures pin their own versions. Change `1.0.0` only by
-  a deliberate release decision. Serve the build's
-  `cybexos-<VERSION>-x86_64-linux.iso` as `cybexos-<VERSION>.iso` with
+- ISOs are production builds without a prerelease tag: `VERSION` is a final
+  version (`1.0.0` from 2026-10-31, after `1.0.0-beta.34`). Each new ISO takes
+  the next version. Before freezing its source, increment the patch number in
+  `VERSION` (for example `1.0.0` to `1.0.1`) past the highest version in
+  `VERSION` and `/data/pxe/iso`, so the boot menu, release metadata and file
+  name agree. `VERSION` is the only file to change; test fixtures pin their
+  own versions. Change the major or minor number only by a deliberate release
+  decision. Serve the build's ISO as `cybexos-<VERSION>.iso` with
   `cybexos-<VERSION>.iso.sha256` naming that file, for example
-  `cybexos-1.0.0-beta.3.iso`, without date or task suffixes. Never reuse a
-  served number; rebuilds before the copy keep it.
+  `cybexos-1.0.1.iso`, without date or task suffixes. Never reuse a served
+  number; rebuilds before the copy keep it.
 - After adding, replacing, or removing a testing ISO, refresh iVentoy's image
   list before handoff. Finish copying and verifying the checksum first; keep
   incomplete ISOs outside the served ISO tree. Use ASCII filenames without
