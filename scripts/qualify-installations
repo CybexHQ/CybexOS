@@ -617,9 +617,13 @@ QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
         data_dirs = self.command(f"tr '\\0' '\\n' < /proc/{shell}/environ | sed -n 's/^XDG_DATA_DIRS=//p'").strip().split(':')
         if '/home/cybexqa/.local/share/flatpak/exports/share' not in data_dirs:
             raise RuntimeError('The shell cannot see Flathub launchers: ' + json.dumps(data_dirs))
-        runs = self.command(session + f'flatpak run --command=vim {app} --version', timeout=300).strip().splitlines()[0]
-        if 'VIM' not in runs:
-            raise RuntimeError('The sandboxed app did not run: ' + runs)
+        # Started with the shell's data path, as a launcher does; Flatpak
+        # notes on stderr when its exports are missing from that path.
+        output = self.command(session + 'XDG_DATA_DIRS=' + shlex.quote(':'.join(data_dirs))
+                              + f' flatpak run --command=vim {app} --version', timeout=300)
+        runs = next((line.strip() for line in output.splitlines() if 'VIM - Vi IMproved' in line), '')
+        if not runs:
+            raise RuntimeError('The sandboxed app did not run: ' + output[-600:])
         cybex('remove ' + app)
         removal = finished('remove', 600)
         left = [row['id'] for row in cybex('status')['installed']]
