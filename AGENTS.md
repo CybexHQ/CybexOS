@@ -19,11 +19,19 @@
   in `/etc/nixos`; secrets/state stay outside the Nix store. Never overwrite
   personal packages, services, VPNs, widgets, preferences, data or skills to make
   an update pass. Never implicitly refresh unrelated personal inputs.
-- Nixpkgs follows **nixos-unstable** independently: a rolling branch whose
-  packages come prebuilt from cache.nixos.org, guarded by the updater's
-  prebuilt check (`lifecycle/cybexos/prebuilt.py`, `nix/modules/prebuilt.nix`).
-  Only Cybex OS's own packages, unfree vendor downloads, kernel modules and
-  machine configuration build locally; fix an uncached Nixpkgs build through
+- Nixpkgs always follows the **latest stable NixOS release** (`nixos-YY.MM`),
+  not the rolling `nixos-unstable` branch. Move to each new release once it is
+  out (May and November) as a qualified Cybex OS update. Take no packages from
+  `nixos-unstable` or another branch: Quickshell, Hyprland, Qt and the rest stay
+  at the release's versions. The kernel stays `linuxPackages_latest`, which the
+  release itself keeps current. Until NixOS 26.11 ships (planned 2026-11-23)
+  the tree still follows `nixos-unstable`; moving to 26.11 is the next branch
+  change.
+- Nixpkgs is selected independently of Cybex OS. Its packages come prebuilt
+  from cache.nixos.org, guarded by the updater's prebuilt check
+  (`lifecycle/cybexos/prebuilt.py`, `nix/modules/prebuilt.nix`). Only Cybex
+  OS's own packages, unfree vendor downloads, kernel modules and machine
+  configuration build locally; fix an uncached Nixpkgs build through
   configuration, never an overlay, and check releases with
   `scripts/check-prebuilt`. Cybex OS follows the machine Nixpkgs and is pinned
   to an authenticated exact release revision and NAR identity. Do not change
