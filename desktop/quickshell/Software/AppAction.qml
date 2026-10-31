@@ -2,8 +2,8 @@ import QtQuick
 import "../Common"
 
 // The one right action for a catalogue app wherever it appears: Install,
-// Added (on the list; press again to take it off), Open, or why it can't be
-// installed yet.
+// Added (on the list; press again to take it off), Open (also when it was
+// installed from Flathub instead), or why it can't be installed yet.
 SoftwareButton {
     id: root
 
@@ -19,7 +19,7 @@ SoftwareButton {
         && Software.flowChange.installs.includes(attribute)
     readonly property string mode: !app ? "none"
         : inFlight ? (Software.phase === "ready" ? "ready" : "installing")
-        : app.installed ? "open"
+        : app.installed || Software.viaFlathub(app) ? "open"
         : queuedAction === "install" ? "added"
         : app.unavailable ? "unavailable"
         : verdict && verdict.state === "compiles" ? "compiles"

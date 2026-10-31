@@ -157,6 +157,55 @@ elif args[:2] == ['software', 'stage']:
 elif args[:2] == ['software', 'request']:
     path = root / 'request.json'
     print(path.read_text() if path.exists() else json.dumps({'state': 'running', 'createdAt': time.time()}))
+elif args[:2] == ['software', 'flathub']:
+    # This account's installation and the latest change, settled lazily: a
+    # change finishes `flathubDelay` seconds after it started.
+    path = root / 'flathub.json'
+    state = json.loads(path.read_text()) if path.exists() else {'installed': [], 'task': None}
+    task = state.get('task')
+    if task and task['state'] == 'running' and time.time() - task['startedAt'] > fixture.get('flathubDelay', 1.5):
+        if fixture.get('flathubFail'):
+            task.update(state='failed', error=fixture['flathubFail'])
+        else:
+            if task['action'] == 'install':
+                state['installed'] += [{'id': app, 'name': task['names'].get(app, app), 'version': '1.0', 'branch': 'stable',
+                                        'origin': 'flathub', 'installation': 'user', 'icon': '', 'desktop': False}
+                                       for app in task['ids']]
+            elif task['action'] == 'remove':
+                state['installed'] = [row for row in state['installed'] if row['id'] not in task['ids']]
+            task['state'] = 'done'
+        path.write_text(json.dumps(state))
+    action = args[2]
+    if action == 'status':
+        public = {key: task.get(key) for key in ('id', 'action', 'ids', 'names', 'state', 'error')} if task else None
+        print(json.dumps({'schema': 1, 'enabled': True, 'available': True, 'remote': True, 'proprietary': True,
+                          'task': public, 'installed': state['installed']}))
+    elif action == 'search':
+        record(args)
+        time.sleep(fixture.get('flathubSearchDelay', 0.3))
+        query = args[3].casefold()
+        rows = [row for row in fixture.get('flathubSearch', []) if query in (row['name'] + ' ' + row['summary']).casefold()]
+        print(json.dumps({'query': args[3], 'total': len(rows), 'results': rows, 'proprietary': True}))
+    elif action == 'app':
+        record(args)
+        apps = fixture.get('flathubApps', {})
+        if args[3] not in apps:
+            print(json.dumps({'error': "Flathub doesn't have this app."}), file=sys.stderr); sys.exit(1)
+        mine = [row for row in state['installed'] if row['id'] == args[3]]
+        print(json.dumps(apps[args[3]] | {'installed': mine[0] if mine else None}))
+    elif action == 'updates':
+        record(args)
+        print(json.dumps({'updates': fixture.get('flathubUpdates', [])}))
+    elif action in ('install', 'remove', 'update'):
+        record(args)
+        names = json.loads(args[args.index('--names') + 1])
+        ids = args[args.index('--names') + 2:]
+        state['task'] = {'id': 'f' * 32, 'action': action, 'ids': ids, 'names': names, 'state': 'running',
+                         'error': '', 'startedAt': time.time()}
+        path.write_text(json.dumps(state))
+        print(json.dumps({'accepted': True, 'task': 'f' * 32}))
+    else:
+        sys.exit(127)
 elif args[:2] == ['update', 'check']:
     print(json.dumps(fixture['sources']))
 elif args[:2] == ['update', 'status']:
@@ -183,6 +232,27 @@ elif args[:1] == ['update']:
 else:
     sys.exit(127)
 '''
+
+THUNDERBIRD_MEDIA = 'https://dl.flathub.org/media/org/mozilla/thunderbird/23751bbaeddad88ad5452bd277389f14/'
+FLATHUB_SEARCH = [
+    {'id': 'org.mozilla.thunderbird', 'name': 'Thunderbird', 'summary': 'Email, newsfeed, chat and calendaring client',
+     'developer': 'MZLA Technologies', 'icon': 'https://dl.flathub.org/media//org/mozilla/thunderbird/23751bbaeddad88ad5452bd277389f14/icons/128x128/org.mozilla.thunderbird.png',
+     'license': 'MPL-2.0', 'free': True, 'verified': True, 'installs': 29077, 'unavailable': '', 'installed': False},
+    {'id': 'eu.betterbird.Betterbird', 'name': 'Betterbird', 'summary': 'A fine-tuned mail client based on Thunderbird',
+     'developer': 'Betterbird Project', 'icon': '', 'license': 'MPL-2.0', 'free': True, 'verified': False, 'installs': 3000,
+     'unavailable': '', 'installed': False},
+    # The catalogue already shows GIMP; Flathub's copy is not listed twice.
+    {'id': 'org.gimp.GIMP', 'name': 'GIMP mail plugin test', 'summary': 'Mail', 'developer': '', 'icon': '', 'license': '',
+     'free': True, 'verified': True, 'installs': 1, 'unavailable': '', 'installed': False}]
+FLATHUB_APPS = {'org.mozilla.thunderbird': {
+    'id': 'org.mozilla.thunderbird', 'name': 'Thunderbird', 'summary': 'Email, newsfeed, chat and calendaring client',
+    'description': ['Thunderbird is a free and open source email, newsfeed, chat and calendaring client that is easy to set up and customize.',
+                    '• Calendars and contacts', '• Encrypted mail with OpenPGP'],
+    'developer': 'MZLA Technologies', 'license': 'MPL-2.0', 'free': True, 'icon': FLATHUB_SEARCH[0]['icon'],
+    'screenshots': [THUNDERBIRD_MEDIA + 'screenshots/image-1_752x470@1.png', THUNDERBIRD_MEDIA + 'screenshots/image-2_752x470@1.png'],
+    'brand': {}, 'homepage': 'https://www.thunderbird.net/', 'version': '159.0', 'verified': True,
+    'downloadBytes': 126212325, 'installedBytes': 343719424, 'runtime': 'Freedesktop Platform version 25.08',
+    'permissions': ['files-home', 'devices', 'network'], 'eol': False, 'supported': True, 'unavailable': ''}}
 
 LAUNCHED = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -229,6 +299,8 @@ IPC = '''
         function category(id: string): void { Software.openCategory(id); }
         function sub(id: string): void { Software.setSubcategory(id); }
         function app(id: string): void { Software.openApp(id); }
+        function flathub(id: string): void { Software.openFlathub(id, null); }
+        function flathubRefresh(): void { Software.refreshFlathub(); }
         function back(): void { Software.back(); }
         function search(text: string): void { Software.search(text); }
         function press(name: string, index: int): string {
@@ -260,6 +332,16 @@ IPC = '''
                 primary: primary ? {text: primary.text, enabled: primary.enabled} : null,
                 appPrimary: appPrimary ? {text: appPrimary.text, enabled: appPrimary.enabled} : null,
                 download: shell.softwareText("softwareAppDownload"), appName: shell.softwareText("softwareAppName"),
+                flathubOn: Software.flathubOn, flathubHits: Software.flathubHits.length,
+                flathubInstalled: Software.flathubInstalled.length,
+                flathubTask: Software.flathubTask ? Software.flathubTask.state : "",
+                flathubName: shell.softwareText("softwareFlathubName"),
+                flathubDownload: shell.softwareText("softwareFlathubDownload"),
+                flathubPrimary: shell.softwareItem("softwareFlathubPrimary") ? {text: shell.softwareItem("softwareFlathubPrimary").text,
+                    enabled: shell.softwareItem("softwareFlathubPrimary").enabled} : null,
+                flathubError: !!shell.softwareItem("softwareFlathubError"),
+                flathubUpdateState: shell.softwareText("softwareFlathubUpdateState"),
+                appFlathub: !!shell.softwareItem("softwareAppFlathub"),
                 categoryTitle: shell.softwareText("softwareCategoryTitle"),
                 badge: shell.softwareText("softwareUpdatesBadge") !== null,
                 counts: {hero: shell.softwareCount(root, "softwareHero"), categories: shell.softwareCount(root, "softwareCategory"),
@@ -269,7 +351,11 @@ IPC = '''
                     personal: shell.softwareCount(root, "softwareInstalledPersonal"), other: shell.softwareCount(root, "softwareInstalledOther"),
                     updateRows: shell.softwareCount(root, "softwareUpdateRow"), upToDate: shell.softwareCount(root, "softwareUpToDate"),
                     screenshots: shell.softwareCount(root, "softwareScreenshot"),
-                    searchApps: shell.softwareCount(root, "softwareSearchApp"), packages: shell.softwareCount(root, "softwarePackageResult")}});
+                    searchApps: shell.softwareCount(root, "softwareSearchApp"), packages: shell.softwareCount(root, "softwarePackageResult"),
+                    flathubResults: shell.softwareCount(root, "softwareFlathubResult"),
+                    flathubPermissions: shell.softwareCount(root, "softwareFlathubPermission"),
+                    installedFlathub: shell.softwareCount(root, "softwareInstalledFlathub"),
+                    flathubUpdateRows: shell.softwareCount(root, "softwareFlathubUpdateRow")}});
         }
     }
 '''
@@ -299,6 +385,10 @@ class Session(welcome.Session):
         path = self.runtime / 'fixture.json'
         value = json.loads(path.read_text()) if path.exists() else {}
         path.write_text(json.dumps(value | values))
+
+    def flathub_state(self, installed, task=None):
+        (self.runtime / 'flathub.json').write_text(json.dumps({'installed': installed, 'task': task}))
+        self.call('software-test', 'flathubRefresh')
 
     def status(self, **values):
         values.setdefault('automatic', {'prepare': False, 'confirm': True})
@@ -359,7 +449,7 @@ def main():
         session = Session(base, native / 'qml')
         session.env.update(CYBEXOS_WELCOME='0', CYBEXOS_ASSISTANT='0')
         for name, body in (('cybex', FAKE), ('systemctl', updates.SYSTEMCTL.replace('REAL', repr(shutil.which('systemctl')))),
-                           ('fake-gimp', LAUNCHED)):
+                           ('fake-gimp', LAUNCHED), ('flatpak', LAUNCHED)):
             (base / 'bin' / name).write_text(body)
             (base / 'bin' / name).chmod(0o700)
         applications = session.home / '.local/share/applications'
@@ -380,6 +470,7 @@ def main():
                                   'blender': {'state': 'compiles', 'compiles': ['blender-4.5.3']},
                                   'krita': {'state': 'prebuilt', 'downloadBytes': 400748336},
                                   'hello': {'state': 'prebuilt', 'downloadBytes': 56000}},
+                        flathubSearch=FLATHUB_SEARCH, flathubApps=FLATHUB_APPS,
                         search=[{'attribute': 'hello', 'name': 'hello', 'version': '2.12.2',
                                  'description': 'A program that produces a familiar, friendly greeting'},
                                 {'attribute': 'gimp', 'name': 'gimp', 'version': '3.0.6', 'description': 'GNU Image Manipulation Program'},
@@ -566,6 +657,66 @@ def main():
             wait(lambda: state().get('view') == 'category', 'category again')
             session.themed(shots, 'software-category-after-browsing', settle=2.0)
 
+            # ---- Flathub ---------------------------------------------------
+            wait(lambda: state().get('flathubOn'), 'Flathub available')
+            session.call('software-test', 'search', 'mail')
+            wait(lambda: state()['counts']['flathubResults'] == 2, 'Flathub results, without the catalogue duplicate')
+            assert ['software', 'flathub', 'search', 'mail'] in session.calls(), session.calls()
+            session.themed(shots, 'software-search-flathub', settle=2.0)
+            session.call('software-test', 'flathub', 'org.mozilla.thunderbird')
+            wait(lambda: state().get('flathubName') == 'Thunderbird' and state()['counts']['flathubPermissions'] == 3,
+                 'Flathub app page with its sandbox')
+            assert state()['flathubPrimary'] == {'text': 'Install', 'enabled': True}, state()
+            assert state()['flathubDownload'] == 'Download ≈ 126 MB · installs right away, for your account', state()
+            session.themed(shots, 'software-flathub-app', settle=3.0)
+            assert session.press('softwareFlathubPrimary')
+            wait(lambda: (state().get('flathubPrimary') or {}).get('text') == 'Installing…', 'installing from Flathub')
+            install = next(call for call in reversed(session.calls()) if call[:3] == ['software', 'flathub', 'install'])
+            assert install[3:] == ['--names', '{"org.mozilla.thunderbird":"Thunderbird"}', 'org.mozilla.thunderbird'], install
+            assert state()['queue'] == ['krita:install'] and state()['phase'] == 'idle', 'no system change is involved'
+            session.shot(shots, 'software-flathub-installing-dark.png')
+            wait(lambda: (state().get('flathubPrimary') or {}).get('text') == 'Open', 'installed from Flathub', timeout=20)
+            assert state()['flathubDownload'] == 'Installed for you from Flathub', state()
+            session.themed(shots, 'software-flathub-installed')
+            assert session.press('softwareFlathubPrimary')
+            wait(lambda: '["run", "org.mozilla.thunderbird"]' in (session.home / 'launched.jsonl').read_text(),
+                 'opened with flatpak run')
+            session.call('software-test', 'tab', 'installed')
+            wait(lambda: state()['counts']['installedFlathub'] == 1, 'Installed lists Flathub apps')
+            session.themed(shots, 'software-installed-flathub')
+            # Removal is immediate, so the first press asks again.
+            assert session.press('softwareInstalledFlathubRemove')
+            assert not any(call[:3] == ['software', 'flathub', 'remove'] for call in session.calls())
+            assert session.press('softwareInstalledFlathubRemove')
+            wait(lambda: state()['counts']['installedFlathub'] == 0, 'removed from Flathub', timeout=20)
+            # Updates: this account's Flathub apps, checked when the tab opens.
+            vim = {'id': 'org.vim.Vim', 'name': 'Vim', 'version': '9.1', 'branch': 'stable', 'origin': 'flathub',
+                   'installation': 'user', 'icon': '', 'desktop': False}
+            session.fixture(flathubUpdates=[{'id': 'org.vim.Vim', 'name': 'Vim', 'icon': '', 'before': '9.1', 'after': '9.2'}])
+            session.flathub_state([vim])
+            wait(lambda: state().get('flathubInstalled') == 1, 'Vim from Flathub')
+            session.call('software-test', 'tab', 'explore')
+            session.call('software-test', 'tab', 'updates')
+            wait(lambda: state()['counts']['flathubUpdateRows'] == 1, 'a Flathub update')
+            session.themed(shots, 'software-updates-flathub')
+            assert session.press('softwareFlathubUpdateAll')
+            wait(lambda: state()['counts']['flathubUpdateRows'] == 0
+                 and state().get('flathubUpdateState') == 'Your Flathub apps are up to date.', 'Flathub apps updated', timeout=20)
+            update = next(call for call in reversed(session.calls()) if call[:3] == ['software', 'flathub', 'update'])
+            assert update[-1] == 'org.vim.Vim', update
+            # A catalogue app NixOS can't install yet points to Flathub; one
+            # Flathub lacks says so on its page.
+            session.call('software-test', 'tab', 'explore')
+            session.call('software-test', 'app', 'blender')
+            wait(lambda: state().get('appFlathub'), 'Flathub offered for a blocked app')
+            session.shot(shots, 'software-app-flathub-offer-dark.png')
+            assert session.press('softwareAppFlathubOpen')
+            wait(lambda: state().get('flathubError'), "Flathub's answer shown on the page")
+            session.call('software-test', 'back')
+            session.call('software-test', 'app', 'gimp')
+            wait(lambda: state().get('appName') == 'GIMP', 'GIMP page')
+            assert not state().get('appFlathub'), 'an installable app is not sent elsewhere'
+
             # Escape from a tab root closes the window.
             session.call('software-test', 'tab', 'explore')
             session.key('-k', 'Escape')
@@ -583,7 +734,8 @@ def main():
                   'checked on demand with screenshots, a blocked app that would compile, search with a checked package, '
                   'keyboard back/search/close, cancelled authorization, another change blocking, queue → check → stage → '
                   'progress → ready → install → open, Installed groups and removal blocked by a pending restart, '
-                  'Updates with a prepared update and up to date, and a worker failure')
+                  'Updates with a prepared update and up to date, a worker failure, and Flathub: search, an app page '
+                  'with its sandbox, install → open, Installed and a confirmed removal, updates, and the offer on a blocked app')
         except BaseException:
             for log in session.logs:
                 if log.exists():

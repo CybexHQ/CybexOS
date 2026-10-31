@@ -28,7 +28,9 @@ available. Rebooting into the retained known-good boot entry also resumes
 recovery. A failed restoration never reports the previous generation as
 restored, and its transaction retains both the original activation error and
 the restoration error. These steps preserve personal configuration and state;
-they do not promise application-data rollback.
+they do not promise application-data rollback. Flathub apps live outside system
+generations too: a rollback neither removes nor downgrades them
+([Flathub](software-and-defaults.md#flathub)).
 
 The previous generation stays the persistent boot default. The candidate is a
 one-shot trial, selected once. A failed boot requires a user-selected reset or

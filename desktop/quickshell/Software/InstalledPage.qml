@@ -3,8 +3,9 @@ import QtQuick
 import "../Common"
 
 // What is on this computer, by who put it there: apps added in Software
-// (removable here), apps included with Cybex OS, apps from the machine's own
-// configuration (read-only here). Packages without an app follow, folded.
+// (removable here), apps from Flathub (this account's removable here), apps
+// included with Cybex OS, apps from the machine's own configuration
+// (read-only here). Packages without an app follow, folded.
 PageScroll {
     id: root
 
@@ -17,7 +18,7 @@ PageScroll {
     Notice {
         width: parent.width
         glyph: "shield-lock"
-        text: I18n.tr("Every change is a checked system update. Your previous system stays available as a fallback if something goes wrong.")
+        text: I18n.tr("Every change to NixOS apps is a checked system update. Your previous system stays available as a fallback if something goes wrong.")
     }
     Notice {
         width: parent.width
@@ -46,6 +47,22 @@ PageScroll {
         delegate: InstalledRow {
             required property var modelData
             objectName: "softwareInstalledMine"
+            width: root.innerWidth
+            row: modelData
+        }
+    }
+
+    GroupLabel {
+        width: parent.width
+        visible: Software.flathubRows.length > 0
+        text: I18n.tr("From Flathub")
+        detail: I18n.tr("Sandboxed · updated in the Updates tab")
+    }
+    Repeater {
+        model: Software.flathubRows
+        delegate: InstalledRow {
+            required property var modelData
+            objectName: "softwareInstalledFlathub"
             width: root.innerWidth
             row: modelData
         }

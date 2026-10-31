@@ -74,3 +74,35 @@ class PersonalInitTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FlathubRemoteTests(unittest.TestCase):
+    """The account's Flathub remote is added once; a removal stays a removal."""
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='cybexos-personal-flathub-')
+        self.addCleanup(temporary.cleanup)
+        self.home = Path(temporary.name)
+        self.calls = []
+
+    def run_flatpak(self, argv, **kwargs):
+        self.calls.append(argv)
+
+    def test_added_once_from_the_shipped_repository_file(self):
+        repository = ROOT / 'lifecycle/cybexos/flathub.flatpakrepo'
+        personal.flathub(self.home, True, repository, run=self.run_flatpak)
+        personal.flathub(self.home, True, repository, run=self.run_flatpak)
+        self.assertEqual(self.calls, [['flatpak', 'remote-add', '--user', '--if-not-exists', 'flathub', str(repository)]])
+        self.assertTrue((self.home / '.local/state/cybexos/flathub-remote').exists())
+
+    def test_turned_off_or_failing_leaves_no_marker(self):
+        personal.flathub(self.home, False, Path('/repo'), run=self.run_flatpak)
+        self.assertEqual(self.calls, [])
+        def fails(argv, **kwargs):
+            raise OSError('flatpak is missing')
+        personal.flathub(self.home, True, Path('/repo'), run=fails)
+        self.assertFalse((self.home / '.local/state/cybexos/flathub-remote').exists(), 'a later login tries again')
+
+    def test_shipped_repository_is_flathub_with_its_signing_key(self):
+        text = (ROOT / 'lifecycle/cybexos/flathub.flatpakrepo').read_text()
+        self.assertIn('\nUrl=https://dl.flathub.org/repo/\n', text)
+        self.assertRegex(text, r'\nGPGKey=[A-Za-z0-9+/=]{2000,}\n')

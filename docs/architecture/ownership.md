@@ -10,6 +10,7 @@ ISO's `cybexos-install`. They do not provision another operating system.
 | Machine/personal declarations | `/etc/nixos/{flake.nix,flake.lock,machine.nix,local/}` | Root-owned working copy; staged separately; vendor defaults use Nix module priorities |
 | Personal desktop | `~/.config/cybexos/{shell.json,plugins.json,displays.json,hypr/user.lua}` | Live preferences; never reconciled by vendor updates |
 | Personal code | `~/.local/share/cybexos/{plugins,themes}` | API 1 native/Omarchy packages, retained across system generations |
+| Personal apps | Flathub apps in `~/.local/share/flatpak` (data in `~/.var/app`); administrator Flatpaks in `/var/lib/flatpak` | Per account, outside system generations; installed, updated and removed in Software, never by vendor updates |
 | Persistent state | Home; `/var/lib`; `/etc/NetworkManager/system-connections`; plugin-data | Independent of system generations; requires application-aware backup/migration |
 | Secrets | `/var/lib/cybexos/secrets`; keyring; private runtime credentials | Root directory 0700/files 0600; no plaintext in store, source, argv or logs |
 | Deployment records | `/var/lib/cybexos/transactions` | Private immutable source/lock snapshots, archive identities and GC roots |

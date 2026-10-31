@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import shutil
+import subprocess
 
 def initialize(home, defaults, share, proprietary, developer=False):
     def seed(relative, content, mode=0o644):
@@ -47,7 +48,24 @@ def initialize(home, defaults, share, proprietary, developer=False):
             print(f'Preserved personal skill at {slot}; vendor skill: {share / "skill"}')
 
 
+def flathub(home, enabled, repository, run=subprocess.run):
+    """Flathub for this account, once. A remote the person removes stays removed."""
+    marker = home / '.local/state/cybexos/flathub-remote'
+    if not enabled or marker.exists():
+        return
+    try:
+        run(['flatpak', 'remote-add', '--user', '--if-not-exists', 'flathub', str(repository)],
+            check=True, timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        print('Flathub was not added for this account; Software adds it with the first Flathub install.')
+        return
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text('Cybex OS added the flathub remote for this account once. Removing it keeps it removed.\n')
+
+
 if __name__ == '__main__':
     initialize(Path.home(), Path('/run/current-system/sw/share/cybexos/defaults'),
                Path(os.environ['CYBEXOS_UPDATER_SHARE']), Path('/etc/cybexos/proprietary-enabled').exists(),
                Path('/etc/cybexos/developer-enabled').exists())
+    from cybexos.flathub import REPOSITORY, enabled
+    flathub(Path.home(), enabled(), REPOSITORY)

@@ -363,6 +363,91 @@ function appUpdates(deployment, catalogue) {
     }).sort((a, b) => String(a.title).localeCompare(String(b.title)));
 }
 
+// ---- Flathub ---------------------------------------------------------------
+
+// Flatpak application IDs: reverse-DNS, at least three elements.
+var FLATHUB_ID = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+){2,}$/;
+
+function flathubId(value) {
+    return typeof value === "string" && value.length <= 255 && FLATHUB_ID.test(value);
+}
+
+// Icons and screenshots of Flathub apps load from Flathub's media server only.
+function flathubMedia(url) {
+    const value = String(url || "");
+    return /^https:\/\/dl\.flathub\.org\/media\/[A-Za-z0-9._~\/@%+-]+\.(?:png|jpe?g|webp|svg)$/.test(value) ? value : "";
+}
+
+// Flathub results that are not already shown as catalogue apps.
+function flathubHits(results, apps) {
+    const shown = {};
+    for (const app of apps || [])
+        if (app && app.appstream)
+            shown[app.appstream] = true;
+    return list(results).filter(row => row && flathubId(row.id) && !shown[row.id]);
+}
+
+// An installed Flatpak app by ID, this account's installation first.
+function flatpak(installed, id) {
+    const rows = list(installed).filter(row => row && row.id === id);
+    return rows.find(row => row.installation === "user") || rows[0] || null;
+}
+
+// The latest Flathub change, when it concerns this app. An update of
+// everything (no IDs) concerns every app.
+function flathubTask(task, id) {
+    if (!task || !id)
+        return null;
+    const ids = list(task.ids);
+    return (task.action === "update" && ids.length === 0) || ids.includes(id) ? task : null;
+}
+
+function flathubRunning(task) {
+    return !!task && ["queued", "running"].includes(task.state);
+}
+
+// The one action for a Flathub app: Install, Open, a change on its way, or
+// why it cannot be installed here.
+function flathubMode(entry, installedRow, task, status) {
+    if (!entry || !flathubId(entry.id))
+        return "none";
+    const mine = flathubTask(task, entry.id);
+    if (flathubRunning(mine))
+        return mine.action === "remove" ? "removing" : mine.action === "update" ? "updating" : "installing";
+    if (installedRow)
+        return "open";
+    const value = status || {};
+    if (value.enabled === false || value.available === false)
+        return "off";
+    if (entry.unavailable === "unfree")
+        return "unfree";
+    if (entry.supported === false)
+        return "unsupported";
+    return "install";
+}
+
+// Installed Flathub apps for the Installed tab, by name. A catalogue app
+// with the same AppStream ID lends its shipped icon.
+function flathubInstalledRows(installed, apps) {
+    const byAppstream = {};
+    for (const app of apps || [])
+        if (app && app.appstream && !(app.appstream in byAppstream))
+            byAppstream[app.appstream] = app;
+    return list(installed).filter(row => row && flathubId(row.id)).map(row => ({
+        key: "flatpak:" + row.installation + ":" + row.id, app: null, catalogue: byAppstream[row.id] || null,
+        name: row.name || row.id, attribute: "", desktopIds: row.desktop ? [row.id + ".desktop"] : [],
+        icon: row.icon || "", version: row.version || "", owner: "flathub", flatpak: row
+    })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+// Sandbox permissions worth showing before an install, most significant first.
+var PERMISSIONS = ["files-all", "files-home", "files-some", "devices", "host-commands", "x11", "network"];
+
+function permissions(keys) {
+    const wanted = list(keys);
+    return PERMISSIONS.filter(key => wanted.includes(key));
+}
+
 // ---- presentation ----------------------------------------------------------
 
 // Decimal sizes, as Nix and the update review report them.
@@ -476,5 +561,6 @@ if (typeof module !== "undefined") module.exports = {
     terms, searchApps, morePackages, installedGroups, selectedPackage, queued, toggle, withAll, installs, removals, prune,
     change, queueState, verdict, PREPARING, FINISHED, FAILED, owns, phase, blocked, changed, progress, appUpdates,
     size, parseHex, luminance, darkInk, mix, brand, paragraphs, license, host, screenshots, GLYPH_FALLBACKS, glyph,
-    columns, entryIds
+    columns, entryIds, FLATHUB_ID, flathubId, flathubMedia, flathubHits, flatpak, flathubTask, flathubRunning,
+    flathubMode, flathubInstalledRows, PERMISSIONS, permissions
 };

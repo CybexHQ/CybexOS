@@ -9,6 +9,8 @@ import "SoftwareHelpers.js" as Helpers
 // owns that change; Software follows it through Updates and applies it with
 // Updates.apply(), which asks for authorization. Nothing compiles here: every
 // install is checked first (`cybex software check`) and blocked if it would.
+// Flathub is the second source: sandboxed apps installed for this account
+// right away (`cybex software flathub`), outside system changes.
 Singleton {
     id: root
 
@@ -43,11 +45,14 @@ Singleton {
         tab = name;
         pages = [];
         query = "";
+        if (name === "updates")
+            checkFlathubUpdates(false);
     }
     function search(text) {
         query = String(text || "").slice(0, 200);
         pages = [];
         moreDelay.restart();
+        flathubDelay.restart();
     }
     function push(entry) { pages = pages.concat([entry]); }
     function openCategory(id) {
@@ -116,6 +121,7 @@ Singleton {
             reloadWanted = true;
         if (searching)
             moreDelay.restart();
+        refreshFlathub();
     }
     function iconSource(app) {
         return app && /^[a-z0-9]{2,32}$/.test(app.id || "") && catalogue.icons
@@ -563,7 +569,258 @@ Singleton {
             Quickshell.execDetached(["gio", "launch", path]);
         return path !== "";
     }
-    function openApplication(app) { return app ? launch(appEntryIds(app), app.name) : false; }
+    function openApplication(app) {
+        if (!app)
+            return false;
+        if (launch(appEntryIds(app), app.name))
+            return true;
+        // Installed from Flathub instead: its own launcher.
+        return !!flathubApp(app.appstream || "") && launchFlathub(app.appstream, app.name);
+    }
+    // A catalogue app installed from Flathub rather than NixOS.
+    function viaFlathub(app) { return !!app && !app.installed && !!flathubApp(app.appstream || ""); }
+
+    // ---- Flathub -----------------------------------------------------------
+    // Status reads only this computer. Search, app pages and update checks
+    // contact Flathub; installs, updates and removals run in a user service
+    // the worker records, so Software follows a change after a shell restart.
+    property var flathub: ({ schema: 1, enabled: false, available: false, remote: false, proprietary: false,
+        task: null, installed: [] })
+    property bool flathubLoaded: false
+    property bool flathubStatusWanted: false
+    readonly property bool flathubOn: flathubLoaded && flathub.enabled === true && flathub.available === true
+    readonly property var flathubInstalled: Helpers.list(flathub.installed)
+    readonly property var flathubTask: flathub.task || null
+    readonly property bool flathubBusy: Helpers.flathubRunning(flathubTask) || flathubStarter.busy
+    readonly property var flathubRows: Helpers.flathubInstalledRows(flathubInstalled, apps)
+    property string flathubStartError: ""
+    property string flathubStartId: ""
+    property string flathubStartAction: ""
+    property string lastFlathubTask: ""
+
+    function flathubApp(id) { return Helpers.flatpak(flathubInstalled, id); }
+    function flathubMode(entry) {
+        if (entry && flathubStarter.busy && flathubStartId === entry.id)
+            return flathubStartAction === "remove" ? "removing" : flathubStartAction === "update" ? "updating" : "installing";
+        return Helpers.flathubMode(entry, flathubApp(entry ? entry.id : ""), flathubTask, flathubLoaded ? flathub : {});
+    }
+    // The latest change's error, when it concerns this app.
+    function flathubFailure(id) {
+        if (flathubStartError !== "" && flathubStartId === id)
+            return flathubStartError;
+        const task = Helpers.flathubTask(flathubTask, id);
+        return task && task.state === "failed" ? task.error || "" : "";
+    }
+    // The latest update's error, for the Updates tab.
+    readonly property string flathubUpdateError: flathubStartAction === "update" && flathubStartError !== "" ? flathubStartError
+        : flathubTask && flathubTask.action === "update" && flathubTask.state === "failed" ? flathubTask.error || "" : ""
+    function refreshFlathub() {
+        if (!flathubStatus.run(["cybex", "software", "flathub", "status"]))
+            flathubStatusWanted = true;
+    }
+    function startFlathub(action, ids, names) {
+        if (flathubBusy)
+            return false;
+        flathubStartError = "";
+        flathubStartId = ids.length === 1 ? ids[0] : "";
+        flathubStartAction = action;
+        return flathubStarter.run(["cybex", "software", "flathub", action, "--names", JSON.stringify(names || {})].concat(ids));
+    }
+    function installFlathub(id, name) {
+        if (Helpers.flathubId(id))
+            startFlathub("install", [id], { [id]: name || id });
+    }
+    function removeFlathub(id, name) {
+        const row = flathubApp(id);
+        if (row && row.installation === "user")
+            startFlathub("remove", [id], { [id]: name || row.name || id });
+    }
+    function updateFlathub(ids) {
+        const names = {};
+        for (const row of flathubUpdates)
+            names[row.id] = row.name;
+        startFlathub("update", ids || [], names);
+    }
+    function launchFlathub(id, name) {
+        if (!Helpers.flathubId(id))
+            return false;
+        if (launch([id + ".desktop"], name))
+            return true;
+        Quickshell.execDetached(["flatpak", "run", id]);
+        return true;
+    }
+
+    JsonCommand {
+        id: flathubStatus
+        onCompleted: () => {
+            const value = flathubStatus.result;
+            if (!value || value.schema !== 1)
+                return;
+            root.flathub = value;
+            root.flathubLoaded = true;
+            const task = value.task || null;
+            // This session's update finished: those apps are current now.
+            if (task && task.id === root.lastFlathubTask && !Helpers.flathubRunning(task)) {
+                root.lastFlathubTask = "";
+                const ids = Helpers.list(task.ids);
+                if (task.action === "update" && task.state === "done")
+                    root.flathubUpdates = ids.length === 0 ? [] : root.flathubUpdates.filter(row => !ids.includes(row.id));
+            }
+        }
+    }
+    Connections {
+        target: flathubStatus
+        function onBusyChanged() {
+            if (!flathubStatus.busy && root.flathubStatusWanted) {
+                root.flathubStatusWanted = false;
+                Qt.callLater(root.refreshFlathub);
+            }
+        }
+    }
+    JsonCommand {
+        id: flathubStarter
+        onCompleted: () => {
+            root.lastFlathubTask = flathubStarter.result.task || "";
+            root.refreshFlathub();
+        }
+        onFailed: message => {
+            root.flathubStartError = message;
+            root.refreshFlathub();
+        }
+    }
+    // Follow a change while it runs, whether or not the window is open.
+    Timer {
+        interval: 1500
+        repeat: true
+        running: Helpers.flathubRunning(root.flathubTask)
+        onTriggered: root.refreshFlathub()
+    }
+
+    // Search results, debounced with the NixOS search.
+    property var flathubResults: []
+    property int flathubTotal: 0
+    property string flathubQuery: ""
+    property string flathubError: ""
+    readonly property bool flathubSearching: flathubSearcher.busy || flathubDelay.running
+    readonly property var flathubHits: flathubQuery === query.trim() ? Helpers.flathubHits(flathubResults, apps) : []
+    Timer {
+        id: flathubDelay
+        interval: 450
+        onTriggered: {
+            const text = root.query.trim();
+            if (text === "" || !root.flathubOn) {
+                root.flathubResults = [];
+                root.flathubQuery = "";
+                return;
+            }
+            if (!flathubSearcher.run(["cybex", "software", "flathub", "search", text]))
+                restart();
+            else
+                flathubSearcher.text = text;
+        }
+    }
+    JsonCommand {
+        id: flathubSearcher
+        property string text: ""
+        onCompleted: () => {
+            const value = flathubSearcher.result;
+            root.flathubResults = Helpers.list(value.results);
+            root.flathubTotal = Number(value.total) || 0;
+            root.flathubQuery = text;
+            root.flathubError = "";
+            if (text !== root.query.trim())
+                flathubDelay.restart();
+        }
+        onFailed: message => {
+            root.flathubResults = [];
+            root.flathubError = message;
+            root.flathubQuery = text;
+        }
+    }
+
+    // App pages: details from Flathub, one request at a time. A search
+    // result or catalogue app lends its name, summary and icon meanwhile.
+    property var flathubPages: ({})
+    property var flathubPreviews: ({})
+    property var flathubWanted: []
+    function openFlathub(id, preview) {
+        if (!Helpers.flathubId(id))
+            return;
+        if (preview) {
+            const next = Object.assign({}, flathubPreviews);
+            next[id] = preview;
+            flathubPreviews = next;
+        }
+        push({ kind: "flathub", id: id, sub: "" });
+        loadFlathub(id);
+    }
+    function flathubPage(id) {
+        const loaded = flathubPages[id];
+        return loaded && loaded.state === "ready" ? loaded.app : Object.assign({ id: id }, flathubPreviews[id] || {});
+    }
+    function flathubPageState(id) { return (flathubPages[id] || {}).state || "loading"; }
+    function flathubPageError(id) { return (flathubPages[id] || {}).error || ""; }
+    function setFlathubPage(id, value) {
+        const next = Object.assign({}, flathubPages);
+        next[id] = value;
+        flathubPages = next;
+    }
+    function loadFlathub(id) {
+        const known = flathubPages[id];
+        if (known && known.state !== "error")
+            return;
+        setFlathubPage(id, { state: "loading" });
+        if (!flathubWanted.includes(id))
+            flathubWanted = flathubWanted.concat([id]);
+        pumpFlathub();
+    }
+    function pumpFlathub() {
+        if (flathubLoader.busy || flathubWanted.length === 0)
+            return;
+        const id = flathubWanted[0];
+        flathubWanted = flathubWanted.slice(1);
+        flathubLoader.appId = id;
+        if (!flathubLoader.run(["cybex", "software", "flathub", "app", id]))
+            flathubWanted = [id].concat(flathubWanted);
+    }
+    JsonCommand {
+        id: flathubLoader
+        property string appId: ""
+        onCompleted: () => {
+            const value = flathubLoader.result;
+            root.setFlathubPage(appId, value && value.id === appId ? { state: "ready", app: value }
+                : { state: "error", error: "" });
+            Qt.callLater(root.pumpFlathub);
+        }
+        onFailed: message => {
+            root.setFlathubPage(appId, { state: "error", error: message });
+            Qt.callLater(root.pumpFlathub);
+        }
+    }
+
+    // Updates for this account's Flathub apps, checked when the Updates tab
+    // opens (at most every ten minutes) or on request.
+    property var flathubUpdates: []
+    property string flathubUpdatesError: ""
+    property var flathubCheckedAt: null
+    readonly property bool flathubChecking: flathubUpdater.busy
+    readonly property bool flathubMine: flathubInstalled.some(row => row.installation === "user")
+    function checkFlathubUpdates(force) {
+        if (!flathubOn || !flathubMine || flathubUpdater.busy)
+            return;
+        if (!force && flathubCheckedAt && Date.now() - flathubCheckedAt.getTime() < 600000)
+            return;
+        flathubUpdater.run(["cybex", "software", "flathub", "updates"]);
+    }
+    JsonCommand {
+        id: flathubUpdater
+        onCompleted: () => {
+            root.flathubUpdates = Helpers.list(flathubUpdater.result.updates);
+            root.flathubUpdatesError = "";
+            root.flathubCheckedAt = new Date();
+        }
+        onFailed: message => { root.flathubUpdatesError = message; }
+    }
 
     // ---- updates -----------------------------------------------------------
     readonly property var updates: Helpers.appUpdates(Updates.deployment, catalogue)

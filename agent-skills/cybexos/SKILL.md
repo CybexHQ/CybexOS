@@ -38,6 +38,14 @@ For packages, services or a VPN, read
 profiles and credentials may instead use its persistent system D-Bus APIs;
 do not copy a credential into a Nix declaration.
 
+A desktop app NixOS has not prebuilt may come from Flathub instead: sandboxed,
+for the signed-in account only, outside system generations and rollback.
+`cybex software flathub search QUERY` and `app ID` read Flathub; `install ID`
+and `remove ID` need no administrator and take effect right away, so name the
+app and its source to the person first. Plain downloaded Linux programs and
+AppImages run through nix-ld and binfmt; anything that installs services or
+kernel modules still needs a Nix declaration.
+
 Preview a requested system change through `cybex update stage local`. This
 builds the complete configuration and checks the candidate desktop. Inspect
 `cybex update status`, including actual package changes and errors. Apply only

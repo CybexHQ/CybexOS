@@ -168,7 +168,8 @@ install, rollback or policy change, still requires authorization.
 
 A missing/untrusted Cybex OS channel does not prevent selecting a confirmed
 NixOS package update. Unavailable sources are explained and excluded from the
-selected scope. Flatpak apps have their own update path; the system review
+selected scope. Flathub apps update separately, right away, from Software's
+Updates tab ([Flathub](software-and-defaults.md#flathub)); the system review
 covers the NixOS generation and Cybex OS source.
 
 Before the first Cybex OS release is published, HTTP 404 for the initial

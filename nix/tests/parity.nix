@@ -161,6 +161,11 @@ assert !generic.programs.uwsm.enable;
 # Desktop requests run through `pkexec cybexos-request`; NixOS 26.11 made the
 # setuid wrapper opt-in, and the payload installs without proprietary apps.
 assert payload.security.wrappers.pkexec.enable && generic.security.wrappers.pkexec.enable;
+# Software beyond NixOS packages (docs/software-and-defaults.md): downloaded
+# programs through nix-ld, AppImages through binfmt, and Flathub in Software.
+assert lib.all (c: c.programs.nix-ld.enable && c.programs.appimage.enable && c.programs.appimage.binfmt
+  && c.services.flatpak.enable && c.cybexos.features.flathub && c.environment.etc ? "cybexos/flathub-enabled")
+  [ payload generic ];
 assert (builtins.fromJSON (medium "release.json")).nixos == "unstable";
 assert installed.updates.branch == "nixos-unstable";
 # All default profiles, including the live medium, must boot the same latest

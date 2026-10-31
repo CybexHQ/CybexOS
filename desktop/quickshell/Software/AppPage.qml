@@ -20,11 +20,20 @@ PageScroll {
     readonly property string licence: Helpers.license(app.license)
     readonly property bool removable: app.installed === true && app.owner === "software"
     readonly property bool wide: innerWidth >= Theme.scaled(700)
+    readonly property bool viaFlathub: Software.viaFlathub(app)
+    // NixOS can't install it here yet, for a reason Flathub doesn't share.
+    readonly property bool blocked: !app.installed && ((app.unavailable !== undefined && app.unavailable !== ""
+        && app.unavailable !== "unfree") || (verdict !== null && (verdict.state === "compiles"
+        || (verdict.state === "unavailable" && verdict.reason !== "unfree"))))
+    readonly property bool flathubOffer: Software.flathubOn && Helpers.flathubId(app.appstream || "")
+        && (viaFlathub || blocked)
 
     objectName: "softwareAppPage"
     Component.onCompleted: Software.requestCheck(app.attribute || "")
 
     function downloadLine() {
+        if (viaFlathub)
+            return I18n.tr("Installed for you from Flathub");
         if (app.installed) {
             return app.owner === "software" ? I18n.tr("Added by you")
                 : app.owner === "personal" ? I18n.tr("From your configuration")
@@ -176,6 +185,20 @@ PageScroll {
                 textFormat: Text.PlainText
             }
         }
+    }
+
+    Notice {
+        objectName: "softwareAppFlathub"
+        width: parent.width
+        visible: root.flathubOffer
+        glyph: root.viaFlathub ? "shield-lock" : "download"
+        text: root.viaFlathub
+            ? I18n.tr("You installed this app from Flathub. It runs in a sandbox and updates in the Updates tab, separately from the system.")
+            : I18n.tr("Flathub has this app too. It installs right away for your account and runs in a sandbox, separately from system updates.")
+        action: root.viaFlathub ? I18n.tr("Manage") : I18n.tr("View on Flathub")
+        actionPrimary: false
+        actionName: "softwareAppFlathubOpen"
+        onTriggered: Software.openFlathub(root.app.appstream, { name: root.app.name, summary: root.app.summary })
     }
 
     // ---- screenshots --------------------------------------------------------

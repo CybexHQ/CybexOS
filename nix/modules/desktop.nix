@@ -221,6 +221,8 @@ in {
       description = "Install vendor agent skills without replacing user skills";
       wantedBy = [ "hyprland-session.target" ];
       before = [ "quickshell.service" ];
+      # Adds the account's Flathub remote once (lifecycle/bin/cybexos-personal-init).
+      path = lib.optional config.services.flatpak.enable config.services.flatpak.package;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${cfg.updaterPackage}/bin/cybexos-personal-init";

@@ -1,8 +1,11 @@
 # Software and application defaults
 
 Open **Software** from the application launcher, **Settings → Applications**
-or `cybexos-software`. It installs and removes native NixOS packages only; there
-are no Flatpak or Flathub apps in Software.
+or `cybexos-software`. It has two sources. NixOS packages come first: they are
+part of the system, staged and rolled back with it. [Flathub](#flathub) is the
+second: sandboxed apps installed for your account right away, outside system
+generations. [Programs from outside both](#programs-from-outside-nixos-and-flathub)
+also run.
 
 ## Prebuilt only
 
@@ -98,6 +101,62 @@ Apps update together with the system in **Software Update**, all prebuilt. The
 installed apps whose versions change (with a count on the tab) and opens
 Software Update to install it; otherwise it says your apps are up to date and
 can check for updates.
+
+## Flathub
+
+Search lists **From Flathub** between the catalogue's apps and **More
+packages**: apps from [flathub.org](https://flathub.org) that the catalogue
+does not already show, with a tick for a developer Flathub verified. An app's
+page loads its details, screenshots and download size from Flathub when it
+opens, and lists the sandbox access the app asks for (all your files, your
+home folder, devices, commands outside the sandbox, the older X11 display
+system, the network). **Install** starts at once, for your account only
+(`flatpak --user`): no authorization, no system change and no restart.
+**Open** starts it; **Remove** asks for a second press, then removes it and
+any runtime nothing else uses. The app's data in `~/.var/app` stays.
+
+A catalogue app NixOS cannot install yet (it would compile, or NixOS marks it
+unavailable) offers **View on Flathub** on its page. One already installed
+from Flathub opens from the catalogue as well. NixOS remains the first
+source: an installable catalogue app is never sent elsewhere.
+
+**Installed** groups Flathub apps under **From Flathub**; ones installed for
+everyone on the computer (`flatpak --system`, an administrator's choice) are
+listed there read-only. **Updates** checks this account's Flathub apps when it
+opens, at most every ten minutes, or with **Check**; **Update all** updates
+them right away. Flathub apps are not part of Software Update's review, its
+trial boot or a system rollback.
+
+Proprietary Flathub apps follow the computer's proprietary choice, as NixOS
+vendor apps do. Each account gets the `flathub` remote once, at its first
+sign-in, from the copy of Flathub's repository file that ships with Cybex OS
+(`lifecycle/cybexos/flathub.flatpakrepo`, signing key
+`6E5C 05D9 79C7 6DAF 93C0 8135 4184 DD4D 907A 7CAE`); Software adds it again
+only for an explicit install. A remote you remove or change stays as you left
+it. Installs, updates and removals run in a transient user service
+(`cybexos-flathub-ID.service`), so closing Software or restarting the shell
+does not interrupt them; Software follows the change from its record in
+`~/.local/state/cybexos/software/`, and Flatpak's own output stays in the
+private `flathub.log` there. `cybex software flathub status`, `search QUERY`,
+`app ID`, `updates`, `install ID…`, `remove ID…` and `update [ID…]` expose the
+same workflow.
+
+Turn Flathub off in Software for a computer with
+`cybexos.features.flathub = false;` in `/etc/nixos/local/`. Flatpak itself
+(`services.flatpak.enable`) stays available for the command line; already
+installed Flathub apps can still be removed.
+
+## Programs from outside NixOS and Flathub
+
+Programs downloaded as plain Linux binaries (vendor tarballs, language
+toolchains, Python wheels, editor extensions) expect the standard dynamic
+loader and common libraries. [nix-ld](https://github.com/nix-community/nix-ld)
+provides both, with the libraries NixOS's own AppImage runtime uses
+(`programs.nix-ld`). AppImages start directly: binfmt hands them to
+`appimage-run` (`programs.appimage`). Both are NixOS defaults that a personal
+module can turn off. Software that installs system services or kernel modules,
+or writes into `/usr`, still needs a Nix package; Distrobox (with Podman)
+offers another distribution's user space for the rest.
 
 ## Application defaults
 

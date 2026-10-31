@@ -11,6 +11,9 @@ CategoryTile CategoryTile.qml
 CollectionCard CollectionCard.qml
 ExplorePage ExplorePage.qml
 FactRow FactRow.qml
+FlathubAction FlathubAction.qml
+FlathubPage FlathubPage.qml
+FlathubRow FlathubRow.qml
 GroupLabel GroupLabel.qml
 MediaFrame MediaFrame.qml
 HeaderBar HeaderBar.qml

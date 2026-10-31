@@ -60,6 +60,19 @@ in {
     programs.steam = { enable = lib.mkDefault cfg.features.steam; remotePlay.openFirewall = false; dedicatedServer.openFirewall = false; };
     programs.gamemode.enable = lib.mkDefault cfg.features.steam;
     services.flatpak.enable = lib.mkDefault true;
+    # Software offers Flathub apps for the signed-in account; each account
+    # gets the remote once, from the repository file that ships with Cybex OS.
+    environment.etc."cybexos/flathub-enabled" = lib.mkIf (cfg.features.flathub && config.services.flatpak.enable) { text = "enabled\n"; };
+    # Programs downloaded as plain Linux binaries (vendor tarballs, language
+    # toolchains, Python wheels, editor extensions) expect the standard dynamic
+    # loader and common libraries. nix-ld provides them from the same set
+    # NixOS's AppImage runtime uses. AppImages start directly through binfmt.
+    programs.nix-ld = {
+      enable = lib.mkDefault true;
+      libraries = (pkgs.appimageTools.defaultFhsEnvArgs.multiPkgs pkgs)
+        ++ (with pkgs; [ gtk3 krb5 libsecret icu libffi libnotify ]);
+    };
+    programs.appimage = { enable = lib.mkDefault true; binfmt = lib.mkDefault true; };
     xdg.mime = {
       enable = true;
       defaultApplications = {

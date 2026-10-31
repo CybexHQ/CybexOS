@@ -76,6 +76,9 @@ in {
       # are always installed (Claude Code with proprietary). Independent of developer.
       assistant = mkOption { type = types.bool; default = true; };
       localNetworkServices = mkOption { type = types.bool; default = true; };
+      # Flathub as Software's second source: sandboxed apps installed for
+      # each account, outside system generations (docs/software-and-defaults.md).
+      flathub = mkOption { type = types.bool; default = true; };
     };
     bootTheme = mkOption {
       type = types.package;

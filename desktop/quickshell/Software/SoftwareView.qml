@@ -71,11 +71,15 @@ FocusScope {
                 if (!active)
                     return;
                 sourceComponent = undefined;
-                sourceComponent = root.page === null ? searchPage : root.page.kind === "app" ? appPage : categoryPage;
+                sourceComponent = pageLoader.component();
             }
             onActiveChanged: {
                 if (active)
-                    sourceComponent = root.page === null ? searchPage : root.page.kind === "app" ? appPage : categoryPage;
+                    sourceComponent = pageLoader.component();
+            }
+            function component() {
+                return root.page === null ? searchPage : root.page.kind === "app" ? appPage
+                    : root.page.kind === "flathub" ? flathubPage : categoryPage;
             }
             onLoaded: fade.restart()
             NumberAnimation {
@@ -96,6 +100,12 @@ FocusScope {
             id: appPage
             AppPage {
                 app: Software.appsById[(pageLoader.entry || {}).id] || ({})
+            }
+        }
+        Component {
+            id: flathubPage
+            FlathubPage {
+                appId: (pageLoader.entry || {}).id || ""
             }
         }
         Component {

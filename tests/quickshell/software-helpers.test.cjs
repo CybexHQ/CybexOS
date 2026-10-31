@@ -224,3 +224,58 @@ test("presentation helpers: sizes, colours, descriptions, licences and screensho
     assert.deepEqual(H.changed({ software: { packages: { length: 1, 0: "gimp" }, previous: { length: 0 } } }),
         { installs: ["gimp"], removals: [] });
 });
+
+test("Flathub apps: IDs, media, deduplicated results and installed rows", () => {
+    assert.equal(H.flathubId("org.mozilla.thunderbird"), true);
+    assert.equal(H.flathubId("net._86box._86Box"), true, "later elements may start with a digit or underscore");
+    assert.equal(H.flathubId("1net.example.App"), false, "the first element starts with a letter");
+    for (const bad of ["org.gimp", "-x.y.z", "org.gimp.GIMP --user", "org/gimp/GIMP", "", null, "a.b." + "c".repeat(260)])
+        assert.equal(H.flathubId(bad), false, String(bad));
+    assert.equal(H.flathubMedia("https://dl.flathub.org/media//org/mozilla/thunderbird/x/icons/128x128/org.mozilla.thunderbird.png"),
+        "https://dl.flathub.org/media//org/mozilla/thunderbird/x/icons/128x128/org.mozilla.thunderbird.png");
+    for (const bad of ["http://dl.flathub.org/media/a.png", "https://dl.flathub.org.example.com/media/a.png",
+                       "https://dl.flathub.org/repo/a.png", "file:///etc/passwd", "https://dl.flathub.org/media/a.png?x=1"])
+        assert.equal(H.flathubMedia(bad), "", bad);
+
+    const catalogue = [{ id: "gimp", appstream: "org.gimp.GIMP", name: "GIMP" }];
+    const results = [{ id: "org.gimp.GIMP", name: "GIMP" }, { id: "org.mozilla.thunderbird", name: "Thunderbird" },
+                     { id: "bad id", name: "x" }, null];
+    assert.deepEqual(H.flathubHits(results, catalogue).map(row => row.id), ["org.mozilla.thunderbird"],
+        "catalogue apps are already shown above Flathub's results");
+    assert.deepEqual(H.flathubHits({ length: 1, 0: results[1] }, []).map(row => row.id), ["org.mozilla.thunderbird"]);
+
+    const installed = [{ id: "org.gimp.GIMP", name: "GIMP", installation: "system", desktop: true, version: "3.0" },
+                       { id: "org.gimp.GIMP", name: "GIMP", installation: "user", desktop: true, version: "3.1" },
+                       { id: "org.vim.Vim", name: "Vim", installation: "user", desktop: false, icon: "/x/vim.png" }];
+    assert.equal(H.flatpak(installed, "org.gimp.GIMP").installation, "user", "this account's copy first");
+    assert.equal(H.flatpak(installed, "org.example.Missing"), null);
+    const rows = H.flathubInstalledRows(installed, catalogue);
+    assert.deepEqual(rows.map(row => [row.name, row.flatpak.installation, row.desktopIds]),
+        [["GIMP", "system", ["org.gimp.GIMP.desktop"]], ["GIMP", "user", ["org.gimp.GIMP.desktop"]], ["Vim", "user", []]]);
+    assert.equal(rows[0].catalogue, catalogue[0], "a catalogue app lends its shipped icon");
+    assert.equal(rows[2].owner, "flathub");
+    assert.deepEqual(H.permissions(["network", "files-all", "unknown", "x11"]), ["files-all", "x11", "network"]);
+});
+
+test("Flathub actions follow the change in flight, what is installed and policy", () => {
+    const entry = { id: "org.mozilla.thunderbird", name: "Thunderbird" };
+    const on = { enabled: true, available: true };
+    assert.equal(H.flathubMode(entry, null, null, on), "install");
+    assert.equal(H.flathubMode(entry, { id: entry.id }, null, on), "open");
+    assert.equal(H.flathubMode(null, null, null, on), "none");
+    assert.equal(H.flathubMode({ id: "bad" }, null, null, on), "none");
+    assert.equal(H.flathubMode(entry, null, null, { enabled: false, available: true }), "off");
+    assert.equal(H.flathubMode(entry, null, null, { enabled: true, available: false }), "off");
+    assert.equal(H.flathubMode(Object.assign({ unavailable: "unfree" }, entry), null, null, on), "unfree");
+    assert.equal(H.flathubMode(Object.assign({ supported: false }, entry), null, null, on), "unsupported");
+    const running = (action, ids, state) => ({ id: "a".repeat(32), action: action, ids: ids, state: state || "running" });
+    assert.equal(H.flathubMode(entry, null, running("install", [entry.id]), on), "installing");
+    assert.equal(H.flathubMode(entry, null, running("install", [entry.id], "queued"), on), "installing");
+    assert.equal(H.flathubMode(entry, { id: entry.id }, running("remove", [entry.id]), on), "removing");
+    assert.equal(H.flathubMode(entry, { id: entry.id }, running("update", []), on), "updating", "an update of everything");
+    assert.equal(H.flathubMode(entry, null, running("install", ["org.vim.Vim"]), on), "install", "another app's change");
+    assert.equal(H.flathubMode(entry, null, running("install", [entry.id], "failed"), on), "install");
+    assert.equal(H.flathubTask(running("install", ["org.vim.Vim"]), entry.id), null);
+    assert.equal(H.flathubRunning(running("update", [], "done")), false);
+    assert.equal(H.flathubRunning(null), false);
+});

@@ -16,6 +16,12 @@
 # and a click on the resume pill's Resume must close its window.
 # The real `cybex doctor` runs inside the session, and Ready reports it.
 #
+# Software beyond NixOS packages, in the same session: the account's Flathub
+# remote (added once, and a removal stays), exported Flatpak apps on the
+# shell's data path, a program built for a standard distribution running
+# through nix-ld, and AppImages registered with binfmt. There is no network,
+# so nothing is installed from Flathub here (tests/software-app.py drives that).
+#
 # Test-only settings: SDDM signs the user in directly (Cybex OS's own
 # automatic login requires verified LUKS), the display is fixed at 1280×800
 # and the character starts at a known place, and 1Password is a stand-in.
@@ -60,6 +66,13 @@ let
     hyprctl -i 0 dispatch 'hl.dsp.window.float({ action = "set", window = "class:cxo-probe" })'
     hyprctl -i 0 dispatch 'hl.dsp.window.resize({ x = 420, y = 300, window = "class:cxo-probe" })'
     hyprctl -i 0 dispatch 'hl.dsp.window.move({ x = 40, y = 120, window = "class:cxo-probe" })'
+  '';
+  # pigz as another distribution builds it: the standard dynamic loader and
+  # no Nix library path, so its zlib must come from nix-ld.
+  foreign = pkgs.runCommand "cybexos-foreign-pigz" { nativeBuildInputs = [ pkgs.patchelf ]; } ''
+    cp ${pkgs.pigz}/bin/pigz $out
+    chmod u+w $out
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 --remove-rpath $out
   '';
   workspace = number: pkgs.writeShellScript "cybexos-pointer-workspace-${number}" ''
     exec hyprctl -i 0 dispatch 'hl.dsp.focus({ workspace = "${number}" })'
@@ -182,6 +195,34 @@ in pkgs.testers.runNixOSTest {
     width, height = round(monitor["width"] / monitor["scale"]), round(monitor["height"] / monitor["scale"])
     assert (width, height) == (1280, 800), monitor
     machine.screenshot("session")
+
+    # ---- software beyond NixOS packages -----------------------------------
+    machine.wait_until_succeeds(f"runuser -u tester -- env {session} systemctl --user show cybexos-personal-init.service"
+                                " -p Result --value | grep -qx success", timeout=120)
+    assert user("flatpak remotes --user --columns=name").split() == ["flathub"]
+    machine.succeed("test -s /home/tester/.local/state/cybexos/flathub-remote")
+    flathub = json.loads(user("cybex software flathub status"))
+    assert flathub["enabled"] and flathub["available"] and flathub["remote"] and flathub["installed"] == [], flathub
+    # A change runs as a transient user service and records its result: an
+    # app that is not installed is already removed.
+    user("cybex software flathub remove org.example.NotInstalled")
+    machine.wait_until_succeeds(f"runuser -u tester -- env {session} cybex software flathub status"
+                                " | grep -q '\"state\": \"done\"'", timeout=60)
+    assert json.loads(user("cybex software flathub status"))["task"]["action"] == "remove"
+    user("flatpak remote-delete --user flathub")
+    user("systemctl --user restart cybexos-personal-init.service")
+    assert "flathub" not in user("flatpak remotes --user --columns=name").split(), "a removed remote stays removed"
+    shell_pid = user("systemctl --user show quickshell.service -p MainPID --value").strip()
+    shell_env = dict(line.split("=", 1) for line in machine.succeed(f"tr '\\0' '\\n' < /proc/{shell_pid}/environ").splitlines() if "=" in line)
+    data_dirs = shell_env.get("XDG_DATA_DIRS", "").split(":")
+    assert "/home/tester/.local/share/flatpak/exports/share" in data_dirs and "/var/lib/flatpak/exports/share" in data_dirs, data_dirs
+    assert machine.succeed("${pkgs.patchelf}/bin/patchelf --print-interpreter --print-rpath ${foreign}").split() == ["/lib64/ld-linux-x86-64.so.2"]
+    loader = " ".join(f"{key}={shell_env[key]}" for key in ("NIX_LD", "NIX_LD_LIBRARY_PATH"))
+    assert "pigz" in machine.succeed(f"runuser -u tester -- env -i {loader} ${foreign} --version 2>&1")
+    machine.succeed("grep -qx enabled /proc/sys/fs/binfmt_misc/appimage_type_2")
+    interpreter = machine.succeed("awk '/^interpreter/ { print $2 }' /proc/sys/fs/binfmt_misc/appimage_type_2").strip()
+    assert "appimage-run" in machine.succeed(f"readlink -f {interpreter}"), interpreter
+    machine.log("software-flexibility: passed")
 
     # The first sign-in shows the welcome guide over everything.
     def welcome():

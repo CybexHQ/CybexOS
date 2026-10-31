@@ -191,6 +191,18 @@ def main():
     software_check.add_argument('attributes', nargs='+', metavar='ATTRIBUTE')
     software_request = software_sub.add_parser('request'); software_request.add_argument('identifier')
     software_stage = software_sub.add_parser('stage'); software_stage.add_argument('request')
+    # Flathub apps for this account (docs/software-and-defaults.md#flathub).
+    flathub = software_sub.add_parser('flathub', help='Sandboxed apps from Flathub for this account')
+    flathub_sub = flathub.add_subparsers(dest='flathub_action', required=True)
+    flathub_sub.add_parser('status', help='Installed Flathub apps and the latest change, without contacting Flathub')
+    flathub_search = flathub_sub.add_parser('search'); flathub_search.add_argument('query', nargs='?', default='')
+    flathub_app = flathub_sub.add_parser('app'); flathub_app.add_argument('id')
+    flathub_sub.add_parser('updates', help='Flathub apps with a newer version')
+    for name in ('install', 'remove', 'update'):
+        change = flathub_sub.add_parser(name)
+        change.add_argument('ids', nargs='*' if name == 'update' else '+', metavar='APP_ID')
+        change.add_argument('--names', default='{}', help=argparse.SUPPRESS)
+    flathub_run = flathub_sub.add_parser('run', help=argparse.SUPPRESS); flathub_run.add_argument('task')
     maintenance = commands.add_parser('maintenance')
     maintenance_sub = maintenance.add_subparsers(dest='maintenance_action', required=True)
     for name in ('status', 'preview', 'resume'):
@@ -248,6 +260,24 @@ def main():
             print(json.dumps(native.check(args.attributes))); return
         if args.software_action == 'request':
             print(json.dumps(request_status(args.identifier))); return
+        if args.software_action == 'flathub':
+            from . import flathub
+            action = args.flathub_action
+            if action == 'status':
+                print(json.dumps(flathub.status())); return
+            if action == 'search':
+                print(json.dumps(flathub.search(args.query))); return
+            if action == 'app':
+                print(json.dumps(flathub.details(args.id))); return
+            if action == 'updates':
+                print(json.dumps(flathub.updates())); return
+            if action == 'run':
+                print(json.dumps(flathub.work(args.task))); return
+            try:
+                names = json.loads(args.names)
+            except ValueError:
+                raise Failure('Invalid app names') from None
+            print(json.dumps(flathub.start(action, args.ids, names=names))); return
         os.execv(PKEXEC, [PKEXEC, '/run/current-system/sw/bin/cybexos-request', 'software', args.request])
     if args.command == 'maintenance':
         require_installed()
