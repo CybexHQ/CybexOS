@@ -26,12 +26,12 @@ thread_local! {
     static APP: RefCell<Option<Shared>> = const { RefCell::new(None) };
 }
 
-fn configure_display() {
+fn configure_display() -> u32 {
     if std::env::var_os("SLINT_BACKEND").is_none() {
         std::env::set_var("SLINT_BACKEND", "linuxkms-software");
     }
     // The boot menu's rotation entries (nix/modules/iso-boot.nix).
-    let degrees = match std::env::var("SLINT_KMS_ROTATION") {
+    match std::env::var("SLINT_KMS_ROTATION") {
         Ok(value) => value.parse().unwrap_or(0),
         Err(_) => {
             let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap_or_default();
@@ -41,15 +41,25 @@ fn configure_display() {
             }
             degrees
         }
-    };
-    if std::env::var_os("SLINT_SCALE_FACTOR").is_none() {
-        let factor = match std::env::var("CYBEXOS_INSTALLER_ZOOM") {
-            Ok(value) if value != "auto" => value.parse().unwrap_or(1.0),
-            _ => zoom::zoom_for(zoom::rotated(zoom::detect_resolution(), degrees)),
-        };
-        std::env::set_var("SLINT_SCALE_FACTOR", format!("{factor}"));
-        eprintln!("cybexos-installer: display zoom {factor}");
     }
+}
+
+/// Fit the canvas to the output the window opened (already rotated). Slint's
+/// KMS backend applies SLINT_SCALE_FACTOR when the window is first shown.
+fn configure_zoom(window: &InstallerWindow, degrees: u32) {
+    if std::env::var_os("SLINT_SCALE_FACTOR").is_some() {
+        return;
+    }
+    let factor = match std::env::var("CYBEXOS_INSTALLER_ZOOM") {
+        Ok(value) if value != "auto" => value.parse().unwrap_or(1.0),
+        _ => {
+            let size = window.window().size();
+            let opened = Some((size.width, size.height)).filter(|&(w, h)| w > 0 && h > 0);
+            zoom::zoom_for(zoom::rotated(zoom::resolution_override(), degrees).or(opened))
+        }
+    };
+    std::env::set_var("SLINT_SCALE_FACTOR", format!("{factor}"));
+    eprintln!("cybexos-installer: display zoom {factor}");
 }
 
 fn request_text_installer() {
@@ -78,7 +88,7 @@ fn notify_ready() {
 }
 
 fn main() {
-    configure_display();
+    let degrees = configure_display();
     // A native GPU driver can still be binding when the unit starts; retry
     // before concluding that this machine has no usable display.
     let mut window = None;
@@ -99,6 +109,7 @@ fn main() {
         request_text_installer();
         std::process::exit(NO_DISPLAY);
     };
+    configure_zoom(&window, degrees);
     let client = Client::start(|event: Event| {
         APP.with(|app| {
             if let Some(app) = app.borrow().as_ref() {

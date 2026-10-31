@@ -258,6 +258,13 @@ assert installed.bootBrand.quiet == { consoleLogLevel = 0; params = [
 assert installer.boot.consoleLogLevel == 0;
 assert lib.all (param: lib.elem param installer.boot.kernelParams) installed.bootBrand.quiet.params;
 assert lib.elem "plymouth.ignore-serial-consoles" installer.boot.kernelParams;
+# Only the medium keeps the firmware's Thunderbolt tunnels, so a dock or display
+# it boots through stays connected when the driver loads (installer.nix).
+assert lib.elem "thunderbolt.host_reset=0" installer.boot.kernelParams;
+assert lib.all (c: !(lib.elem "thunderbolt.host_reset=0" c.boot.kernelParams)) [ payload generic ];
+# A screen that keeps failing asks for the text installer instead of looping.
+assert lib.hasInfix "cybexos-installer-screen-failed"
+  installer.systemd.services.cybexos-installer-ui.serviceConfig.ExecStopPost;
 # The menu stays hidden for a second; GRUB marks each start, the system clears
 # the mark, and a start that did not finish opens the menu (boot.py).
 assert installed.bootBrand.menu.timeoutStyle == "hidden" && installed.bootBrand.menu.timeout == 1;

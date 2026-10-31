@@ -49,7 +49,11 @@ boots with systemd stage one like installed machines. iVentoy's NixOS hook was
 written for the removed scripted initrd; the medium runs that hook itself when
 iVentoy injected it (`cybexos-network-medium` in the initrd), with iVentoy's
 DHCP client on its path. A successful virtual-CD boot does not establish a
-successful iVentoy boot.
+successful iVentoy boot. The medium boots with `thunderbolt.host_reset=0`: the
+Thunderbolt driver loads in stage 2 and would otherwise tear down the tunnels
+the firmware made, disconnecting a USB stick or network adapter that the
+medium boots through a dock or Thunderbolt display. Installed systems keep the
+driver's reset.
 
 ## The installer screen
 
@@ -58,10 +62,13 @@ renderer straight to KMS/DRM, with keyboard, mouse and touch input through
 libinput. It needs no compositor, browser, Qt or GPU userspace, so one image
 draws through amdgpu, i915/xe, nouveau, virtio-gpu or the firmware framebuffer,
 and the medium carries no separate NVIDIA kernel. The 1280×800 design canvas is
-zoomed to the largest connected mode (1920×1200 → 1.5, 2880×1800 → 2.25) and
-centred. It runs as the unprivileged `cybexos-installer` user in a logind session
+zoomed to the output the screen draws on (1920×1200 → 1.5, 2880×1800 → 2.25)
+and centred; a larger external monitor beside a laptop panel does not change
+the zoom. It runs as the unprivileged `cybexos-installer` user in a logind session
 on seat0, the same unit shape as NixOS's `services.cage`. If no display device
-works after a few attempts, it switches tty1 to the text installer.
+works after a few attempts, it switches tty1 to the text installer. A screen
+that fails three times within a minute while tty1 is shown asks the installer
+service for the text installer too, unless an installation is running.
 
 The boot splash hands over the display without a blank screen, as a display
 manager does. `cybexos-installer-splash` waits for udev, completes the bar and
@@ -372,6 +379,9 @@ scripts/qualify-installations /path/to/completed.iso --interactive \
 ```
 
 This boots the ISO as a virtual optical disk and installs into disposable disks.
+`--display WIDTHxHEIGHT` sets the virtual display (default 1280x800). Run one
+case at a size whose frame is not a whole number of memory pages, such as
+`1440x900`: drivers then pad the screen's display buffers.
 `--interactive` installs through the real tty1 screen with QMP keyboard and
 pointer input: Enter for development consent and navigation, a pointer click on
 the encryption switch (plain case), typing a name and `CybexQA` (the service must

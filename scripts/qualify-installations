@@ -196,8 +196,9 @@ def shortcuts_script():
 
 
 class VM:
-    def __init__(self, directory, disk, iso=None, *, extra_qemu_args=()):
+    def __init__(self, directory, disk, iso=None, *, extra_qemu_args=(), display=(1280, 800)):
         self.directory, self.disk, self.iso = directory, disk, iso
+        self.display = display
         self.extra_qemu_args = list(extra_qemu_args)
         self.process = None
         self.control_directory = None
@@ -221,7 +222,8 @@ class VM:
                 '-drive',f'if=pflash,format=raw,readonly=on,file={self.firmware / "OVMF_CODE.fd"}',
                 '-drive',f'if=pflash,format=raw,file={self.vars}',
                 '-drive',f'file={self.disk},if=none,id=systemdisk,format=qcow2','-device','virtio-blk-pci,drive=systemdisk,serial=CYBEXOS-QA-DISK',
-                '-netdev','user,id=net','-device','virtio-net-pci,netdev=net','-device','virtio-vga',
+                '-netdev','user,id=net','-device','virtio-net-pci,netdev=net',
+                '-device',f'virtio-vga,xres={self.display[0]},yres={self.display[1]}',
                 # An absolute pointer lets QMP click the installer screen exactly.
                 '-device','qemu-xhci','-device','usb-tablet',
                 '-display','none','-serial','stdio','-no-reboot', '-qmp',f'unix:{self.qmp},server=on,wait=off']
@@ -945,7 +947,7 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         # reach no page. Wait for the service's report of an attached screen.
         state = self.wait_installer(lambda s: s.get('phase') in ('development', 'setup') and s.get('screens', 0) > 0,
                                     'the release checks and the reconnected screen')
-        size = self.screenshot(screenshots / 'welcome.png') if screenshots else (1280, 800)
+        size = self.screenshot(screenshots / 'welcome.png') if screenshots else self.display
         evidence['display'] = list(size)
         if state['phase'] == 'development':
             self.press('ret')
@@ -1415,7 +1417,8 @@ unlink /run/cybexos-kernel-qa/readback''', timeout=300)
         'snapshot and rollback', 'zvol block I/O', 'scrub', 'export and import']}
 
 
-def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=False, applications='minimal', screenshots=None):
+def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=False, applications='minimal', screenshots=None,
+            display=(1280, 800)):
     evidence = {} if evidence is None else evidence
     milestones = evidence.setdefault('milestones', {})
     case=base/('encrypted' if encrypted else 'plain');case.mkdir()
@@ -1430,7 +1433,7 @@ def qualify(iso, encrypted, base, lifecycle=True, evidence=None, *, interactive=
     import base64
     plan64=base64.b64encode(json.dumps(plan).encode()).decode()
     secrets=json.dumps({'password':PASSWORD})
-    vm=VM(case,disk,iso)
+    vm=VM(case,disk,iso,display=display)
     vm.autologin = encrypted
     try:
         vm.start();vm.login(live=True)
@@ -1611,6 +1614,10 @@ def main():
     parser.add_argument('--applications', choices=('standard', 'minimal'), default='standard', help='Use shared default application groups or the smaller optional selection')
     parser.add_argument('--work-dir', type=Path, help='Parent for disposable VM files; use task storage rather than a memory-backed /tmp')
     parser.add_argument('--screenshots', type=Path, help='Retain actual VM display captures for UX review')
+    parser.add_argument('--display', default=(1280, 800), metavar='WIDTHxHEIGHT',
+                        type=lambda value: tuple(int(part) for part in value.split('x', 1)),
+                        help='Virtual display size. A frame that is not a whole number of memory pages, such as '
+                             '1440x900, also checks that the screen handles display buffers padded by the driver')
     parser.add_argument('--scenario', choices=('install', 'lifecycle'), default='lifecycle',
                         help='install stops after actual installed desktop login; lifecycle additionally exercises local deployments and recovery')
     args=parser.parse_args();iso=args.iso.resolve()
@@ -1623,7 +1630,8 @@ def main():
             evidence = result['checks'][name] = {'result': 'running'}
             screenshots = args.screenshots.resolve() / name if args.screenshots else None
             try:qualify(iso,encrypted,Path(temporary), args.scenario == 'lifecycle', evidence,
-                        interactive=args.interactive, applications=args.applications, screenshots=screenshots)
+                        interactive=args.interactive, applications=args.applications, screenshots=screenshots,
+                        display=args.display)
             except Exception as error:evidence.update(result='failed', error=str(error))
             if args.output:
                 args.output.write_text(json.dumps(result, indent=2) + '\n')

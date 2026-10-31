@@ -171,6 +171,32 @@
                  }
              })?;
              if !matches!(outcome, DrawOutcome::Success) {
+--- a/i-slint-backend-linuxkms-1.18.1/display/swdisplay/dumbbuffer.rs
++++ b/i-slint-backend-linuxkms-1.18.1/display/swdisplay/dumbbuffer.rs
+@@ -79,11 +79,22 @@
+         let mut back_buffer = self.back_buffer.borrow_mut();
+         let age = back_buffer.age;
+         let format = back_buffer.format;
++        // Drivers round a dumb buffer up to whole pages (64 KiB on some), so
++        // its mapping can end past the frame. Hand over exactly the frame's
++        // rows: the renderer takes the pitch from their length.
++        let handle = &back_buffer.buffer_handle;
++        let frame_bytes = drm::buffer::Buffer::pitch(handle) as usize
++            * drm::buffer::Buffer::size(handle).1 as usize;
+         self.drm_output
+             .drm_device
+             .map_dumb_buffer(&mut back_buffer.buffer_handle)
+             .map_err(|e| PlatformError::Other(format!("Error mapping dumb buffer: {e}")))
+-            .and_then(|mut buffer| callback(buffer.as_mut(), age, format))
++            .and_then(|mut buffer| {
++                let frame = buffer.as_mut().get_mut(..frame_bytes).ok_or_else(|| {
++                    format!("Dumb buffer mapping is shorter than its {frame_bytes}-byte frame")
++                })?;
++                callback(frame, age, format)
++            })
+     }
+ 
+     fn is_write_combined_memory(&self) -> bool {
 --- a/i-slint-backend-linuxkms-1.18.1/renderer/sw.rs
 +++ b/i-slint-backend-linuxkms-1.18.1/renderer/sw.rs
 @@ -8,15 +8,24 @@

@@ -28,6 +28,29 @@ let
     (lib.unique (builtins.attrNames payload.config.users.users ++ builtins.attrNames payload.config.users.groups)));
   text = lib.getExe' updater "cybexos-install";
   plymouth = lib.getExe' config.boot.plymouth.package "plymouth";
+  # After the screen ends: a clean exit (a keyboard change) or 75 (the text
+  # installer already has tty1) is not a failure. Neither is one while another
+  # VT is active: the screen cannot hold the display behind the recovery
+  # shell. Three failures within a minute ask the state service for the text
+  # installer, as the screen's menu does; it refuses while installing.
+  screenFailed = pkgs.writeShellScript "cybexos-installer-screen-failed" ''
+    if [ "$SERVICE_RESULT" = success ] || [ "$EXIT_STATUS" = 75 ]; then
+      exit 0
+    fi
+    if [ "$(${pkgs.coreutils}/bin/cat /sys/class/tty/tty0/active 2>/dev/null)" != tty1 ]; then
+      exit 0
+    fi
+    state=/run/cybexos-installer/screen-failures
+    now=$(${pkgs.coreutils}/bin/date +%s)
+    recent=$({ ${pkgs.coreutils}/bin/cat "$state" 2>/dev/null; echo "$now"; } | ${pkgs.gawk}/bin/awk -v now="$now" 'now - $1 < 60')
+    printf '%s\n' "$recent" > "$state"
+    count=$(printf '%s\n' "$recent" | ${pkgs.coreutils}/bin/wc -l)
+    if [ "$count" -ge 3 ]; then
+      ${pkgs.coreutils}/bin/rm -f "$state"
+      echo "The installer screen failed $count times within a minute ($SERVICE_RESULT); asking for the text installer."
+      ${lib.getExe' installer "cybexos-installerd"} --client --request '{"action":"text-installer"}' --timeout 5 >/dev/null || true
+    fi
+  '';
   # A change event on the DRM devices once a driver's framebuffer console is added.
   probeDisplays = systemd: ''
     ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", RUN+="${systemd}/bin/udevadm trigger --action=change --subsystem-match=drm --property-match=DEVTYPE=drm_minor"
@@ -194,6 +217,8 @@ in {
         RestartSec = "300ms";
         # 75: no usable display; the text installer has taken tty1.
         RestartPreventExitStatus = 75;
+        # A screen that keeps failing must not leave a black display.
+        ExecStopPost = "+${screenFailed}";
       };
     };
 
@@ -283,7 +308,13 @@ in {
     # framebuffer showed garbled text and no splash. Other GPUs (NVIDIA, until
     # nouveau loads in stage 2) get the firmware framebuffer after Plymouth's
     # eight-second device timeout.
-    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles" ];
+    # The Thunderbolt driver loads in stage 2. By default it resets the host
+    # router and tears down the tunnels the firmware made, which disconnects
+    # whatever the medium boots through a dock or display: the USB stick, or
+    # the network adapter of a network boot. The medium keeps those tunnels,
+    # as Linux did before 6.9; installed systems keep the reset.
+    boot.kernelParams = [ "console=ttyS0,115200n8" "console=tty0" "plymouth.ignore-serial-consoles"
+      "thunderbolt.host_reset=0" ];
     # The splash's variant with the medium's boot progress (nix/packages/plymouth.nix).
     boot.plymouth.theme = "cybexos-installer";
     # When a native driver loads, Plymouth opens its new device at once. Not

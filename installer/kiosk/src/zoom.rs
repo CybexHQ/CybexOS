@@ -1,41 +1,21 @@
 //! Display zoom: the 1280×800 design canvas fitted to the panel.
 //!
-//! The same rule as the Tiaris kiosk: the largest connected DRM mode decides,
-//! 1920×1200 → 1.5, 2880×1800 → 2.25, 3840×2160 → 2.7, never below 0.8.
+//! The same rule as the Tiaris kiosk, applied to the output the screen draws
+//! on: 1920×1200 → 1.5, 2880×1800 → 2.25, 3840×2160 → 2.7, never below 0.8.
+//! Other connected outputs never count: a larger external monitor beside a
+//! laptop panel would zoom the canvas past the panel's edges.
 
 pub const CANVAS: (f32, f32) = (1280.0, 800.0);
 
-pub fn detect_resolution() -> Option<(u32, u32)> {
-    if let Ok(value) = std::env::var("CYBEXOS_INSTALLER_RESOLUTION") {
-        if let Some((w, h)) = value.split_once('x') {
-            if let (Ok(w), Ok(h)) = (w.parse(), h.parse()) {
-                return Some((w, h));
-            }
-        }
-    }
-    let mut best: Option<(u32, u32)> = None;
-    for entry in std::fs::read_dir("/sys/class/drm").ok()?.flatten() {
-        let path = entry.path();
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if !(name.starts_with("card") && name.contains('-')) {
-            continue;
-        }
-        if std::fs::read_to_string(path.join("status")).map(|s| s.trim() != "connected").unwrap_or(true) {
-            continue;
-        }
-        let Some(mode) = std::fs::read_to_string(path.join("modes")).ok().and_then(|m| m.lines().next().map(str::to_owned)) else {
-            continue;
-        };
-        if let Some((w, h)) = mode.split_once('x') {
-            let h = h.trim_end_matches(|c: char| !c.is_ascii_digit());
-            if let (Ok(w), Ok(h)) = (w.parse::<u32>(), h.parse::<u32>()) {
-                if best.is_none_or(|(bw, bh)| w * h > bw * bh) {
-                    best = Some((w, h));
-                }
-            }
-        }
-    }
-    best
+/// `CYBEXOS_INSTALLER_RESOLUTION` (WIDTHxHEIGHT, before rotation), for
+/// previews and tests; the opened output decides otherwise.
+pub fn resolution_override() -> Option<(u32, u32)> {
+    std::env::var("CYBEXOS_INSTALLER_RESOLUTION").ok().as_deref().and_then(parse_resolution)
+}
+
+pub fn parse_resolution(value: &str) -> Option<(u32, u32)> {
+    let (w, h) = value.split_once('x')?;
+    Some((w.parse().ok()?, h.parse().ok()?)).filter(|&(w, h)| w > 0 && h > 0)
 }
 
 /// The boot menu's "Rotate the screen" choice, `cybexos.rotate=` on the kernel
@@ -75,6 +55,14 @@ mod tests {
         assert_eq!(zoom_for(Some((3840, 2160))), 2.7);
         assert_eq!(zoom_for(Some((1024, 600))), 0.8);
         assert_eq!(zoom_for(None), 1.0);
+    }
+
+    #[test]
+    fn resolution_override_is_width_by_height() {
+        assert_eq!(parse_resolution("2880x1800"), Some((2880, 1800)));
+        assert_eq!(parse_resolution("0x800"), None);
+        assert_eq!(parse_resolution("2880"), None);
+        assert_eq!(parse_resolution("wide"), None);
     }
 
     #[test]

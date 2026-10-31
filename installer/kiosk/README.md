@@ -85,13 +85,18 @@ reference's icon table.
 - Socket: `CYBEXOS_INSTALLER_SOCKET`, default `/run/cybexos-installer/control.sock`.
   On every connection the screen sends `{"action":"hello","client":"screen"}`;
   snapshots count the attached screens in `screens`, which automation waits for.
-- Zoom: `CYBEXOS_INSTALLER_ZOOM` (a number, or `auto`) and
-  `CYBEXOS_INSTALLER_RESOLUTION` (`WIDTHxHEIGHT`); `SLINT_SCALE_FACTOR` wins.
+- Zoom: `CYBEXOS_INSTALLER_ZOOM` (a number, or `auto`). `auto` fits the canvas
+  to the output the screen opened, never to another connected monitor;
+  `CYBEXOS_INSTALLER_RESOLUTION` (`WIDTHxHEIGHT`) overrides that size for
+  previews. `SLINT_SCALE_FACTOR` wins.
 - Keyboard: `XKB_DEFAULT_LAYOUT`, from `/run/cybexos-installer/keyboard.env`.
   Slint's KMS backend compiles the keymap once, so a layout change restarts the
   screen (exit 0; the unit restarts it).
 - Exit 75: no usable display after four attempts; the daemon was asked to put
   the text installer on tty1, and the unit does not restart the screen.
+- Any other failure restarts the screen. Three within a minute while tty1 is
+  the active VT ask the daemon for the text installer instead (the unit's
+  `ExecStopPost`, nix/modules/installer.nix); it refuses while installing.
 - The pinned Slint dependencies have a small local patch, `slint-kms.patch`,
   applied to the Nix build's private vendor copy. It draws the software cursor
   in the same partial-rendering pass, damages its old and new bounds, and adds
@@ -99,8 +104,11 @@ reference's icon table.
   libinput wheel, finger and continuous scroll events. Legacy duplicate axis
   events are ignored. List scrollbars support track clicks and thumb dragging.
   Buttons ignore
-  repeated activation keys. Test the packaged KMS backend through Nix; plain
-  Cargo uses the upstream dependencies without this patch.
+  repeated activation keys. A dumb buffer's mapping is cut to its pitch ×
+  height rows: drivers round the allocation up to whole pages (64 KiB on
+  some), and a 2880×1800 or 1440×900 frame is not a whole number of pages.
+  Test the packaged KMS backend through Nix; plain Cargo uses the upstream
+  dependencies without this patch.
 - KMS software frames render in cached RAM instead of blending in uncached
   display memory. Only physical damage is copied to scanout, including the two
   preceding frames for triple buffering. New buffers or unknown ages receive a
