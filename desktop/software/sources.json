@@ -176,5 +176,56 @@
     ["rustdesk", "rustdesk-flutter", "com.rustdesk.RustDesk", "utilities", "system"],
     ["clocks", "gnome-clocks", "org.gnome.clocks", "utilities", "system"],
     ["weather", "gnome-weather", "org.gnome.Weather", "utilities", "system"]
+  ],
+  "roles": [
+    {"id": "browser", "options": [
+      {"id": "brave", "summary": "Brave Origin: fast and private, and blocks ads and trackers.", "desktop": "brave-browser.desktop", "name": "Brave", "included": true, "perks": ["1password", "webapps"]},
+      {"id": "firefox", "summary": "Mozilla’s browser, with its own independent engine.", "desktop": "firefox.desktop", "name": "Firefox", "included": true, "perks": ["1password", "-webapps"]},
+      {"id": "librewolf", "summary": "Firefox, hardened for privacy out of the box.", "desktop": "librewolf.desktop", "attribute": "librewolf", "perks": ["-1password", "-webapps"]},
+      {"id": "chromium", "summary": "The open-source browser that Google Chrome is built on.", "desktop": "chromium-browser.desktop", "name": "Chromium", "attribute": "chromium", "perks": ["webapps", "-1password"]},
+      {"id": "vivaldi", "summary": "Tabs, panels and notes, arranged however you like.", "desktop": "vivaldi-stable.desktop", "attribute": "vivaldi", "perks": ["webapps", "-1password"]},
+      {"id": "chrome", "summary": "Google’s browser, synced with your Google account.", "desktop": "google-chrome.desktop", "attribute": "google-chrome", "perks": ["webapps", "-1password"]},
+      {"id": "zen", "summary": "A calm Firefox, with vertical tabs and split view.", "desktop": "app.zen_browser.zen.desktop", "flathub": "app.zen_browser.zen", "perks": ["sandbox", "-1password", "-webapps"]}]},
+    {"id": "terminal", "options": [
+      {"id": "kitty", "summary": "Fast and GPU-drawn, with tabs, splits and images.", "desktop": "kitty.desktop", "name": "Kitty", "included": true, "perks": ["theme", "tabs"]},
+      {"id": "ghostty", "summary": "Native-feeling and fast, with almost nothing to set up.", "desktop": "com.mitchellh.ghostty.desktop", "name": "Ghostty", "attribute": "ghostty", "icon": "share/icons/hicolor/256x256/apps/com.mitchellh.ghostty.png", "perks": ["theme", "tabs"]},
+      {"id": "alacritty", "summary": "Minimal and very fast. Pairs well with tmux or Zellij.", "desktop": "Alacritty.desktop", "name": "Alacritty", "attribute": "alacritty", "icon": "share/icons/hicolor/scalable/apps/Alacritty.svg", "perks": ["theme", "-tabs"]},
+      {"id": "foot", "summary": "Tiny, Wayland-native and quick to start.", "desktop": "foot.desktop", "name": "foot", "attribute": "foot", "icon": "share/icons/hicolor/scalable/apps/foot.svg", "perks": ["theme", "-tabs"]}]},
+    {"id": "editor", "options": [
+      {"id": "texteditor", "summary": "Simple, with tabs, autosave and spell checking.", "desktop": "org.gnome.TextEditor.desktop", "name": "Text Editor", "included": true},
+      {"id": "zed", "summary": "A very fast code editor, with AI built in.", "desktop": "dev.zed.Zed.desktop", "attribute": "zed-editor", "perks": ["projects"]},
+      {"id": "vscode", "summary": "Microsoft’s code editor and its extension marketplace.", "desktop": "code.desktop", "attribute": "vscode", "perks": ["projects"]},
+      {"id": "vscodium", "summary": "Visual Studio Code without Microsoft’s branding and telemetry.", "desktop": "codium.desktop", "attribute": "vscodium", "perks": ["projects"]},
+      {"id": "neovim", "summary": "Keyboard-driven editing, in your terminal.", "desktop": "nvim.desktop", "name": "Neovim", "included": true, "perks": ["terminal"]},
+      {"id": "kate", "summary": "KDE’s capable editor, with sessions and a terminal panel.", "desktop": "org.kde.kate.desktop", "attribute": "kdePackages.kate", "perks": ["-kde"]}]},
+    {"id": "files", "options": [
+      {"id": "nautilus", "summary": "GNOME Files: quick previews with Space, tabs and network places.", "desktop": "org.gnome.Nautilus.desktop", "name": "Files", "included": true},
+      {"id": "thunar", "summary": "Light and quick, from Xfce, with bulk renaming.", "desktop": "thunar.desktop", "name": "Thunar", "attribute": "thunar", "icon": "share/icons/hicolor/scalable/apps/org.xfce.thunar.svg"},
+      {"id": "kdedolphin", "summary": "Split views, a terminal panel and plenty of settings, from KDE.", "desktop": "org.kde.dolphin.desktop", "name": "Dolphin", "attribute": "kdePackages.dolphin", "appstream": "org.kde.dolphin", "perks": ["-kde"]}]},
+    {"id": "mail", "options": [
+      {"id": "thunderbird", "summary": "Mail, calendars and contacts, from Mozilla.", "desktop": "thunderbird.desktop", "attribute": "thunderbird", "flathub": "org.mozilla.Thunderbird"},
+      {"id": "evolution", "summary": "Mail, calendars and contacts, with your online accounts.", "desktop": "org.gnome.Evolution.desktop", "attribute": "evolution"},
+      {"id": "geary", "summary": "Light, conversation-style mail.", "desktop": "org.gnome.Geary.desktop", "name": "Geary", "attribute": "geary", "appstream": "org.gnome.Geary"},
+      {"id": "gmail", "summary": "New messages open in Gmail, in your web browser.", "desktop": "cybexos-mail-gmail.desktop", "name": "Gmail", "web": true, "glyph": "inbox", "perks": ["noinstall"]},
+      {"id": "outlook", "summary": "New messages open in Outlook.com, in your web browser.", "desktop": "cybexos-mail-outlook.desktop", "name": "Outlook", "web": true, "glyph": "inbox", "perks": ["noinstall"]}]},
+    {"id": "music", "options": [
+      {"id": "mpv", "summary": "Plays anything, in a small and simple window.", "desktop": "mpv.desktop", "included": true},
+      {"id": "rhythmbox", "summary": "A classic music library, with podcasts and radio.", "desktop": "org.gnome.Rhythmbox3.desktop", "name": "Rhythmbox", "attribute": "rhythmbox", "appstream": "org.gnome.Rhythmbox3", "perks": ["library"]},
+      {"id": "strawberry", "summary": "For large libraries, with lyrics and scrobbling.", "desktop": "org.strawberrymusicplayer.strawberry.desktop", "attribute": "strawberry", "perks": ["library"]},
+      {"id": "amberol", "summary": "Plays your music, and nothing else.", "desktop": "io.bassi.Amberol.desktop", "name": "Amberol", "attribute": "amberol", "flathub": "io.bassi.Amberol"}]},
+    {"id": "video", "options": [
+      {"id": "mpv", "summary": "Plays anything; keyboard-driven.", "desktop": "mpv.desktop", "included": true},
+      {"id": "vlc", "summary": "Plays everything, with plenty of controls.", "desktop": "vlc.desktop", "attribute": "vlc"},
+      {"id": "celluloid", "summary": "mpv, with a friendly GNOME interface.", "desktop": "io.github.celluloid_player.Celluloid.desktop", "attribute": "celluloid"},
+      {"id": "showtime", "summary": "GNOME’s simple, modern video player.", "desktop": "org.gnome.Showtime.desktop", "name": "Showtime", "attribute": "showtime", "appstream": "org.gnome.Showtime"}]},
+    {"id": "pdf", "options": [
+      {"id": "evince", "summary": "Reads PDFs and fills in simple forms.", "desktop": "org.gnome.Evince.desktop", "name": "Document Viewer", "included": true},
+      {"id": "papers", "summary": "GNOME’s newer document viewer, with signatures.", "desktop": "org.gnome.Papers.desktop", "name": "Papers", "attribute": "papers", "appstream": "org.gnome.Papers"},
+      {"id": "okular", "summary": "Annotate, highlight and fill in forms.", "desktop": "okularApplication_pdf.desktop", "attribute": "kdePackages.okular", "perks": ["annotate", "-kde"]}]},
+    {"id": "image", "options": [
+      {"id": "imv", "summary": "Fast and keyboard-driven.", "desktop": "imv.desktop", "name": "imv", "included": true},
+      {"id": "loupe", "summary": "GNOME’s Image Viewer: smooth zoom, rotate and crop.", "desktop": "org.gnome.Loupe.desktop", "name": "Image Viewer", "attribute": "loupe", "appstream": "org.gnome.Loupe"},
+      {"id": "gthumb", "summary": "Browse, organise and touch up your photos.", "desktop": "org.gnome.gthumb.desktop", "name": "gThumb", "attribute": "gthumb", "appstream": "org.gnome.gThumb"},
+      {"id": "gwenview", "summary": "KDE’s image viewer, with folder browsing.", "desktop": "org.kde.gwenview.desktop", "name": "Gwenview", "attribute": "kdePackages.gwenview", "appstream": "org.kde.gwenview", "perks": ["-kde"]}]}
   ]
 }

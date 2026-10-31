@@ -201,6 +201,39 @@ PageScroll {
         onTriggered: Software.openFlathub(root.app.appstream, { name: root.app.name, summary: root.app.summary })
     }
 
+    // An app that can do an everyday job offers to: "Use Firefox as your web
+    // browser?", the same switch as Software's home.
+    Repeater {
+        model: Software.rolesFor(root.app)
+        delegate: Notice {
+            required property var modelData
+            readonly property string noun: Software.roleWord(modelData.id, "noun")
+            readonly property var card: Software.roleCard(modelData.id)
+            readonly property bool mine: card.option !== null && card.option.id === root.app.id
+            readonly property bool current: mine && card.who !== "switching"
+            readonly property bool waiting: mine && card.who === "switching"
+            readonly property var choice: Software.roleChoices(modelData.id).find(row => row.option.id === root.app.id) || null
+
+            objectName: "softwareAppDefault"
+            width: parent.width
+            visible: current || waiting || choice !== null
+            glyph: current ? "check" : Helpers.ROLE_GLYPHS[modelData.id] || "apps"
+            title: current ? I18n.format("%1 is your %2.", [root.app.name, noun])
+                : waiting ? I18n.format("%1 becomes your %2 once it's installed.", [root.app.name, noun])
+                : I18n.format("Use %1 as your %2?", [root.app.name, noun])
+            text: Software.roleWord(modelData.id, "use")
+            action: current ? I18n.tr("Change…") : waiting ? "" : choice && choice.ready ? I18n.format("Use as %1", [noun]) : I18n.tr("Install and use")
+            actionPrimary: !current
+            actionName: "softwareAppDefaultAction"
+            onTriggered: {
+                if (current)
+                    Software.openPicker(modelData.id);
+                else
+                    Software.useDefault(modelData.id, root.app.id);
+            }
+        }
+    }
+
     // ---- screenshots --------------------------------------------------------
     Item {
         id: shotTiles

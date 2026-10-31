@@ -14,6 +14,7 @@ notices this file changing.
 import os
 import subprocess
 
+import theme_terminal
 import theme_tokens
 
 NAME = 'kitty'
@@ -24,10 +25,6 @@ HEADER = (
     '# or font_size overrides in ~/.config/kitty/kitty.conf after the CYBEXOS\n'
     '# MANAGED INCLUDE block instead.\n'
 )
-# The vendor fragment's size, in points, which kitty keeps at the shell's
-# default text size (theme_tokens.text_scale).
-FONT_SIZE = 12.0
-
 # The GUI instances only, matched on the whole command line: `kitty`, a path
 # ending in /kitty, or either with arguments that are not a `+` or `@`
 # subcommand (kitty's own is_kitty_gui_cmdline(), which also counts `+open`).
@@ -42,21 +39,17 @@ RELOAD_TIMEOUT = 5
 def settings(tokens):
     """(key, value) pairs in file order."""
     colors = tokens['colors']
-    background, text, accent = colors['background'], colors['text'], colors['accent']
-    # accentText already clears 4.5:1 on the shell's panels; the terminal base
-    # can differ slightly from them in wallpaper mode.
-    accent_text = theme_tokens.ensure_contrast(colors['accentText'], background, 4.5)
-    # The shell's own selected fill and the ink it draws on it
-    # (Theme.accentContainerFg).
-    selection = colors['accentContainer']
+    accent = colors['accent']
+    terminal = theme_terminal.colors(tokens)
+    background, accent_text = terminal['background'], terminal['cursor']
     pairs = [
-        ('foreground', text),
+        ('foreground', terminal['foreground']),
         ('background', background),
-        ('selection_foreground', theme_tokens.foreground_for(selection)),
-        ('selection_background', selection),
+        ('selection_foreground', terminal['selection_foreground']),
+        ('selection_background', terminal['selection_background']),
         ('cursor', accent_text),
-        ('cursor_text_color', background),
-        ('url_color', accent_text),
+        ('cursor_text_color', terminal['cursor_text']),
+        ('url_color', terminal['url']),
         # Filled like the shell's selected chips: accent with its own ink.
         ('active_tab_foreground', colors['onAccent']),
         ('active_tab_background', accent),
@@ -73,14 +66,13 @@ def settings(tokens):
     for number, fill in enumerate((accent, colors['amber'], colors['red']), 1):
         pairs.append((f'mark{number}_foreground', theme_tokens.foreground_for(fill)))
         pairs.append((f'mark{number}_background', fill))
-    pairs.extend((f'color{index}', value)
-                 for index, value in enumerate(theme_tokens.ansi_palette(tokens)))
+    pairs.extend((f'color{index}', value) for index, value in enumerate(terminal['ansi']))
     return pairs
 
 
 def font_size(tokens):
     """kitty's font_size: its 12 pt default, scaled like the shell's text."""
-    return f'{FONT_SIZE * theme_tokens.text_scale(tokens):.1f}'
+    return theme_terminal.font_size(tokens)
 
 
 def render(tokens):

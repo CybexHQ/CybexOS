@@ -64,7 +64,7 @@ bind(mainMod .. " + A", hl.dsp.exec_cmd("cybexos-runtime ipc popouts toggle cont
   { description = "Shell: Control Panel" })
 bind(mainMod .. " + K", hl.dsp.exec_cmd("cybexos-runtime ipc session keys"),
   { description = "Shell: Keyboard shortcuts" })
-bind(mainMod .. " + E", hl.dsp.exec_cmd("nautilus --new-window"), { description = "Apps: Files" })
+bind(mainMod .. " + E", hl.dsp.exec_cmd("cybexos-apps files"), { description = "Apps: Files" })
 bind(mainMod .. " + B", hl.dsp.exec_cmd(browser), { description = "Apps: Browser" })
 bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd(privateBrowser), { description = "Apps: Private browser window" })
 bind(mainMod .. " + M", hl.dsp.exec_cmd(web_app("slack")), { description = "Web apps: Slack" })

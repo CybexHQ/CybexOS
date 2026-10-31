@@ -19,11 +19,13 @@ SettingsPage {
         SettingsGroup {
             width: parent.width
             title: I18n.tr("Default applications")
-            SettingsHint { width: parent.width; text: I18n.tr("Applies immediately to your account. Your own shortcuts and explicit editor overrides keep their choices.") }
+            SettingsHint { width: parent.width; text: I18n.tr("Applies immediately to your account, choosing among the apps already installed. Your own shortcuts and explicit editor overrides keep their choices.") }
             Repeater {
                 model: [{id:"browser", label:"Web browser"}, {id:"terminal", label:"Terminal"},
-                    {id:"editor", label:"Text editor"}, {id:"pdf", label:"PDF viewer"},
-                    {id:"image", label:"Image viewer"}, {id:"video", label:"Video player"}]
+                    {id:"editor", label:"Text editor"}, {id:"files", label:"File manager"},
+                    {id:"mail", label:"Email"}, {id:"music", label:"Music player"},
+                    {id:"video", label:"Video player"}, {id:"pdf", label:"PDF viewer"},
+                    {id:"image", label:"Image viewer"}]
                 delegate: SelectRow {
                     required property var modelData
                     readonly property var role: DefaultApplications.roles[modelData.id] || ({})
@@ -41,6 +43,11 @@ SettingsPage {
             ValueRow {
                 width: parent.width; label: I18n.tr("Available applications")
                 SettingsAction { text: I18n.tr("Refresh"); enabled: !DefaultApplications.busy; onTriggered: DefaultApplications.refresh() }
+            }
+            ValueRow {
+                width: parent.width; label: I18n.tr("Install other apps for these in Software")
+                property string searchAnchor: "applications-software-defaults"
+                SettingsAction { text: I18n.tr("Choose in Software…"); glyph: "apps"; onTriggered: Software.showDefaults("") }
             }
         }
         SettingsGroup {

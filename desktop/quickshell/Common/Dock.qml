@@ -23,6 +23,7 @@ Singleton {
     property int defaultsEpoch: 0
     readonly property string browserId: String(effectiveDefaults.browser || "").replace(/\.desktop$/, "")
     readonly property string terminalId: String(effectiveDefaults.terminal || "").replace(/\.desktop$/, "")
+    readonly property string filesId: String(effectiveDefaults.files || "").replace(/\.desktop$/, "")
     property var webApps: []
     readonly property var desktopApps: DesktopEntries.applications.values
 
@@ -46,7 +47,8 @@ Singleton {
             root.defaultsEpoch++;
             root.effectiveDefaults = {
                 browser: (DefaultApplications.roles.browser || {}).effective || "",
-                terminal: (DefaultApplications.roles.terminal || {}).effective || ""
+                terminal: (DefaultApplications.roles.terminal || {}).effective || "",
+                files: (DefaultApplications.roles.files || {}).effective || ""
             };
         }
     }
@@ -55,7 +57,7 @@ Singleton {
         ? Hyprland.activeToplevel.address : ""
     readonly property bool pinsExplicit: Settings.explicitOverrides.indexOf("dockPinned") !== -1
     readonly property var pins: DockHelpers.effectivePins(Settings.dockPinned, pinsExplicit,
-        DockHelpers.suggestedPins(browserId, terminalId))
+        DockHelpers.suggestedPins(browserId, terminalId, filesId))
 
     // Desktop entries load after the shell starts, and an app installed later
     // appears then too; reading the list makes both re-resolve.

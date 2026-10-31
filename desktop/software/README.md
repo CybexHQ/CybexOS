@@ -20,6 +20,10 @@ subcategory, plus the profiles, featured apps and display-name overrides.
   compressed download beyond the default installation, per app and per
   profile.
 
+Its `roles` list the apps Software's home offers for each everyday job
+(browser, terminal, editor, files, mail, music, video, pdf, image; the names
+`cybexos-apps` uses), see [Default apps](#default-apps).
+
 Regenerate before each release, after updating `flake.lock`.
 `scripts/software-catalogue --check` verifies the catalogue against
 `sources.json` and the icons without network access.
@@ -28,6 +32,47 @@ Screenshots are not shipped. Software loads them from Flathub's media server
 when someone opens an app's page. Icons and screenshots belong to their
 projects and identify the apps; names and logos remain their owners'
 trademarks.
+
+## Default apps
+
+`roles` lists, per job, the apps Cybex OS has checked work for it, in the
+order the picker shows them. Every option names its exact desktop entry
+(`desktop`), the one `cybexos-apps set` makes the default, and a short
+`summary`. It also has one of:
+
+- `included`: Cybex OS installs it (Brave, Firefox, Kitty and the other
+  defaults). Software offers it only where it is installed.
+- `web`: a Cybex OS mail handler in `desktop/` that opens a web mail service
+  in the browser, drawn with a `glyph`.
+- `attribute`: the Nixpkgs package to install. The generator keeps the option
+  only while NixOS has prebuilt it (or it is an unfree vendor download), and
+  checks that the package really installs `desktop`.
+- `flathub`: the Flathub app installed for the account when NixOS has no
+  prebuilt package (or none at all). Its desktop entry is the Flathub ID plus
+  `.desktop`.
+
+`perks` are the notes the picker shows about how the app works with Cybex OS;
+Software words each one. `-key` marks one the app gives up, such as
+`-1password` ("Add the 1Password extension yourself"). Keys:
+
+- `1password`: the 1Password extension and desktop app work together;
+- `webapps`: web apps open in their own windows;
+- `theme`: follows the Cybex theme;
+- `tabs`: tabs and splits;
+- `sandbox`: runs in a sandbox;
+- `projects`: opens folders as projects;
+- `terminal`: runs in your terminal;
+- `kde`: brings KDE libraries (used as `-kde`);
+- `library`: a music library and playlists;
+- `annotate`: annotate and fill in forms;
+- `noinstall`: nothing to install.
+
+An option with the same id as a catalogue app uses that app's icon, name and
+page. Any other option needs an icon. It takes Flathub's icon (from its
+`flathub` or `appstream` ID), or, for an app Flathub doesn't carry, the
+package's own `icon` file from cache.nixos.org (a hicolor `share/icons`
+path). Ghostty, Alacritty, foot and Thunar use theirs this way. These icons
+belong to their projects too.
 
 ## What a profile includes
 

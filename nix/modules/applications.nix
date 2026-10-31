@@ -90,7 +90,11 @@ in {
         "video/mp4" = lib.mkDefault "mpv.desktop";
         "video/webm" = lib.mkDefault "mpv.desktop";
         "video/x-matroska" = lib.mkDefault "mpv.desktop";
-      };
+        # Software's Files, Music and Email defaults. Nothing handles email
+        # links until someone chooses an app or a web mail service.
+        "inode/directory" = lib.mkDefault "org.gnome.Nautilus.desktop";
+      } // lib.genAttrs [ "audio/mpeg" "audio/flac" "audio/ogg" "audio/x-vorbis+ogg" "audio/x-opus+ogg" "audio/mp4" "audio/x-wav" ]
+        (_: lib.mkDefault "mpv.desktop");
     };
     environment.etc."xdg/xdg-terminals.list".text = "kitty.desktop\n";
     services.gnome.gnome-keyring.enable = true;

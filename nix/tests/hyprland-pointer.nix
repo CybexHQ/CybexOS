@@ -16,6 +16,10 @@
 # and a click on the resume pill's Resume must close its window.
 # The real `cybex doctor` runs inside the session, and Ready reports it.
 #
+# Default apps in the same session: the jobs cybexos-apps reports with
+# Cybex OS's picks, a web mail handler chosen and reset, the Files command
+# opening Nautilus, and the terminals seeded to follow the shell's theme.
+#
 # Software beyond NixOS packages, in the same session: the account's Flathub
 # remote (added once, and a removal stays), exported Flatpak apps on the
 # shell's data path, a program built for a standard distribution running
@@ -416,6 +420,34 @@ in pkgs.testers.runNixOSTest {
     machine.screenshot("d-window-clicked")
     machine.log("d-clicks: " + ("passed" if clicks["passed"] else "FAILED") + " " + json.dumps(
         {key: clicks[key] for key in ("clickOpensBox", "boxClosedByDesktopClick", "windowReceivesClick", "windowFocused")}))
+
+    # ---- default apps -------------------------------------------------------
+    # Every job Software offers, with Cybex OS's picks from the machine's
+    # mimeapps.list and terminal list; a web mail handler chosen and reset;
+    # Super+E's command opening the selected file manager; and the terminals
+    # Software offers seeded to follow the shell's theme.
+    roles = json.loads(user("cybexos-apps status"))["roles"]
+    assert set(roles) == {"browser", "terminal", "editor", "files", "mail", "music", "video", "pdf", "image"}, roles.keys()
+    picks = {role: (roles[role]["system"], roles[role]["effective"], roles[role]["personal"])
+             for role in ("terminal", "files", "music", "mail")}
+    assert picks == {"terminal": ("kitty.desktop", "kitty.desktop", False),
+                     "files": ("org.gnome.Nautilus.desktop", "org.gnome.Nautilus.desktop", False),
+                     "music": ("mpv.desktop", "mpv.desktop", False), "mail": ("", "", False)}, picks
+    assert {"cybexos-mail-gmail.desktop", "cybexos-mail-outlook.desktop"} <= {c["value"] for c in roles["mail"]["choices"]}
+    mail = json.loads(user("cybexos-apps set mail cybexos-mail-outlook.desktop"))["roles"]["mail"]
+    assert (mail["effective"], mail["personal"]) == ("cybexos-mail-outlook.desktop", True), mail
+    mail = json.loads(user("cybexos-apps reset mail"))["roles"]["mail"]
+    assert (mail["effective"], mail["personal"]) == ("", False), mail
+    user("cybexos-apps files")
+    assert wait(lambda: any(client.get("class") == "org.gnome.Nautilus" for client in hypr("clients")), 60), hypr("clients")
+    machine.screenshot("default-apps-files")
+    user("hyprctl -i 0 dispatch 'hl.dsp.window.close({ window = \"class:org.gnome.Nautilus\" })'")
+    assert wait(lambda: not any(client.get("class") == "org.gnome.Nautilus" for client in hypr("clients")), 30)
+    for path in (".config/ghostty/config", ".config/alacritty/alacritty.toml", ".config/foot/foot.ini"):
+        machine.succeed(f"test -s /home/tester/{path}")
+    for name in ("kitty.conf", "ghostty.conf", "alacritty.toml", "foot.ini"):
+        machine.succeed(f"grep -q background /home/tester/.local/state/cybexos/theme/{name}")
+    machine.log("default-apps: passed")
 
     log = shell_journal()
     # The whole log is kept; the Assistant's own files must be clean.

@@ -1,0 +1,10 @@
+[Desktop Entry]
+# No MimeType: GIO would make a hidden entry that declares mailto the
+# default for email links nobody chose. cybexos-apps offers it for email.
+Type=Application
+Name=Gmail
+Comment=Write email links in Gmail, in your web browser
+Exec=cybexos-apps mailto gmail %u
+Icon=mail-send
+Categories=Network;Email;
+NoDisplay=true

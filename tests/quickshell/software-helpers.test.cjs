@@ -279,3 +279,65 @@ test("Flathub actions follow the change in flight, what is installed and policy"
     assert.equal(H.flathubRunning(running("update", [], "done")), false);
     assert.equal(H.flathubRunning(null), false);
 });
+
+// ---- default apps ------------------------------------------------------------
+
+const browserRole = { id: "browser", options: [
+    { id: "brave", name: "Brave", desktop: "brave-browser.desktop", included: true, perks: ["1password", "webapps"] },
+    { id: "firefox", name: "Firefox", desktop: "firefox.desktop", included: true, perks: ["1password", "-webapps"] },
+    { id: "librewolf", name: "LibreWolf", desktop: "librewolf.desktop", attribute: "librewolf", free: true,
+      downloadBytes: 128e6, unavailable: "", perks: ["-1password", "-webapps"] },
+    { id: "chrome", name: "Google Chrome", desktop: "google-chrome.desktop", attribute: "google-chrome", free: false,
+      unavailable: "unfree" },
+    { id: "vivaldi", name: "Vivaldi", desktop: "vivaldi-stable.desktop", attribute: "vivaldi", free: false, unavailable: "" },
+    { id: "zen", name: "Zen Browser", desktop: "app.zen_browser.zen.desktop", attribute: null,
+      flathub: "app.zen_browser.zen", flathubDesktop: "app.zen_browser.zen.desktop", perks: ["sandbox"] },
+    { id: "thunderbird", name: "Thunderbird", desktop: "thunderbird.desktop", attribute: "thunderbird", unavailable: "missing",
+      flathub: "org.mozilla.Thunderbird", flathubDesktop: "org.mozilla.Thunderbird.desktop" }] };
+
+test("a job's options say how each would arrive, and hide what this computer can't use", () => {
+    const present = id => ["firefox.desktop"].includes(id);
+    const rows = H.roleChoices(browserRole, present, { flathubOn: true, flathubInstalled: [] });
+    assert.deepEqual(rows.map(row => [row.option.id, row.source, row.desktop]), [
+        ["firefox", "installed", "firefox.desktop"],
+        ["librewolf", "nixos", "librewolf.desktop"],
+        ["vivaldi", "vendor", "vivaldi-stable.desktop"],
+        ["zen", "flathub", "app.zen_browser.zen.desktop"],
+        ["thunderbird", "flathub", "org.mozilla.Thunderbird.desktop"]],
+        "Brave isn't here (proprietary apps off) and Chrome can't be installed: both are hidden");
+    assert.equal(rows[0].ready, true);
+    const off = H.roleChoices(browserRole, present, { flathubOn: false, flathubInstalled: [] });
+    assert.deepEqual(off.map(row => row.option.id), ["firefox", "librewolf", "vivaldi"], "Flathub turned off");
+    const fromFlathub = H.roleOption(browserRole.options[6], () => false,
+        { flathubInstalled: [{ id: "org.mozilla.Thunderbird", installation: "user" }] });
+    assert.deepEqual([fromFlathub.source, fromFlathub.desktop, fromFlathub.ready],
+        ["installed", "org.mozilla.Thunderbird.desktop", true]);
+    const web = H.roleOption({ id: "gmail", desktop: "cybexos-mail-gmail.desktop", web: true, glyph: "inbox" }, () => false, {});
+    assert.deepEqual([web.source, web.ready], ["web", true]);
+});
+
+test("a job's card names the app doing it, who chose it, and one on its way", () => {
+    const status = { effective: "brave-browser.desktop", system: "brave-browser.desktop", personal: false, pending: "",
+        choices: [{ value: "brave-browser.desktop", label: "Brave" }, { value: "epiphany.desktop", label: "Web" }] };
+    assert.deepEqual(H.roleCard(browserRole, status).who, "system");
+    assert.equal(H.roleCard(browserRole, status).name, "Brave");
+    const mine = Object.assign({}, status, { effective: "firefox.desktop", personal: true });
+    assert.deepEqual([H.roleCard(browserRole, mine).who, H.roleCard(browserRole, mine).name], ["you", "Firefox"]);
+    const same = Object.assign({}, status, { personal: true });
+    assert.equal(H.roleCard(browserRole, same).who, "system", "choosing Cybex OS's pick yourself is still its pick");
+    const other = Object.assign({}, status, { effective: "epiphany.desktop", personal: true });
+    assert.deepEqual([H.roleCard(browserRole, other).name, H.roleCard(browserRole, other).option], ["Web", null]);
+    const waiting = Object.assign({}, mine, { pending: "app.zen_browser.zen.desktop" });
+    const card = H.roleCard(browserRole, waiting);
+    assert.deepEqual([card.who, card.name, card.desktop, card.pending.id], ["switching", "Zen Browser", "app.zen_browser.zen.desktop", "zen"]);
+    assert.equal(H.roleCard({ id: "mail", options: [] }, { effective: "", choices: [] }).who, "none");
+    assert.deepEqual(H.otherApps(browserRole, status), [{ value: "epiphany.desktop", label: "Web" }]);
+    assert.deepEqual(H.roleChanged({ browser: mine, editor: same, terminal: { personal: true, effective: "a", system: "a" },
+        unknown: { personal: true, effective: "x", system: "y" } }), ["browser"]);
+});
+
+test("1Password notes only show while proprietary apps are on", () => {
+    assert.deepEqual(H.perks(browserRole.options[2], true), [{ key: "1password", yes: false }, { key: "webapps", yes: false }]);
+    assert.deepEqual(H.perks(browserRole.options[2], false), [{ key: "webapps", yes: false }]);
+    assert.deepEqual(Object.keys(H.ROLE_GLYPHS), ["browser", "terminal", "editor", "files", "mail", "music", "video", "pdf", "image"]);
+});

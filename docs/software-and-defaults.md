@@ -1,7 +1,9 @@
 # Software and application defaults
 
 Open **Software** from the application launcher, **Settings → Applications**
-or `cybexos-software`. It has two sources. NixOS packages come first: they are
+or `cybexos-software`. Its home starts with [your default apps](#default-apps),
+the apps doing each everyday job, which you can switch in a click. It has two
+sources. NixOS packages come first: they are
 part of the system, staged and rolled back with it. [Flathub](#flathub) is the
 second: sandboxed apps installed for your account right away, outside system
 generations. [Programs from outside both](#programs-from-outside-nixos-and-flathub)
@@ -28,7 +30,8 @@ download beyond the default installation) is an estimate until then.
 
 ## Explore, categories and app pages
 
-**Explore** shows featured apps, eight categories, collections built from the
+**Explore** starts with [your default apps](#default-apps). Under **Discover**
+it shows featured apps, eight categories, collections built from the
 installer's profiles (**Install all** adds a collection's missing apps), and the
 most popular apps by Flathub's install counts. A category page has subcategory
 filters, an Editor's choice and every app in it by popularity. An app page
@@ -158,26 +161,114 @@ module can turn off. Software that installs system services or kernel modules,
 or writes into `/usr`, still needs a Nix package; Distrobox (with Podman)
 offers another distribution's user space for the rest.
 
-## Application defaults
+## Default apps
 
-**Settings → Applications** also selects a browser, terminal, text editor,
-PDF viewer, image viewer and video player. These per-account preferences apply
-immediately, using GIO's standard MIME associations and `xdg-terminal-exec`'s
-standard terminal preference list. System defaults are fallbacks; unrelated
-personal associations remain intact. A missing saved choice is retained and
-shown as unavailable, while an available application handles launches. An
-explicit association changed outside Settings takes precedence.
+Cybex OS picks the app for each everyday job, and **Software's home** shows
+them first, under **Your default apps**, above everything to discover. Nine
+jobs have a card: web browser, terminal, text editor, files, email, music,
+videos, documents (PDF) and images. Each card names the app doing the job and
+who chose it: **Cybex pick** (what the machine's configuration declares) or
+**Your choice**. Nothing handles email links until you choose, so that card
+says **Choose an app**. These choices are per account and apply at once.
 
-Cybex OS browser/terminal shortcuts, agent windows, maintenance and firmware
-terminals, web apps, and dock suggestions use the same defaults. Chromium-based
-selected browsers can open web apps in app mode; other browsers open their URL
-normally. Private browsing uses the selected browser's advertised desktop action;
-unsupported private actions produce a notification. Explicit `VISUAL`/`EDITOR`
-values and personal shortcuts retain their precedence. Arguments are passed as
-argv, including filenames and URLs containing spaces; they are not shell code.
+A card opens the job's picker. It says what the job controls (Super+B and
+private windows for the browser, Super+Return and Cybex OS's own terminal
+windows for the terminal, Super+E for files) and lists a short set of apps
+Cybex OS has checked work for it. For each one it shows what keeps working
+with Cybex OS and what doesn't, such as the 1Password extension, web apps in
+their own windows, or following the Cybex theme. It also shows how the app
+would arrive: already **Installed**, **Prebuilt** with its download, a
+**Vendor download**, or from **Flathub**. Installed apps that can do the job
+but are not on the list follow under **Also on this computer**, and **Find
+another … in Software** searches for more. The footer says what choosing
+will do before you press anything.
 
-The `cybexos-apps` helper offers `status`, `set ROLE DESKTOP_ID`, `browser`,
-`browser --private`, `webapp URL`, `terminal [OPTIONS] [-- COMMAND ARGS…]`, and
-`edit FILE…`. `cybex software catalogue`, `list`, `search QUERY`,
-`check ATTR…`, `stage JSON` and `request ID` expose the native package workflow
-for scripting.
+- **An installed app** takes over at once.
+- **A NixOS app** goes on the install list, which starts preparing the change
+  right away. You confirm with your password, as for any app. The app takes
+  over once it is installed, with no restart.
+- **A Flathub app** (one NixOS has no prebuilt package for, such as
+  Thunderbird, Amberol or Zen Browser) installs for your account with no
+  password, then takes over.
+- **Gmail** and **Outlook** in your browser handle email links with nothing
+  to install. Cybex OS ships the two hidden handlers
+  (`cybexos-mail-gmail.desktop`, `cybexos-mail-outlook.desktop`). They open a
+  new message, with the link's recipients, subject and body, in the selected
+  browser.
+
+A choice that waits for its app is kept by `cybexos-apps`, so closing Software
+or restarting the shell loses nothing. It applies the next time the app is
+there, within a day. Software drops it when the install fails or the app is
+taken off the install list. Each switch shows a note with **Undo**, which
+puts back what was there before. **Reset to Cybex picks** appears once any
+job differs from Cybex OS's pick: it forgets this account's choices and
+leaves installed apps installed. The app that did a job before stays
+installed. An app's own page offers the same switch: "Use Firefox as your web
+browser?".
+
+The curated lists live in `desktop/software/sources.json` (see
+`desktop/software/README.md`). The catalogue generator keeps an option only
+while NixOS has it prebuilt, or Flathub has it.
+
+### Terminals and the Cybex theme
+
+Kitty, Ghostty, Alacritty and foot all follow the shell's appearance: its
+colours, its sixteen terminal colours and its text size. Each account gets a
+small configuration for them at sign-in, only where it has none of its own.
+Those files include Cybex OS's defaults (`desktop/defaults/`) and the
+generated theme in `~/.local/state/cybexos/theme/`:
+
+- `~/.config/kitty/kitty.conf`;
+- `~/.config/ghostty/config`, which loads the defaults, then the theme, then
+  your own `~/.config/ghostty/personal.conf`;
+- `~/.config/alacritty/alacritty.toml`;
+- `~/.config/foot/foot.ini`.
+
+Kitty and Ghostty windows change with the appearance at once (SIGUSR1 and
+SIGUSR2). Alacritty reloads the file itself. foot uses it for each new window.
+
+xdg-terminal-exec passes Cybex OS's window options (title, app ID, working
+directory, keeping the window open after a command) only to terminals whose
+desktop entries declare how. Alacritty's and foot's don't, so `cybexos-apps
+terminal` gives those two their own `--title`, `--class`/`--app-id`,
+`--working-directory` and `--hold` options. Update and maintenance windows
+therefore stay open in every listed terminal.
+
+### How defaults apply
+
+**Settings → Applications** chooses among the apps already installed for the
+same nine jobs. **Choose in Software…** opens the picker above to install
+another. Both use GIO's standard MIME associations (`inode/directory` for
+files, `x-scheme-handler/mailto` for email, the common audio types for music)
+and `xdg-terminal-exec`'s terminal preference list. System defaults are
+fallbacks; unrelated personal associations remain intact. A missing saved
+choice is retained and shown as unavailable, while an available application
+handles launches. An explicit association changed outside Settings takes
+precedence.
+
+Cybex OS's browser, terminal and Files shortcuts, agent windows, maintenance
+and firmware terminals, web apps and dock suggestions use the same defaults.
+Super+E opens the selected file manager (`cybexos-apps files`). Chromium-based
+browsers (Brave, Chromium, Chrome, Vivaldi) open web apps in app mode; other
+browsers open their URL normally. Private browsing uses the selected browser's
+advertised desktop action; unsupported private actions produce a notification.
+Explicit `VISUAL`/`EDITOR` values and personal shortcuts retain their
+precedence. Arguments are passed as argv, including filenames and URLs
+containing spaces; they are not shell code.
+
+The `cybexos-apps` helper offers:
+
+- `status`;
+- `set ROLE DESKTOP_ID [--when-installed]`;
+- `reset ROLE` (back to Cybex OS's pick) and `cancel ROLE` (forget a waiting
+  choice);
+- `browser` and `browser --private`;
+- `webapp URL`;
+- `terminal [OPTIONS] [-- COMMAND ARGS…]`;
+- `files [PATH…]`;
+- `edit FILE…`;
+- `mailto gmail|outlook [ADDRESS]`.
+
+`cybex software catalogue`, `list`, `search QUERY`, `check ATTR…`,
+`stage JSON` and `request ID` expose the native package workflow for
+scripting.

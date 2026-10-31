@@ -93,7 +93,8 @@ test("kitty is signalled only when its file changed, or on --force", t => {
         assert.equal(result.report.targets.kitty.error, null);
         return result.report.targets.kitty.changed;
     };
-    const pkills = () => stubs.calls().filter(call => call.startsWith("pkill "));
+    // Other terminal targets (Ghostty) reload through pkill too.
+    const pkills = () => stubs.calls().filter(call => call.startsWith("pkill ") && call.includes("kitty"));
 
     assert.equal(apply(darkTokens()), true);
     assert.deepEqual(pkills(), ["pkill " + PKILL_ARGS]);
@@ -120,7 +121,7 @@ test("no running kitty is not an error; a failing pkill is reported", t => {
         { bin: idle.bin });
     assert.equal(quiet.status, 0, quiet.stderr);
     assert.deepEqual(quiet.report.targets.kitty, { changed: true, error: null });
-    assert.equal(idle.calls().length, 1);
+    assert.equal(idle.calls().filter(call => call.includes("kitty")).length, 1);
 
     const broken = stubBin(t, { pkill: "echo 'pkill: bad pattern' >&2; exit 2" });
     const state = scratch(t);

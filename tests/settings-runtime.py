@@ -325,9 +325,9 @@ class Audit:
 
     def default_applications(self):
         self.page('applications')
-        self.wait('!DefaultApplications.busy && Object.keys(DefaultApplications.roles).length === 6')
-        labels={'browser':'Web browser','terminal':'Terminal','editor':'Text editor',
-                'pdf':'PDF viewer','image':'Image viewer','video':'Video player'}
+        self.wait('!DefaultApplications.busy && Object.keys(DefaultApplications.roles).length === 9')
+        labels={'browser':'Web browser','terminal':'Terminal','editor':'Text editor','files':'File manager',
+                'mail':'Email','music':'Music player','video':'Video player','pdf':'PDF viewer','image':'Image viewer'}
         result={}
         for role,label in labels.items():
             state=self.evaluate('DefaultApplications.roles['+json.dumps(role)+']')
@@ -339,7 +339,12 @@ class Audit:
                 actual=json.loads(self.user(['cybexos-apps','status']))['roles'][role]
                 assert actual['selected']==choice['value'],actual
                 result[role].append(choice['value'])
-            self.edit(state['selected'],label=label)
+            if state['selected']:
+                self.edit(state['selected'],label=label)
+            else:
+                # Nothing was set (email links): back to Cybex OS's default.
+                self.user(['cybexos-apps','reset',role])
+                self.evaluate('(DefaultApplications.refresh(), true)')
             self.wait('!DefaultApplications.busy')
         return result
 

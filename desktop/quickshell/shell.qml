@@ -35,6 +35,8 @@ ShellRoot {
         target: "software"
         function open(): void { Software.show(); }
         function close(): void { Software.close(); }
+        // Software's home at the default apps, with a job's picker open ("" for none).
+        function defaults(role: string): void { Software.showDefaults(role); }
     }
 
     // Hyprland dispatches this in-process. Super+Space no longer waits for a

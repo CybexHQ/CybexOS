@@ -1,0 +1,24 @@
+# Cybex OS's Alacritty defaults, imported from
+# ~/.config/alacritty/alacritty.toml. Your own settings in that file win.
+#
+# Alacritty loads imports in order and the importing file last: the fallback
+# theme, then the shell's current appearance (rewritten by theme-apply.py and
+# reloaded by Alacritty's own watcher). This file therefore sets neither
+# colours nor the font size.
+[general]
+import = ["alacritty-colors.toml", "~/.local/state/cybexos/theme/alacritty.toml"]
+live_config_reload = true
+
+[font]
+normal = { family = "JetBrainsMono Nerd Font" }
+
+[window]
+padding = { x = 14, y = 14 }
+decorations = "None"
+opacity = 0.95
+
+[cursor]
+style = { shape = "Underline", blinking = "Off" }
+
+[mouse]
+hide_when_typing = true

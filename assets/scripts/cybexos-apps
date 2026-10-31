@@ -5,15 +5,41 @@ import configparser
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
 import tempfile
+import time
+from urllib.parse import quote, unquote, urlencode, urlsplit
 
 ROLES = {'browser': ['x-scheme-handler/http', 'x-scheme-handler/https', 'text/html'],
          'editor': ['text/plain'], 'pdf': ['application/pdf'],
          'image': ['image/png', 'image/jpeg', 'image/webp'],
-         'video': ['video/mp4', 'video/webm', 'video/x-matroska'], 'terminal': []}
+         'video': ['video/mp4', 'video/webm', 'video/x-matroska'],
+         'music': ['audio/mpeg', 'audio/flac', 'audio/ogg', 'audio/x-vorbis+ogg', 'audio/x-opus+ogg',
+                   'audio/mp4', 'audio/x-wav'],
+         'files': ['inode/directory'], 'mail': ['x-scheme-handler/mailto'], 'terminal': []}
+# A choice made before its app is installed (Software's "Install and use")
+# takes effect once the app is there, if that happens within a day.
+PENDING_SECONDS = 86400
+# Cybex OS's hidden mail handlers that write a message in a web mail service,
+# in the selected browser. They are offered for email links only, and declare
+# no MIME type, so they never become the default before someone chooses one.
+WEBMAIL = {'gmail': ('https://mail.google.com/mail/', {'view': 'cm', 'fs': '1'},
+                     {'to': 'to', 'cc': 'cc', 'bcc': 'bcc', 'subject': 'su', 'body': 'body'}),
+           'outlook': ('https://outlook.live.com/mail/0/deeplink/compose', {},
+                       {'to': 'to', 'cc': 'cc', 'bcc': 'bcc', 'subject': 'subject', 'body': 'body'})}
+DESKTOP_ID = re.compile(r'[A-Za-z0-9_@.+-]{1,200}\.desktop')
+# Terminals whose desktop entries do not declare xdg-terminal-exec's
+# X-TerminalArg* keys, so it would drop --title, --app-id, --dir and --hold.
+# Their own options, used only while their entry declares none of its own.
+TERMINAL_OPTIONS = {
+    'Alacritty.desktop': {'--title=': ['--title'], '--app-id=': ['--class'], '--dir=': ['--working-directory'],
+                          '--hold': ['--hold']},
+    'foot.desktop': {'--title=': ['--title'], '--app-id=': ['--app-id'], '--dir=': ['--working-directory'],
+                     '--hold': ['--hold']},
+}
 
 
 def libraries():
@@ -33,15 +59,45 @@ def config_root():
     return Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config')))
 
 
-def load_choices():
-    path = config_root() / 'cybexos/default-applications.json'
+def preference_path():
+    return config_root() / 'cybexos/default-applications.json'
+
+
+def load_preferences():
+    path = preference_path()
     try:
         value = json.loads(path.read_text())
     except FileNotFoundError:
-        return {}
-    if value.get('schema') != 1 or not isinstance(value.get('choices'), dict):
+        return {'schema': 1, 'choices': {}, 'pending': {}}
+    if (value.get('schema') != 1 or not isinstance(value.get('choices'), dict)
+            or not isinstance(value.get('pending', {}), dict)):
         raise ValueError('Unsupported default-application preferences. Preserve the existing file.')
-    return value['choices']
+    return {'schema': 1, 'choices': value['choices'], 'pending': value.get('pending', {})}
+
+
+def load_choices():
+    return load_preferences()['choices']
+
+
+def save_preferences(value):
+    path = preference_path()
+    if path.is_symlink():
+        raise ValueError('The preference file is linked. Edit its source explicitly.')
+    document = {'schema': 1, 'choices': value['choices']}
+    if value['pending']:
+        document['pending'] = value['pending']
+    write(path, json.dumps(document, indent=2) + '\n')
+
+
+def pending_choices(value, now=None):
+    """Unexpired choices waiting for their app, by role."""
+    now = time.time() if now is None else now
+    result = {}
+    for role, entry in value['pending'].items():
+        if (role in ROLES and isinstance(entry, dict) and isinstance(entry.get('id'), str)
+                and isinstance(entry.get('since'), (int, float)) and 0 <= now - entry['since'] < PENDING_SECONDS):
+            result[role] = entry['id']
+    return result
 
 
 def write(path, text):
@@ -59,11 +115,27 @@ def write(path, text):
 
 
 def compatible(app, role):
+    categories = (app.get_categories() or '').split(';')
     if role == 'browser':
         return app.supports_uris() and bool(set(app.get_supported_types() or []) & set(ROLES['browser'][:2]))
     if role == 'terminal':
-        return 'TerminalEmulator' in (app.get_categories() or '').split(';')
+        return 'TerminalEmulator' in categories
+    if role == 'files':
+        # Editors open folders too; only file managers manage them.
+        return 'inode/directory' in (app.get_supported_types() or []) and 'FileManager' in categories
+    if role == 'mail' and webmail_entry(app):
+        return True
     return bool(set(app.get_supported_types() or []) & set(ROLES[role]))
+
+
+def webmail_entry(app):
+    identifier = app.get_id() or ''
+    return identifier.startswith('cybexos-mail-') and identifier.removeprefix('cybexos-mail-').removesuffix('.desktop') in WEBMAIL
+
+
+def listed(app, role):
+    """Shown as a choice: visible entries, and Cybex OS's web mail handlers for email."""
+    return app.should_show() or (role == 'mail' and webmail_entry(app))
 
 
 def desktop_app(identifier):
@@ -82,9 +154,10 @@ def current(role):
     return Gio.AppInfo.get_default_for_type(ROLES[role][0], False)
 
 
-def declared_choice(role):
+def declared_choice(role, system=False):
+    """The first declared choice; `system` skips this account's own files."""
     desktops = [d.lower() for d in os.environ.get('XDG_CURRENT_DESKTOP', '').split(':') if d]
-    config_dirs = [config_root(), *map(Path, os.environ.get('XDG_CONFIG_DIRS', '/etc/xdg').split(':'))]
+    config_dirs = [*([] if system else [config_root()]), *map(Path, os.environ.get('XDG_CONFIG_DIRS', '/etc/xdg').split(':'))]
     if role == 'terminal':
         for folder in config_dirs:
             for name in [*(d + '-xdg-terminals.list' for d in desktops), 'xdg-terminals.list']:
@@ -93,7 +166,7 @@ def declared_choice(role):
                     entries = [line.strip() for line in path.read_text().splitlines() if line.strip() and not line.startswith('#')]
                     if entries: return entries[0].split(':')[0]
         return ''
-    data_dirs = [Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))),
+    data_dirs = [*([] if system else [Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share')))]),
                  *map(Path, os.environ.get('XDG_DATA_DIRS', '/usr/local/share:/usr/share').split(':'))]
     for folder in [*config_dirs, *(d / 'applications' for d in data_dirs)]:
         for name in [*(d + '-mimeapps.list' for d in desktops), 'mimeapps.list']:
@@ -104,31 +177,55 @@ def declared_choice(role):
     return ''
 
 
+def settle():
+    """Apply waiting choices whose apps are installed now; forget expired ones."""
+    preferences = load_preferences()
+    waiting = pending_choices(preferences)
+    settled = []
+    for role, identifier in waiting.items():
+        app = desktop_app(identifier)
+        if app and compatible(app, role):
+            select(role, identifier)
+            settled.append(role)
+    preferences = load_preferences()
+    kept = {role: entry for role, entry in preferences['pending'].items() if role in pending_choices(preferences)}
+    if kept != preferences['pending']:
+        save_preferences(preferences | {'pending': kept})
+    return settled
+
+
 def status():
     Gio, _, Desktop = libraries()
-    saved = load_choices()
-    applications = [a for a in Gio.AppInfo.get_all() if isinstance(a, Desktop) and a.should_show()]
+    settled = settle()
+    preferences = load_preferences()
+    saved, waiting = preferences['choices'], pending_choices(preferences)
+    applications = [a for a in Gio.AppInfo.get_all() if isinstance(a, Desktop)]
     result = {}
     for role in ROLES:
         actual = current(role)
         missing = saved.get(role) and declared_choice(role) == saved[role] and desktop_app(saved[role]) is None
         chosen = saved[role] if missing else actual.get_id() if actual else ''
-        choices = [{'value': a.get_id(), 'label': a.get_display_name()} for a in applications if compatible(a, role)]
+        choices = [{'value': a.get_id(), 'label': a.get_display_name()} for a in applications
+                   if listed(a, role) and compatible(a, role)]
         choices.sort(key=lambda a: a['label'].casefold())
         if chosen and not any(c['value'] == chosen for c in choices):
             choices.insert(0, {'value': chosen, 'label': chosen + (' · unavailable' if missing else '')})
         result[role] = {'selected': chosen, 'effective': actual.get_id() if actual else '',
-                        'unavailable': bool(missing), 'choices': choices}
-    return {'roles': result}
+                        'unavailable': bool(missing), 'choices': choices,
+                        # What Cybex OS and the machine's configuration choose, and
+                        # whether this account chose for itself in Settings or Software.
+                        'system': declared_choice(role, system=True), 'personal': role in saved,
+                        'pending': waiting.get(role, '')}
+    return {'roles': result, 'settled': settled}
 
 
 def effective_defaults():
-    # The dock only needs these two effective IDs, not an installed-app
-    # catalog and six Settings choice lists. Use the same GIO/terminal
+    # The dock only needs these effective IDs, not an installed-app catalog
+    # and every role's choice list. Use the same GIO/terminal
     # resolution as full status, including unavailable-default fallbacks.
     load_choices()
     result = {}
-    for role in ('browser', 'terminal'):
+    for role in ('browser', 'terminal', 'files'):
         app = current(role)
         result[role] = app.get_id() if app else ''
     return result
@@ -139,9 +236,8 @@ def select(role, identifier):
     app = desktop_app(identifier)
     if not app or not compatible(app, role):
         raise ValueError('Choose an installed application that supports this use.')
-    saved = load_choices()
-    preference = config_root() / 'cybexos/default-applications.json'
-    if preference.is_symlink():
+    preferences = load_preferences()
+    if preference_path().is_symlink():
         raise ValueError('The preference file is linked. Edit its source explicitly.')
     if role == 'terminal':
         # Respect the most-specific personal terminal file when it exists.
@@ -154,7 +250,68 @@ def select(role, identifier):
         for mime in ROLES[role]:
             if not app.set_as_default_for_type(mime):
                 raise ValueError('The application association could not be saved.')
-    write(preference, json.dumps({'schema': 1, 'choices': saved | {role: identifier}}, indent=2) + '\n')
+    preferences['choices'][role] = identifier
+    preferences['pending'].pop(role, None)
+    save_preferences(preferences)
+
+
+def choose(role, identifier, when_installed=False):
+    """Use an app for a role now, or, when it is still being installed, once it is."""
+    app = desktop_app(identifier)
+    if app and compatible(app, role):
+        select(role, identifier)
+    elif when_installed and app is None and DESKTOP_ID.fullmatch(identifier):
+        preferences = load_preferences()
+        preferences['pending'][role] = {'id': identifier, 'since': int(time.time())}
+        save_preferences(preferences)
+    else:
+        raise ValueError('Choose an installed application that supports this use.')
+    return status()
+
+
+def cancel(role):
+    preferences = load_preferences()
+    if preferences['pending'].pop(role, None) is not None:
+        save_preferences(preferences)
+    return status()
+
+
+def terminal_lists():
+    """This account's terminal preference files, most specific first."""
+    desktops = [d.lower() for d in os.environ.get('XDG_CURRENT_DESKTOP', '').split(':') if d]
+    return [config_root() / (d + '-xdg-terminals.list') for d in desktops] + [config_root() / 'xdg-terminals.list']
+
+
+def reset(role):
+    """Forget this account's choice for a role, so Cybex OS's default applies again.
+
+    Only what Settings or Software wrote is removed: the role's own MIME
+    associations and, for the terminal, the chosen entry in this account's
+    terminal list. Other personal associations stay.
+    """
+    Gio, _, _ = libraries()
+    preferences = load_preferences()
+    if preference_path().is_symlink():
+        raise ValueError('The preference file is linked. Edit its source explicitly.')
+    if role == 'terminal':
+        saved = preferences['choices'].get('terminal')
+        for path in terminal_lists():
+            if not saved or not path.is_file() or path.is_symlink():
+                continue
+            lines = path.read_text().splitlines()
+            kept = [line for line in lines if line.strip() != saved]
+            if kept == lines:
+                continue
+            if any(line.strip() and not line.strip().startswith('#') for line in kept):
+                write(path, '\n'.join(kept) + '\n')
+            else:
+                path.unlink()
+    else:
+        for mime in ROLES[role]:
+            Gio.AppInfo.reset_type_associations(mime)
+    preferences['choices'].pop(role, None)
+    preferences['pending'].pop(role, None)
+    save_preferences(preferences)
     return status()
 
 
@@ -173,9 +330,84 @@ def warn_fallback(role):
                'Using an available application. Your saved choice is unchanged; review Settings → Applications.')
 
 
+def own_terminal_argv(identifier, arguments):
+    """The terminal's own command for xdg-terminal-exec's generic options, or None.
+
+    Only for the terminals in TERMINAL_OPTIONS while their entry declares no
+    X-TerminalArg* keys, and only when every option is one of the four
+    generic ones; anything else stays with xdg-terminal-exec.
+    """
+    table = TERMINAL_OPTIONS.get(identifier)
+    app = desktop_app(identifier) if table else None
+    if not app or any(app.has_key(key) for key in ('X-TerminalArgExec', 'X-TerminalArgHold', 'X-TerminalArgAppId')):
+        return None
+    _, GLib, _ = libraries()
+    _, command = GLib.shell_parse_argv(app.get_commandline())
+    # File and URL codes have nothing to receive here; any other code is unsupported.
+    command = [token for token in command if not re.fullmatch(r'%[fFuU]', token)]
+    if any('%' in token.replace('%%', '') for token in command):
+        return None
+    options, rest = [], list(arguments)
+    while rest and rest[0] != '--':
+        option = rest.pop(0)
+        prefix = next((key for key in table if option == key or (key.endswith('=') and option.startswith(key))), None)
+        if prefix is None:
+            return None
+        options += table[prefix] + ([option[len(prefix):]] if prefix.endswith('=') else [])
+    child = rest[1:]
+    return [*command, *options, *(['-e', *child] if child else [])]
+
+
 def terminal(arguments):
     warn_fallback('terminal')
+    result = subprocess.run(['xdg-terminal-exec', '--print-id'], text=True, capture_output=True, timeout=10)
+    identifier = result.stdout.strip().split(':')[0] if result.returncode == 0 else ''
+    own = own_terminal_argv(identifier, arguments) if identifier in TERMINAL_OPTIONS else None
+    if own:
+        os.execvp(own[0], own)
     os.execvp('xdg-terminal-exec', ['xdg-terminal-exec', *arguments])
+
+
+def files(paths):
+    """Open folders (or the home folder) in the selected file manager."""
+    warn_fallback('files')
+    app = current('files')
+    if not app:
+        raise ValueError('Choose an installed file manager in Software.')
+    Gio, _, _ = libraries()
+    app.launch([Gio.File.new_for_commandline_arg(path) for path in paths], None)
+
+
+def compose_url(provider, address):
+    """A web mail service's new-message page for a mailto: link."""
+    if provider not in WEBMAIL:
+        raise ValueError('Unsupported web mail service.')
+    base, fixed, keys = WEBMAIL[provider]
+    fields = {}
+    if address:
+        if not address.lower().startswith('mailto:') or len(address) > 8192:
+            raise ValueError('Only email links can be opened here.')
+        parts = urlsplit(address)
+        recipients = [unquote(part) for part in parts.path.split(',') if part]
+        # RFC 6068: "+" is a literal plus in a mailto: link, not a space.
+        lowered = {}
+        for field in parts.query.split('&'):
+            key, _, value = field.partition('=')
+            if key:
+                lowered.setdefault(unquote(key).lower(), []).append(unquote(value))
+        to = recipients + [value for value in lowered.get('to', []) if value]
+        if to:
+            fields['to'] = ','.join(to)
+        for key in ('cc', 'bcc', 'subject', 'body'):
+            values = [value for value in lowered.get(key, []) if value]
+            if values:
+                fields[key] = ','.join(values) if key in ('cc', 'bcc') else values[0]
+    query = fixed | {keys[key]: value for key, value in fields.items()}
+    return base + ('?' + urlencode(query, quote_via=quote) if query else '')
+
+
+def mailto(provider, address):
+    browser([compose_url(provider, address)])
 
 
 def browser(arguments, private=False):
@@ -198,7 +430,7 @@ def browser(arguments, private=False):
 
 def webapp(url):
     app = current('browser')
-    if app and any(name in (app.get_id() or '').lower() for name in ('brave', 'chromium', 'chrome', 'msedge')):
+    if app and any(name in (app.get_id() or '').lower() for name in ('brave', 'chromium', 'chrome', 'msedge', 'vivaldi')):
         warn_fallback('browser')
         subprocess.Popen([*editor_argv(app, []), '--app=' + url], start_new_session=True)
     else:
@@ -249,7 +481,12 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('status')
     sub.add_parser('effective-defaults')
-    choose = sub.add_parser('set'); choose.add_argument('role', choices=ROLES); choose.add_argument('desktop_id')
+    picker = sub.add_parser('set'); picker.add_argument('role', choices=ROLES); picker.add_argument('desktop_id')
+    picker.add_argument('--when-installed', action='store_true')
+    sub.add_parser('reset').add_argument('role', choices=ROLES)
+    sub.add_parser('cancel').add_argument('role', choices=ROLES)
+    sub.add_parser('files').add_argument('paths', nargs='*')
+    mail = sub.add_parser('mailto'); mail.add_argument('provider', choices=WEBMAIL); mail.add_argument('address', nargs='?', default='')
     term = sub.add_parser('terminal'); term.add_argument('arguments', nargs=argparse.REMAINDER)
     web = sub.add_parser('browser'); web.add_argument('--private', action='store_true'); web.add_argument('addresses', nargs='*')
     site = sub.add_parser('webapp'); site.add_argument('url')
@@ -260,7 +497,11 @@ def main():
     args = parser.parse_args()
     if args.action == 'status': print(json.dumps(status()))
     elif args.action == 'effective-defaults': print(json.dumps(effective_defaults()))
-    elif args.action == 'set': print(json.dumps(select(args.role, args.desktop_id)))
+    elif args.action == 'set': print(json.dumps(choose(args.role, args.desktop_id, args.when_installed)))
+    elif args.action == 'reset': print(json.dumps(reset(args.role)))
+    elif args.action == 'cancel': print(json.dumps(cancel(args.role)))
+    elif args.action == 'files': files(args.paths)
+    elif args.action == 'mailto': mailto(args.provider, args.address)
     elif args.action == 'terminal': terminal(args.arguments)
     elif args.action == 'browser': browser(args.addresses, args.private)
     elif args.action == 'edit': edit(args.files)
@@ -272,7 +513,7 @@ if __name__ == '__main__':
     except Exception as error:
         # GIO diagnostics and application arguments can contain private URLs.
         message = str(error) if isinstance(error, ValueError) else 'The application request failed. Check the selected application and retry.'
-        if len(sys.argv) > 1 and sys.argv[1] not in ('status', 'effective-defaults', 'set'):
+        if len(sys.argv) > 1 and sys.argv[1] not in ('status', 'effective-defaults', 'set', 'reset', 'cancel'):
             notify('Application could not be opened', message)
         print(json.dumps({'error': message}), file=sys.stderr)
         sys.exit(1)

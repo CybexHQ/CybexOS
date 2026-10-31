@@ -448,6 +448,91 @@ function permissions(keys) {
     return PERMISSIONS.filter(key => wanted.includes(key));
 }
 
+// ---- default apps ------------------------------------------------------------
+// The jobs Software offers apps for (catalogue.roles, as cybexos-apps names
+// them), in the order the home page shows them, with each one's glyph.
+var ROLE_GLYPHS = { browser: "world", terminal: "terminal-2", editor: "pencil", files: "folder", mail: "inbox",
+    music: "music", video: "movie", pdf: "file-text", image: "photo" };
+
+function roleDesktops(option) {
+    return option ? [option.desktop].concat(option.flathubDesktop ? [option.flathubDesktop] : []) : [];
+}
+
+// One option on this computer: installed (its entry is there, or its Flathub
+// app), and otherwise how it would arrive. `present(id)` says whether a
+// desktop entry exists; `context` is {flathubOn, flathubInstalled}.
+//   installed · web (a Cybex OS mail handler) · nixos · vendor (an unfree
+//   download) · flathub · missing (Cybex OS's own, not on this computer) ·
+//   unavailable (no way to install it here)
+function roleOption(option, present, context) {
+    const value = context || {};
+    const entry = roleDesktops(option).find(id => present(id)) || "";
+    const fromFlathub = !!option.flathub && !!flatpak(value.flathubInstalled, option.flathub);
+    let source;
+    if (option.web)
+        source = "web";
+    else if (entry !== "" || fromFlathub)
+        source = "installed";
+    else if (option.included)
+        source = "missing";
+    else if (option.attribute && !option.unavailable)
+        source = option.free === false ? "vendor" : "nixos";
+    else if (option.flathub && value.flathubOn)
+        source = "flathub";
+    else
+        source = "unavailable";
+    const desktop = entry || (fromFlathub || source === "flathub" ? option.flathubDesktop : option.desktop);
+    return { option: option, source: source, desktop: desktop, ready: source === "installed" || source === "web" };
+}
+
+// The options a picker lists: those this computer can use or install.
+function roleChoices(role, present, context) {
+    return list((role || {}).options).map(option => roleOption(option, present, context))
+        .filter(row => row.source !== "missing" && row.source !== "unavailable");
+}
+
+// The option a desktop entry ID belongs to, or null.
+function roleOptionFor(role, desktop) {
+    return desktop ? list((role || {}).options).find(option => roleDesktops(option).includes(desktop)) || null : null;
+}
+
+// Installed apps that can do the job but are not among the role's options.
+function otherApps(role, state) {
+    const known = {};
+    for (const option of list((role || {}).options))
+        for (const id of roleDesktops(option))
+            known[id] = true;
+    return list((state || {}).choices).filter(row => row && row.value && !known[row.value] && !/ · unavailable$/.test(row.label || ""));
+}
+
+// What a role's card says: the app doing the job and who chose it, or the
+// one being switched to. `state` is cybexos-apps status for the role.
+//   who: "system" (Cybex OS's pick) · "you" · "none" (nothing set) · "switching"
+function roleCard(role, state) {
+    const value = state || {};
+    const pending = value.pending ? roleOptionFor(role, value.pending) : null;
+    const effective = value.effective || "";
+    const option = roleOptionFor(role, effective);
+    const label = option ? option.name : (list(value.choices).find(row => row.value === effective) || {}).label || "";
+    const who = pending ? "switching" : effective === "" ? "none"
+        : value.personal && effective !== value.system ? "you" : "system";
+    return { option: pending || option, name: pending ? pending.name : label, desktop: pending ? value.pending : effective,
+        who: who, pending: pending };
+}
+
+// A role differs from Cybex OS's pick when this account chose for itself.
+function roleChanged(states) {
+    return Object.keys(states || {}).filter(id => !!ROLE_GLYPHS[id] && states[id] && states[id].personal
+        && states[id].effective !== states[id].system);
+}
+
+// An option's notes as {key, yes}; 1Password notes only while proprietary
+// apps (and so 1Password) are on.
+function perks(option, proprietary) {
+    return list((option || {}).perks).map(perk => ({ key: perk.replace(/^-/, ""), yes: perk[0] !== "-" }))
+        .filter(perk => proprietary || perk.key !== "1password");
+}
+
 // ---- presentation ----------------------------------------------------------
 
 // Decimal sizes, as Nix and the update review report them.
@@ -562,5 +647,6 @@ if (typeof module !== "undefined") module.exports = {
     change, queueState, verdict, PREPARING, FINISHED, FAILED, owns, phase, blocked, changed, progress, appUpdates,
     size, parseHex, luminance, darkInk, mix, brand, paragraphs, license, host, screenshots, GLYPH_FALLBACKS, glyph,
     columns, entryIds, FLATHUB_ID, flathubId, flathubMedia, flathubHits, flatpak, flathubTask, flathubRunning,
-    flathubMode, flathubInstalledRows, PERMISSIONS, permissions
+    flathubMode, flathubInstalledRows, PERMISSIONS, permissions, ROLE_GLYPHS, roleDesktops, roleOption, roleChoices,
+    roleOptionFor, otherApps, roleCard, roleChanged, perks
 };

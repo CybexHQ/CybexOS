@@ -1,0 +1,41 @@
+# The shell's default dark theme and size, as
+# desktop/quickshell/scripts/theme_alacritty.py renders it (a test keeps the
+# two equal); alacritty.toml imports it before the shell's current appearance.
+[font]
+size = 12.0
+
+[colors.primary]
+foreground = "#f2f0ea"
+background = "#1a1917"
+
+[colors.selection]
+text = "#ffffff"
+background = "#3d5c82"
+
+[colors.cursor]
+text = "#1a1917"
+cursor = "#60a5fa"
+
+[colors.hints.start]
+foreground = "#1a1917"
+background = "#60a5fa"
+
+[colors.normal]
+black = "#302f2c"
+red = "#e8837a"
+green = "#a3c98f"
+yellow = "#d3b47e"
+blue = "#9ecbeb"
+magenta = "#c0a8dc"
+cyan = "#6ec2b2"
+white = "#b3afa4"
+
+[colors.bright]
+black = "#706f6b"
+red = "#ffb3ab"
+green = "#b8dba5"
+yellow = "#e5cb98"
+blue = "#b6dcf6"
+magenta = "#d4c0ec"
+cyan = "#8fd8ca"
+white = "#f2f0ea"

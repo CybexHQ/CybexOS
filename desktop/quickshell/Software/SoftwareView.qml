@@ -16,7 +16,9 @@ FocusScope {
 
     Keys.onPressed: event => {
         if (event.key === Qt.Key_Escape) {
-            if (Software.viewer)
+            if (Software.picker !== "")
+                Software.closePicker();
+            else if (Software.viewer)
                 Software.closeViewer();
             else if (!Software.back())
                 Software.close();
@@ -24,10 +26,10 @@ FocusScope {
         } else if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
             Software.back();
             event.accepted = true;
-        } else if ((event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) || event.key === Qt.Key_Slash) {
+        } else if (Software.picker === "" && ((event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) || event.key === Qt.Key_Slash)) {
             header.focusSearch("");
             event.accepted = true;
-        } else if (event.text.length === 1 && event.text.charCodeAt(0) > 32 && event.text.charCodeAt(0) !== 127
+        } else if (Software.picker === "" && event.text.length === 1 && event.text.charCodeAt(0) > 32 && event.text.charCodeAt(0) !== 127
                 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
             header.focusSearch(event.text);
             event.accepted = true;
@@ -170,6 +172,14 @@ FocusScope {
         }
     }
 
+    // A switched job, with Undo, just above the install list.
+    DefaultsToast {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: bar.visible ? bar.top : parent.bottom
+        anchors.bottomMargin: Theme.scaled(16)
+        z: 3
+    }
+
     QueueBar {
         id: bar
         anchors.bottom: parent.bottom
@@ -180,5 +190,10 @@ FocusScope {
     ScreenshotViewer {
         anchors.fill: parent
         z: 5
+    }
+
+    DefaultPicker {
+        anchors.fill: parent
+        z: 6
     }
 }

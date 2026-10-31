@@ -27,10 +27,12 @@ test("a newer Settings selection wins over a previously started dock query", () 
         .match(/onCompleted: value => \{([\s\S]*?)\n        \}/)[1];
     const root = { defaultsEpoch: 0, effectiveDefaults: {browser: "old.desktop", terminal: "terminal.desktop"} };
     const context = vm.createContext({ root, epoch: 0, value: {browser:"old.desktop", terminal:"terminal.desktop"},
-        DefaultApplications: { roles: {browser:{effective:"new.desktop"}, terminal:{effective:"terminal.desktop"}} } });
+        DefaultApplications: { roles: {browser:{effective:"new.desktop"}, terminal:{effective:"terminal.desktop"},
+            files:{effective:"files.desktop"}} } });
     vm.runInContext(selected, context);
     vm.runInContext(completed, context);
     assert.equal(root.effectiveDefaults.browser, "new.desktop");
+    assert.equal(root.effectiveDefaults.files, "files.desktop");
     context.epoch = root.defaultsEpoch;
     context.value = {browser: "external.desktop", terminal: "other-terminal.desktop"};
     vm.runInContext(completed, context);
@@ -172,6 +174,8 @@ test("suggested pins hold until the person pins or unpins anything", () => {
     const suggestions = D.suggestedPins("brave");
     assert.deepEqual(suggestions, ["brave", "org.gnome.Nautilus", "kitty"]);
     assert.deepEqual(D.suggestedPins(""), ["org.gnome.Nautilus", "kitty"]);
+    assert.deepEqual(D.suggestedPins("firefox", "com.mitchellh.ghostty", "thunar"), ["firefox", "thunar", "com.mitchellh.ghostty"],
+        "the chosen file manager and terminal replace Cybex OS's");
     assert.deepEqual(D.effectivePins([], false, suggestions), suggestions);
     assert.deepEqual(D.effectivePins([], true, suggestions), [], "an explicit empty dock stays empty");
     assert.deepEqual(D.effectivePins(["kitty"], true, suggestions), ["kitty"]);

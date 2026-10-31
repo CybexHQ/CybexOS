@@ -10,7 +10,8 @@ import "SoftwareHelpers.js" as Helpers
 // Updates.apply(), which asks for authorization. Nothing compiles here: every
 // install is checked first (`cybex software check`) and blocked if it would.
 // Flathub is the second source: sandboxed apps installed for this account
-// right away (`cybex software flathub`), outside system changes.
+// right away (`cybex software flathub`), outside system changes. The apps
+// that do each everyday job (browser, terminal…) can be switched here too.
 Singleton {
     id: root
 
@@ -38,6 +39,7 @@ Singleton {
     function close() {
         open = false;
         viewer = null;
+        picker = "";
     }
     function selectTab(name) {
         if (!["explore", "installed", "updates"].includes(name))
@@ -122,6 +124,7 @@ Singleton {
         if (searching)
             moreDelay.restart();
         refreshFlathub();
+        DefaultApplications.refresh();
     }
     function iconSource(app) {
         return app && /^[a-z0-9]{2,32}$/.test(app.id || "") && catalogue.icons
@@ -347,7 +350,9 @@ Singleton {
     function queued(attribute) { return Helpers.queued(queue, attribute); }
     function item(attribute, action) {
         const app = appsByAttribute[attribute];
-        return { attribute: attribute, action: action, id: app ? app.id : "", name: app ? app.name : attribute };
+        const option = roleOptionsByAttribute[attribute];
+        return { attribute: attribute, action: action, id: app ? app.id : "",
+            name: app ? app.name : option ? option.name : attribute };
     }
     function toggleInstall(attribute) {
         if (!attribute)
@@ -456,6 +461,12 @@ Singleton {
         // The change is live: the installed state and desired list moved.
         if (phase === "done")
             refresh();
+        // An app chosen for a job takes over once installed; a change that
+        // ends without it leaves the job as it was.
+        if (phase === "done" || phase === "failed" || phase === "idle")
+            DefaultApplications.refresh();
+        if (phase === "failed" || phase === "idle")
+            Qt.callLater(root.dropAbandoned);
     }
 
     JsonCommand {
@@ -825,4 +836,225 @@ Singleton {
     // ---- updates -----------------------------------------------------------
     readonly property var updates: Helpers.appUpdates(Updates.deployment, catalogue)
     function openSoftwareUpdate() { Updates.show(); }
+
+    // ---- default apps --------------------------------------------------------
+    // The everyday jobs (catalogue.roles) and the apps that do them. An app
+    // already here takes over at once; another is installed first (from NixOS
+    // through the install list, or from Flathub) and takes over once it is.
+    // cybexos-apps keeps that waiting choice and applies it itself, so closing
+    // Software or a shell restart loses nothing. Undo puts back what was there.
+    readonly property var roles: Helpers.list(catalogue.roles).filter(role => !!Helpers.ROLE_GLYPHS[role.id])
+    readonly property var rolesById: Helpers.index(roles, "id")
+    readonly property var roleStates: DefaultApplications.roles
+    readonly property var roleOptionsByAttribute: {
+        const result = {};
+        for (const role of roles)
+            for (const option of Helpers.list(role.options))
+                if (option.attribute && !(option.attribute in result))
+                    result[option.attribute] = option;
+        return result;
+    }
+    readonly property var changedRoles: Helpers.roleChanged(roleStates)
+    // Each job's words: its card label, the noun in sentences ("is now your
+    // web browser"), and what choosing it controls.
+    readonly property var roleWords: ({
+        browser: { label: I18n.tr("Web browser"), noun: I18n.tr("web browser"),
+            use: I18n.tr("Opens links and web apps. Super+B opens it, and Super+Shift+B a private window."),
+            after: I18n.tr("Links and Super+B open it now."), search: "browser" },
+        terminal: { label: I18n.tr("Terminal"), noun: I18n.tr("terminal"),
+            use: I18n.tr("Super+Return, developer shells, agent windows and maintenance tasks open in it."),
+            after: I18n.tr("Super+Return opens it now."), search: "terminal" },
+        editor: { label: I18n.tr("Text editor"), noun: I18n.tr("text editor"),
+            use: I18n.tr("Opens text and code files, and the edit command in a terminal."),
+            after: I18n.tr("Text files open in it now."), search: "editor" },
+        files: { label: I18n.tr("Files"), noun: I18n.tr("file manager"),
+            use: I18n.tr("Opens folders, and Super+E."),
+            after: I18n.tr("Folders and Super+E open it now."), search: "files" },
+        mail: { label: I18n.tr("Email"), noun: I18n.tr("email app"),
+            use: I18n.tr("Opens email links (mailto:) from any app or web page."),
+            after: I18n.tr("Email links open it now."), search: "mail" },
+        music: { label: I18n.tr("Music"), noun: I18n.tr("music player"),
+            use: I18n.tr("Opens music files from Files and your downloads."),
+            after: I18n.tr("Music files open in it now."), search: "music" },
+        video: { label: I18n.tr("Videos"), noun: I18n.tr("video player"),
+            use: I18n.tr("Opens video files."),
+            after: I18n.tr("Videos open in it now."), search: "video" },
+        pdf: { label: I18n.tr("Documents"), noun: I18n.tr("PDF viewer"),
+            use: I18n.tr("Opens PDF documents."),
+            after: I18n.tr("PDFs open in it now."), search: "pdf" },
+        image: { label: I18n.tr("Images"), noun: I18n.tr("image viewer"),
+            use: I18n.tr("Opens pictures and screenshots."),
+            after: I18n.tr("Pictures open in it now."), search: "image viewer" }
+    })
+    function roleWord(roleId, key) { return (roleWords[roleId] || {})[key] || ""; }
+    // What an option's note says, kept or given up.
+    function perkLabel(key, yes) {
+        switch (key) {
+        case "1password":
+            return yes ? I18n.tr("1Password built in") : I18n.tr("Add the 1Password extension yourself");
+        case "webapps":
+            return yes ? I18n.tr("Web apps open in their own windows") : I18n.tr("Web apps open as tabs");
+        case "theme":
+            return I18n.tr("Follows your Cybex theme");
+        case "tabs":
+            return yes ? I18n.tr("Tabs and splits") : I18n.tr("No tabs or splits");
+        case "sandbox":
+            return I18n.tr("Runs in a sandbox");
+        case "projects":
+            return I18n.tr("Opens folders as projects");
+        case "terminal":
+            return I18n.tr("Opens in your terminal");
+        case "kde":
+            return I18n.tr("Adds KDE libraries");
+        case "library":
+            return I18n.tr("Music library and playlists");
+        case "annotate":
+            return I18n.tr("Annotate and fill in forms");
+        case "noinstall":
+            return I18n.tr("Nothing to install");
+        }
+        return "";
+    }
+    property string picker: ""
+    // The last switch, for the toast's Undo: {name, roles: [id], previous: {role: {desktop, personal}}}.
+    property var defaultsNotice: null
+
+    function showDefaults(role) {
+        selectTab("explore");
+        show();
+        openPicker(role || "");
+    }
+    function openPicker(role) {
+        DefaultApplications.refresh();
+        picker = rolesById[role] ? role : "";
+    }
+    function closePicker() { picker = ""; }
+    // Whether an app for a job is here: its desktop entry, or cybexos-apps
+    // already lists it (an entry Quickshell has not indexed yet).
+    function roleEntryPresent(roleId, id) {
+        void DesktopEntries.applications.values;
+        const ids = Helpers.entryIds([id]);
+        if (ids.length === 1 && DesktopEntries.byId(ids[0]) !== null)
+            return true;
+        const state = roleStates[roleId] || {};
+        return state.effective === id || Helpers.otherApps(null, state).some(row => row.value === id);
+    }
+    function roleContext() { return { flathubOn: flathubOn, flathubInstalled: flathubInstalled }; }
+    function roleChoices(roleId) {
+        return Helpers.roleChoices(rolesById[roleId], id => root.roleEntryPresent(roleId, id), roleContext());
+    }
+    function roleCard(roleId) { return Helpers.roleCard(rolesById[roleId], roleStates[roleId]); }
+    function rolesFor(app) {
+        return app && app.id ? roles.filter(role => Helpers.list(role.options).some(option => option.id === app.id)) : [];
+    }
+
+    function before(roleIds) {
+        const result = {};
+        for (const id of roleIds) {
+            const state = roleStates[id] || {};
+            result[id] = { desktop: state.effective || "", personal: state.personal === true };
+        }
+        return result;
+    }
+    // Use an option for a job: now when it is here, else once it is installed.
+    function useDefault(roleId, optionId) {
+        const option = Helpers.list((rolesById[roleId] || {}).options).find(entry => entry.id === optionId);
+        if (!option)
+            return;
+        const row = Helpers.roleOption(option, id => root.roleEntryPresent(roleId, id), roleContext());
+        const previous = before([roleId]);
+        if (row.ready) {
+            DefaultApplications.select(roleId, row.desktop);
+            defaultsNotice = { name: option.name, roles: [roleId], previous: previous };
+        } else if (row.source === "nixos" || row.source === "vendor") {
+            DefaultApplications.selectWhenInstalled(roleId, option.desktop);
+            if (queued(option.attribute) !== "install")
+                toggleInstall(option.attribute);
+            defaultsNotice = null;
+            // Start the change now when nothing is in the way; otherwise the
+            // install list says why, and the choice waits.
+            if (!flowActive && blockReason === "")
+                install();
+        } else if (row.source === "flathub") {
+            DefaultApplications.selectWhenInstalled(roleId, option.flathubDesktop);
+            installFlathub(option.flathub, option.name);
+            defaultsNotice = null;
+        }
+        switchedFrom = Object.assign({}, switchedFrom, previous);
+        picker = "";
+    }
+    // Use an installed app that is not among a job's options.
+    function useOther(roleId, desktop) {
+        const previous = before([roleId]);
+        const row = Helpers.otherApps(rolesById[roleId], roleStates[roleId]).find(entry => entry.value === desktop);
+        DefaultApplications.select(roleId, desktop);
+        defaultsNotice = { name: row ? row.label : desktop, roles: [roleId], previous: previous };
+        picker = "";
+    }
+    function resetDefaults() {
+        const ids = changedRoles.slice();
+        if (ids.length === 0)
+            return;
+        defaultsNotice = { name: "", roles: ids, previous: before(ids), reset: true };
+        for (const id of ids)
+            DefaultApplications.reset(id);
+    }
+    function undoDefaults() {
+        const notice = defaultsNotice;
+        if (!notice)
+            return;
+        defaultsNotice = null;
+        for (const id of notice.roles) {
+            const value = notice.previous[id] || {};
+            if (value.personal && value.desktop)
+                DefaultApplications.select(id, value.desktop);
+            else
+                DefaultApplications.reset(id);
+        }
+    }
+    // What each waiting job looked like before, so its toast can undo it.
+    property var switchedFrom: ({})
+    Connections {
+        target: DefaultApplications
+        function onSettled(ids) {
+            const named = Helpers.list(ids).filter(id => !!root.rolesById[id]);
+            if (named.length === 0)
+                return;
+            const card = Helpers.roleCard(root.rolesById[named[0]], root.roleStates[named[0]]);
+            const previous = {};
+            for (const id of named)
+                previous[id] = root.switchedFrom[id] || { desktop: "", personal: false };
+            root.defaultsNotice = { name: card.name, roles: named, previous: previous };
+        }
+    }
+    // A NixOS app taken off the install list, outside a change, is no longer
+    // on its way: its job stays as it was.
+    onQueueChanged: Qt.callLater(root.dropAbandoned)
+    function dropAbandoned() {
+        if (flowActive)
+            return;
+        for (const role of roles) {
+            const card = Helpers.roleCard(role, roleStates[role.id]);
+            const option = card.pending;
+            if (option && card.desktop === option.desktop && option.attribute
+                    && queued(option.attribute) !== "install" && !roleEntryPresent(role.id, card.desktop))
+                DefaultApplications.cancel(role.id);
+        }
+    }
+    // A Flathub install that finished makes its app available; one that
+    // failed leaves its job as it was.
+    onFlathubTaskChanged: {
+        const task = flathubTask;
+        if (!task || task.action !== "install" || Helpers.flathubRunning(task))
+            return;
+        DefaultApplications.refresh();
+        if (task.state !== "failed")
+            return;
+        for (const role of roles) {
+            const card = Helpers.roleCard(role, roleStates[role.id]);
+            if (card.pending && card.pending.flathub && Helpers.list(task.ids).includes(card.pending.flathub)
+                    && card.desktop === card.pending.flathubDesktop)
+                DefaultApplications.cancel(role.id);
+        }
+    }
 }

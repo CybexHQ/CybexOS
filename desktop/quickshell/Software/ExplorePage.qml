@@ -3,8 +3,9 @@ import QtQuick
 import "../Common"
 import "../Common/SoftwareHelpers.js" as Helpers
 
-// The front page: featured apps, the eight categories, collections from the
-// installer's profiles, and what people install most.
+// The front page: the apps doing each everyday job, which you can change,
+// then everything to discover: featured apps, the eight categories,
+// collections from the installer's profiles, and what people install most.
 PageScroll {
     id: root
 
@@ -13,6 +14,20 @@ PageScroll {
 
     objectName: "softwareExplorePage"
     spacing: Theme.scaled(12)
+
+    DefaultsSection {
+        width: parent.width
+    }
+    Rectangle {
+        width: parent.width
+        height: 1
+        color: Theme.hairlineSoft
+    }
+    SectionTitle {
+        width: parent.width
+        text: I18n.tr("Discover")
+        detail: I18n.tr("More apps, all prebuilt · nothing to compile")
+    }
 
     HeroCarousel {
         objectName: "softwareHero"

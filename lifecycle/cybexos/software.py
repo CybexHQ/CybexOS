@@ -17,6 +17,9 @@ ATTRIBUTE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_+-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_
 APP_ID = re.compile(r'[a-z0-9]{2,32}')
 DESKTOP_ID = re.compile(r'[A-Za-z0-9_@.+-]{1,200}\.desktop')
 STORE_PATH = re.compile(r'/nix/store/[a-z0-9]{32}-[^/]+')
+FLATPAK_ID = re.compile(r'[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+){2,}')
+# The default-app roles Software offers apps for (cybexos-apps names them).
+ROLES = ('browser', 'terminal', 'editor', 'files', 'mail', 'music', 'video', 'pdf', 'image')
 # Follows the selected system generation, like the shell's own runtime.
 SHIPPED = Path('/run/current-system/sw/share/cybexos/software')
 EXPRESSION = Path(__file__).with_name('software-catalogue.nix')
@@ -172,6 +175,22 @@ def shipped_catalogue(source):
     return data, apps
 
 
+def shipped_roles(data):
+    """Each role's options, keeping only well-formed ones: an option's desktop
+    entry and attribute reach cybexos-apps and Nix, its Flathub ID flatpak."""
+    def valid(option):
+        attribute, flathub = option.get('attribute'), option.get('flathub')
+        return (isinstance(option, dict) and isinstance(option.get('id'), str) and APP_ID.fullmatch(option['id'])
+                and isinstance(option.get('desktop'), str) and DESKTOP_ID.fullmatch(option['desktop'])
+                and (attribute is None or (isinstance(attribute, str) and len(attribute) <= 200 and ATTRIBUTE.fullmatch(attribute)))
+                and (flathub is None or (isinstance(flathub, str) and len(flathub) <= 255 and FLATPAK_ID.fullmatch(flathub)
+                                         and option.get('flathubDesktop') == flathub + '.desktop'))
+                and (attribute is not None or flathub is not None or option.get('included') is True or option.get('web') is True))
+    roles = data.get('roles') if isinstance(data.get('roles'), list) else []
+    return [{'id': role['id'], 'options': [option for option in role['options'] if valid(option)]}
+            for role in roles if isinstance(role, dict) and role.get('id') in ROLES and isinstance(role.get('options'), list)]
+
+
 def catalogue(*, config='/etc/nixos', installed='/etc/cybexos/software.json', source=SHIPPED, cache=None, run=None):
     """The shipped app catalogue with this machine's state.
 
@@ -184,7 +203,9 @@ def catalogue(*, config='/etc/nixos', installed='/etc/cybexos/software.json', so
     from .engine import config_digest
     config = Path(config).resolve()
     data, apps = shipped_catalogue(source)
-    attributes = sorted({app['attribute'] for app in apps})
+    roles = shipped_roles(data)
+    attributes = sorted({app['attribute'] for app in apps} | {option['attribute'] for role in roles
+                                                              for option in role['options'] if option.get('attribute')})
     before = config_digest(config)
     identity = hashlib.sha256((before + '\0' + '\0'.join(attributes)).encode()).hexdigest()
     cache = cache_directory(cache)
@@ -233,11 +254,17 @@ def catalogue(*, config='/etc/nixos', installed='/etc/cybexos/software.json', so
             'selected': app['attribute'] in selected,
             'desired': app['attribute'] in desired,
         })
+    # Whether an option can be installed here; installed or not is read from
+    # its desktop entry, which is what a default needs.
+    choices = [{'id': role['id'], 'options': [option | {
+        'unavailable': unavailable(index['packages'].get(option['attribute']), allow_unfree) if option.get('attribute') else '',
+        'version': (index['packages'].get(option['attribute']) or {}).get('version', '') if option.get('attribute') else ''}
+        for option in role['options']]} for role in roles]
     return {'schema': 1, 'identity': before, 'nixpkgs': data.get('nixpkgs', ''),
             'icons': str(Path(source) / 'icons'), 'allowUnfree': allow_unfree,
             'categories': data['categories'], 'profiles': data['profiles'],
             'featured': [name for name in data['featured'] if isinstance(name, str)],
-            'apps': merged, 'packages': rows,
+            'apps': merged, 'packages': rows, 'roles': choices,
             'selected': current['selected'], 'desired': current['desired'],
             'configurationChanged': current['configurationChanged']}
 

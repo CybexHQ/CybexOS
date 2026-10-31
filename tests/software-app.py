@@ -224,6 +224,12 @@ elif args[:1] == ['update']:
         state.update(state='awaiting-boot', phase='Activation passed. Reboot when ready.')
         fixture['catalogue'] = 'catalogue-after.json'
         (root / 'fixture.json').write_text(json.dumps(fixture))
+        # The applied change's apps now have desktop entries (scripted cybexos-apps).
+        staged = (state.get('software') or {}).get('packages', [])
+        entries = root / 'installed-desktops.json'
+        have = json.loads(entries.read_text()) if entries.exists() else []
+        mapping = fixture.get('desktopsByAttribute', {})
+        entries.write_text(json.dumps(have + [mapping[name] for name in staged if name in mapping]))
         (root / 'request.json').write_text(json.dumps({'state': 'done', 'createdAt': time.time()}))
     elif args[1] == 'discard':
         state = {'state': 'idle', 'automatic': state.get('automatic', {})}
@@ -253,6 +259,84 @@ FLATHUB_APPS = {'org.mozilla.thunderbird': {
     'brand': {}, 'homepage': 'https://www.thunderbird.net/', 'version': '159.0', 'verified': True,
     'downloadBytes': 126212325, 'installedBytes': 343719424, 'runtime': 'Freedesktop Platform version 25.08',
     'permissions': ['files-home', 'devices', 'network'], 'eol': False, 'supported': True, 'unavailable': ''}}
+
+# cybexos-apps over a scripted account: which apps are here (Software's own
+# fixtures, Flathub's installed apps and an applied change's), each job's
+# choice, Cybex OS's pick, and a choice waiting for its app.
+APPS = r'''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+root = Path(os.environ['XDG_RUNTIME_DIR'])
+path = root / 'apps.json'
+state = json.loads(path.read_text())
+args = sys.argv[1:]
+with (root / 'apps-calls.jsonl').open('a') as stream:
+    stream.write(json.dumps(args) + '\n')
+def installed():
+    ids = set(state['installed'])
+    flathub = root / 'flathub.json'
+    if flathub.exists():
+        ids |= {row['id'] + '.desktop' for row in json.loads(flathub.read_text())['installed']}
+    entries = root / 'installed-desktops.json'
+    if entries.exists():
+        ids |= set(json.loads(entries.read_text()))
+    return ids
+def status(settled=()):
+    here, roles = installed(), {}
+    for role, value in state['roles'].items():
+        roles[role] = {'selected': value['effective'], 'effective': value['effective'], 'system': value['system'],
+                       'personal': value['personal'], 'pending': value['pending'], 'unavailable': False,
+                       'choices': [{'value': ident, 'label': state['labels'].get(ident, ident)}
+                                   for ident in state['compatible'][role] if ident in here]}
+    return {'roles': roles, 'settled': list(settled)}
+def save():
+    path.write_text(json.dumps(state))
+action = args[0] if args else ''
+if action == 'status':
+    settled = []
+    for role, value in state['roles'].items():
+        if value['pending'] and value['pending'] in installed():
+            value.update(effective=value['pending'], personal=True, pending='')
+            settled.append(role)
+    save()
+    print(json.dumps(status(settled)))
+elif action == 'effective-defaults':
+    print(json.dumps({role: state['roles'][role]['effective'] for role in ('browser', 'terminal', 'files')}))
+elif action == 'set':
+    value = state['roles'][args[1]]
+    if args[2] in installed():
+        value.update(effective=args[2], personal=True, pending='')
+    elif '--when-installed' in args:
+        value['pending'] = args[2]
+    else:
+        print(json.dumps({'error': 'Choose an installed application that supports this use.'}), file=sys.stderr)
+        sys.exit(1)
+    save()
+    print(json.dumps(status()))
+elif action in ('reset', 'cancel'):
+    value = state['roles'][args[1]]
+    value.update(pending='') if action == 'cancel' else value.update(effective=value['system'], personal=False, pending='')
+    save()
+    print(json.dumps(status()))
+'''
+
+CYBEX_PICKS = {'browser': 'brave-browser.desktop', 'terminal': 'kitty.desktop', 'editor': 'org.gnome.TextEditor.desktop',
+               'files': 'org.gnome.Nautilus.desktop', 'mail': '', 'music': 'mpv.desktop', 'video': 'mpv.desktop',
+               'pdf': 'org.gnome.Evince.desktop', 'image': 'imv.desktop'}
+ACCOUNT = {
+    'roles': {role: {'effective': pick, 'system': pick, 'personal': False, 'pending': ''} for role, pick in CYBEX_PICKS.items()},
+    'installed': [pick for pick in CYBEX_PICKS.values() if pick] + ['firefox.desktop', 'nvim.desktop',
+                  'cybexos-mail-gmail.desktop', 'cybexos-mail-outlook.desktop', 'org.gnome.Epiphany.desktop'],
+    'compatible': {'browser': ['brave-browser.desktop', 'firefox.desktop', 'org.gnome.Epiphany.desktop'],
+                   'terminal': ['kitty.desktop', 'com.mitchellh.ghostty.desktop'],
+                   'editor': ['org.gnome.TextEditor.desktop', 'nvim.desktop'], 'files': ['org.gnome.Nautilus.desktop'],
+                   'mail': ['cybexos-mail-gmail.desktop', 'cybexos-mail-outlook.desktop', 'org.mozilla.Thunderbird.desktop'],
+                   'music': ['mpv.desktop'], 'video': ['mpv.desktop'], 'pdf': ['org.gnome.Evince.desktop'], 'image': []},
+    'labels': {'brave-browser.desktop': 'Brave', 'firefox.desktop': 'Firefox', 'org.gnome.Epiphany.desktop': 'Web',
+               'kitty.desktop': 'kitty', 'com.mitchellh.ghostty.desktop': 'Ghostty', 'org.gnome.TextEditor.desktop': 'Text Editor',
+               'nvim.desktop': 'Neovim', 'org.gnome.Nautilus.desktop': 'Files', 'cybexos-mail-gmail.desktop': 'Gmail',
+               'cybexos-mail-outlook.desktop': 'Outlook', 'org.mozilla.Thunderbird.desktop': 'Thunderbird',
+               'mpv.desktop': 'mpv Media Player', 'org.gnome.Evince.desktop': 'Document Viewer'}}
 
 LAUNCHED = r'''#!/usr/bin/env python3
 import json, os, sys
@@ -292,6 +376,14 @@ IPC = '''
         const item = shell.softwareItem(name);
         return item ? String(item.text) : null;
     }
+    function softwareTexts(name) {
+        const result = [];
+        for (let index = 0; ; index++) {
+            const item = shell.softwareItem(name, index);
+            if (!item) return result;
+            result.push(String(item.text));
+        }
+    }
     IpcHandler {
         target: "software-test"
         function refresh(): void { Updates.refreshStatus(); Updates.check(); }
@@ -302,6 +394,12 @@ IPC = '''
         function flathub(id: string): void { Software.openFlathub(id, null); }
         function flathubRefresh(): void { Software.refreshFlathub(); }
         function back(): void { Software.back(); }
+        function picker(role: string): void { Software.openPicker(role); }
+        function choose(option: string): void {
+            const picker = shell.softwareItem("softwareDefaultPicker");
+            if (picker) picker.pick(option);
+        }
+        function resetDefaults(): void { Software.resetDefaults(); }
         function search(text: string): void { Software.search(text); }
         function press(name: string, index: int): string {
             const item = shell.softwareItem(name, index);
@@ -355,7 +453,17 @@ IPC = '''
                     flathubResults: shell.softwareCount(root, "softwareFlathubResult"),
                     flathubPermissions: shell.softwareCount(root, "softwareFlathubPermission"),
                     installedFlathub: shell.softwareCount(root, "softwareInstalledFlathub"),
-                    flathubUpdateRows: shell.softwareCount(root, "softwareFlathubUpdateRow")}});
+                    flathubUpdateRows: shell.softwareCount(root, "softwareFlathubUpdateRow"),
+                    defaultCards: shell.softwareCount(root, "softwareDefaultCard"),
+                    defaultOptions: shell.softwareCount(root, "softwareDefaultOption"),
+                    appDefault: shell.softwareCount(root, "softwareAppDefault")},
+                defaults: shell.softwareTexts("softwareDefaultName"), defaultStatus: shell.softwareTexts("softwareDefaultStatus"),
+                picker: Software.picker, pickerTitle: shell.softwareText("softwareDefaultPickerTitle"),
+                pickerNote: shell.softwareText("softwareDefaultPickerNote"), options: shell.softwareTexts("softwareDefaultOptionName"),
+                use: shell.softwareItem("softwareDefaultUse") ? {text: shell.softwareItem("softwareDefaultUse").text,
+                    enabled: shell.softwareItem("softwareDefaultUse").enabled} : null,
+                toast: shell.softwareText("softwareDefaultsToastTitle"), roleKeys: Object.keys(DefaultApplications.roles).length,
+                defaultsBusy: DefaultApplications.busy});
         }
     }
 '''
@@ -449,7 +557,7 @@ def main():
         session = Session(base, native / 'qml')
         session.env.update(CYBEXOS_WELCOME='0', CYBEXOS_ASSISTANT='0')
         for name, body in (('cybex', FAKE), ('systemctl', updates.SYSTEMCTL.replace('REAL', repr(shutil.which('systemctl')))),
-                           ('fake-gimp', LAUNCHED), ('flatpak', LAUNCHED)):
+                           ('fake-gimp', LAUNCHED), ('flatpak', LAUNCHED), ('cybexos-apps', APPS)):
             (base / 'bin' / name).write_text(body)
             (base / 'bin' / name).chmod(0o700)
         applications = session.home / '.local/share/applications'
@@ -461,6 +569,7 @@ def main():
         after = merged(base / 'fixture-after', ['gimp', 'hello'])
         (session.runtime / 'catalogue.json').write_text(json.dumps(before))
         (session.runtime / 'catalogue-after.json').write_text(json.dumps(after))
+        (session.runtime / 'apps.json').write_text(json.dumps(ACCOUNT))
         assert {app['id']: app['owner'] for app in before['apps'] if app['installed']} == \
             {'firefox': 'cybexos', 'libreoffice': 'cybexos', 'pinta': 'cybexos', 'inkscape': 'cybexos',
              'mpv': 'cybexos', 'localsend': 'cybexos', 'obs': 'personal'}, before['apps']
@@ -471,6 +580,7 @@ def main():
                                   'krita': {'state': 'prebuilt', 'downloadBytes': 400748336},
                                   'hello': {'state': 'prebuilt', 'downloadBytes': 56000}},
                         flathubSearch=FLATHUB_SEARCH, flathubApps=FLATHUB_APPS,
+                        desktopsByAttribute={'ghostty': 'com.mitchellh.ghostty.desktop'},
                         search=[{'attribute': 'hello', 'name': 'hello', 'version': '2.12.2',
                                  'description': 'A program that produces a familiar, friendly greeting'},
                                 {'attribute': 'gimp', 'name': 'gimp', 'version': '3.0.6', 'description': 'GNU Image Manipulation Program'},
@@ -492,6 +602,10 @@ def main():
             session.start_shell('qs-first.log')
             state = session.state
             wait = session.wait
+
+            def apps_calls():
+                path = session.runtime / 'apps-calls.jsonl'
+                return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
             # ---- Explore ---------------------------------------------------
             session.call('software', 'open')
@@ -717,6 +831,83 @@ def main():
             wait(lambda: state().get('appName') == 'GIMP', 'GIMP page')
             assert not state().get('appFlathub'), 'an installable app is not sent elsewhere'
 
+            # ---- default apps ---------------------------------------------
+            session.status(state='idle')
+            session.fixture(verdicts={'ghostty': {'state': 'prebuilt', 'downloadBytes': 17610075}})
+            session.call('software-test', 'tab', 'explore')
+            session.call('software-test', 'scrollTo', 'softwareExplorePage', '0')
+            wait(lambda: state()['counts']['defaultCards'] == 9 and state().get('roleKeys') == 9
+                 and not state().get('defaultsBusy'), 'nine jobs on Software\'s home')
+            current = state()
+            assert current['defaults'][:5] == ['Brave', 'Kitty', 'Text Editor', 'Files', 'Choose an app'], current['defaults']
+            assert current['defaultStatus'][0] == 'Cybex pick' and current['defaultStatus'][4] == 'Nothing set yet', current
+            session.themed(shots, 'software-defaults')
+            # An installed app takes over at once, with Undo.
+            session.call('software-test', 'picker', 'browser')
+            wait(lambda: state().get('pickerTitle') == 'Choose your web browser' and 'Firefox' in state().get('options', []), 'browser picker')
+            current = state()
+            assert current['use'] == {'text': 'In use', 'enabled': False}, current
+            assert current['options'][:2] == ['Brave', 'Firefox'] and 'Web' in current['options'], current['options']
+            session.themed(shots, 'software-defaults-picker')
+            session.call('software-test', 'choose', 'librewolf')
+            wait(lambda: (state().get('pickerNote') or '').startswith('Installs LibreWolf (≈ 129 MB, prebuilt by NixOS)'), 'what installing does')
+            session.call('software-test', 'choose', 'firefox')
+            wait(lambda: state().get('use') == {'text': 'Use Firefox', 'enabled': True}, 'Use Firefox')
+            assert state()['pickerNote'].startswith('Switches to Firefox right away. Brave stays installed'), state()['pickerNote']
+            assert session.press('softwareDefaultUse')
+            wait(lambda: state().get('toast') == 'Firefox is now your web browser' and state()['defaults'][0] == 'Firefox'
+                 and state()['defaultStatus'][0] == 'Your choice', 'Firefox took over')
+            assert state()['picker'] == '', state()
+            session.shot(shots, 'software-defaults-switched-dark.png')
+            assert session.press('softwareDefaultsUndo')
+            wait(lambda: state()['defaults'][0] == 'Brave' and state()['defaultStatus'][0] == 'Cybex pick', 'undone')
+            # One NixOS has: installed through the install list, then the default.
+            session.call('software-test', 'picker', 'terminal')
+            wait(lambda: state().get('pickerTitle') == 'Choose your terminal', 'terminal picker')
+            assert state()['options'][:4] == ['Kitty', 'Ghostty', 'Alacritty', 'foot'], state()['options']
+            session.call('software-test', 'choose', 'ghostty')
+            wait(lambda: state().get('use') == {'text': 'Install and use', 'enabled': True}, 'Install and use')
+            session.shot(shots, 'software-defaults-terminal-dark.png')
+            assert session.press('softwareDefaultUse')
+            wait(lambda: state().get('phase') == 'preparing' and state()['defaults'][1] == 'Ghostty'
+                 and state()['defaultStatus'][1] == 'Downloading · 42%', 'Ghostty installing')
+            assert ['set', 'terminal', 'com.mitchellh.ghostty.desktop', '--when-installed'] in apps_calls(), apps_calls()
+            stage = next(call for call in reversed(session.calls()) if call[:2] == ['software', 'stage'])
+            assert 'ghostty' in set(stage[2]['packages']) - set(stage[2]['previous']), stage
+            session.themed(shots, 'software-defaults-installing')
+            session.status(state='ready', changeKind='software', requestId='c' * 32, transaction='a' * 32,
+                           reviewToken='b' * 64, changes='ghostty: ∅ → 1.3.1', packageChanges=[], software=stage[2],
+                           phase='Built and checked; review changes before applying')
+            wait(lambda: state().get('phase') == 'ready' and state()['defaultStatus'][1] == 'Ready · finish below', 'ready')
+            assert session.press('softwareQueuePrimary')
+            wait(lambda: state().get('toast') == 'Ghostty is now your terminal' and state()['defaultStatus'][1] == 'Your choice',
+                 'Ghostty took over once installed', timeout=40)
+            session.shot(shots, 'software-defaults-installed-dark.png')
+            assert session.press('softwareQueueDismiss')
+            session.status(state='idle')
+            # One only Flathub has: installed for the account, then the default.
+            session.call('software-test', 'picker', 'mail')
+            wait(lambda: state().get('pickerTitle') == 'Choose your email app', 'email picker')
+            session.call('software-test', 'choose', 'thunderbird')
+            wait(lambda: (state().get('pickerNote') or '').startswith('Installs Thunderbird from Flathub for your account only'), 'Flathub note')
+            assert session.press('softwareDefaultUse')
+            wait(lambda: state()['defaults'][4] == 'Thunderbird' and state()['defaultStatus'][4] == 'Your choice'
+                 and state().get('toast') == 'Thunderbird is now your email app', 'Thunderbird from Flathub', timeout=20)
+            install = next(call for call in reversed(session.calls()) if call[:3] == ['software', 'flathub', 'install'])
+            assert install[-1] == 'org.mozilla.Thunderbird', install
+            # Back to Cybex OS's picks: every job this account chose.
+            session.call('software-test', 'resetDefaults')
+            wait(lambda: state().get('toast') == "Back to Cybex OS's picks" and state()['defaults'][1] == 'Kitty'
+                 and state()['defaults'][4] == 'Choose an app', 'reset to Cybex picks')
+            assert {tuple(call) for call in apps_calls() if call[0] == 'reset'} >= {('reset', 'terminal'), ('reset', 'mail')}
+            # An app's own page offers the same switch.
+            session.call('software-test', 'app', 'firefox')
+            wait(lambda: state().get('appName') == 'Firefox' and state()['counts']['appDefault'] == 1, 'Firefox offers to take over')
+            session.shot(shots, 'software-defaults-app-dark.png')
+            assert session.press('softwareAppDefaultAction')
+            wait(lambda: state().get('toast') == 'Firefox is now your web browser', 'Firefox from its page')
+            session.call('software-test', 'back')
+
             # Escape from a tab root closes the window.
             session.call('software-test', 'tab', 'explore')
             session.key('-k', 'Escape')
@@ -735,7 +926,9 @@ def main():
                   'keyboard back/search/close, cancelled authorization, another change blocking, queue → check → stage → '
                   'progress → ready → install → open, Installed groups and removal blocked by a pending restart, '
                   'Updates with a prepared update and up to date, a worker failure, and Flathub: search, an app page '
-                  'with its sandbox, install → open, Installed and a confirmed removal, updates, and the offer on a blocked app')
+                  'with its sandbox, install → open, Installed and a confirmed removal, updates, and the offer on a blocked app; '
+                  'default apps: an installed one at once with Undo, one installed from NixOS then used, one from Flathub, '
+                  'back to Cybex OS\'s picks, and the switch from an app\'s page')
         except BaseException:
             for log in session.logs:
                 if log.exists():

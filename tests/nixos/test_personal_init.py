@@ -55,6 +55,35 @@ class PersonalInitTests(unittest.TestCase):
         self.assertEqual(preference.read_text(), 'personal preference\n')
         self.assertEqual((skill / 'SKILL.md').read_text(), 'User-authored skill\n')
 
+    def test_terminals_follow_the_theme_and_personal_settings_win(self):
+        self.seed(False)
+        ghostty = (self.home / '.config/ghostty/config').read_text().splitlines()
+        self.assertEqual([line for line in ghostty if not line.startswith('#')],
+                         [f'config-file = {self.defaults_fixture}/ghostty.conf',
+                          'config-file = ?~/.local/state/cybexos/theme/ghostty.conf',
+                          'config-file = ?~/.config/ghostty/personal.conf'],
+                         'Ghostty loads them in order: personal settings last')
+        self.assertIn(f'import = ["{self.defaults_fixture}/alacritty.toml"]',
+                      (self.home / '.config/alacritty/alacritty.toml').read_text())
+        self.assertTrue((self.home / '.config/foot/foot.ini').read_text().startswith(f'include={self.defaults_fixture}/foot.ini\n'))
+        theme = self.home / '.local/state/cybexos/theme/foot.ini'
+        self.assertTrue(theme.read_text().startswith('#'), 'foot refuses a missing include')
+        theme.write_text('[colors-dark]\nbackground=000000\n')
+        self.seed(False)
+        self.assertEqual(theme.read_text(), '[colors-dark]\nbackground=000000\n', 'the theme file is the shell\'s')
+
+    def test_terminal_configurations_people_already_have_are_kept(self):
+        own = self.home / '.config/ghostty/config.ghostty'
+        own.parent.mkdir(parents=True)
+        own.write_text('theme = personal\n')
+        legacy = self.home / '.config/alacritty/alacritty.yml'
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text('font: {}\n')
+        self.seed(False)
+        self.assertFalse((self.home / '.config/ghostty/config').exists())
+        self.assertFalse((self.home / '.config/alacritty/alacritty.toml').exists())
+        self.assertEqual(own.read_text(), 'theme = personal\n')
+
     def test_no_ssh_agent_integration_without_proprietary_choice(self):
         self.seed(False)
         self.assertFalse((self.home / '.ssh/config').exists())

@@ -9,6 +9,11 @@ AppRow AppRow.qml
 CategoryPage CategoryPage.qml
 CategoryTile CategoryTile.qml
 CollectionCard CollectionCard.qml
+DefaultCard DefaultCard.qml
+DefaultOption DefaultOption.qml
+DefaultPicker DefaultPicker.qml
+DefaultsSection DefaultsSection.qml
+DefaultsToast DefaultsToast.qml
 ExplorePage ExplorePage.qml
 FactRow FactRow.qml
 FlathubAction FlathubAction.qml
@@ -25,6 +30,7 @@ PackageRow PackageRow.qml
 PageScroll PageScroll.qml
 PickCard PickCard.qml
 QueueBar QueueBar.qml
+RoleIcon RoleIcon.qml
 ScreenshotTile ScreenshotTile.qml
 ScreenshotViewer ScreenshotViewer.qml
 SearchPage SearchPage.qml

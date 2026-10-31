@@ -266,7 +266,7 @@
     "blender",
     "scribus"
    ],
-   "downloadBytes": 1686629863
+   "downloadBytes": 1685933429
   },
   {
    "id": "media",
@@ -283,7 +283,7 @@
     "shotcut",
     "handbrake"
    ],
-   "downloadBytes": 644793377
+   "downloadBytes": 644071362
   },
   {
    "id": "gaming",
@@ -315,7 +315,7 @@
     "heroic",
     "prismlauncher"
    ],
-   "downloadBytes": 564822236
+   "downloadBytes": 560817471
   },
   {
    "id": "chat",
@@ -367,7 +367,7 @@
     "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-3_1248x681@1.png",
     "https://dl.flathub.org/media/org/gimp/GIMP/95e6d7d59d33a0f9364535dbe023d807/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 60529,
+   "installs": 60248,
    "brand": {
     "light": "#f4e4cb",
     "dark": "#293a56"
@@ -401,7 +401,7 @@
     "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/kde/krita/1348962dcc0842250c4ce6876acc36cc/screenshots/image-4_1248x677@1.png"
    ],
-   "installs": 35335,
+   "installs": 35083,
    "brand": {},
    "desktopIds": [
     "krita_brush.desktop",
@@ -429,7 +429,7 @@
     "krita_webp.desktop",
     "org.kde.krita.desktop"
    ],
-   "downloadBytes": 406895130
+   "downloadBytes": 406198696
   },
   {
    "id": "inkscape",
@@ -454,7 +454,7 @@
     "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-3_1248x764@1.png",
     "https://dl.flathub.org/media/org/inkscape/Inkscape/d06b79da7ad6df73032683fbcf8c4d56/screenshots/image-4_1248x763@1.png"
    ],
-   "installs": 21996,
+   "installs": 21962,
    "brand": {},
    "desktopIds": [
     "org.inkscape.Inkscape.desktop"
@@ -484,7 +484,7 @@
     "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/darktable/Darktable/1b5cfd7af8bcd84fc939759726f1ba7d/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 247670,
+   "installs": 246944,
    "brand": {},
    "desktopIds": [
     "org.darktable.darktable.desktop"
@@ -513,7 +513,7 @@
     "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/blender/Blender/c6b07403115901571923d99f1b725b0e/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 23984,
+   "installs": 23972,
    "brand": {
     "light": "#5ab3f6",
     "dark": "#265787"
@@ -521,7 +521,7 @@
    "desktopIds": [
     "blender.desktop"
    ],
-   "downloadBytes": 1030900128
+   "downloadBytes": 1030203694
   },
   {
    "id": "scribus",
@@ -543,7 +543,7 @@
     "https://dl.flathub.org/media/net/scribus/Scribus/48ad39685c76efc094f785ce90f3743e/screenshots/image-1_752x532@1.png",
     "https://dl.flathub.org/media/net/scribus/Scribus/48ad39685c76efc094f785ce90f3743e/screenshots/image-2_752x527@1.png"
    ],
-   "installs": 3819,
+   "installs": 3789,
    "brand": {},
    "desktopIds": [
     "scribus.desktop"
@@ -568,7 +568,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/github/PintaProject.Pinta/6036b596f8f5a6ce7c2dc8a7d9c0565f/screenshots/image-1_1248x804@1.png"
    ],
-   "installs": 16201,
+   "installs": 16429,
    "brand": {},
    "desktopIds": [
     "com.github.PintaProject.Pinta.desktop"
@@ -598,7 +598,7 @@
     "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/com/rawtherapee/RawTherapee/1690c20ece4741e6dcb2ed7346d3747e/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 2291,
+   "installs": 2296,
    "brand": {},
    "desktopIds": [
     "rawtherapee.desktop"
@@ -628,12 +628,12 @@
     "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-3_1248x766@1.png",
     "https://dl.flathub.org/media/org/freecad/FreeCAD/147bb7390e51b88c0e4e7c461019b230/screenshots/image-4_1248x767@1.png"
    ],
-   "installs": 31824,
+   "installs": 31642,
    "brand": {},
    "desktopIds": [
     "org.freecad.FreeCAD.desktop"
    ],
-   "downloadBytes": 1074783423
+   "downloadBytes": 1074086989
   },
   {
    "id": "mypaint",
@@ -654,7 +654,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/mypaint/MyPaint/7ae5ec387d1933b7b5e5ede0c53a9d32/screenshots/image-1_1248x702@1.png"
    ],
-   "installs": 1485,
+   "installs": 1498,
    "brand": {},
    "desktopIds": [
     "mypaint.desktop"
@@ -693,7 +693,7 @@
     "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-3_752x477@1.png",
     "https://dl.flathub.org/media/org/synfig/SynfigStudio/04b93a93fa24d0ecfdb489070af5bcfa/screenshots/image-4_752x515@1.png"
    ],
-   "installs": 928,
+   "installs": 940,
    "brand": {
     "light": "#fafafa",
     "dark": "#023b5f"
@@ -723,7 +723,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/fontforge/FontForge/2b9c2c6e74e1ae49618cc67bd81d693c/screenshots/image-1_752x423@1.png"
    ],
-   "installs": 596,
+   "installs": 599,
    "brand": {},
    "desktopIds": [
     "org.fontforge.FontForge.desktop"
@@ -750,7 +750,7 @@
     "https://dl.flathub.org/media/com/github/huluti.Curtail/577552f7e8f21037288d25d01dfd857f/screenshots/image-1_752x598@1.png",
     "https://dl.flathub.org/media/com/github/huluti.Curtail/577552f7e8f21037288d25d01dfd857f/screenshots/image-2_752x688@1.png"
    ],
-   "installs": 2479,
+   "installs": 2478,
    "brand": {
     "light": "#f66151",
     "dark": "#a51d2d"
@@ -781,12 +781,12 @@
     "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-3_1248x780@1.png",
     "https://dl.flathub.org/media/org/upscayl/Upscayl/d407ddb4cb2ce379a1a84198fbe10b16/screenshots/image-4_1248x780@1.png"
    ],
-   "installs": 8631,
+   "installs": 8558,
    "brand": {},
    "desktopIds": [
     "upscayl.desktop"
    ],
-   "downloadBytes": 322606851
+   "downloadBytes": 298775893
   },
   {
    "id": "penpot",
@@ -813,7 +813,7 @@
     "https://dl.flathub.org/media/com/authormore/penpotdesktop/a68b3bf181b38a781f54dd355a0c5214/screenshots/image-1_1248x809@1.png",
     "https://dl.flathub.org/media/com/authormore/penpotdesktop/a68b3bf181b38a781f54dd355a0c5214/screenshots/image-2_1248x809@1.png"
    ],
-   "installs": 1209,
+   "installs": 1203,
    "brand": {
     "light": "#dde3e9",
     "dark": "#34393c"
@@ -840,12 +840,12 @@
    "developer": "The Document Foundation",
    "license": "MPL-2.0",
    "screenshots": [
-    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-1_1248x873@1.png",
-    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-2_1248x724@1.png",
-    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-3_1248x906@1.png",
-    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/6a06e0ec2876ffc989b0e2a1340d3331/screenshots/image-4_1248x826@1.png"
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/9370129a4d8977ebb5548950a58df1b1/screenshots/image-1_1248x873@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/9370129a4d8977ebb5548950a58df1b1/screenshots/image-2_1248x724@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/9370129a4d8977ebb5548950a58df1b1/screenshots/image-3_1248x906@1.png",
+    "https://dl.flathub.org/media/org/libreoffice/LibreOffice/9370129a4d8977ebb5548950a58df1b1/screenshots/image-4_1248x826@1.png"
    ],
-   "installs": 59578,
+   "installs": 59674,
    "brand": {},
    "desktopIds": [
     "base.desktop",
@@ -884,12 +884,12 @@
     "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-3_1248x873@1.png",
     "https://dl.flathub.org/media/org/onlyoffice/desktopeditors/05940ed2ec8bd1b907711688f3f9d066/screenshots/image-4_1248x873@1.png"
    ],
-   "installs": 88326,
+   "installs": 87947,
    "brand": {},
    "desktopIds": [
     "onlyoffice-desktopeditors.desktop"
    ],
-   "downloadBytes": 619551494
+   "downloadBytes": 615643067
   },
   {
    "id": "obsidian",
@@ -917,7 +917,7 @@
     "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-3_1248x873@1.png",
     "https://dl.flathub.org/media/md/obsidian/Obsidian/7eeae89d1ebcc6ff853f8135b2a6a138/screenshots/image-4_1248x835@1.png"
    ],
-   "installs": 73292,
+   "installs": 72915,
    "brand": {},
    "desktopIds": [
     "md.obsidian.Obsidian.desktop"
@@ -947,7 +947,7 @@
     "https://dl.flathub.org/media/net/cozic/joplin_desktop/0400efd10f68aa1b55f521ff7c205f74/screenshots/image-2_1248x1008@1.png",
     "https://dl.flathub.org/media/net/cozic/joplin_desktop/0400efd10f68aa1b55f521ff7c205f74/screenshots/image-3_1248x972@1.png"
    ],
-   "installs": 10172,
+   "installs": 10084,
    "brand": {},
    "desktopIds": [
     "appimagekit-joplin.desktop"
@@ -992,7 +992,7 @@
     "https://dl.flathub.org/media/com/github/xournalpp.xournalpp/f749561a6863b04f4890fe795ecb5183/screenshots/image-2_1248x657@1.png",
     "https://dl.flathub.org/media/com/github/xournalpp.xournalpp/f749561a6863b04f4890fe795ecb5183/screenshots/image-3_1248x657@1.png"
    ],
-   "installs": 10853,
+   "installs": 10713,
    "brand": {
     "light": "#77767b",
     "dark": "#241f31"
@@ -1025,7 +1025,7 @@
     "https://dl.flathub.org/media/org/kde/okular.desktop/0317c20dc29e75b2c16aa725cce48672/screenshots/image-1_752x531@1.png",
     "https://dl.flathub.org/media/org/kde/okular.desktop/0317c20dc29e75b2c16aa725cce48672/screenshots/image-2_752x531@1.png"
    ],
-   "installs": 15988,
+   "installs": 15935,
    "brand": {},
    "desktopIds": [
     "okularApplication_comicbook.desktop",
@@ -1077,7 +1077,7 @@
     "https://dl.flathub.org/media/org/gnucash/GnuCash/1a86a3cf1fcb0f8d45f915a88fa02491/screenshots/image-2_752x422@1.png",
     "https://dl.flathub.org/media/org/gnucash/GnuCash/1a86a3cf1fcb0f8d45f915a88fa02491/screenshots/image-3_752x422@1.png"
    ],
-   "installs": 1922,
+   "installs": 1904,
    "brand": {},
    "desktopIds": [
     "gnucash.desktop"
@@ -1122,7 +1122,7 @@
     "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-3_752x570@1.png",
     "https://dl.flathub.org/media/io/github/alainm23.planify/caab2d5959e999c8cfa39e9fac258229/screenshots/image-4_752x570@1.png"
    ],
-   "installs": 13420,
+   "installs": 13056,
    "brand": {
     "light": "#f9f06b",
     "dark": "#9141ac"
@@ -1158,7 +1158,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/io/github/mrvladus.List/606615ffeaf2bb74496a387c4fba2f57/screenshots/image-1_752x550@1.png"
    ],
-   "installs": 1959,
+   "installs": 1976,
    "brand": {
     "light": "#a9a9da",
     "dark": "#45457c"
@@ -1201,7 +1201,7 @@
     "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-3_1248x812@1.png",
     "https://dl.flathub.org/media/com/super_productivity/SuperProductivity/16fb0dd3179b44639aa922bcc46b8860/screenshots/image-4_1248x812@1.png"
    ],
-   "installs": 4910,
+   "installs": 4917,
    "brand": {
     "light": "#99c1f1",
     "dark": "#0d47a1"
@@ -1233,7 +1233,7 @@
     "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-3_1248x728@1.png",
     "https://dl.flathub.org/media/org/gnome/Evolution.desktop/085ce74968a216fb14514c81fed577de/screenshots/image-4_1248x724@1.png"
    ],
-   "installs": 6128,
+   "installs": 5968,
    "brand": {
     "light": "#d6dfd9",
     "dark": "#613583"
@@ -1264,12 +1264,12 @@
    "developer": "Zed Industries, Inc.",
    "license": "AGPL-3.0-or-later and Apache-2.0 and GPL-3.0-or-later",
    "screenshots": [
-    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-1_752x575@1.png",
-    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-2_752x575@1.png",
-    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-3_752x575@1.png",
-    "https://dl.flathub.org/media/dev/zed/Zed/0b0ab9b840c4ed292cbede255668d8ac/screenshots/image-4_752x575@1.png"
+    "https://dl.flathub.org/media/dev/zed/Zed/e8f5e55d803e02103a9c9ea427f6c672/screenshots/image-1_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/e8f5e55d803e02103a9c9ea427f6c672/screenshots/image-2_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/e8f5e55d803e02103a9c9ea427f6c672/screenshots/image-3_752x575@1.png",
+    "https://dl.flathub.org/media/dev/zed/Zed/e8f5e55d803e02103a9c9ea427f6c672/screenshots/image-4_752x575@1.png"
    ],
-   "installs": 10670,
+   "installs": 10731,
    "brand": {},
    "desktopIds": [
     "dev.zed.Zed.desktop"
@@ -1295,7 +1295,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/visualstudio/code/929ab57f09f2d5a5bc7cea0648c9a332/screenshots/image-1_1248x678@1.png"
    ],
-   "installs": 58470,
+   "installs": 58871,
    "brand": {},
    "desktopIds": [
     "com.visualstudio.code.desktop"
@@ -1324,7 +1324,7 @@
     "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-3_1248x798@1.png",
     "https://dl.flathub.org/media/com/vscodium/codium/3914e24c34d81b8def2d0e58deaefefd/screenshots/image-4_1248x840@1.png"
    ],
-   "installs": 24753,
+   "installs": 24802,
    "brand": {
     "light": "#e0ecfb",
     "dark": "#144d92"
@@ -1381,7 +1381,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/kde/kate.desktop/1b02a095b526381010dd92d6c64b1911/screenshots/image-1_1248x926@1.png"
    ],
-   "installs": 8263,
+   "installs": 8256,
    "brand": {
     "light": "#cdecfc",
     "dark": "#17529b"
@@ -1415,7 +1415,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/dev/neovide/neovide/5b731c50346bce7495824eed65971b11/screenshots/image-1_1248x785@1.png"
    ],
-   "installs": 468,
+   "installs": 461,
    "brand": {
     "light": "#79b242",
     "dark": "#4d8a3b"
@@ -1465,7 +1465,7 @@
     "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-3_1248x1025@1.png",
     "https://dl.flathub.org/media/org/gnome/Builder/18ce275bf2230a495c992e08b5fbf088/screenshots/image-4_1248x1025@1.png"
    ],
-   "installs": 2498,
+   "installs": 2525,
    "brand": {
     "light": "#ffa348",
     "dark": "#e66100"
@@ -1496,7 +1496,7 @@
     "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-3_1248x668@1.png",
     "https://dl.flathub.org/media/io/dbeaver/DBeaverCommunity/b20b0c992c3de3c47eb318c1f08ce0b1/screenshots/image-4_1248x669@1.png"
    ],
-   "installs": 14201,
+   "installs": 14149,
    "brand": {
     "light": "#6e98bf",
     "dark": "#324658"
@@ -1528,7 +1528,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/usebruno/Bruno/85e912642ffa669e17f176926c671c1d/screenshots/image-1_1248x793@1.png"
    ],
-   "installs": 5763,
+   "installs": 5761,
    "brand": {},
    "desktopIds": [
     "bruno.desktop"
@@ -1544,16 +1544,16 @@
    "free": false,
    "homepage": "https://www.getpostman.com",
    "name": "Postman",
-   "summary": "Platform for building and using APIs",
+   "summary": "API Development Environment",
    "description": [
-    "Postman is the complete toolchain for API developers, used by 5 million developers and more than 100,000 companies worldwide to access 130 million APIs every month. Postman makes working with APIs faster and easier by supporting developers at every stage of their workflow, and is available for macOS, Windows, Linux and Chrome users."
+    "Postman is an API platform for building and using APIs. Postman simplifies each step of the API lifecycle and streamlines collaboration so you can create better APIs -- faster. Over 30 million developers and 500,000 organizations use Postman, which is available for Mac OS X, Windows, Linux, and Chrome users."
    ],
    "developer": "Postman Inc.",
-   "license": "LicenseRef-proprietary",
+   "license": "LicenseRef-proprietary=https://www.postman.com/legal/terms",
    "screenshots": [
-    "https://dl.flathub.org/media/com/getpostman/Postman/c0cca027c0a0895212ba276b04b7714b/screenshots/image-1_1248x780@1.png"
+    "https://dl.flathub.org/media/com/getpostman/Postman/cf8d2e9cafc6ac63bafe5905f6256cb3/screenshots/image-1_1248x780@1.png"
    ],
-   "installs": 10384,
+   "installs": 10407,
    "brand": {},
    "desktopIds": [
     "com.getpostman.Postman.desktop"
@@ -1589,12 +1589,12 @@
    "screenshots": [
     "https://dl.flathub.org/media/rest/insomnia/Insomnia/022bfa713b450b74d4f42f9e453dc497/screenshots/image-1_1248x701@1.png"
    ],
-   "installs": 2208,
+   "installs": 2190,
    "brand": {},
    "desktopIds": [
     "insomnia.desktop"
    ],
-   "downloadBytes": 549215416
+   "downloadBytes": 525384458
   },
   {
    "id": "githubdesktop",
@@ -1621,7 +1621,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/io/github/shiftey.Desktop/8d98948ef8d3ac80c55f4ef46a38d2d9/screenshots/image-1_1248x898@1.png"
    ],
-   "installs": 11056,
+   "installs": 11191,
    "brand": {},
    "desktopIds": [
     "github-desktop.desktop"
@@ -1649,7 +1649,7 @@
     "https://dl.flathub.org/media/org/gnome/meld/8a8b4b0e10bf2716239ac1f332e36279/screenshots/image-2_752x488@1.png",
     "https://dl.flathub.org/media/org/gnome/meld/8a8b4b0e10bf2716239ac1f332e36279/screenshots/image-3_752x489@1.png"
    ],
-   "installs": 3046,
+   "installs": 3054,
    "brand": {},
    "desktopIds": [
     "org.gnome.Meld.desktop"
@@ -1678,7 +1678,7 @@
     "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-2_1248x769@1.png",
     "https://dl.flathub.org/media/org/wireshark/Wireshark/2deb35c6e11388c10636f712973a2e7b/screenshots/image-3_1248x676@1.png"
    ],
-   "installs": 4827,
+   "installs": 4780,
    "brand": {},
    "desktopIds": [
     "org.wireshark.Wireshark.desktop"
@@ -1720,7 +1720,7 @@
     "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-3_1248x832@1.png",
     "https://dl.flathub.org/media/io/podman_desktop/PodmanDesktop/0e874175db2eacf98c2c6a442bd66730/screenshots/image-4_1248x834@1.png"
    ],
-   "installs": 13252,
+   "installs": 13277,
    "brand": {},
    "desktopIds": [
     "podman-desktop.desktop"
@@ -1758,7 +1758,7 @@
     "https://dl.flathub.org/media/me/iepure/devtoolbox/640a058cc8ec23f49c5b63ac55b669d0/screenshots/image-2_752x550@1.png",
     "https://dl.flathub.org/media/me/iepure/devtoolbox/640a058cc8ec23f49c5b63ac55b669d0/screenshots/image-3_752x550@1.png"
    ],
-   "installs": 3659,
+   "installs": 3832,
    "brand": {
     "light": "#99c1f1",
     "dark": "#061d39"
@@ -1795,7 +1795,7 @@
     "https://dl.flathub.org/media/org/godotengine/Godot.desktop/7d0473583b3a7a60927f7e289669a20c/screenshots/image-1_1248x717@1.png",
     "https://dl.flathub.org/media/org/godotengine/Godot.desktop/7d0473583b3a7a60927f7e289669a20c/screenshots/image-2_1248x702@1.png"
    ],
-   "installs": 9612,
+   "installs": 9610,
    "brand": {
     "light": "#a5d7ff",
     "dark": "#2d3c67"
@@ -1842,7 +1842,7 @@
     "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-3_1248x873@1.png",
     "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/screenshots/image-4_1248x873@1.png"
    ],
-   "installs": 91685,
+   "installs": 91361,
    "brand": {
     "light": "#ac9aac",
     "dark": "#1c202c"
@@ -1850,7 +1850,7 @@
    "desktopIds": [
     "com.heroicgameslauncher.hgl.desktop"
    ],
-   "downloadBytes": 104446719
+   "downloadBytes": 100485198
   },
   {
    "id": "prismlauncher",
@@ -1884,12 +1884,12 @@
     "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_752x547@1.png",
     "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_752x494@1.png"
    ],
-   "installs": 85817,
+   "installs": 85499,
    "brand": {},
    "desktopIds": [
     "org.prismlauncher.PrismLauncher.desktop"
    ],
-   "downloadBytes": 460375517
+   "downloadBytes": 460332273
   },
   {
    "id": "retroarch",
@@ -1913,7 +1913,7 @@
     "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-3_752x563@1.png",
     "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/screenshots/image-4_752x470@1.png"
    ],
-   "installs": 64446,
+   "installs": 64345,
    "brand": {
     "light": "#cfd8dc",
     "dark": "#37474f"
@@ -1943,12 +1943,12 @@
     "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-2_752x572@1.png",
     "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/screenshots/image-4_752x683@1.png"
    ],
-   "installs": 57222,
+   "installs": 57158,
    "brand": {},
    "desktopIds": [
     "dolphin-emu.desktop"
    ],
-   "downloadBytes": 27383268
+   "downloadBytes": 27002054
   },
   {
    "id": "pcsx2",
@@ -1970,7 +1970,7 @@
     "https://dl.flathub.org/media/net/pcsx2/PCSX2/374d48f39b8b90c9f400fdfe2d0b0595/screenshots/image-1_1248x953@1.png",
     "https://dl.flathub.org/media/net/pcsx2/PCSX2/374d48f39b8b90c9f400fdfe2d0b0595/screenshots/image-2_1248x953@1.png"
    ],
-   "installs": 23602,
+   "installs": 23583,
    "brand": {
     "light": "#3584e4",
     "dark": "#241f31"
@@ -2002,7 +2002,7 @@
     "https://dl.flathub.org/media/net/supertuxkart/SuperTuxKart/ed6e8f73eecfb93757794648174bcf0e/screenshots/image-2_1248x702@1.png",
     "https://dl.flathub.org/media/net/supertuxkart/SuperTuxKart/ed6e8f73eecfb93757794648174bcf0e/screenshots/image-3_1248x702@1.png"
    ],
-   "installs": 7304,
+   "installs": 7334,
    "brand": {},
    "desktopIds": [
     "supertuxkart.desktop"
@@ -2030,7 +2030,7 @@
     "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/com/github/Anuken.Mindustry/2804e472bd74db522c749cfbd7c63315/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 1900,
+   "installs": 1926,
    "brand": {},
    "desktopIds": [
     "Mindustry.desktop"
@@ -2056,7 +2056,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/gnome/Chess/0714dad21a5aad8667d9ddc5df3d6f38/screenshots/image-1_752x614@1.png"
    ],
-   "installs": 3296,
+   "installs": 3319,
    "brand": {},
    "desktopIds": [
     "org.gnome.Chess.desktop"
@@ -2084,7 +2084,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/gnome/TwentyFortyEight/5a4a70b070010784c32fa1a14c07a39a/screenshots/image-1_752x813@1.png"
    ],
-   "installs": 759,
+   "installs": 751,
    "brand": {},
    "desktopIds": [
     "org.gnome.TwentyFortyEight.desktop"
@@ -2109,7 +2109,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/gnome/Aisleriot/df1127e0cceaf8fe12bf84fc1c96063c/screenshots/image-1_752x423@1.png"
    ],
-   "installs": 5040,
+   "installs": 5037,
    "brand": {},
    "desktopIds": [
     "sol.desktop"
@@ -2135,7 +2135,7 @@
     "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_1248x702@1.png",
     "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_1248x702@1.png"
    ],
-   "installs": 109654,
+   "installs": 109404,
    "brand": {},
    "desktopIds": [
     "vlc-openbd.desktop",
@@ -2167,7 +2167,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/io/mpv/Mpv/4021dec7d90c2c9591fef27ba6a04f5b/screenshots/image-1_752x473@1.png"
    ],
-   "installs": 10859,
+   "installs": 10935,
    "brand": {},
    "desktopIds": [
     "mpv.desktop",
@@ -2199,7 +2199,7 @@
     "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-2_752x423@1.png",
     "https://dl.flathub.org/media/io/github/celluloid_player.Celluloid/8168e3ac33b884791a9e011c7b12d24e/screenshots/image-3_752x423@1.png"
    ],
-   "installs": 6941,
+   "installs": 6977,
    "brand": {},
    "desktopIds": [
     "io.github.celluloid_player.Celluloid.desktop"
@@ -2227,7 +2227,7 @@
     "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 114552,
+   "installs": 114565,
    "brand": {},
    "desktopIds": [
     "com.spotify.Client.desktop"
@@ -2269,7 +2269,7 @@
     "https://dl.flathub.org/media/org/strawberrymusicplayer/strawberry/89842dfbeda78c0ef4513ed8c232bac3/screenshots/image-1_1248x726@1.png",
     "https://dl.flathub.org/media/org/strawberrymusicplayer/strawberry/89842dfbeda78c0ef4513ed8c232bac3/screenshots/image-2_1248x726@1.png"
    ],
-   "installs": 9509,
+   "installs": 9493,
    "brand": {},
    "desktopIds": [
     "org.strawberrymusicplayer.strawberry.desktop"
@@ -2302,7 +2302,7 @@
     "https://dl.flathub.org/media/de/haeckerfelix/Shortwave/57e51d0b06c9f8331965986ea910b4ed/screenshots/image-1_752x534@1.png",
     "https://dl.flathub.org/media/de/haeckerfelix/Shortwave/57e51d0b06c9f8331965986ea910b4ed/screenshots/image-2_752x534@1.png"
    ],
-   "installs": 19113,
+   "installs": 19046,
    "brand": {
     "light": "#fcd85e",
     "dark": "#865e3c"
@@ -2333,7 +2333,7 @@
     "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-3_1248x891@1.png",
     "https://dl.flathub.org/media/org/gnome/Podcasts/614b5e26298512096c4dd5a4ba6923c0/screenshots/image-4_1248x891@1.png"
    ],
-   "installs": 2435,
+   "installs": 2439,
    "brand": {
     "light": "#fb6969",
     "dark": "#7b1824"
@@ -2365,7 +2365,7 @@
     "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-3_752x527@1.png",
     "https://dl.flathub.org/media/io/freetubeapp/FreeTube/aa55a516bb9ede7b1eff56ada345d909/screenshots/image-4_752x527@1.png"
    ],
-   "installs": 37245,
+   "installs": 37095,
    "brand": {
     "light": "#f06a73",
     "dark": "#8b1e2d"
@@ -2402,9 +2402,9 @@
    "developer": "OBS Project",
    "license": "GPL-2.0-or-later",
    "screenshots": [
-    "https://dl.flathub.org/media/com/obsproject/Studio/d95756e227c3b10951a83e14e063c185/screenshots/image-1_752x526@1.png"
+    "https://dl.flathub.org/media/com/obsproject/Studio/eee0a1f453649164008dc9f0913dfe7e/screenshots/image-1_752x526@1.png"
    ],
-   "installs": 91752,
+   "installs": 91828,
    "brand": {},
    "desktopIds": [
     "com.obsproject.Studio.desktop"
@@ -2440,7 +2440,7 @@
     "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-3_1248x716@1.png",
     "https://dl.flathub.org/media/org/kde/kdenlive.desktop/ed746a0f36b42446cedf1605b1c4f0cb/screenshots/image-4_1248x734@1.png"
    ],
-   "installs": 39609,
+   "installs": 39403,
    "brand": {
     "light": "#CAE3FC",
     "dark": "#315C7F"
@@ -2448,7 +2448,7 @@
    "desktopIds": [
     "org.kde.kdenlive.desktop"
    ],
-   "downloadBytes": 297620774
+   "downloadBytes": 296924340
   },
   {
    "id": "shotcut",
@@ -2470,12 +2470,12 @@
     "https://dl.flathub.org/media/org/shotcut/Shotcut/6740996b9caf645b4d2d71211d68fd3f/screenshots/image-1_1248x770@1.png",
     "https://dl.flathub.org/media/org/shotcut/Shotcut/6740996b9caf645b4d2d71211d68fd3f/screenshots/image-3_752x629@1.png"
    ],
-   "installs": 16332,
+   "installs": 16176,
    "brand": {},
    "desktopIds": [
     "org.shotcut.Shotcut.desktop"
    ],
-   "downloadBytes": 107955996
+   "downloadBytes": 107930415
   },
   {
    "id": "handbrake",
@@ -2497,7 +2497,7 @@
    "developer": "HandBrake Team",
    "license": "GPL-2.0-only",
    "screenshots": [],
-   "installs": 24999,
+   "installs": 24922,
    "brand": {
     "light": "#87ceeb",
     "dark": "#205c8d"
@@ -2505,7 +2505,7 @@
    "desktopIds": [
     "fr.handbrake.ghb.desktop"
    ],
-   "downloadBytes": 154264408
+   "downloadBytes": 153567974
   },
   {
    "id": "losslesscut",
@@ -2525,12 +2525,12 @@
    "screenshots": [
     "https://dl.flathub.org/media/no/mifi/losslesscut/24400b33bf25ed472706fb8c50663d5e/screenshots/image-1_752x475@1.png"
    ],
-   "installs": 6929,
+   "installs": 6928,
    "brand": {},
    "desktopIds": [
     "losslesscut.desktop"
    ],
-   "downloadBytes": 230897243
+   "downloadBytes": 207066285
   },
   {
    "id": "audacity",
@@ -2558,12 +2558,12 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/audacityteam/Audacity/0ad4a24524b6c06220649dc83a08ae81/screenshots/image-1_752x473@1.png"
    ],
-   "installs": 20952,
+   "installs": 20846,
    "brand": {},
    "desktopIds": [
     "org.audacityteam.Audacity.desktop"
    ],
-   "downloadBytes": 39862273
+   "downloadBytes": 39481059
   },
   {
    "id": "ardour",
@@ -2585,12 +2585,12 @@
     "https://dl.flathub.org/media/org/ardour/Ardour/86d74e929c58446380c839eb12b20846/screenshots/image-1_1248x702@1.png",
     "https://dl.flathub.org/media/org/ardour/Ardour/86d74e929c58446380c839eb12b20846/screenshots/image-2_1248x702@1.png"
    ],
-   "installs": 5056,
+   "installs": 5023,
    "brand": {},
    "desktopIds": [
     "ardour9.desktop"
    ],
-   "downloadBytes": 36779765
+   "downloadBytes": 36398551
   },
   {
    "id": "lmms",
@@ -2610,12 +2610,12 @@
    "screenshots": [
     "https://dl.flathub.org/media/io/lmms/LMMS/6107ab24d0136ed99fbf3d732992e171/screenshots/image-1_orig.png"
    ],
-   "installs": 3536,
+   "installs": 3497,
    "brand": {},
    "desktopIds": [
     "lmms.desktop"
    ],
-   "downloadBytes": 75672241
+   "downloadBytes": 75291027
   },
   {
    "id": "easyeffects",
@@ -2641,7 +2641,7 @@
     "https://dl.flathub.org/media/com/github/wwmm.easyeffects.desktop/50fb3b40504f5faa5e94e44d27401d0d/screenshots/image-2_1248x782@1.png",
     "https://dl.flathub.org/media/com/github/wwmm.easyeffects.desktop/50fb3b40504f5faa5e94e44d27401d0d/screenshots/image-3_1248x782@1.png"
    ],
-   "installs": 30029,
+   "installs": 30019,
    "brand": {
     "light": "#1c71d8",
     "dark": "#004079"
@@ -2649,7 +2649,7 @@
    "desktopIds": [
     "com.github.wwmm.easyeffects.desktop"
    ],
-   "downloadBytes": 321976475
+   "downloadBytes": 321595261
   },
   {
    "id": "signal",
@@ -2671,7 +2671,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/signal/Signal/32b3cf3838234b30b8d28f854e4fb3b8/screenshots/image-1_752x458@1.png"
    ],
-   "installs": 26687,
+   "installs": 26781,
    "brand": {},
    "desktopIds": [
     "signal.desktop"
@@ -2705,7 +2705,7 @@
     "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-3_1248x780@1.png",
     "https://dl.flathub.org/media/org/telegram/desktop/3281b1f47174280285f7c4691dcc3667/screenshots/image-4_1248x780@1.png"
    ],
-   "installs": 92804,
+   "installs": 92344,
    "brand": {
     "light": "#edf0f2",
     "dark": "#2d363f"
@@ -2737,12 +2737,12 @@
     "Discord is written in Javascript, React, Elixir, and Rust. The desktop application uses the electron framework."
    ],
    "developer": "Discord Inc.",
-   "license": "LicenseRef-proprietary",
+   "license": "LicenseRef-proprietary=https://discord.com/terms",
    "screenshots": [
-    "https://dl.flathub.org/media/com/discordapp/Discord/0080992ea88490f6950b84fa4ae759a1/screenshots/image-1_1248x957@1.png",
-    "https://dl.flathub.org/media/com/discordapp/Discord/0080992ea88490f6950b84fa4ae759a1/screenshots/image-2_1248x957@1.png"
+    "https://dl.flathub.org/media/com/discordapp/Discord/34a49b5070ac91437d7f7b962e92686d/screenshots/image-1_1248x957@1.png",
+    "https://dl.flathub.org/media/com/discordapp/Discord/34a49b5070ac91437d7f7b962e92686d/screenshots/image-2_1248x957@1.png"
    ],
-   "installs": 172785,
+   "installs": 173315,
    "brand": {
     "light": "#a0aaf3",
     "dark": "#3831a8"
@@ -2772,7 +2772,7 @@
     "https://dl.flathub.org/media/dev/vencord/Vesktop/1295762b6142d0f41c4a334f40945860/screenshots/image-1_1248x842@1.png",
     "https://dl.flathub.org/media/dev/vencord/Vesktop/1295762b6142d0f41c4a334f40945860/screenshots/image-2_1248x842@1.png"
    ],
-   "installs": 34651,
+   "installs": 34797,
    "brand": {
     "light": "#f5edca",
     "dark": "#282828"
@@ -2808,7 +2808,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/im/riot/Riot/2c7c157fb4b4fe0c57e84ec63e19f082/screenshots/image-1_1248x679@1.png"
    ],
-   "installs": 8095,
+   "installs": 8269,
    "brand": {
     "light": "#71d7ae",
     "dark": "#004832"
@@ -2843,7 +2843,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/gnome/Fractal/19ef4d8b6cd6656e77b056a7ee55bc53/screenshots/image-1_752x557@1.png"
    ],
-   "installs": 1674,
+   "installs": 1702,
    "brand": {
     "light": "#bdfbff",
     "dark": "#1a5fb4"
@@ -2871,7 +2871,7 @@
    "developer": "Dino Development Team",
    "license": "GPL-3.0+",
    "screenshots": [],
-   "installs": 842,
+   "installs": 851,
    "brand": {
     "light": "#B2DFDB",
     "dark": "#004D40"
@@ -2897,12 +2897,12 @@
     "Scientifically proven (or at least rumored) to make your working life simpler, more pleasant, and more productive. We hope you’ll give Slack a try."
    ],
    "developer": "Slack Technologies Inc.",
-   "license": "LicenseRef-proprietary",
+   "license": "LicenseRef-proprietary=https://slack.com/terms-of-service/user",
    "screenshots": [
-    "https://dl.flathub.org/media/com/slack/Slack/812f3bcc954054b233164bd98afd78e5/screenshots/image-1_1248x902@1.png",
-    "https://dl.flathub.org/media/com/slack/Slack/812f3bcc954054b233164bd98afd78e5/screenshots/image-2_1248x902@1.png"
+    "https://dl.flathub.org/media/com/slack/Slack/9401c17b0c8c8b2aa7f171ed0adf07ee/screenshots/image-1_1248x902@1.png",
+    "https://dl.flathub.org/media/com/slack/Slack/9401c17b0c8c8b2aa7f171ed0adf07ee/screenshots/image-2_1248x902@1.png"
    ],
-   "installs": 10903,
+   "installs": 10792,
    "brand": {
     "light": "#7e547e",
     "dark": "#4a154b"
@@ -2935,7 +2935,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/us/zoom/Zoom/58282a0f461c5b2c1f503aa027e8e052/screenshots/image-1_752x443@1.png"
    ],
-   "installs": 27419,
+   "installs": 27178,
    "brand": {},
    "desktopIds": [
     "us.zoom.Zoom.desktop"
@@ -2964,7 +2964,7 @@
     "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-3_752x590@1.png",
     "https://dl.flathub.org/media/com/github/IsmaelMartinez.teams_for_linux/c9b835dbf18c972970a7de0bc78d4c99/screenshots/image-4_1248x858@1.png"
    ],
-   "installs": 19879,
+   "installs": 19733,
    "brand": {},
    "desktopIds": [
     "teams-for-linux.desktop"
@@ -2989,7 +2989,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/info/mumble/Mumble/4ce88a4ed6fafacca1e1197fb30a31d9/screenshots/image-1_1248x737@1.png"
    ],
-   "installs": 1414,
+   "installs": 1405,
    "brand": {},
    "desktopIds": [
     "info.mumble.Mumble.desktop"
@@ -3013,7 +3013,7 @@
    "developer": "Damien Elmes",
    "license": "AGPL-3.0+",
    "screenshots": [],
-   "installs": 11836,
+   "installs": 11730,
    "brand": {
     "light": "#9dc3db",
     "dark": "#5d90b2"
@@ -3053,7 +3053,7 @@
     "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-3_1248x811@1.png",
     "https://dl.flathub.org/media/org/kde/gcompris/6b4a73b3e227329bd88ac50017e42bbb/screenshots/image-4_1248x811@1.png"
    ],
-   "installs": 4612,
+   "installs": 4569,
    "brand": {
     "light": "#85d8f6",
     "dark": "#16b8ea"
@@ -3082,7 +3082,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/net/sourceforge/Klavaro/057dfa0ae2c56afd3b1ee4b9247b6884/screenshots/image-1_752x545@1.png"
    ],
-   "installs": 735,
+   "installs": 719,
    "brand": {},
    "desktopIds": [
     "klavaro.desktop"
@@ -3108,7 +3108,7 @@
    "developer": "Stellarium team",
    "license": "GPL-2.0-or-later",
    "screenshots": [],
-   "installs": 4185,
+   "installs": 4183,
    "brand": {
     "light": "#cfcfcf",
     "dark": "#464646"
@@ -3138,7 +3138,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/kde/marble.desktop/6661b8efffb5bfb586d460aff8607cc6/screenshots/image-1_752x607@1.png"
    ],
-   "installs": 1095,
+   "installs": 1088,
    "brand": {},
    "desktopIds": [
     "marble_geojson.desktop",
@@ -3170,7 +3170,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/kde/kalzium.desktop/9aa4138bce0c0abfbd8148b53cb3f5f0/screenshots/image-1_1248x901@1.png"
    ],
-   "installs": 1229,
+   "installs": 1204,
    "brand": {},
    "desktopIds": [
     "org.kde.kalzium.desktop",
@@ -3208,7 +3208,7 @@
     "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-3_1248x794@1.png",
     "https://dl.flathub.org/media/com/github/johnfactotum.Foliate/50c58d8da7fe3fa08d1fbf5174369d7d/screenshots/image-4_1248x794@1.png"
    ],
-   "installs": 13728,
+   "installs": 13688,
    "brand": {
     "light": "#7bf1d9",
     "dark": "#0b6275"
@@ -3239,7 +3239,7 @@
     "https://dl.flathub.org/media/com/calibre_ebook/calibre/2ac083fe30ac8e892f25412b0f652fca/screenshots/image-2_1248x702@1.png",
     "https://dl.flathub.org/media/com/calibre_ebook/calibre/2ac083fe30ac8e892f25412b0f652fca/screenshots/image-3_1248x702@1.png"
    ],
-   "installs": 11571,
+   "installs": 11564,
    "brand": {},
    "desktopIds": [
     "calibre-ebook-edit.desktop",
@@ -3266,12 +3266,12 @@
    "developer": "The Chromium Authors",
    "license": "BSD-3-Clause and LGPL-2.1+ and Apache-2.0 and IJG and MIT and GPL-2.0+ and ISC and OpenSSL and (MPL-1.1 or GPL-2.0 or LG",
    "screenshots": [
-    "https://dl.flathub.org/media/org/chromium/Chromium/21bf2825ed26a799f0f3ccaf3208b807/screenshots/image-1_1248x702@1.png"
+    "https://dl.flathub.org/media/org/chromium/Chromium/bb4a5d31fa73f8b39608465713f86108/screenshots/image-1_1248x702@1.png"
    ],
-   "installs": 55169,
+   "installs": 54533,
    "brand": {},
    "desktopIds": [
-    "org.chromium.Chromium.desktop"
+    "chromium-browser.desktop"
    ],
    "downloadBytes": 218107109
   },
@@ -3295,7 +3295,7 @@
     "https://dl.flathub.org/media/com/google/Chrome/ec2d2d7c360a795bfb10be534c4dd9e4/screenshots/image-2_752x438@1.png",
     "https://dl.flathub.org/media/com/google/Chrome/ec2d2d7c360a795bfb10be534c4dd9e4/screenshots/image-3_752x438@1.png"
    ],
-   "installs": 179524,
+   "installs": 179817,
    "brand": {},
    "desktopIds": [
     "com.google.Chrome.desktop"
@@ -3333,7 +3333,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/io/gitlab/librewolf-community/84e1e5d25d9a293332c618fa37cb22e8/screenshots/image-1_752x604@1.png"
    ],
-   "installs": 51963,
+   "installs": 53050,
    "brand": {},
    "desktopIds": [
     "librewolf.desktop"
@@ -3363,12 +3363,12 @@
    "developer": "Vivaldi Technologies",
    "license": "LicenseRef-proprietary",
    "screenshots": [
-    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-1_1248x702@1.png",
-    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-2_1248x702@1.png",
-    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-3_1248x702@1.png",
-    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/6d5ed2ca63d28f50cb032c4bd420b9b5/screenshots/image-4_1248x702@1.png"
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/939baca8b3266d2a4e550cfbc97f20db/screenshots/image-1_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/939baca8b3266d2a4e550cfbc97f20db/screenshots/image-2_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/939baca8b3266d2a4e550cfbc97f20db/screenshots/image-3_1248x702@1.png",
+    "https://dl.flathub.org/media/com/vivaldi/Vivaldi/939baca8b3266d2a4e550cfbc97f20db/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 18217,
+   "installs": 18211,
    "brand": {},
    "desktopIds": [
     "com.vivaldi.Vivaldi.desktop"
@@ -3395,7 +3395,7 @@
     "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
     "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png"
    ],
-   "installs": 208756,
+   "installs": 208979,
    "brand": {},
    "desktopIds": [
     "firefox.desktop"
@@ -3422,9 +3422,9 @@
    "developer": "Bitwarden Inc.",
    "license": "LicenseRef-proprietary=https://raw.githubusercontent.com/bitwarden/clients/refs/heads/main/LICENSE_BITWARDEN.txt",
    "screenshots": [
-    "https://dl.flathub.org/media/com/bitwarden/desktop/d6040b1641ce50b86ec5ff97358f1399/screenshots/image-1_1248x748@1.png"
+    "https://dl.flathub.org/media/com/bitwarden/desktop/a7a59c4eba3b04a44ad926250c143da6/screenshots/image-1_1248x748@1.png"
    ],
-   "installs": 43814,
+   "installs": 43915,
    "brand": {},
    "desktopIds": [
     "bitwarden.desktop"
@@ -3452,7 +3452,7 @@
     "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-3_1248x890@1.png",
     "https://dl.flathub.org/media/org/keepassxc/KeePassXC.desktop/8703bd4e659abcb1dac1d6646881bb00/screenshots/image-4_1248x949@1.png"
    ],
-   "installs": 27615,
+   "installs": 27679,
    "brand": {
     "light": "#5b982a",
     "dark": "#5b982a"
@@ -3500,7 +3500,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/protonvpn/www/9482c813425d1462ae1200edd35d3c14/screenshots/image-1_752x389@1.png"
    ],
-   "installs": 49967,
+   "installs": 50098,
    "brand": {},
    "desktopIds": [
     "proton.vpn.app.gtk.desktop"
@@ -3534,7 +3534,7 @@
     "https://dl.flathub.org/media/org/gnome/World.PikaBackup/bed402ded7f6226f1c6d7fc1f72fec9f/screenshots/image-2_752x646@1.png",
     "https://dl.flathub.org/media/org/gnome/World.PikaBackup/bed402ded7f6226f1c6d7fc1f72fec9f/screenshots/image-3_752x646@1.png"
    ],
-   "installs": 7543,
+   "installs": 7639,
    "brand": {
     "light": "#d790de",
     "dark": "#4a2b64"
@@ -3572,7 +3572,7 @@
     "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-3_752x639@1.png",
     "https://dl.flathub.org/media/org/gnome/DejaDup/00692dcba561d76fbde09a6cf43b953a/screenshots/image-4_752x639@1.png"
    ],
-   "installs": 6524,
+   "installs": 6677,
    "brand": {
     "dark": "#304d64",
     "light": "#7bc9ff"
@@ -3609,7 +3609,7 @@
     "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-3_752x509@1.png",
     "https://dl.flathub.org/media/com/borgbase/Vorta/576b3db8344ba8458e600ec6617f03f6/screenshots/image-4_752x509@1.png"
    ],
-   "installs": 1418,
+   "installs": 1431,
    "brand": {},
    "desktopIds": [
     "com.borgbase.Vorta.desktop"
@@ -3637,7 +3637,7 @@
     "https://dl.flathub.org/media/org/localsend/localsend_app/e1bb6e9a29b498c0a48de1a5683c652a/screenshots/image-2_1248x915@1.png",
     "https://dl.flathub.org/media/org/localsend/localsend_app/e1bb6e9a29b498c0a48de1a5683c652a/screenshots/image-3_1248x915@1.png"
    ],
-   "installs": 70654,
+   "installs": 70662,
    "brand": {},
    "desktopIds": [
     "LocalSend.desktop"
@@ -3668,7 +3668,7 @@
    "developer": "Fina Wilke",
    "license": "GPL-3.0-only",
    "screenshots": [],
-   "installs": 3806,
+   "installs": 3792,
    "brand": {
     "light": "#ce9eff",
     "dark": "#2a1179"
@@ -3713,7 +3713,7 @@
     "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-3_752x639@1.png",
     "https://dl.flathub.org/media/org/qbittorrent/qBittorrent/c5c5043daf205a37d36fe5bcd82495b2/screenshots/image-4_752x495@1.png"
    ],
-   "installs": 59212,
+   "installs": 59262,
    "brand": {},
    "desktopIds": [
     "org.qbittorrent.qBittorrent.desktop"
@@ -3756,7 +3756,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/org/filezillaproject/Filezilla/5160b88ed6c01ce752c9e46f86093d6e/screenshots/image-1_1248x702@1.png"
    ],
-   "installs": 12087,
+   "installs": 12070,
    "brand": {
     "light": "#FF69B4",
     "dark": "#6A1B4E"
@@ -3764,7 +3764,7 @@
    "desktopIds": [
     "filezilla.desktop"
    ],
-   "downloadBytes": 18599445
+   "downloadBytes": 18218231
   },
   {
    "id": "czkawka",
@@ -3786,7 +3786,7 @@
     "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-2_1248x683@1.png",
     "https://dl.flathub.org/media/com/github/qarmin.czkawka/a229ad4f1ec70e88b3831c889494e0ae/screenshots/image-3_1248x929@1.png"
    ],
-   "installs": 5704,
+   "installs": 5721,
    "brand": {},
    "desktopIds": [
     "com.github.qarmin.czkawka.desktop",
@@ -3827,7 +3827,7 @@
     "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/gnome/Boxes.desktop/21197cc56a7bd29d89fe91d2bda9b910/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 17017,
+   "installs": 16937,
    "brand": {
     "light": "#c061cb",
     "dark": "#813d9c"
@@ -3853,7 +3853,7 @@
    "developer": "Khaleel Al-Adhami",
    "license": "GPL-3.0",
    "screenshots": [],
-   "installs": 22131,
+   "installs": 22239,
    "brand": {
     "light": "#ffb63f",
     "dark": "#c54400"
@@ -3903,7 +3903,7 @@
     "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-3_1248x857@1.png",
     "https://dl.flathub.org/media/io/missioncenter/MissionCenter/7794bb57afc07c0aeeaf1a88f93f0f62/screenshots/image-4_1248x810@1.png"
    ],
-   "installs": 43985,
+   "installs": 43839,
    "brand": {
     "light": "#91b3c3",
     "dark": "#071f2b"
@@ -3941,7 +3941,7 @@
     "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-3_752x550@1.png",
     "https://dl.flathub.org/media/net/nokyan/Resources/26207441617772360b43556d7ac89840/screenshots/image-4_752x550@1.png"
    ],
-   "installs": 25577,
+   "installs": 25934,
    "brand": {
     "light": "#94c4ff",
     "dark": "#2d5e9a"
@@ -3971,7 +3971,7 @@
     "https://dl.flathub.org/media/org/gnome/baobab/dd1f4020a8309f35facb5ffb316648bc/screenshots/image-1_752x501@1.png",
     "https://dl.flathub.org/media/org/gnome/baobab/dd1f4020a8309f35facb5ffb316648bc/screenshots/image-2_752x501@1.png"
    ],
-   "installs": 14753,
+   "installs": 14974,
    "brand": {
     "light": "#a1e9bb",
     "dark": "#3c8658"
@@ -4004,7 +4004,7 @@
     "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-3_1248x702@1.png",
     "https://dl.flathub.org/media/org/remmina/Remmina/25c1e58ee7a9bb3b88dbb89f0083eab8/screenshots/image-4_1248x702@1.png"
    ],
-   "installs": 18588,
+   "installs": 18467,
    "brand": {},
    "desktopIds": [
     "org.remmina.Remmina-file.desktop",
@@ -4037,7 +4037,7 @@
    "screenshots": [
     "https://dl.flathub.org/media/com/rustdesk/RustDesk/cdcf62c519fde533907a1e84a8e5b069/screenshots/image-1_752x376@1.png"
    ],
-   "installs": 34307,
+   "installs": 34261,
    "brand": {
     "light": "#d9eaf8",
     "dark": "#0160ee"
@@ -4073,7 +4073,7 @@
     "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-3_752x615@1.png",
     "https://dl.flathub.org/media/org/gnome/clocks/cf1afae44c663bad86644cdb9a4cf331/screenshots/image-4_752x615@1.png"
    ],
-   "installs": 10128,
+   "installs": 10331,
    "brand": {
     "light": "#b3adbf",
     "dark": "#59526c"
@@ -4104,7 +4104,7 @@
     "https://dl.flathub.org/media/org/gnome/Weather/e718a6da7f664cb622c882e538821ae6/screenshots/image-1_752x569@1.png",
     "https://dl.flathub.org/media/org/gnome/Weather/e718a6da7f664cb622c882e538821ae6/screenshots/image-2_752x569@1.png"
    ],
-   "installs": 9804,
+   "installs": 9966,
    "brand": {
     "light": "#81d2f5",
     "dark": "#1a5fb4"
@@ -4113,6 +4113,586 @@
     "org.gnome.Weather.desktop"
    ],
    "downloadBytes": 187953
+  }
+ ],
+ "roles": [
+  {
+   "id": "browser",
+   "options": [
+    {
+     "id": "brave",
+     "name": "Brave",
+     "desktop": "brave-browser.desktop",
+     "perks": [
+      "1password",
+      "webapps"
+     ],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Brave Origin: fast and private, and blocks ads and trackers."
+    },
+    {
+     "id": "firefox",
+     "name": "Firefox",
+     "desktop": "firefox.desktop",
+     "perks": [
+      "1password",
+      "-webapps"
+     ],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": true,
+     "summary": "Mozilla’s browser, with its own independent engine."
+    },
+    {
+     "id": "librewolf",
+     "name": "LibreWolf",
+     "desktop": "librewolf.desktop",
+     "perks": [
+      "-1password",
+      "-webapps"
+     ],
+     "attribute": "librewolf",
+     "free": true,
+     "downloadBytes": 128640552,
+     "icon": true,
+     "app": true,
+     "summary": "Firefox, hardened for privacy out of the box."
+    },
+    {
+     "id": "chromium",
+     "name": "Chromium",
+     "desktop": "chromium-browser.desktop",
+     "perks": [
+      "webapps",
+      "-1password"
+     ],
+     "attribute": "chromium",
+     "free": true,
+     "downloadBytes": 218107109,
+     "icon": true,
+     "app": true,
+     "summary": "The open-source browser that Google Chrome is built on."
+    },
+    {
+     "id": "vivaldi",
+     "name": "Vivaldi",
+     "desktop": "vivaldi-stable.desktop",
+     "perks": [
+      "webapps",
+      "-1password"
+     ],
+     "attribute": "vivaldi",
+     "free": false,
+     "downloadBytes": null,
+     "icon": true,
+     "app": true,
+     "summary": "Tabs, panels and notes, arranged however you like."
+    },
+    {
+     "id": "chrome",
+     "name": "Google Chrome",
+     "desktop": "google-chrome.desktop",
+     "perks": [
+      "webapps",
+      "-1password"
+     ],
+     "attribute": "google-chrome",
+     "free": false,
+     "downloadBytes": null,
+     "icon": true,
+     "app": true,
+     "summary": "Google’s browser, synced with your Google account."
+    },
+    {
+     "id": "zen",
+     "name": "Zen",
+     "desktop": "app.zen_browser.zen.desktop",
+     "perks": [
+      "sandbox",
+      "-1password",
+      "-webapps"
+     ],
+     "attribute": null,
+     "free": true,
+     "downloadBytes": null,
+     "flathub": "app.zen_browser.zen",
+     "flathubDesktop": "app.zen_browser.zen.desktop",
+     "icon": true,
+     "app": false,
+     "summary": "A calm Firefox, with vertical tabs and split view."
+    }
+   ]
+  },
+  {
+   "id": "terminal",
+   "options": [
+    {
+     "id": "kitty",
+     "name": "Kitty",
+     "desktop": "kitty.desktop",
+     "perks": [
+      "theme",
+      "tabs"
+     ],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Fast and GPU-drawn, with tabs, splits and images."
+    },
+    {
+     "id": "ghostty",
+     "name": "Ghostty",
+     "desktop": "com.mitchellh.ghostty.desktop",
+     "perks": [
+      "theme",
+      "tabs"
+     ],
+     "attribute": "ghostty",
+     "free": true,
+     "downloadBytes": 17610075,
+     "icon": true,
+     "app": false,
+     "summary": "Native-feeling and fast, with almost nothing to set up."
+    },
+    {
+     "id": "alacritty",
+     "name": "Alacritty",
+     "desktop": "Alacritty.desktop",
+     "perks": [
+      "theme",
+      "-tabs"
+     ],
+     "attribute": "alacritty",
+     "free": true,
+     "downloadBytes": 3823169,
+     "icon": true,
+     "app": false,
+     "summary": "Minimal and very fast. Pairs well with tmux or Zellij."
+    },
+    {
+     "id": "foot",
+     "name": "foot",
+     "desktop": "foot.desktop",
+     "perks": [
+      "theme",
+      "-tabs"
+     ],
+     "attribute": "foot",
+     "free": true,
+     "downloadBytes": 372136,
+     "icon": true,
+     "app": false,
+     "summary": "Tiny, Wayland-native and quick to start."
+    }
+   ]
+  },
+  {
+   "id": "editor",
+   "options": [
+    {
+     "id": "texteditor",
+     "name": "Text Editor",
+     "desktop": "org.gnome.TextEditor.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Simple, with tabs, autosave and spell checking."
+    },
+    {
+     "id": "zed",
+     "name": "Zed",
+     "desktop": "dev.zed.Zed.desktop",
+     "perks": [
+      "projects"
+     ],
+     "attribute": "zed-editor",
+     "free": true,
+     "downloadBytes": 0,
+     "icon": true,
+     "app": true,
+     "summary": "A very fast code editor, with AI built in."
+    },
+    {
+     "id": "vscode",
+     "name": "Visual Studio Code",
+     "desktop": "code.desktop",
+     "perks": [
+      "projects"
+     ],
+     "attribute": "vscode",
+     "free": false,
+     "downloadBytes": null,
+     "icon": true,
+     "app": true,
+     "summary": "Microsoft’s code editor and its extension marketplace."
+    },
+    {
+     "id": "vscodium",
+     "name": "VSCodium",
+     "desktop": "codium.desktop",
+     "perks": [
+      "projects"
+     ],
+     "attribute": "vscodium",
+     "free": true,
+     "downloadBytes": 198618478,
+     "icon": true,
+     "app": true,
+     "summary": "Visual Studio Code without Microsoft’s branding and telemetry."
+    },
+    {
+     "id": "neovim",
+     "name": "Neovim",
+     "desktop": "nvim.desktop",
+     "perks": [
+      "terminal"
+     ],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Keyboard-driven editing, in your terminal."
+    },
+    {
+     "id": "kate",
+     "name": "Kate",
+     "desktop": "org.kde.kate.desktop",
+     "perks": [
+      "-kde"
+     ],
+     "attribute": "kdePackages.kate",
+     "free": true,
+     "downloadBytes": 79805081,
+     "icon": true,
+     "app": true,
+     "summary": "KDE’s capable editor, with sessions and a terminal panel."
+    }
+   ]
+  },
+  {
+   "id": "files",
+   "options": [
+    {
+     "id": "nautilus",
+     "name": "Files",
+     "desktop": "org.gnome.Nautilus.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "GNOME Files: quick previews with Space, tabs and network places."
+    },
+    {
+     "id": "thunar",
+     "name": "Thunar",
+     "desktop": "thunar.desktop",
+     "perks": [],
+     "attribute": "thunar",
+     "free": true,
+     "downloadBytes": 5051096,
+     "icon": true,
+     "app": false,
+     "summary": "Light and quick, from Xfce, with bulk renaming."
+    },
+    {
+     "id": "kdedolphin",
+     "name": "Dolphin",
+     "desktop": "org.kde.dolphin.desktop",
+     "perks": [
+      "-kde"
+     ],
+     "attribute": "kdePackages.dolphin",
+     "free": true,
+     "downloadBytes": 79242621,
+     "icon": true,
+     "app": false,
+     "summary": "Split views, a terminal panel and plenty of settings, from KDE."
+    }
+   ]
+  },
+  {
+   "id": "mail",
+   "options": [
+    {
+     "id": "thunderbird",
+     "name": "Thunderbird",
+     "desktop": "thunderbird.desktop",
+     "perks": [],
+     "attribute": null,
+     "free": true,
+     "downloadBytes": null,
+     "flathub": "org.mozilla.Thunderbird",
+     "flathubDesktop": "org.mozilla.Thunderbird.desktop",
+     "icon": true,
+     "app": false,
+     "summary": "Mail, calendars and contacts, from Mozilla."
+    },
+    {
+     "id": "evolution",
+     "name": "Evolution",
+     "desktop": "org.gnome.Evolution.desktop",
+     "perks": [],
+     "attribute": "evolution",
+     "free": true,
+     "downloadBytes": 34121304,
+     "icon": true,
+     "app": true,
+     "summary": "Mail, calendars and contacts, with your online accounts."
+    },
+    {
+     "id": "geary",
+     "name": "Geary",
+     "desktop": "org.gnome.Geary.desktop",
+     "perks": [],
+     "attribute": "geary",
+     "free": true,
+     "downloadBytes": 6474465,
+     "icon": true,
+     "app": false,
+     "summary": "Light, conversation-style mail."
+    },
+    {
+     "id": "gmail",
+     "name": "Gmail",
+     "desktop": "cybexos-mail-gmail.desktop",
+     "perks": [
+      "noinstall"
+     ],
+     "included": false,
+     "web": true,
+     "glyph": "inbox",
+     "icon": false,
+     "summary": "New messages open in Gmail, in your web browser."
+    },
+    {
+     "id": "outlook",
+     "name": "Outlook",
+     "desktop": "cybexos-mail-outlook.desktop",
+     "perks": [
+      "noinstall"
+     ],
+     "included": false,
+     "web": true,
+     "glyph": "inbox",
+     "icon": false,
+     "summary": "New messages open in Outlook.com, in your web browser."
+    }
+   ]
+  },
+  {
+   "id": "music",
+   "options": [
+    {
+     "id": "mpv",
+     "name": "mpv",
+     "desktop": "mpv.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": true,
+     "summary": "Plays anything, in a small and simple window."
+    },
+    {
+     "id": "rhythmbox",
+     "name": "Rhythmbox",
+     "desktop": "org.gnome.Rhythmbox3.desktop",
+     "perks": [
+      "library"
+     ],
+     "attribute": "rhythmbox",
+     "free": true,
+     "downloadBytes": 10699395,
+     "icon": true,
+     "app": false,
+     "summary": "A classic music library, with podcasts and radio."
+    },
+    {
+     "id": "strawberry",
+     "name": "Strawberry Music Player",
+     "desktop": "org.strawberrymusicplayer.strawberry.desktop",
+     "perks": [
+      "library"
+     ],
+     "attribute": "strawberry",
+     "free": true,
+     "downloadBytes": 59606507,
+     "icon": true,
+     "app": true,
+     "summary": "For large libraries, with lyrics and scrobbling."
+    },
+    {
+     "id": "amberol",
+     "name": "Amberol",
+     "desktop": "io.bassi.Amberol.desktop",
+     "perks": [],
+     "attribute": null,
+     "free": true,
+     "downloadBytes": null,
+     "flathub": "io.bassi.Amberol",
+     "flathubDesktop": "io.bassi.Amberol.desktop",
+     "icon": true,
+     "app": false,
+     "summary": "Plays your music, and nothing else."
+    }
+   ]
+  },
+  {
+   "id": "video",
+   "options": [
+    {
+     "id": "mpv",
+     "name": "mpv",
+     "desktop": "mpv.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": true,
+     "summary": "Plays anything; keyboard-driven."
+    },
+    {
+     "id": "vlc",
+     "name": "VLC",
+     "desktop": "vlc.desktop",
+     "perks": [],
+     "attribute": "vlc",
+     "free": true,
+     "downloadBytes": 68350612,
+     "icon": true,
+     "app": true,
+     "summary": "Plays everything, with plenty of controls."
+    },
+    {
+     "id": "celluloid",
+     "name": "Celluloid",
+     "desktop": "io.github.celluloid_player.Celluloid.desktop",
+     "perks": [],
+     "attribute": "celluloid",
+     "free": true,
+     "downloadBytes": 396885,
+     "icon": true,
+     "app": true,
+     "summary": "mpv, with a friendly GNOME interface."
+    },
+    {
+     "id": "showtime",
+     "name": "Showtime",
+     "desktop": "org.gnome.Showtime.desktop",
+     "perks": [],
+     "attribute": "showtime",
+     "free": true,
+     "downloadBytes": 49918232,
+     "icon": true,
+     "app": false,
+     "summary": "GNOME’s simple, modern video player."
+    }
+   ]
+  },
+  {
+   "id": "pdf",
+   "options": [
+    {
+     "id": "evince",
+     "name": "Document Viewer",
+     "desktop": "org.gnome.Evince.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Reads PDFs and fills in simple forms."
+    },
+    {
+     "id": "papers",
+     "name": "Papers",
+     "desktop": "org.gnome.Papers.desktop",
+     "perks": [],
+     "attribute": "papers",
+     "free": true,
+     "downloadBytes": 5570633,
+     "icon": true,
+     "app": false,
+     "summary": "GNOME’s newer document viewer, with signatures."
+    },
+    {
+     "id": "okular",
+     "name": "Okular",
+     "desktop": "okularApplication_pdf.desktop",
+     "perks": [
+      "annotate",
+      "-kde"
+     ],
+     "attribute": "kdePackages.okular",
+     "free": true,
+     "downloadBytes": 70701480,
+     "icon": true,
+     "app": true,
+     "summary": "Annotate, highlight and fill in forms."
+    }
+   ]
+  },
+  {
+   "id": "image",
+   "options": [
+    {
+     "id": "imv",
+     "name": "imv",
+     "desktop": "imv.desktop",
+     "perks": [],
+     "included": true,
+     "web": false,
+     "glyph": "",
+     "icon": false,
+     "summary": "Fast and keyboard-driven."
+    },
+    {
+     "id": "loupe",
+     "name": "Image Viewer",
+     "desktop": "org.gnome.Loupe.desktop",
+     "perks": [],
+     "attribute": "loupe",
+     "free": true,
+     "downloadBytes": 3086160,
+     "icon": true,
+     "app": false,
+     "summary": "GNOME’s Image Viewer: smooth zoom, rotate and crop."
+    },
+    {
+     "id": "gthumb",
+     "name": "gThumb",
+     "desktop": "org.gnome.gthumb.desktop",
+     "perks": [],
+     "attribute": "gthumb",
+     "free": true,
+     "downloadBytes": 2489067,
+     "icon": true,
+     "app": false,
+     "summary": "Browse, organise and touch up your photos."
+    },
+    {
+     "id": "gwenview",
+     "name": "Gwenview",
+     "desktop": "org.kde.gwenview.desktop",
+     "perks": [
+      "-kde"
+     ],
+     "attribute": "kdePackages.gwenview",
+     "free": true,
+     "downloadBytes": 76653661,
+     "icon": true,
+     "app": false,
+     "summary": "KDE’s image viewer, with folder browsing."
+    }
+   ]
   }
  ]
 }

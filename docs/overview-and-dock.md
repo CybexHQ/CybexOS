@@ -53,7 +53,7 @@ the focused app has a wider accent mark.
   applications still ask about unsaved work.
 
 Until you pin or unpin something, the dock suggests your default browser,
-Files and the terminal. Pins are desktop entry ids stored in `dockPinned` in
+file manager and terminal. Pins are desktop entry ids stored in `dockPinned` in
 `~/.config/cybexos/shell.json`. A pinned app that is not installed is not
 shown, but it stays pinned.
 
@@ -89,7 +89,7 @@ signalled. Processes that belong to other users have no end button, and neither
 do processes whose end would end the session or the shell (Hyprland, systemd,
 Xwayland, the lock screen and the shell itself).
 
-**Open system monitor** opens `btop` in Kitty, as `Super+Shift+T` does.
+**Open system monitor** opens `btop` in your terminal, as `Super+Shift+T` does.
 
 ## Verification
 

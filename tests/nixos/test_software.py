@@ -113,9 +113,21 @@ SHIPPED = {'schema': 1, 'nixpkgs': 'abc', 'featured': ['gimp'],
               'subcategory': 'audio', 'free': False, 'desktopIds': ['spotify.desktop'], 'downloadBytes': None},
              {'id': 'krita', 'attribute': 'krita', 'name': 'Krita', 'category': 'create', 'subcategory': 'photo',
               'free': True, 'desktopIds': ['org.kde.krita.desktop'], 'downloadBytes': 3},
-             {'id': 'BAD', 'attribute': 'x; abort', 'name': 'Injected'}]}
+             {'id': 'BAD', 'attribute': 'x; abort', 'name': 'Injected'}],
+    'roles': [{'id': 'browser', 'options': [
+        {'id': 'firefox', 'desktop': 'firefox.desktop', 'included': True},
+        {'id': 'librewolf', 'desktop': 'librewolf.desktop', 'attribute': 'librewolf', 'free': True},
+        {'id': 'chrome', 'desktop': 'google-chrome.desktop', 'attribute': 'google-chrome', 'free': False},
+        {'id': 'zen', 'desktop': 'app.zen_browser.zen.desktop', 'attribute': None, 'flathub': 'app.zen_browser.zen',
+         'flathubDesktop': 'app.zen_browser.zen.desktop'},
+        {'id': 'evil', 'desktop': '../../x.desktop', 'attribute': 'evil'},
+        {'id': 'abort', 'desktop': 'a.desktop', 'attribute': 'x; abort'},
+        {'id': 'loose', 'desktop': 'loose.desktop'}]},
+              {'id': 'unknown', 'options': [{'id': 'x', 'desktop': 'x.desktop', 'included': True}]}]}
 
 METADATA = {'gimp': {'pname': 'gimp', 'version': '3.0.6', 'unfree': False, 'available': True, 'broken': False},
+            'librewolf': {'pname': 'librewolf', 'version': '158.0', 'unfree': False, 'available': True, 'broken': False},
+            'google-chrome': {'pname': 'google-chrome', 'version': '150.0', 'unfree': True, 'available': False, 'broken': False},
             'firefox': {'pname': 'firefox', 'version': '144.0', 'unfree': False, 'available': True, 'broken': False},
             'kdePackages.okular': {'pname': 'okular', 'version': '25.08.2', 'unfree': False, 'available': True, 'broken': False},
             'spotify': {'pname': 'spotify', 'version': '1.2.74', 'unfree': True, 'available': False, 'broken': False},
@@ -209,6 +221,14 @@ class CatalogueAndCheckTests(unittest.TestCase):
         self.assertIn('software-catalogue.nix', eval_args[-1])
         self.assertIn('"kdePackages.okular"', eval_args[-1]); self.assertNotIn('abort', eval_args[-1])
         self.assertIn('derivations = false', eval_args[-1])
+        self.assertIn('"librewolf"', eval_args[-1])
+        self.assertEqual([role['id'] for role in result['roles']], ['browser'], 'unknown roles are dropped')
+        options = {option['id']: option for option in result['roles'][0]['options']}
+        self.assertEqual(list(options), ['firefox', 'librewolf', 'chrome', 'zen'],
+                         'options with unsafe desktop IDs or attributes, or no way to install, are dropped')
+        self.assertEqual((options['librewolf']['unavailable'], options['librewolf']['version']), ('', '158.0'))
+        self.assertEqual(options['chrome']['unavailable'], 'unfree')
+        self.assertEqual((options['zen']['unavailable'], options['firefox']['unavailable']), ('', ''))
 
     def test_catalogue_metadata_is_cached_per_configuration_identity(self):
         args = self.machine([])

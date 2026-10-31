@@ -17,6 +17,20 @@ def initialize(home, defaults, share, proprietary, developer=False):
             pass
 
     seed('.config/kitty/kitty.conf', f'include {defaults}/kitty.conf\n# Personal overrides belong below this line.\n')
+    # The terminals Software offers follow the shell's theme the same way. They
+    # are seeded whether or not one is installed, so a terminal chosen later
+    # starts themed; a person's own configuration is never replaced.
+    if not any((home / '.config/ghostty' / name).exists() for name in ('config', 'config.ghostty')):
+        seed('.config/ghostty/config', f'# Cybex OS\'s defaults, then the shell\'s current theme, then your own settings.\n'
+             f'# Ghostty reads these after this file, in order: put yours in personal.conf.\n'
+             f'config-file = {defaults}/ghostty.conf\nconfig-file = ?~/.local/state/cybexos/theme/ghostty.conf\n'
+             f'config-file = ?~/.config/ghostty/personal.conf\n')
+    if not (home / '.config/alacritty/alacritty.yml').exists():
+        seed('.config/alacritty/alacritty.toml', f'[general]\nimport = ["{defaults}/alacritty.toml"]\n\n'
+             f'# Personal settings belong below this line; they win over the imported ones.\n')
+    seed('.config/foot/foot.ini', f'include={defaults}/foot.ini\n# Personal overrides belong below this line.\n')
+    # foot refuses a missing include; the shell rewrites this with your theme.
+    seed('.local/state/cybexos/theme/foot.ini', '# theme-apply.py writes the shell\'s appearance here.\n')
     seed('.config/fish/conf.d/cybexos.fish', f'source {defaults}/fish-config.fish\n')
     seed('.config/fastfetch/config.jsonc', (defaults / 'fastfetch.jsonc').read_text())
     seed('.config/voxtype/config.toml', (defaults / 'voxtype.toml').read_text())

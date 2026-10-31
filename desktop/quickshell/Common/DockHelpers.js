@@ -14,8 +14,9 @@ var RECENT_LIMIT = 64;
 var SHELL_APP_IDS = ["org.quickshell", "quickshell"];
 
 // Pinned by default until the person pins or unpins something: the default
-// browser (read from mimeapps.list), Files and the terminal — the apps the
-// Super+B, Super+E and Super+Return bindings open.
+// browser, file manager and terminal — the apps the Super+B, Super+E and
+// Super+Return bindings open. These are Cybex OS's own, before the defaults
+// are known.
 var SUGGESTED_PINS = ["org.gnome.Nautilus", "kitty"];
 
 // Use the live workspace identity with the compositor's layout snapshot.
@@ -219,8 +220,8 @@ function defaultBrowserId(text) {
     return found;
 }
 
-function suggestedPins(browserId, terminalId) {
-    return uniqueIds([browserId, "org.gnome.Nautilus", terminalId === undefined ? "kitty" : terminalId]);
+function suggestedPins(browserId, terminalId, filesId) {
+    return uniqueIds([browserId, filesId ? filesId : SUGGESTED_PINS[0], terminalId === undefined ? SUGGESTED_PINS[1] : terminalId]);
 }
 
 // Where the dock sits and what it reserves. The layer surface is anchored to
