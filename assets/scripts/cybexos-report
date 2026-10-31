@@ -24,7 +24,7 @@ import sys
 import tarfile
 import urllib.parse
 
-ISSUE_URL = 'https://github.com/DigitalPals/CybexOS/issues/new'
+ISSUE_URL = 'https://github.com/CybexHQ/CybexOS/issues/new'
 # GitHub accepts .gz/.tgz/.zip attachments but not .zst, so the default
 # archive is a gzip tarball the user can attach directly.
 DEFAULT_SUFFIX = '.tar.gz'

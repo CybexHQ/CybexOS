@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 
 from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse, read, syncdir
 from . import inputs
-from .trust import Fetcher, NoPublishedRelease, discover, version
+from .trust import REPO, Fetcher, NoPublishedRelease, discover, version
 from . import review, firmware, prebuilt
 from .progress import NixProgress
 
@@ -313,7 +313,7 @@ class Engine:
                     # Lock generation evaluates the selected flake to learn its
                     # inputs. Verify its content before allowing that evaluation,
                     # rather than checking the NAR only after generating a lock.
-                    source = 'github:DigitalPals/CybexOS/' + candidate['revision']
+                    source = f'github:{REPO}/' + candidate['revision']
                     source += '?' + urlencode({'narHash': candidate['narHash']})
                     fetched = parse(self.nix('flake', 'prefetch', '--json', source, step='inputs'))
                     if fetched.get('hash') != candidate['narHash']:
@@ -344,8 +344,10 @@ class Engine:
                     self.nix('flake', 'update', 'nixpkgs', '--flake', f'path:{config}', step='inputs')
                 if candidate:
                     flake = config / 'flake.nix'
-                    expression = r'(cybexos\.url\s*=\s*")github:DigitalPals/CybexOS/[^"]+("\s*;)'
-                    text, count = re.subn(expression, lambda m: m[1] + 'github:DigitalPals/CybexOS/' + candidate['revision'] + m[2], flake.read_text())
+                    # A machine installed from its medium's bundled source names
+                    # that content-addressed store path until its first release.
+                    expression = r'(cybexos\.url\s*=\s*")(?:github:' + re.escape(REPO) + r'/[^"]+|path:/nix/store/[^"]+)("\s*;)'
+                    text, count = re.subn(expression, lambda m: m[1] + f'github:{REPO}/' + candidate['revision'] + m[2], flake.read_text())
                     if count != 1:
                         raise Failure('Machine flake must declare one literal cybexos.url. Keep personal modules in local/.')
                     atomic(flake, text.encode())

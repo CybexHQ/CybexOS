@@ -4,7 +4,7 @@ The machine owns `/etc/nixos/flake.nix` and `flake.lock`:
 
 ```nix
 inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-inputs.cybexos.url = "github:DigitalPals/CybexOS/EXACT_AUTHENTICATED_REVISION";
+inputs.cybexos.url = "github:CybexHQ/CybexOS/EXACT_AUTHENTICATED_REVISION";
 inputs.cybexos.inputs.nixpkgs.follows = "nixpkgs";
 ```
 

@@ -30,4 +30,4 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: 'dark', accent: '#60a5fa', wallpaper: 'mountains', glass: false,
   clock24: true, reducedMotion: false, font: 'mono',
 };
-export const REPOSITORY_URL = 'https://github.com/DigitalPals/CybexOS';
+export const REPOSITORY_URL = 'https://github.com/CybexHQ/CybexOS';

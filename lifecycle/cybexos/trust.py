@@ -14,11 +14,13 @@ import urllib.request
 from .common import Failure, atomic, parse, read
 
 API = 1
-REPO = 'DigitalPals/CybexOS'
+REPO = 'CybexHQ/CybexOS'
 # The Nixpkgs branch a release follows: release.json's "nixos" and an entry of
 # signed release metadata's "nixos" list. A branch identity, not a version.
 NIXOS = 'unstable'
-CHANNEL_BASE = f'https://digitalpals.github.io/{REPO.split("/")[1]}/channels'
+# GitHub Pages of the repository: promote.yml publishes the signed channels.
+PAGES_HOST = f'{REPO.split("/")[0].lower()}.github.io'
+CHANNEL_BASE = f'https://{PAGES_HOST}/{REPO.split("/")[1]}/channels'
 SEMVER = re.compile(r'^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(beta|rc)\.([1-9][0-9]*))?$')
 
 
@@ -51,7 +53,7 @@ class Fetcher:
         self.cache.mkdir(parents=True, exist_ok=True)
 
     def get(self, url, limit=2 * 1024 * 1024):
-        https(url, {'digitalpals.github.io', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
+        https(url, {PAGES_HOST, 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
         name = hashlib.sha256(url.encode()).hexdigest()
         body, meta = self.cache / name, self.cache / (name + '.json')
         old = read(meta, {})
@@ -60,7 +62,7 @@ class Fetcher:
             headers['If-None-Match'] = old['etag']
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
-                https(response.url, {'digitalpals.github.io', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
+                https(response.url, {PAGES_HOST, 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
                 data = response.read(limit + 1)
                 if len(data) > limit:
                     raise Failure('Release response exceeds its size limit')

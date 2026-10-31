@@ -13,7 +13,7 @@ body:
         and prefills the environment below. Nothing is uploaded for you.
 
         Security problems do not belong here; report them privately as
-        described in [SECURITY.md](https://github.com/DigitalPals/CybexOS/blob/main/SECURITY.md).
+        described in [SECURITY.md](https://github.com/CybexHQ/CybexOS/blob/main/SECURITY.md).
   - type: textarea
     id: summary
     attributes:

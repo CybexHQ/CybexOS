@@ -19,7 +19,7 @@ Things to try
 • Write something in Omawrite. Notes stay in this browser.
 • Type help in the terminal to explore supported commands.
 
-Source: https://github.com/DigitalPals/CybexOS
+Source: https://github.com/CybexHQ/CybexOS
 `;
 
 export const SHORTCUTS_CONTENT = `Cybex OS browser shortcuts
@@ -85,7 +85,7 @@ export const FILE_SYSTEM: Record<string, VirtualFile[]> = {
     { name: 'moon-mountains.jpg', kind: 'image', description: 'Desktop wallpaper' },
   ],
   [`${HOME_PATH}/Code`]: [
-    { name: 'README.md', kind: 'text', description: 'Markdown document', content: '# Make it yours\n\nA workspace for your next idea.\n\nExplore the desktop, image builder, and documentation at:\nhttps://github.com/DigitalPals/CybexOS\n\nThis is a sample folder in the browser preview.\n' },
+    { name: 'README.md', kind: 'text', description: 'Markdown document', content: '# Make it yours\n\nA workspace for your next idea.\n\nExplore the desktop, image builder, and documentation at:\nhttps://github.com/CybexHQ/CybexOS\n\nThis is a sample folder in the browser preview.\n' },
   ],
 };
 

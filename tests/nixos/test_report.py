@@ -253,7 +253,7 @@ class Bundle(unittest.TestCase):
             output = json.loads(fixture.run('--json', '--output', str(fixture.base)).stdout)
             url = urllib.parse.urlsplit(output['issueUrl'])
             self.assertEqual(f'{url.scheme}://{url.netloc}{url.path}',
-                             'https://github.com/DigitalPals/CybexOS/issues/new')
+                             'https://github.com/CybexHQ/CybexOS/issues/new')
             query = urllib.parse.parse_qs(url.query)
             self.assertEqual(query['template'], ['bug_report.yml'])
             environment = query['environment'][0]

@@ -35,8 +35,8 @@ def lock():
         'nixpkgs': {'original': {'type':'github','owner':'NixOS','repo':'nixpkgs','ref':'nixos-unstable'},
                     'locked': {'type':'github','owner':'NixOS','repo':'nixpkgs','rev':REV_OLD,'narHash':NAR_OLD}},
         'cybexos': {'inputs': {'nixpkgs':['nixpkgs'], 'lanzaboote':'lanzaboote'},
-                   'original':{'type':'github','owner':'DigitalPals','repo':'CybexOS','rev':REV_OLD},
-                   'locked':{'type':'github','owner':'DigitalPals','repo':'CybexOS','rev':REV_OLD,'narHash':NAR_OLD}},
+                   'original':{'type':'github','owner':'CybexHQ','repo':'CybexOS','rev':REV_OLD},
+                   'locked':{'type':'github','owner':'CybexHQ','repo':'CybexOS','rev':REV_OLD,'narHash':NAR_OLD}},
         'lanzaboote': {'inputs':{'nixpkgs':['nixpkgs']},'locked':{'type':'github','repo':'lanzaboote','rev':REV_OLD}},
         'personal': {'inputs':{'nixpkgs':['nixpkgs']},'locked':{'type':'github','repo':'personal','rev':REV_OLD}}
     }}
@@ -46,7 +46,7 @@ def release():
     return {'schema':1,'version':'1.1.0','revision':REV_NEW,'narHash':NAR_NEW,
             'architectures':['x86_64-linux'],'nixos':['unstable'],'configurationApi':1,'pluginApi':1,
             'minUpdater':1,'notes':'A qualified release','vendorInputs':['lanzaboote'],
-            'assets':[{'name':'source.tar.gz','url':'https://github.com/DigitalPals/CybexOS/releases/download/v1.1.0/source.tar.gz',
+            'assets':[{'name':'source.tar.gz','url':'https://github.com/CybexHQ/CybexOS/releases/download/v1.1.0/source.tar.gz',
                        'sha256':'f'*64,'bytes':1}]}
 
 
@@ -194,7 +194,7 @@ class TrustTests(unittest.TestCase):
                 self.close_connection = True
             def log_message(self, *args):
                 pass
-        endpoint = 'https://digitalpals.github.io/CybexOS/channels/stable.json'
+        endpoint = 'https://cybexhq.github.io/CybexOS/channels/stable.json'
         requests = []
         real_urlopen = urllib.request.urlopen
         with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Interrupted) as server:
@@ -267,10 +267,10 @@ class TrustTests(unittest.TestCase):
 
     def test_channel_manifest_chain_and_replay(self):
         body=json.dumps(release()).encode()
-        url='https://github.com/DigitalPals/CybexOS/releases/download/v1.1.0/manifest.json'
+        url='https://github.com/CybexHQ/CybexOS/releases/download/v1.1.0/manifest.json'
         channel={'schema':1,'channel':'stable','sequence':4,'expires':'2099-01-01T00:00:00Z','manifest':url,'sha256':hashlib.sha256(body).hexdigest()}
         channel_body=json.dumps(channel).encode()
-        base='https://digitalpals.github.io/CybexOS/channels/stable.json'
+        base='https://cybexhq.github.io/CybexOS/channels/stable.json'
         data={base:channel_body,base+'.sig':self.sign(channel_body),url:body,url+'.sig':self.sign(body)}
         class Fetch:
             def get(self,url): return data[url]
@@ -281,7 +281,7 @@ class TrustTests(unittest.TestCase):
         with self.assertRaises(Failure): trust.discover(Fetch(),self.trust,'stable','1.0.0','x86_64-linux','unstable',4)
 
     def test_asset_url_identity(self):
-        for value in ['https://example.com/source.tar.gz','https://github.com/DigitalPals/CybexOS/releases/download/main/source.tar.gz']:
+        for value in ['https://example.com/source.tar.gz','https://github.com/CybexHQ/CybexOS/releases/download/main/source.tar.gz']:
             data=release();data['assets'][0]['url']=value
             with self.assertRaises(Failure): trust.validate_release(data,'1.0.0','x86_64-linux','unstable','stable')
 
@@ -388,7 +388,7 @@ class EngineTests(unittest.TestCase):
         base=Path(self.temp.name);self.base=base
         self.config=base/'config';self.config.mkdir()
         atomic(self.config/'flake.lock',lock())
-        (self.config/'flake.nix').write_text('cybexos.url = "github:DigitalPals/CybexOS/'+REV_OLD+'";')
+        (self.config/'flake.nix').write_text('cybexos.url = "github:CybexHQ/CybexOS/'+REV_OLD+'";')
         (self.config/'local').mkdir();(self.config/'local/personal.nix').write_text('# packages, VPN, services sentinel\n{}')
         self.working=base/'nixos';self.working.symlink_to(self.config)
         self.system=base/'current-system';self.system.symlink_to(OLD_SYSTEM)

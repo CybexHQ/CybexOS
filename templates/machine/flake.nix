@@ -3,7 +3,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # The fresh installer replaces this with the authenticated exact release revision.
-    cybexos.url = "github:DigitalPals/CybexOS/REPLACE_WITH_AUTHENTICATED_REVISION";
+    cybexos.url = "github:CybexHQ/CybexOS/REPLACE_WITH_AUTHENTICATED_REVISION";
     cybexos.inputs.nixpkgs.follows = "nixpkgs";
     # Add personal inputs explicitly. cybex update never refreshes these implicitly.
   };

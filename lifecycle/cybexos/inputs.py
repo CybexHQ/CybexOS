@@ -1,6 +1,7 @@
 """Lock ownership: upstream, vendor graph, and unrelated personal inputs."""
 import re
 from .common import Failure
+from .trust import REPO
 
 
 def root_inputs(lock):
@@ -24,9 +25,10 @@ def validate_machine(lock, branch='nixos-unstable'):
     selected = vendor.get('locked', {})
     origin = vendor.get('original', {})
     if selected.get('type') == 'github':
-        if (origin.get('type') != 'github' or origin.get('owner') != 'DigitalPals'
-                or origin.get('repo') != 'CybexOS' or set(origin) != {'type', 'owner', 'repo', 'rev'}
-                or selected.get('owner') != 'DigitalPals' or selected.get('repo') != 'CybexOS'
+        owner, repo = REPO.split('/')
+        if (origin.get('type') != 'github' or origin.get('owner') != owner
+                or origin.get('repo') != repo or set(origin) != {'type', 'owner', 'repo', 'rev'}
+                or selected.get('owner') != owner or selected.get('repo') != repo
                 or not re.fullmatch('[0-9a-f]{40}', origin.get('rev', ''))
                 or selected.get('rev') != origin['rev']
                 or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', selected.get('narHash', ''))):

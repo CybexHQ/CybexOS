@@ -243,7 +243,7 @@ class DeliveryHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.request.settimeout(20)
         connect = self.headers(self.request).splitlines()[0].split()
-        assert connect[0] == 'CONNECT' and connect[1] in ('digitalpals.github.io:443', 'github.com:443')
+        assert connect[0] == 'CONNECT' and connect[1] in ('cybexhq.github.io:443', 'github.com:443')
         self.request.sendall(b'HTTP/1.1 200 Connection established\r\n\r\n')
         with self.server.tls.wrap_socket(self.request, server_side=True) as connection:
             headers = self.headers(connection).splitlines()
@@ -263,7 +263,7 @@ def delivery(base):
     cert, key = base / 'transport.pem', base / 'transport-key.pem'
     command('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
             '-subj', '/CN=Cybex OS isolated native integration',
-            '-addext', 'subjectAltName=DNS:digitalpals.github.io,DNS:github.com',
+            '-addext', 'subjectAltName=DNS:cybexhq.github.io,DNS:github.com',
             '-keyout', key, '-out', cert)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(cert, key)
@@ -302,11 +302,11 @@ def authenticated_delivery(base, revision, nar_hash):
                'pluginApi': 1, 'minUpdater': 1, 'notes': 'Isolated authenticated transport qualification',
                'vendorInputs': ['vendorlib'], 'assets': [{
                    'name': 'qualification-source.tar.gz',
-                   'url': 'https://github.com/DigitalPals/CybexOS/releases/download/v1.0.0-beta.2/qualification-source.tar.gz',
+                   'url': 'https://github.com/CybexHQ/CybexOS/releases/download/v1.0.0-beta.2/qualification-source.tar.gz',
                    'sha256': '0' * 64, 'bytes': 1,
                }]}
-    channel_url = 'https://digitalpals.github.io/CybexOS/channels/beta.json'
-    manifest_url = 'https://github.com/DigitalPals/CybexOS/releases/download/v1.0.0-beta.2/manifest.json'
+    channel_url = 'https://cybexhq.github.io/CybexOS/channels/beta.json'
+    manifest_url = 'https://github.com/CybexHQ/CybexOS/releases/download/v1.0.0-beta.2/manifest.json'
     channel = {'schema': 1, 'channel': 'beta', 'sequence': 2,
                'expires': (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)).isoformat(),
                'manifest': manifest_url, 'sha256': ''}
