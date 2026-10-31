@@ -12,8 +12,8 @@ ISO file from another boot manager (Ventoy, a GRUB `loopback` entry) is not
 qualified. A DVD needs a dual-layer disc.
 
 Plug the stick into the computer itself rather than a hub, dock or monitor.
-If the installer cannot find its medium within two minutes, it explains the
-likely causes and opens a maintenance shell instead of waiting on the splash.
+If the installer cannot find its medium within two minutes, it stops and
+explains the likely causes instead of waiting on the splash.
 
 **Turn Secure Boot off** in the firmware settings before starting the stick.
 The installation medium is not signed, so firmware with Secure Boot on refuses

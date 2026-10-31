@@ -312,7 +312,7 @@ in {
         and try another USB port or another stick of 8 GB or more.
       - For a network boot, check the cable and that the boot server is on.
 
-      A maintenance shell follows. Turn the computer off to try again.
+      Turn the computer off, then fix the medium and start again.
 
     '';
     boot.initrd.systemd.services.cybexos-medium-missing = {
@@ -325,9 +325,14 @@ in {
       };
       serviceConfig = {
         Type = "oneshot";
-        ExecStartPre = "-/bin/plymouth quit";
+        # Wait for the splash to end, so emergency mode's own quit finds
+        # nothing left to report on the console.
+        ExecStartPre = "-/bin/plymouth --wait quit";
         ExecStart = "/bin/cat /etc/cybexos/medium-missing.txt";
-        StandardOutput = "journal+console";
+        # Plain text on the console: through the journal, every line would
+        # carry a kernel timestamp and wrap.
+        StandardOutput = "tty";
+        TTYPath = "/dev/console";
       };
     };
     # A network-medium hook needs the wired NIC in stage 1; the ordinary CD
