@@ -1,0 +1,5096 @@
+{
+  "kind": "isolated-installation-evidence",
+  "version": "1.0.0-beta.31",
+  "completedAt": "2026-10-31T00:14:10.025581+00:00",
+  "scope": "VM only; no physical hardware, signed-in external accounts or public signed release qualification",
+  "sourceRevision": "c2e6a8f6fe4a6719d40549371e8a062226285c48",
+  "sourceNarHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+  "image": {
+    "servedPath": "/data/pxe/iso/cybexos-1.0.0-beta.31.iso",
+    "size": 7457329152,
+    "sha256": "19b3b4cb09614251459b50fa9c6b4df2923cb0d8e5e1ca38c2a44f91d3ff1bf6",
+    "removed": [
+      "cybexos-1.0.0-beta.30.iso"
+    ],
+    "refresh": {
+      "result": "success"
+    },
+    "restarted": true,
+    "status": {
+      "status": "running"
+    },
+    "service": "active"
+  },
+  "pxeFinalVerification": {
+    "checkedAt": "2026-10-30T23:56:58.724468+00:00",
+    "checksumVerification": {
+      "command": "sha256sum -c cybexos-1.0.0-beta.31.iso.sha256",
+      "status": 0,
+      "note": "Completed successfully immediately before the urllib management request timed out; management checks repeated with the documented curl API."
+    },
+    "status": {
+      "status": "running"
+    },
+    "tree": [
+      {
+        "name": "cybexos-1.0.0-beta.31.iso",
+        "checked": false,
+        "imgid": 1,
+        "icon": "/static/ztree/img/iso.png"
+      }
+    ],
+    "summary": {
+      "count": 1,
+      "maxid": 1,
+      "isos_url": "http://10.10.0.7:16000/iso/"
+    },
+    "service": "active",
+    "files": [
+      "cybexos-1.0.0-beta.31.iso"
+    ]
+  },
+  "sourceChecks": [
+    {
+      "check": "source",
+      "status": 0,
+      "seconds": 147.67
+    },
+    {
+      "check": "qml-lint",
+      "status": 0,
+      "seconds": 13.09
+    }
+  ],
+  "imageParity": {
+    "result": "passed",
+    "checks": {
+      "source": {
+        "files": 1889,
+        "sha256": "71d40823a13d8912a88495a9584c10a27c92e769d0db8b70b4d046fa4d534e26"
+      },
+      "desktop": {
+        "files": 1103,
+        "sha256": "a99014b1ca3d2363810dd79df7582b2d722740ed1807f493f533e1ca3ca3775a"
+      },
+      "updater": {
+        "files": 94,
+        "sha256": "a8bbfead9b71162ad824a486fce89d0d6733a495894e97e5a9cd17a4d4e87cf9"
+      },
+      "installerUi": {
+        "files": 125,
+        "sha256": "af7a48933b9d05e1650ed5a711bb7f55a301c6e60bd2ce176f636639bd48c665"
+      },
+      "installerScreen": {
+        "files": 1,
+        "sha256": "546c2dc23d843a9731ef4fb26d0a29e8bbef70e69c08e808b3e74a0773fea0eb"
+      },
+      "payloadSystemPath": {
+        "files": 1060,
+        "sha256": "0306cc1d0b0cf0603ab2c77b4762607aa4b02a879989ca7186a6a2f16af4c969"
+      },
+      "payloadEtc": {
+        "files": 15,
+        "sha256": "a93228b67f000bab501a2197af85b1b8510e42f40cbe003d9ef6c05705f09edb"
+      },
+      "system": {
+        "files": 11,
+        "sha256": "38e2d1381b45fb4b04f38cb54e3b3cc9ef839af0f62c52eb3e23061a24e17d2c"
+      },
+      "etc": {
+        "files": 6,
+        "sha256": "47bd04d34e3059c27520396e9be6ae14cf6a048dbd027921cad42f5602fa3309"
+      },
+      "releaseFile": {
+        "files": 1,
+        "sha256": "0f79f53ce1c32529465718b370fa11bca5fad908b098990942ee31a9ce71bee5"
+      },
+      "installerSourceFile": {
+        "files": 1,
+        "sha256": "6080aacf411d90afa4b4c5cf60228ef8b579cda5506c4c435c7f039a9ad002ca"
+      },
+      "installerInputsFile": {
+        "files": 1,
+        "sha256": "e4988d82747b48c16d913939e9e0f5110efb776658df3a041f36aecd9bfc4c94"
+      },
+      "hardwareCatalogue": {
+        "files": 1,
+        "sha256": "44cb1258d05a4e4d4a0660a304b44f6615ce5dd6730ed3005b5dab7b0647284f"
+      },
+      "inputSource:0": {
+        "files": 92,
+        "sha256": "3b906e5ef19206b26c7dd6a27bf1c2bb4b95d144c9ab8cccd457637d0e5c1c19"
+      },
+      "inputSource:1": {
+        "files": 55247,
+        "sha256": "987d5f9cc2abed36b1177e4293f584ed9041767908061a364120190c4d92f78c"
+      },
+      "inputSource:2": {
+        "files": 669,
+        "sha256": "ac16267ad0dc4dfb43e5d887588da649d309df5f7375376f3f773da98e360046"
+      },
+      "inputSource:3": {
+        "files": 5,
+        "sha256": "61cc1022d5187e2dd48d294334f9d711418283d362b725e3774bacfd9ca9cd24"
+      },
+      "inputSource:4": {
+        "files": 56,
+        "sha256": "e166c809e0f33fe979d6643976e7183124cba81b29172ffe5e2fdbdc351fe2b7"
+      },
+      "inputSource:5": {
+        "files": 35,
+        "sha256": "0783f834cf11613b628dacb18313aa6639478f02164af1f1c8626c8b1b89850d"
+      },
+      "inputSource:6": {
+        "files": 934,
+        "sha256": "462679237e67879418e1c4e092e34453312916c748295752646df271d1abbb46"
+      },
+      "inputSource:7": {
+        "files": 24,
+        "sha256": "76237c4886edab782e8b7d44ff726c27080bc3a006e2d8c9ba5ca5b121189d7c"
+      },
+      "quickshell": {
+        "files": 832,
+        "sha256": "25aadabb06194e49dfa4b8ff2f647cc33f3ea058e933b910535d0fb7ede84c80"
+      },
+      "hyprlandConfiguration": {
+        "files": 20,
+        "sha256": "ade30aaf3d2ce67cb6a66d9fa020522bef9f0ae3e2a4d7bf8a8ea396529833e2"
+      },
+      "desktopSkill": {
+        "files": 6,
+        "sha256": "c8744d7a1ff90770b06035552984210dc1c0d78d16ef7c9647ea7b6d1b296bba"
+      },
+      "updaterSkill": {
+        "files": 6,
+        "sha256": "c8744d7a1ff90770b06035552984210dc1c0d78d16ef7c9647ea7b6d1b296bba"
+      },
+      "machineTemplate": {
+        "files": 8,
+        "sha256": "9e14919266107d436448546ca6f91dcff058806aa968158b248e502e674e393b"
+      },
+      "updaterCode": {
+        "files": 23,
+        "sha256": "b325eea8f4605296f4420140bcf07e0bab34b44b4bc3f8936660713d41d03097"
+      },
+      "installerService": {
+        "files": 1,
+        "sha256": "409364490883dad6354c63ef302279c4a613f164dd4e1619816e1ce83eec1219"
+      },
+      "installerNetworkHelper": {
+        "files": 1,
+        "sha256": "11e20249bb07b8b5fb642900b6d624be1fa696631fa1bb2a6d4a4172e2503695"
+      },
+      "updaterExecutable:cybexos-verify-encryption": {
+        "files": 1,
+        "sha256": "a1e9a50041170ad3a5e9fca95939050b1b64bf01f0ab437599e42fddec4b1870"
+      },
+      "updaterExecutable:cybexos-desktop-check": {
+        "files": 1,
+        "sha256": "0b6d1307d7af28b3fbbd9191c4576a9dbce7ca2378e2eb5f653f8b39eb1862dd"
+      },
+      "updaterExecutable:cybexos-boot-trial": {
+        "files": 1,
+        "sha256": "c51762ea9f7d92cdee673526832fc536489ccb92381377c78d275c6c0bcc69db"
+      },
+      "updaterExecutable:cybexos-personal-init": {
+        "files": 1,
+        "sha256": "a6531401986e3d2175ff573c08ac34767b9fa15967658b506caeec22c1b4bb12"
+      },
+      "updaterExecutable:cybexos-health": {
+        "files": 1,
+        "sha256": "1077581b4d977d2b0b550c45697f74eb88580f5cb0e18d4eea10447a942a952b"
+      },
+      "updaterExecutable:cybex": {
+        "files": 1,
+        "sha256": "dc04583bedbed5d622984582c77db08293b1419b13e9940a5de350517f132319"
+      },
+      "updaterExecutable:cybexos-request": {
+        "files": 1,
+        "sha256": "14b9b6bc3a0af50f11784a18ff6fe5668d1e181f9febd7ca1c091596c3e8d296"
+      },
+      "updaterExecutable:cybexos-boot-menu": {
+        "files": 1,
+        "sha256": "f90eb27b636237064ed2dd2c67e361259d130916d0b496f1e5a7d12192bf8ff3"
+      },
+      "updaterExecutable:cybexos-password-worker": {
+        "files": 1,
+        "sha256": "5fa1de4e00bb8557e48ff2a9a59ae07ae45285aeeb7f5f9ed5ad6f372dd740fd"
+      },
+      "updaterExecutable:cybexos-ssh-server": {
+        "files": 1,
+        "sha256": "a2f60cab51bc7d9df337b35ffec63c16515c3b6334b5ba016639d3511280a963"
+      },
+      "updaterExecutable:cybexos-boot-started": {
+        "files": 1,
+        "sha256": "7c3032bbe5b12985add30f7442a19eef0391013667b6ed1699aec959f895046c"
+      },
+      "updaterExecutable:cybexos-admin": {
+        "files": 1,
+        "sha256": "a6ddcf8792dd6a969ba20908569c1f951bbd99e1bbb1fde612b0d8b1a3e3f220"
+      },
+      "updaterExecutable:cybexos-install": {
+        "files": 1,
+        "sha256": "f30392429dc1f8905e9692d5b97f1638c0e32e0c2b26fd2821099941adbd561a"
+      }
+    }
+  },
+  "installations": {
+    "plain": {
+      "result": "passed",
+      "milestones": {
+        "isoSourceIdentity": {
+          "result": "passed"
+        },
+        "liveHardwareInventory": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "networkDrivers": [
+            "virtio_net"
+          ],
+          "scope": "virtual devices only; no physical qualification"
+        },
+        "installerKernelAndZfs": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "checks": [
+            "ZFS module loaded",
+            "file-backed pool with compression",
+            "file I/O",
+            "snapshot and rollback",
+            "zvol block I/O",
+            "scrub",
+            "export and import"
+          ]
+        },
+        "nativeGuiAssertions": {
+          "result": "passed",
+          "installerOnlyRuntime": "tty1 kiosk as cybexos-installer; no live account, compositor or display manager",
+          "display": [
+            1280,
+            800
+          ],
+          "developmentConsent": "Enter on the screen",
+          "encryptionSwitch": "pointer click turned encryption off",
+          "lowercaseUsername": "typed CybexQA; the screen kept cybexqa",
+          "installerScrolling": {
+            "result": "passed",
+            "wheel": true,
+            "contentDrag": true,
+            "scrollbarDrag": true,
+            "scope": "QMP pointer input through libinput and packaged KMS screen; rendered list pixels changed"
+          },
+          "reviewedPlan": {
+            "username": "cybexqa",
+            "fullName": "Cybex QA",
+            "hostname": "cybexqa-cybexos",
+            "timezone": "Europe/Amsterdam",
+            "keyboard": "us",
+            "encrypted": false,
+            "autoLogin": false,
+            "features": {
+              "developer": true,
+              "proprietary": true,
+              "steam": false,
+              "docker": true,
+              "podman": true,
+              "tailscale": true,
+              "connectedWidgets": true,
+              "assistant": true,
+              "localNetworkServices": true
+            },
+            "software": {
+              "packages": [
+                "bruno",
+                "dbeaver-bin",
+                "meld",
+                "zed-editor"
+              ]
+            }
+          },
+          "completed": {
+            "username": "cybexqa",
+            "hostname": "cybexqa-cybexos",
+            "encrypted": false
+          },
+          "observedElapsedSeconds": 183.521,
+          "workerElapsedSeconds": 177,
+          "pollingIntervalSeconds": 20
+        },
+        "installerCompleted": {
+          "result": "passed",
+          "interface": "tty1 Slint screen with real QMP keyboard and pointer input",
+          "applications": "standard"
+        },
+        "installedBootAndSerialPasswordLogin": {
+          "result": "passed"
+        },
+        "installedKernel": {
+          "result": "passed",
+          "kernel": "7.3.0"
+        },
+        "automaticUpdatePolicy": {
+          "result": "passed",
+          "default": {
+            "prepare": true,
+            "confirm": true
+          },
+          "preparationDuringRun": false
+        },
+        "quietBoot": {
+          "result": "passed",
+          "linesOnConsole": {
+            "kernel": 0,
+            "efiStub": 0
+          },
+          "plymouthTextViewStatusLines": 163,
+          "scope": "serial console of the installed boot until the login prompt"
+        },
+        "installedBootMenu": {
+          "result": "passed",
+          "checks": [
+            "GRUB with the installer theme",
+            "labelled exact-system generations",
+            "removable fallback loader",
+            "firmware boot entry",
+            "quiet kernel command line",
+            "hidden menu with versioned titles",
+            "confirmed start cleared its pending mark"
+          ]
+        },
+        "prebuiltStoreTransfer": {
+          "paths": 3372,
+          "seconds": 87.983
+        },
+        "installedSourceIdentity": {
+          "result": "passed",
+          "isoRelease": {
+            "architecture": "x86_64-linux",
+            "configurationApi": 1,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "nixos": "unstable",
+            "pluginApi": 1,
+            "revision": "c2e6a8f6fe4a6719d40549371e8a062226285c48",
+            "updaterApi": 1,
+            "version": "1.0.0-beta.31"
+          },
+          "installedRelease": {
+            "architecture": "x86_64-linux",
+            "configurationApi": 1,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "nixos": "unstable",
+            "pluginApi": 1,
+            "revision": "uncommitted",
+            "updaterApi": 1,
+            "version": "1.0.0-beta.31"
+          },
+          "installedSource": {
+            "lastModified": 0,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "path": "/nix/store/z5044n2xa134lzpckpl1yxvs62n2n9i5-source",
+            "type": "path"
+          },
+          "scope": "same exact source NAR; bundled path inputs have no Git revision metadata"
+        },
+        "installedHardwareInventory": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "scope": "virtual devices only; no physical qualification"
+        },
+        "runtimeEncryption": {
+          "result": "passed",
+          "encrypted": false
+        },
+        "desktopConfigurationCheck": {
+          "result": "passed"
+        },
+        "proprietaryApplications": {
+          "result": "passed",
+          "proprietary": true,
+          "onePassword": true,
+          "connectCard": "available",
+          "defaultBrowser": "brave-browser.desktop",
+          "xdgBrowser": "brave-browser.desktop",
+          "vendorApps": [
+            "discord",
+            "google-chrome",
+            "obsidian",
+            "postman",
+            "slack",
+            "spotify",
+            "vivaldi",
+            "vscode",
+            "zoom-us"
+          ]
+        },
+        "welcomeFirstLogin": {
+          "result": "passed",
+          "opened": true,
+          "fullScreenLayer": "qs-welcome",
+          "steppedAsideForWindow": true,
+          "resumed": true,
+          "dismissed": true,
+          "unmapped": true,
+          "helloSummaryServices": {
+            "region": {
+              "loaded": true,
+              "failed": false
+            },
+            "input": {
+              "loaded": true,
+              "failed": false
+            }
+          }
+        },
+        "keyboardShortcutsRuntime": {
+          "userLuaBefore": "absent",
+          "defaults": {
+            "actions": 99,
+            "binds": 107,
+            "describedBinds": 107,
+            "requiredActions": 40,
+            "stateError": null,
+            "evalErrorNil": true,
+            "browser": [
+              "SUPER + B"
+            ]
+          },
+          "keymap": {
+            "entries": 483,
+            "keycode10": "1",
+            "layout": [
+              [
+                "us",
+                "English (US)"
+              ]
+            ]
+          },
+          "applied": {
+            "browser": [
+              "SUPER + ALT + B"
+            ],
+            "custom": [
+              {
+                "group": "Web",
+                "id": "custom.qa-docs",
+                "keys": [
+                  "SUPER + ALT + D"
+                ],
+                "label": "QA docs",
+                "run": {
+                  "type": "url",
+                  "url": "https://example.org"
+                }
+              }
+            ],
+            "diagnostics": [],
+            "customBind": [
+              {
+                "locked": false,
+                "mouse": false,
+                "release": false,
+                "repeat": false,
+                "longPress": false,
+                "non_consuming": false,
+                "auto_consuming": false,
+                "has_description": true,
+                "modmask": 72,
+                "submap": "",
+                "submap_universal": "false",
+                "key": "D",
+                "keycode": 0,
+                "catch_all": false,
+                "description": "Web: QA docs",
+                "allow_input_capture": false,
+                "dispatcher": "__lua",
+                "arg": "186"
+              }
+            ]
+          },
+          "reset": {
+            "browser": [
+              "SUPER + B"
+            ],
+            "custom": [],
+            "changedRows": 0
+          },
+          "userLuaAfter": "absent",
+          "settingsPage": {
+            "opened": "cybexos-runtime ipc settings open shortcuts",
+            "page": "keyboard",
+            "tab": "shortcuts"
+          },
+          "journal": {
+            "lines": 19,
+            "onboardingQmlErrors": [],
+            "otherQmlErrors": 0,
+            "otherQmlErrorSamples": []
+          },
+          "result": "passed"
+        },
+        "authenticatedDesktopHealth": {
+          "result": "passed",
+          "login": "SDDM password login"
+        },
+        "desktopAuthorization": {
+          "result": "passed",
+          "sshCancellation": true,
+          "sshEnable": true,
+          "sshDisable": true,
+          "updateStage": true,
+          "passwordPrompts": "real Quickshell agent and PAM"
+        },
+        "sharedPasswordChanges": {
+          "result": "passed",
+          "encrypted": false,
+          "roundTrips": 2,
+          "keyringStored": true,
+          "accountChanges": 2,
+          "checks": [
+            "real packaged worker and PAM",
+            "no disk change",
+            "reboot and password desktop login",
+            "login keyring unlocked with changed password"
+          ]
+        }
+      },
+      "isoReleaseIdentity": {
+        "architecture": "x86_64-linux",
+        "configurationApi": 1,
+        "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+        "nixos": "unstable",
+        "pluginApi": 1,
+        "revision": "c2e6a8f6fe4a6719d40549371e8a062226285c48",
+        "updaterApi": 1,
+        "version": "1.0.0-beta.31"
+      },
+      "lifecycle": {
+        "automaticPreparation": {
+          "result": "passed",
+          "outcome": {
+            "accepted": true,
+            "requestId": "04ecfa739b094e50874f0b0a73df58ab",
+            "unit": "cybexos-update@04ecfa739b094e50874f0b0a73df58ab.service",
+            "scope": "upstream"
+          },
+          "highlights": {
+            "apps": [
+              {
+                "after": "4.3.0",
+                "before": "4.0.0",
+                "icon": "bruno",
+                "kind": "updated",
+                "name": "bruno",
+                "title": "Bruno"
+              },
+              {
+                "after": "159.0",
+                "before": "158.0.1",
+                "icon": "firefox",
+                "kind": "updated",
+                "name": "firefox",
+                "title": "Firefox"
+              },
+              {
+                "after": "159.0",
+                "before": "158.0.1",
+                "icon": "firefox",
+                "kind": "updated",
+                "name": "firefox",
+                "title": "Firefox"
+              },
+              {
+                "after": "1.26.2",
+                "before": "1.25.3",
+                "icon": "zed",
+                "kind": "updated",
+                "name": "zed-editor",
+                "title": "Zed"
+              }
+            ],
+            "background": 25,
+            "components": [
+              {
+                "after": "26.11.20261030.1c89083",
+                "before": "26.11.20261027.31ecbac",
+                "id": "nixos"
+              },
+              {
+                "after": "26.2.6",
+                "before": "26.2.5",
+                "id": "graphics"
+              },
+              {
+                "after": "0.57.0",
+                "before": "0.56.2",
+                "id": "hyprland"
+              }
+            ],
+            "schema": 1,
+            "sizeChange": -17677824,
+            "tools": [
+              {
+                "after": "2.1.312",
+                "before": "2.1.311",
+                "kind": "updated",
+                "name": "claude-code"
+              },
+              {
+                "after": "0.165.0",
+                "before": "0.164.0",
+                "kind": "updated",
+                "name": "codex"
+              },
+              {
+                "after": "29.9.2",
+                "before": "29.9.1",
+                "kind": "updated",
+                "name": "docker"
+              },
+              {
+                "after": "2.103.3",
+                "before": "2.103.2",
+                "kind": "updated",
+                "name": "gh"
+              },
+              {
+                "after": "0.57.0",
+                "before": "0.56.2",
+                "kind": "updated",
+                "name": "hyprland"
+              },
+              {
+                "after": "2.2.1",
+                "before": "2.1.4",
+                "kind": "updated",
+                "name": "opencode"
+              },
+              {
+                "after": "1.104.4",
+                "before": "1.104.2",
+                "kind": "updated",
+                "name": "tailscale"
+              },
+              {
+                "after": "1.5.0",
+                "before": "1.4.1",
+                "kind": "updated",
+                "name": "xdg-desktop-portal-hyprland"
+              },
+              {
+                "after": "0.14.4",
+                "before": "0.14.3",
+                "kind": "updated",
+                "name": "xdg-terminal-exec"
+              }
+            ]
+          }
+        },
+        "upstreamWithUnavailableVendor": {
+          "result": "passed",
+          "discovery": {
+            "upstream": {
+              "state": "available",
+              "installed": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+              "available": "1c89083e451e891152365b799595cf7790a43325",
+              "detail": "Stage upstream to build and review actual package changes."
+            },
+            "cybexos": {
+              "state": "unpublished",
+              "installed": "1.0.0-beta.31"
+            },
+            "firmware": {
+              "state": "current",
+              "devices": []
+            },
+            "checkedAt": 1793404829,
+            "installedIdentity": "15b5fd67546215de428cde957a028deecba9426063223a7619fff48d88281617"
+          },
+          "transaction": "9cd25a2cfb094c959be2406870222efd",
+          "upstreamBefore": {
+            "lastModified": 1793110635,
+            "narHash": "sha256-dhoW6VgFWlaodSY5jrBn+CF2FLmaUvDVgM7+C7T2+NM=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+            "type": "github"
+          },
+          "upstreamAfter": {
+            "lastModified": 1793341285,
+            "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "1c89083e451e891152365b799595cf7790a43325",
+            "type": "github"
+          },
+          "upstreamChanged": true,
+          "applied": false,
+          "scope": "actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification"
+        },
+        "kernelUpdateAndRollback": {
+          "result": "passed",
+          "previous": "6.18.59",
+          "latest": "7.3.0",
+          "transaction": "ad09b85d917643b5939b3a23729fbc2d",
+          "checks": [
+            "staged kernel review",
+            "trial boot",
+            "desktop confirmation",
+            "rollback booted previous kernel",
+            "latest kernel restored"
+          ]
+        },
+        "personalBaseline": {
+          "result": "passed",
+          "transaction": "ffedae34b75848ffa60f2ea77c2330dc"
+        },
+        "evaluationFailure": {
+          "result": "passed"
+        },
+        "buildFailure": {
+          "result": "passed"
+        },
+        "interruptedStageRecovery": {
+          "result": "passed"
+        },
+        "unconfirmedTrialFallback": {
+          "result": "passed",
+          "transaction": "57b2827775074ac3b22f062b94a8145d"
+        },
+        "localApplyBootConfirm": {
+          "result": "passed",
+          "transaction": "937317776f9749fe86d70a85a4fb40c3"
+        },
+        "rollbackAndPersonalPersistence": {
+          "result": "passed"
+        },
+        "changedUpstreamAppliedAndConfirmed": {
+          "result": "passed",
+          "transaction": "a8995567988642d0878f03a8f9833038",
+          "nixpkgs": {
+            "lastModified": 1793341285,
+            "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "1c89083e451e891152365b799595cf7790a43325",
+            "type": "github"
+          },
+          "cybexos": {
+            "lastModified": 0,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "path": "/nix/store/z5044n2xa134lzpckpl1yxvs62n2n9i5-source",
+            "type": "path"
+          },
+          "scope": "actual staged upstream update, GRUB trial, desktop confirmation and runtime checks"
+        },
+        "changedUpstreamRuntimeAndRollback": {
+          "result": "passed",
+          "scope": "settings and plugins on updated compositor; rollback boot and desktop health"
+        }
+      },
+      "scope": "actual ISO installation, boot/login, background preparation, local updater failure/interruption, staged application, GRUB trial boot, unconfirmed-trial fallback, automatic confirmation from the signed-in desktop and rollback; no signed channel or physical qualification"
+    },
+    "encrypted": {
+      "result": "passed",
+      "milestones": {
+        "isoSourceIdentity": {
+          "result": "passed"
+        },
+        "liveHardwareInventory": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "networkDrivers": [
+            "virtio_net"
+          ],
+          "scope": "virtual devices only; no physical qualification"
+        },
+        "installerKernelAndZfs": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "checks": [
+            "ZFS module loaded",
+            "file-backed pool with compression",
+            "file I/O",
+            "snapshot and rollback",
+            "zvol block I/O",
+            "scrub",
+            "export and import"
+          ]
+        },
+        "nativeGuiAssertions": {
+          "result": "passed",
+          "installerOnlyRuntime": "tty1 kiosk as cybexos-installer; no live account, compositor or display manager",
+          "display": [
+            1280,
+            800
+          ],
+          "developmentConsent": "Enter on the screen",
+          "lowercaseUsername": "typed CybexQA; the screen kept cybexqa",
+          "installerScrolling": {
+            "result": "passed",
+            "wheel": true,
+            "contentDrag": true,
+            "scrollbarDrag": true,
+            "scope": "QMP pointer input through libinput and packaged KMS screen; rendered list pixels changed"
+          },
+          "reviewedPlan": {
+            "username": "cybexqa",
+            "fullName": "Cybex QA",
+            "hostname": "cybexqa-cybexos",
+            "timezone": "Europe/Amsterdam",
+            "keyboard": "us",
+            "encrypted": true,
+            "autoLogin": true,
+            "features": {
+              "developer": true,
+              "proprietary": true,
+              "steam": false,
+              "docker": true,
+              "podman": true,
+              "tailscale": true,
+              "connectedWidgets": true,
+              "assistant": true,
+              "localNetworkServices": true
+            },
+            "software": {
+              "packages": [
+                "bruno",
+                "dbeaver-bin",
+                "meld",
+                "zed-editor"
+              ]
+            }
+          },
+          "completed": {
+            "username": "cybexqa",
+            "hostname": "cybexqa-cybexos",
+            "encrypted": true
+          },
+          "observedElapsedSeconds": 183.347,
+          "workerElapsedSeconds": 172,
+          "pollingIntervalSeconds": 20
+        },
+        "installerCompleted": {
+          "result": "passed",
+          "interface": "tty1 Slint screen with real QMP keyboard and pointer input",
+          "applications": "standard"
+        },
+        "installedBootAndSerialPasswordLogin": {
+          "result": "passed"
+        },
+        "installedKernel": {
+          "result": "passed",
+          "kernel": "7.3.0"
+        },
+        "automaticUpdatePolicy": {
+          "result": "passed",
+          "default": {
+            "prepare": true,
+            "confirm": true
+          },
+          "preparationDuringRun": false
+        },
+        "quietBoot": {
+          "result": "passed",
+          "linesOnConsole": {
+            "kernel": 0,
+            "efiStub": 0
+          },
+          "plymouthTextViewStatusLines": 165,
+          "scope": "serial console of the installed boot until the login prompt"
+        },
+        "installedBootMenu": {
+          "result": "passed",
+          "checks": [
+            "GRUB with the installer theme",
+            "labelled exact-system generations",
+            "removable fallback loader",
+            "firmware boot entry",
+            "quiet kernel command line",
+            "hidden menu with versioned titles",
+            "confirmed start cleared its pending mark"
+          ]
+        },
+        "prebuiltStoreTransfer": {
+          "paths": 3367,
+          "seconds": 75.418
+        },
+        "installedSourceIdentity": {
+          "result": "passed",
+          "isoRelease": {
+            "architecture": "x86_64-linux",
+            "configurationApi": 1,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "nixos": "unstable",
+            "pluginApi": 1,
+            "revision": "c2e6a8f6fe4a6719d40549371e8a062226285c48",
+            "updaterApi": 1,
+            "version": "1.0.0-beta.31"
+          },
+          "installedRelease": {
+            "architecture": "x86_64-linux",
+            "configurationApi": 1,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "nixos": "unstable",
+            "pluginApi": 1,
+            "revision": "uncommitted",
+            "updaterApi": 1,
+            "version": "1.0.0-beta.31"
+          },
+          "installedSource": {
+            "lastModified": 0,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "path": "/nix/store/z5044n2xa134lzpckpl1yxvs62n2n9i5-source",
+            "type": "path"
+          },
+          "scope": "same exact source NAR; bundled path inputs have no Git revision metadata"
+        },
+        "installedHardwareInventory": {
+          "result": "passed",
+          "kernel": "7.3.0",
+          "scope": "virtual devices only; no physical qualification"
+        },
+        "runtimeEncryption": {
+          "result": "passed",
+          "encrypted": true
+        },
+        "desktopConfigurationCheck": {
+          "result": "passed"
+        },
+        "proprietaryApplications": {
+          "result": "passed",
+          "proprietary": true,
+          "onePassword": true,
+          "connectCard": "available",
+          "defaultBrowser": "brave-browser.desktop",
+          "xdgBrowser": "brave-browser.desktop",
+          "vendorApps": [
+            "discord",
+            "google-chrome",
+            "obsidian",
+            "postman",
+            "slack",
+            "spotify",
+            "vivaldi",
+            "vscode",
+            "zoom-us"
+          ]
+        },
+        "welcomeFirstLogin": {
+          "result": "passed",
+          "opened": true,
+          "fullScreenLayer": "qs-welcome",
+          "steppedAsideForWindow": true,
+          "resumed": true,
+          "dismissed": true,
+          "unmapped": true,
+          "helloSummaryServices": {
+            "region": {
+              "loaded": true,
+              "failed": false
+            },
+            "input": {
+              "loaded": true,
+              "failed": false
+            }
+          }
+        },
+        "keyboardShortcutsRuntime": {
+          "userLuaBefore": "absent",
+          "defaults": {
+            "actions": 99,
+            "binds": 107,
+            "describedBinds": 107,
+            "requiredActions": 40,
+            "stateError": null,
+            "evalErrorNil": true,
+            "browser": [
+              "SUPER + B"
+            ]
+          },
+          "keymap": {
+            "entries": 483,
+            "keycode10": "1",
+            "layout": [
+              [
+                "us",
+                "English (US)"
+              ]
+            ]
+          },
+          "applied": {
+            "browser": [
+              "SUPER + ALT + B"
+            ],
+            "custom": [
+              {
+                "group": "Web",
+                "id": "custom.qa-docs",
+                "keys": [
+                  "SUPER + ALT + D"
+                ],
+                "label": "QA docs",
+                "run": {
+                  "type": "url",
+                  "url": "https://example.org"
+                }
+              }
+            ],
+            "diagnostics": [],
+            "customBind": [
+              {
+                "locked": false,
+                "mouse": false,
+                "release": false,
+                "repeat": false,
+                "longPress": false,
+                "non_consuming": false,
+                "auto_consuming": false,
+                "has_description": true,
+                "modmask": 72,
+                "submap": "",
+                "submap_universal": "false",
+                "key": "D",
+                "keycode": 0,
+                "catch_all": false,
+                "description": "Web: QA docs",
+                "allow_input_capture": false,
+                "dispatcher": "__lua",
+                "arg": "186"
+              }
+            ]
+          },
+          "reset": {
+            "browser": [
+              "SUPER + B"
+            ],
+            "custom": [],
+            "changedRows": 0
+          },
+          "userLuaAfter": "absent",
+          "settingsPage": {
+            "opened": "cybexos-runtime ipc settings open shortcuts",
+            "page": "keyboard",
+            "tab": "shortcuts"
+          },
+          "journal": {
+            "lines": 19,
+            "onboardingQmlErrors": [],
+            "otherQmlErrors": 0,
+            "otherQmlErrorSamples": []
+          },
+          "result": "passed"
+        },
+        "authenticatedDesktopHealth": {
+          "result": "passed",
+          "login": "SDDM automatic login after disk unlock, keyring unlocked"
+        },
+        "desktopAuthorization": {
+          "result": "passed",
+          "sshCancellation": true,
+          "sshEnable": true,
+          "sshDisable": true,
+          "updateStage": true,
+          "passwordPrompts": "real Quickshell agent and PAM"
+        },
+        "sharedPasswordChanges": {
+          "result": "passed",
+          "encrypted": true,
+          "roundTrips": 2,
+          "keyringStored": true,
+          "accountChanges": 2,
+          "checks": [
+            "real packaged worker and PAM",
+            "old disk key rejected",
+            "reboot and automatic desktop login after disk unlock",
+            "login keyring unlocked with changed password"
+          ]
+        }
+      },
+      "isoReleaseIdentity": {
+        "architecture": "x86_64-linux",
+        "configurationApi": 1,
+        "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+        "nixos": "unstable",
+        "pluginApi": 1,
+        "revision": "c2e6a8f6fe4a6719d40549371e8a062226285c48",
+        "updaterApi": 1,
+        "version": "1.0.0-beta.31"
+      },
+      "lifecycle": {
+        "automaticPreparation": {
+          "result": "passed",
+          "outcome": {
+            "accepted": true,
+            "requestId": "d1455df175984ae0bc13ce1aba279374",
+            "unit": "cybexos-update@d1455df175984ae0bc13ce1aba279374.service",
+            "scope": "upstream"
+          },
+          "highlights": {
+            "apps": [
+              {
+                "after": "4.3.0",
+                "before": "4.0.0",
+                "icon": "bruno",
+                "kind": "updated",
+                "name": "bruno",
+                "title": "Bruno"
+              },
+              {
+                "after": "159.0",
+                "before": "158.0.1",
+                "icon": "firefox",
+                "kind": "updated",
+                "name": "firefox",
+                "title": "Firefox"
+              },
+              {
+                "after": "159.0",
+                "before": "158.0.1",
+                "icon": "firefox",
+                "kind": "updated",
+                "name": "firefox",
+                "title": "Firefox"
+              },
+              {
+                "after": "1.26.2",
+                "before": "1.25.3",
+                "icon": "zed",
+                "kind": "updated",
+                "name": "zed-editor",
+                "title": "Zed"
+              }
+            ],
+            "background": 25,
+            "components": [
+              {
+                "after": "26.11.20261030.1c89083",
+                "before": "26.11.20261027.31ecbac",
+                "id": "nixos"
+              },
+              {
+                "after": "26.2.6",
+                "before": "26.2.5",
+                "id": "graphics"
+              },
+              {
+                "after": "0.57.0",
+                "before": "0.56.2",
+                "id": "hyprland"
+              }
+            ],
+            "schema": 1,
+            "sizeChange": -17677824,
+            "tools": [
+              {
+                "after": "2.1.312",
+                "before": "2.1.311",
+                "kind": "updated",
+                "name": "claude-code"
+              },
+              {
+                "after": "0.165.0",
+                "before": "0.164.0",
+                "kind": "updated",
+                "name": "codex"
+              },
+              {
+                "after": "29.9.2",
+                "before": "29.9.1",
+                "kind": "updated",
+                "name": "docker"
+              },
+              {
+                "after": "2.103.3",
+                "before": "2.103.2",
+                "kind": "updated",
+                "name": "gh"
+              },
+              {
+                "after": "0.57.0",
+                "before": "0.56.2",
+                "kind": "updated",
+                "name": "hyprland"
+              },
+              {
+                "after": "2.2.1",
+                "before": "2.1.4",
+                "kind": "updated",
+                "name": "opencode"
+              },
+              {
+                "after": "1.104.4",
+                "before": "1.104.2",
+                "kind": "updated",
+                "name": "tailscale"
+              },
+              {
+                "after": "1.5.0",
+                "before": "1.4.1",
+                "kind": "updated",
+                "name": "xdg-desktop-portal-hyprland"
+              },
+              {
+                "after": "0.14.4",
+                "before": "0.14.3",
+                "kind": "updated",
+                "name": "xdg-terminal-exec"
+              }
+            ]
+          }
+        },
+        "upstreamWithUnavailableVendor": {
+          "result": "passed",
+          "discovery": {
+            "upstream": {
+              "state": "available",
+              "installed": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+              "available": "1c89083e451e891152365b799595cf7790a43325",
+              "detail": "Stage upstream to build and review actual package changes."
+            },
+            "cybexos": {
+              "state": "unpublished",
+              "installed": "1.0.0-beta.31"
+            },
+            "firmware": {
+              "state": "current",
+              "devices": []
+            },
+            "checkedAt": 1793403214,
+            "installedIdentity": "15b5fd67546215de428cde957a028deecba9426063223a7619fff48d88281617"
+          },
+          "transaction": "300e6f85b6c24e2eb706c14b8ab215f3",
+          "upstreamBefore": {
+            "lastModified": 1793110635,
+            "narHash": "sha256-dhoW6VgFWlaodSY5jrBn+CF2FLmaUvDVgM7+C7T2+NM=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+            "type": "github"
+          },
+          "upstreamAfter": {
+            "lastModified": 1793341285,
+            "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "1c89083e451e891152365b799595cf7790a43325",
+            "type": "github"
+          },
+          "upstreamChanged": true,
+          "applied": false,
+          "scope": "actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification"
+        },
+        "kernelUpdateAndRollback": {
+          "result": "passed",
+          "previous": "6.18.59",
+          "latest": "7.3.0",
+          "transaction": "0c7d407395004c0f9cfbf64142b22bc9",
+          "checks": [
+            "staged kernel review",
+            "trial boot",
+            "desktop confirmation",
+            "rollback booted previous kernel",
+            "latest kernel restored"
+          ]
+        },
+        "personalBaseline": {
+          "result": "passed",
+          "transaction": "730538908a994ae08e622d90f6cb1beb"
+        },
+        "evaluationFailure": {
+          "result": "passed"
+        },
+        "buildFailure": {
+          "result": "passed"
+        },
+        "interruptedStageRecovery": {
+          "result": "passed"
+        },
+        "unconfirmedTrialFallback": {
+          "result": "passed",
+          "transaction": "b7fc0212334343debe438b406b703d3e"
+        },
+        "localApplyBootConfirm": {
+          "result": "passed",
+          "transaction": "74b5ce1e5a2a427fa46ca35a76194811"
+        },
+        "rollbackAndPersonalPersistence": {
+          "result": "passed"
+        },
+        "changedUpstreamAppliedAndConfirmed": {
+          "result": "passed",
+          "transaction": "3e450efff6fd4682b34867c0404ff8b4",
+          "nixpkgs": {
+            "lastModified": 1793341285,
+            "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
+            "owner": "NixOS",
+            "repo": "nixpkgs",
+            "rev": "1c89083e451e891152365b799595cf7790a43325",
+            "type": "github"
+          },
+          "cybexos": {
+            "lastModified": 0,
+            "narHash": "sha256-09S2fvH7mwzOfF4IT2wbtqbG/C4zXIAqcPsxE95p/xQ=",
+            "path": "/nix/store/z5044n2xa134lzpckpl1yxvs62n2n9i5-source",
+            "type": "path"
+          },
+          "scope": "actual staged upstream update, GRUB trial, desktop confirmation and runtime checks"
+        },
+        "changedUpstreamRuntimeAndRollback": {
+          "result": "passed",
+          "scope": "settings and plugins on updated compositor; rollback boot and desktop health"
+        }
+      },
+      "scope": "actual ISO installation, boot/login, background preparation, local updater failure/interruption, staged application, GRUB trial boot, unconfirmed-trial fallback, automatic confirmation from the signed-in desktop and rollback; no signed channel or physical qualification"
+    }
+  },
+  "runtimeAudits": {
+    "plain-settings": {
+      "tests": 194,
+      "pages": 22,
+      "settings": 69,
+      "cases": [
+        {
+          "name": "one managed shell before audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "1795",
+            "shellPIDs": [
+              "1795"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        },
+        {
+          "name": "page: home",
+          "result": "passed",
+          "detail": {
+            "rows": 6,
+            "visible": 6
+          }
+        },
+        {
+          "name": "page: appearance",
+          "result": "passed",
+          "detail": {
+            "rows": 32,
+            "visible": 32
+          }
+        },
+        {
+          "name": "preference: themeMode",
+          "result": "passed",
+          "detail": {
+            "key": "themeMode",
+            "values": [
+              "dark",
+              "light"
+            ]
+          }
+        },
+        {
+          "name": "preference: glassEnabled",
+          "result": "passed",
+          "detail": {
+            "key": "glassEnabled",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: font",
+          "result": "passed",
+          "detail": {
+            "key": "font",
+            "values": [
+              "figtree",
+              "google",
+              "urbanist",
+              "plex",
+              "inter",
+              "mono"
+            ]
+          }
+        },
+        {
+          "name": "preference: textScale",
+          "result": "passed",
+          "detail": {
+            "key": "textScale",
+            "values": [
+              "default",
+              "large",
+              "larger"
+            ]
+          }
+        },
+        {
+          "name": "preference: shellScale",
+          "result": "passed",
+          "detail": {
+            "key": "shellScale",
+            "values": [
+              75,
+              200,
+              100
+            ]
+          }
+        },
+        {
+          "name": "preference: interfaceDensity",
+          "result": "passed",
+          "detail": {
+            "key": "interfaceDensity",
+            "values": [
+              "compact",
+              "default",
+              "comfortable"
+            ]
+          }
+        },
+        {
+          "name": "preference: shellFontSize",
+          "result": "passed",
+          "detail": {
+            "key": "shellFontSize",
+            "values": [
+              10,
+              24,
+              14
+            ]
+          }
+        },
+        {
+          "name": "preference: paletteMode",
+          "result": "passed",
+          "detail": {
+            "key": "paletteMode",
+            "values": [
+              "wallpaper",
+              "fixed"
+            ]
+          }
+        },
+        {
+          "name": "preference: pointerSize",
+          "result": "passed",
+          "detail": {
+            "key": "pointerSize",
+            "values": [
+              "default",
+              "large",
+              "larger",
+              "largest"
+            ]
+          }
+        },
+        {
+          "name": "preference: pointerLeftHanded",
+          "result": "passed",
+          "detail": {
+            "key": "pointerLeftHanded",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: pointerHideTyping",
+          "result": "passed",
+          "detail": {
+            "key": "pointerHideTyping",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: pointerHideIdle",
+          "result": "passed",
+          "detail": {
+            "key": "pointerHideIdle",
+            "values": [
+              0,
+              3,
+              10,
+              20
+            ]
+          }
+        },
+        {
+          "name": "preference: surfaceBorderMode",
+          "result": "passed",
+          "detail": {
+            "key": "surfaceBorderMode",
+            "values": [
+              "accent",
+              "subtle",
+              "custom"
+            ]
+          }
+        },
+        {
+          "name": "preference: surfaceBorderColor",
+          "result": "passed",
+          "detail": {
+            "key": "surfaceBorderColor",
+            "values": [
+              "#123abc",
+              "#9ecbeb"
+            ]
+          }
+        },
+        {
+          "name": "preference: surfaceBorderWidth",
+          "result": "passed",
+          "detail": {
+            "key": "surfaceBorderWidth",
+            "values": [
+              0,
+              8,
+              2
+            ]
+          }
+        },
+        {
+          "name": "preference: surfaceBorderOpacity",
+          "result": "passed",
+          "detail": {
+            "key": "surfaceBorderOpacity",
+            "values": [
+              0,
+              100,
+              100
+            ]
+          }
+        },
+        {
+          "name": "preference: surfaceCornerRadius",
+          "result": "passed",
+          "detail": {
+            "key": "surfaceCornerRadius",
+            "values": [
+              0,
+              30,
+              16
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginScale",
+          "result": "passed",
+          "detail": {
+            "key": "pluginScale",
+            "values": [
+              75,
+              200,
+              100
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginBorderMode",
+          "result": "passed",
+          "detail": {
+            "key": "pluginBorderMode",
+            "values": [
+              "inherit",
+              "accent",
+              "subtle",
+              "custom"
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginBorderColor",
+          "result": "passed",
+          "detail": {
+            "key": "pluginBorderColor",
+            "values": [
+              "#123abc",
+              "#9ecbeb"
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginBorderWidth",
+          "result": "passed",
+          "detail": {
+            "key": "pluginBorderWidth",
+            "values": [
+              0,
+              8,
+              2
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginBorderOpacity",
+          "result": "passed",
+          "detail": {
+            "key": "pluginBorderOpacity",
+            "values": [
+              0,
+              100,
+              100
+            ]
+          }
+        },
+        {
+          "name": "preference: pluginRadius",
+          "result": "passed",
+          "detail": {
+            "key": "pluginRadius",
+            "values": [
+              -1,
+              30,
+              -1
+            ]
+          }
+        },
+        {
+          "name": "preference: highContrast",
+          "result": "passed",
+          "detail": {
+            "key": "highContrast",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: reducedMotion",
+          "result": "passed",
+          "detail": {
+            "key": "reducedMotion",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "page: wallpaper",
+          "result": "passed",
+          "detail": {
+            "rows": 3,
+            "visible": 3
+          }
+        },
+        {
+          "name": "preference: shuffle",
+          "result": "passed",
+          "detail": {
+            "key": "shuffle",
+            "values": [
+              "Off",
+              "15m",
+              "1h",
+              "1d"
+            ]
+          }
+        },
+        {
+          "name": "page: bar",
+          "result": "passed",
+          "detail": {
+            "rows": 13,
+            "visible": 12
+          }
+        },
+        {
+          "name": "preference: position",
+          "result": "passed",
+          "detail": {
+            "key": "position",
+            "values": [
+              "top",
+              "bottom"
+            ]
+          }
+        },
+        {
+          "name": "preference: barStyle",
+          "result": "passed",
+          "detail": {
+            "key": "barStyle",
+            "values": [
+              "hug",
+              "floating",
+              "attached"
+            ]
+          }
+        },
+        {
+          "name": "preference: gap",
+          "result": "passed",
+          "detail": {
+            "key": "gap",
+            "values": [
+              4,
+              20,
+              8
+            ]
+          }
+        },
+        {
+          "name": "preference: barRadius",
+          "result": "passed",
+          "detail": {
+            "key": "barRadius",
+            "values": [
+              0,
+              30,
+              11
+            ]
+          }
+        },
+        {
+          "name": "preference: barHeight",
+          "result": "passed",
+          "detail": {
+            "key": "barHeight",
+            "values": [
+              28,
+              60,
+              36
+            ]
+          }
+        },
+        {
+          "name": "preference: barColorMode",
+          "result": "passed",
+          "detail": {
+            "key": "barColorMode",
+            "values": [
+              "default",
+              "macos",
+              "black",
+              "graphite",
+              "slate",
+              "white",
+              "custom"
+            ]
+          }
+        },
+        {
+          "name": "preference: barCustomHue",
+          "result": "passed",
+          "detail": {
+            "key": "barCustomHue",
+            "values": [
+              0,
+              359,
+              230
+            ]
+          }
+        },
+        {
+          "name": "preference: barCustomSaturation",
+          "result": "passed",
+          "detail": {
+            "key": "barCustomSaturation",
+            "values": [
+              0,
+              100,
+              14
+            ]
+          }
+        },
+        {
+          "name": "preference: barCustomLightness",
+          "result": "passed",
+          "detail": {
+            "key": "barCustomLightness",
+            "values": [
+              0,
+              100,
+              9
+            ]
+          }
+        },
+        {
+          "name": "preference: autoHide",
+          "result": "passed",
+          "detail": {
+            "key": "autoHide",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: exclusive",
+          "result": "passed",
+          "detail": {
+            "key": "exclusive",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "page: workspaces",
+          "result": "passed",
+          "detail": {
+            "rows": 8,
+            "visible": 8
+          }
+        },
+        {
+          "name": "preference: dock",
+          "result": "passed",
+          "detail": {
+            "key": "dock",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: dockAutoHide",
+          "result": "passed",
+          "detail": {
+            "key": "dockAutoHide",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "page: notifications",
+          "result": "passed",
+          "detail": {
+            "rows": 16,
+            "visible": 16
+          }
+        },
+        {
+          "name": "preference: notifQuiet",
+          "result": "passed",
+          "detail": {
+            "key": "notifQuiet",
+            "values": [
+              "off",
+              "nights",
+              "custom"
+            ]
+          }
+        },
+        {
+          "name": "preference: notifQuietStart",
+          "result": "passed",
+          "detail": {
+            "key": "notifQuietStart",
+            "values": [
+              0,
+              435,
+              1425,
+              1320
+            ]
+          }
+        },
+        {
+          "name": "preference: notifQuietEnd",
+          "result": "passed",
+          "detail": {
+            "key": "notifQuietEnd",
+            "values": [
+              0,
+              435,
+              1425,
+              420
+            ]
+          }
+        },
+        {
+          "name": "preference: notifDuration",
+          "result": "passed",
+          "detail": {
+            "key": "notifDuration",
+            "values": [
+              4,
+              20,
+              8
+            ]
+          }
+        },
+        {
+          "name": "preference: notifPosition",
+          "result": "passed",
+          "detail": {
+            "key": "notifPosition",
+            "values": [
+              "top-left",
+              "top-right",
+              "bottom-left",
+              "bottom-right"
+            ]
+          }
+        },
+        {
+          "name": "preference: notifDensity",
+          "result": "passed",
+          "detail": {
+            "key": "notifDensity",
+            "values": [
+              "compact",
+              "default",
+              "roomy"
+            ]
+          }
+        },
+        {
+          "name": "preference: notifIcons",
+          "result": "passed",
+          "detail": {
+            "key": "notifIcons",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "preference: notifProgress",
+          "result": "passed",
+          "detail": {
+            "key": "notifProgress",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "preference: notifBodyLines",
+          "result": "passed",
+          "detail": {
+            "key": "notifBodyLines",
+            "values": [
+              0,
+              1,
+              2,
+              3
+            ]
+          }
+        },
+        {
+          "name": "preference: notifFullscreen",
+          "result": "passed",
+          "detail": {
+            "key": "notifFullscreen",
+            "values": [
+              "away",
+              "show"
+            ]
+          }
+        },
+        {
+          "name": "preference: notifBurstLimit",
+          "result": "passed",
+          "detail": {
+            "key": "notifBurstLimit",
+            "values": [
+              1,
+              20,
+              5
+            ]
+          }
+        },
+        {
+          "name": "preference: notifHistoryPersist",
+          "result": "passed",
+          "detail": {
+            "key": "notifHistoryPersist",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: notifHistoryHours",
+          "result": "passed",
+          "detail": {
+            "key": "notifHistoryHours",
+            "values": [
+              1,
+              24,
+              168
+            ]
+          }
+        },
+        {
+          "name": "preference: notifHistoryCount",
+          "result": "passed",
+          "detail": {
+            "key": "notifHistoryCount",
+            "values": [
+              10,
+              200,
+              50
+            ]
+          }
+        },
+        {
+          "name": "preference: osd",
+          "result": "passed",
+          "detail": {
+            "key": "osd",
+            "values": [
+              "top",
+              "bottom"
+            ]
+          }
+        },
+        {
+          "name": "page: plugins",
+          "result": "passed",
+          "detail": {
+            "rows": 1,
+            "visible": 1
+          }
+        },
+        {
+          "name": "page: displays",
+          "result": "passed",
+          "detail": {
+            "rows": 10,
+            "visible": 10
+          }
+        },
+        {
+          "name": "preference: nightLight",
+          "result": "passed",
+          "detail": {
+            "key": "nightLight",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: warmth",
+          "result": "passed",
+          "detail": {
+            "key": "warmth",
+            "values": [
+              1900,
+              4500,
+              3400
+            ]
+          }
+        },
+        {
+          "name": "page: sound",
+          "result": "passed",
+          "detail": {
+            "rows": 9,
+            "visible": 4
+          }
+        },
+        {
+          "name": "page: network",
+          "result": "passed",
+          "detail": {
+            "rows": 17,
+            "visible": 10
+          }
+        },
+        {
+          "name": "page: touchpad",
+          "result": "passed",
+          "detail": {
+            "rows": 5,
+            "visible": 5
+          }
+        },
+        {
+          "name": "preference: scrollFactor",
+          "result": "passed",
+          "detail": {
+            "key": "scrollFactor",
+            "values": [
+              0.2,
+              2,
+              1
+            ]
+          }
+        },
+        {
+          "name": "page: keyboard",
+          "result": "passed",
+          "detail": {
+            "rows": 7,
+            "visible": 7
+          }
+        },
+        {
+          "name": "page: power",
+          "result": "passed",
+          "detail": {
+            "rows": 6,
+            "visible": 6
+          }
+        },
+        {
+          "name": "preference: idleLockMins",
+          "result": "passed",
+          "detail": {
+            "key": "idleLockMins",
+            "values": [
+              0,
+              1,
+              2,
+              5,
+              10,
+              15,
+              30
+            ]
+          }
+        },
+        {
+          "name": "preference: idleScreenOffMins",
+          "result": "passed",
+          "detail": {
+            "key": "idleScreenOffMins",
+            "values": [
+              0,
+              1,
+              2,
+              5,
+              10,
+              15,
+              30
+            ]
+          }
+        },
+        {
+          "name": "preference: idleSuspendMins",
+          "result": "passed",
+          "detail": {
+            "key": "idleSuspendMins",
+            "values": [
+              0,
+              15,
+              30,
+              60,
+              120
+            ]
+          }
+        },
+        {
+          "name": "preference: idleSuspendBatteryOnly",
+          "result": "passed",
+          "detail": {
+            "key": "idleSuspendBatteryOnly",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "page: security",
+          "result": "passed",
+          "detail": {
+            "rows": 10,
+            "visible": 3
+          }
+        },
+        {
+          "name": "page: accounts",
+          "result": "passed",
+          "detail": {
+            "rows": 3,
+            "visible": 1
+          }
+        },
+        {
+          "name": "page: assistant",
+          "result": "passed",
+          "detail": {
+            "rows": 10,
+            "visible": 10
+          }
+        },
+        {
+          "name": "preference: assistantAgent",
+          "result": "passed",
+          "detail": {
+            "key": "assistantAgent",
+            "values": [
+              "auto",
+              "claude",
+              "codex"
+            ]
+          }
+        },
+        {
+          "name": "preference: assistantApprovalPolicy",
+          "result": "passed",
+          "detail": {
+            "key": "assistantApprovalPolicy",
+            "values": [
+              "always",
+              "ask"
+            ]
+          }
+        },
+        {
+          "name": "preference: assistantClaudeModel",
+          "result": "passed",
+          "detail": {
+            "key": "assistantClaudeModel",
+            "values": [
+              "default",
+              "fable",
+              "sonnet",
+              "opus"
+            ]
+          }
+        },
+        {
+          "name": "preference: assistantCodexModel",
+          "result": "passed",
+          "detail": {
+            "key": "assistantCodexModel",
+            "values": [
+              "default",
+              "gpt-5.6-luna",
+              "gpt-5.6-terra",
+              "gpt-5.6-sol"
+            ]
+          }
+        },
+        {
+          "name": "preference: assistantSpeak",
+          "result": "passed",
+          "detail": {
+            "key": "assistantSpeak",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: assistantScreenContext",
+          "result": "passed",
+          "detail": {
+            "key": "assistantScreenContext",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "page: applications",
+          "result": "passed",
+          "detail": {
+            "rows": 8,
+            "visible": 8
+          }
+        },
+        {
+          "name": "page: region",
+          "result": "passed",
+          "detail": {
+            "rows": 6,
+            "visible": 6
+          }
+        },
+        {
+          "name": "preference: clock24",
+          "result": "passed",
+          "detail": {
+            "key": "clock24",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "preference: unit",
+          "result": "passed",
+          "detail": {
+            "key": "unit",
+            "values": [
+              "c",
+              "f"
+            ]
+          }
+        },
+        {
+          "name": "page: backup",
+          "result": "passed",
+          "detail": {
+            "rows": 17,
+            "visible": 1
+          }
+        },
+        {
+          "name": "page: shortcuts",
+          "result": "passed",
+          "detail": {
+            "rows": 85,
+            "visible": 75
+          }
+        },
+        {
+          "name": "page: recovery",
+          "result": "passed",
+          "detail": {
+            "rows": 10,
+            "visible": 5
+          }
+        },
+        {
+          "name": "page: storage",
+          "result": "passed",
+          "detail": {
+            "rows": 10,
+            "visible": 2
+          }
+        },
+        {
+          "name": "one managed shell after audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "1795",
+            "shellPIDs": [
+              "1795"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        },
+        {
+          "name": "input_preferences",
+          "result": "passed",
+          "detail": {
+            "liveTouchpadOptions": {
+              "tap": false,
+              "naturalScroll": false,
+              "workspaceSwipe": false,
+              "sensitivity": 0.35
+            },
+            "discard": true,
+            "navigationPersistence": true,
+            "restored": true
+          }
+        },
+        {
+          "name": "keyboard_preferences",
+          "result": "passed",
+          "detail": {
+            "layouts": [
+              {
+                "layout": "us",
+                "variant": "intl"
+              },
+              {
+                "layout": "nl",
+                "variant": ""
+              }
+            ],
+            "switch": [
+              {
+                "name": "at-translated-set-2-keyboard",
+                "layout": "Dutch"
+              }
+            ],
+            "reorderAndDiscard": true,
+            "restored": true
+          }
+        },
+        {
+          "name": "keyboard_stability",
+          "result": "passed",
+          "detail": {
+            "applySwitchRemoveCycles": 8,
+            "managedShellUnchanged": true
+          }
+        },
+        {
+          "name": "workspaces",
+          "result": "passed",
+          "detail": {
+            "modes": [
+              "per-monitor",
+              "shared"
+            ],
+            "layouts": [
+              "dwindle",
+              "scrolling",
+              "floating"
+            ],
+            "perWorkspace": true,
+            "titlebars": true
+          }
+        },
+        {
+          "name": "default_applications",
+          "result": "passed",
+          "detail": {
+            "browser": [
+              "brave-browser.desktop",
+              "brave-origin.desktop",
+              "chatgpt.desktop",
+              "firefox.desktop"
+            ],
+            "terminal": [
+              "kitty.desktop"
+            ],
+            "editor": [
+              "nvim.desktop",
+              "omawrite.desktop",
+              "org.gnome.TextEditor.desktop",
+              "dev.zed.Zed.desktop"
+            ],
+            "pdf": [
+              "brave-browser.desktop",
+              "brave-origin.desktop",
+              "org.gnome.Evince.desktop"
+            ],
+            "image": [
+              "imv.desktop",
+              "brave-browser.desktop",
+              "brave-origin.desktop",
+              "com.github.PintaProject.Pinta.desktop"
+            ],
+            "video": [
+              "mpv.desktop"
+            ]
+          }
+        },
+        {
+          "name": "display_trial",
+          "result": "passed",
+          "detail": {
+            "trial": true,
+            "discard": true,
+            "keep": true,
+            "revert": true,
+            "pageExitRollback": true,
+            "restored": true
+          }
+        },
+        {
+          "name": "display_formats",
+          "result": "passed",
+          "detail": {
+            "trials": [
+              {
+                "control": "Resolution",
+                "value": "preferred"
+              },
+              {
+                "control": "Resolution",
+                "value": "5120x2160"
+              },
+              {
+                "control": "Resolution",
+                "value": "4096x2160"
+              },
+              {
+                "control": "Rotation",
+                "value": 1
+              },
+              {
+                "control": "Rotation",
+                "value": 2
+              },
+              {
+                "control": "Rotation",
+                "value": 3
+              },
+              {
+                "control": "Flipped",
+                "value": true
+              },
+              {
+                "control": "Adaptive sync",
+                "value": 0
+              },
+              {
+                "control": "Adaptive sync",
+                "value": 1
+              },
+              {
+                "control": "Adaptive sync",
+                "value": 2
+              }
+            ],
+            "watchdogRollback": true,
+            "physicalVRR": "not measurable on virtio-vga"
+          }
+        },
+        {
+          "name": "network_trial",
+          "result": "passed",
+          "detail": {
+            "activeProfile": "Cybex OS Wired",
+            "discard": true,
+            "checkpoint": true,
+            "revert": true,
+            "keep": true,
+            "restored": true
+          }
+        },
+        {
+          "name": "network_addresses",
+          "result": "passed",
+          "detail": {
+            "realInactiveNetworkManagerProfile": true,
+            "IPv4AndIPv6Manual": true,
+            "addressGatewayDNSAutoconnectMetering": true,
+            "invalidAddressAndBothDisabledBlocked": true
+          }
+        },
+        {
+          "name": "vpn",
+          "result": "passed",
+          "detail": {
+            "wireguardImport": true,
+            "realInterfaceActivation": true,
+            "disconnect": true,
+            "removeCancelConfirm": true,
+            "externalPeerHandshake": "requires a peer"
+          }
+        },
+        {
+          "name": "idle_and_night_light",
+          "result": "passed",
+          "detail": {
+            "stayAwakeModes": [
+              "30m",
+              "1h",
+              "always",
+              "off"
+            ],
+            "realHyprsunsetStartStop": true
+          }
+        },
+        {
+          "name": "idle_restart_burst",
+          "result": "passed",
+          "detail": {
+            "rapidSavedTimeoutChanges": 8,
+            "idleLockServiceStayedActive": true,
+            "servicePIDs": [
+              "50577",
+              "50836",
+              "50984",
+              "51131",
+              "51279",
+              "51427",
+              "51559",
+              "51707"
+            ]
+          }
+        },
+        {
+          "name": "notifications",
+          "result": "passed",
+          "detail": {
+            "doNotDisturb": true,
+            "customQuietTimes": true,
+            "corners": 4,
+            "realNotification": true
+          }
+        },
+        {
+          "name": "audio",
+          "result": "passed",
+          "detail": {
+            "nativePipeWireOutputs": 2,
+            "nativeMicrophone": true,
+            "volume": true,
+            "mute": true,
+            "balance": true,
+            "defaultOutput": true
+          }
+        },
+        {
+          "name": "wallpaper",
+          "result": "passed",
+          "detail": {
+            "localPicker": 2,
+            "rotationChoices": 4,
+            "shuffle": true,
+            "invalidFolderPreservesCollection": true
+          }
+        },
+        {
+          "name": "appearance_extras",
+          "result": "passed",
+          "detail": {
+            "accentPresets": true,
+            "hueBounds": true,
+            "borderOpacityBounds": true,
+            "customThemeSaveApply": true
+          }
+        },
+        {
+          "name": "bar_layout",
+          "result": "passed",
+          "detail": {
+            "presets": 3,
+            "eachBuiltinMembership": 21,
+            "saved": true
+          }
+        },
+        {
+          "name": "bar_background",
+          "result": "passed",
+          "detail": {
+            "backgroundChoices": 7,
+            "customHueSaturationLightnessBounds": true
+          }
+        },
+        {
+          "name": "widget: ws / Min slots",
+          "result": "passed",
+          "detail": {
+            "module": "ws",
+            "label": "Min slots",
+            "values": [
+              1,
+              10,
+              5
+            ]
+          }
+        },
+        {
+          "name": "widget: ws / Hide empty",
+          "result": "passed",
+          "detail": {
+            "module": "ws",
+            "label": "Hide empty",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "widget: ws / Style",
+          "result": "passed",
+          "detail": {
+            "module": "ws",
+            "label": "Style",
+            "values": [
+              "numbers",
+              "dots"
+            ]
+          }
+        },
+        {
+          "name": "widget: media / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "media",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: media / Title",
+          "result": "passed",
+          "detail": {
+            "module": "media",
+            "label": "Title",
+            "values": [
+              "title-artist",
+              "title",
+              "artist-title"
+            ]
+          }
+        },
+        {
+          "name": "widget: media / Max width",
+          "result": "passed",
+          "detail": {
+            "module": "media",
+            "label": "Max width",
+            "values": [
+              120,
+              360,
+              180
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Visibility",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Visibility",
+            "values": [
+              "hover",
+              "always",
+              "active"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Model",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Model",
+            "values": [
+              "tiny",
+              "base",
+              "small",
+              "medium",
+              "large-v3",
+              "large-v3-turbo"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Capture",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Capture",
+            "values": [
+              "region",
+              "window",
+              "screen"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Elapsed time",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Elapsed time",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Active display",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Active display",
+            "values": [
+              "icon",
+              "count"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Primary click",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Primary click",
+            "values": [
+              "list",
+              "quick-add"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Quick add",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Quick add",
+            "values": [
+              5,
+              15,
+              30,
+              60
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / At sign-in",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "At sign-in",
+            "values": [
+              "remember",
+              "off",
+              "on"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / At sign-in",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "At sign-in",
+            "values": [
+              "remember",
+              "off",
+              "on"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Primary click",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Primary click",
+            "values": [
+              "always",
+              "1h",
+              "quiet-boundary"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / At sign-in",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "At sign-in",
+            "values": [
+              "remember",
+              "off",
+              "on"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Primary click",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Primary click",
+            "values": [
+              "30m",
+              "1h",
+              "unplugged",
+              "always"
+            ]
+          }
+        },
+        {
+          "name": "widget: indicators / Time remaining",
+          "result": "passed",
+          "detail": {
+            "module": "indicators",
+            "label": "Time remaining",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Seconds",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Seconds",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Date",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Date",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Date format",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Date format",
+            "values": [
+              "ddd dd",
+              "ddd d MMM",
+              "dd MMM",
+              "dd-MM"
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Events",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Events",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Look ahead",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Look ahead",
+            "values": [
+              1,
+              31,
+              14
+            ]
+          }
+        },
+        {
+          "name": "widget: clock / Refresh",
+          "result": "passed",
+          "detail": {
+            "module": "clock",
+            "label": "Refresh",
+            "values": [
+              5,
+              60,
+              15
+            ]
+          }
+        },
+        {
+          "name": "widget: weather / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "weather",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: weather / Update every",
+          "result": "passed",
+          "detail": {
+            "module": "weather",
+            "label": "Update every",
+            "values": [
+              5,
+              60,
+              20
+            ]
+          }
+        },
+        {
+          "name": "widget: notes / Title provider",
+          "result": "passed",
+          "detail": {
+            "module": "notes",
+            "label": "Title provider",
+            "values": [
+              "off",
+              "codex",
+              "claude"
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / In the bar",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "In the bar",
+            "values": [
+              "Percentages",
+              "Icon"
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / Warn below",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "Warn below",
+            "values": [
+              1,
+              100,
+              25
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / Critical below",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "Critical below",
+            "values": [
+              0,
+              100,
+              10
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / Refresh every",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "Refresh every",
+            "values": [
+              60,
+              3600,
+              900
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / Hide account emails",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "Hide account emails",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: modelusage / Square usage cards",
+          "result": "passed",
+          "detail": {
+            "module": "modelusage",
+            "label": "Square usage cards",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: fusebox / Menubar figure",
+          "result": "passed",
+          "detail": {
+            "module": "fusebox",
+            "label": "Menubar figure",
+            "values": [
+              "sessions",
+              "serving",
+              "rpm",
+              "faults",
+              "clients"
+            ]
+          }
+        },
+        {
+          "name": "widget: fusebox / Quota meters",
+          "result": "passed",
+          "detail": {
+            "module": "fusebox",
+            "label": "Quota meters",
+            "values": [
+              "used",
+              "remaining"
+            ]
+          }
+        },
+        {
+          "name": "widget: fusebox / Hide account emails",
+          "result": "passed",
+          "detail": {
+            "module": "fusebox",
+            "label": "Hide account emails",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: fusebox / Notify about faults",
+          "result": "passed",
+          "detail": {
+            "module": "fusebox",
+            "label": "Notify about faults",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "widget: updates / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "updates",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: updates / Check every",
+          "result": "passed",
+          "detail": {
+            "module": "updates",
+            "label": "Check every",
+            "values": [
+              10,
+              240,
+              30
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / Badge",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "Badge",
+            "values": [
+              "dot",
+              "count",
+              "off"
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / Recent account repos",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "Recent account repos",
+            "values": [
+              3,
+              15,
+              8
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / Repo refresh",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "Repo refresh",
+            "values": [
+              1,
+              30,
+              5
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / CI reports",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "CI reports",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: gh / Toasts",
+          "result": "passed",
+          "detail": {
+            "module": "gh",
+            "label": "Toasts",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: t3 / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "t3",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: t3 / Status label",
+          "result": "passed",
+          "detail": {
+            "module": "t3",
+            "label": "Status label",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: hermes / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "hermes",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: hermes / Status label",
+          "result": "passed",
+          "detail": {
+            "module": "hermes",
+            "label": "Status label",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: hermes / Activity detail",
+          "result": "passed",
+          "detail": {
+            "module": "hermes",
+            "label": "Activity detail",
+            "values": [
+              "full",
+              "verb",
+              "generic"
+            ]
+          }
+        },
+        {
+          "name": "widget: remote / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "remote",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: remote / Menubar statistic",
+          "result": "passed",
+          "detail": {
+            "module": "remote",
+            "label": "Menubar statistic",
+            "values": [
+              "cpu",
+              "load",
+              "memory",
+              "memoryUsed",
+              "memoryFree",
+              "disk",
+              "diskFree",
+              "rx",
+              "tx",
+              "temperature"
+            ]
+          }
+        },
+        {
+          "name": "widget: remote / Show server name",
+          "result": "passed",
+          "detail": {
+            "module": "remote",
+            "label": "Show server name",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: remote / Update every",
+          "result": "passed",
+          "detail": {
+            "module": "remote",
+            "label": "Update every",
+            "values": [
+              2,
+              60,
+              5
+            ]
+          }
+        },
+        {
+          "name": "widget: tray / Start expanded",
+          "result": "passed",
+          "detail": {
+            "module": "tray",
+            "label": "Start expanded",
+            "values": [
+              true,
+              false
+            ]
+          }
+        },
+        {
+          "name": "widget: notifications / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "notifications",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: notifications / Grouping",
+          "result": "passed",
+          "detail": {
+            "module": "notifications",
+            "label": "Grouping",
+            "values": [
+              "solo",
+              "status"
+            ]
+          }
+        },
+        {
+          "name": "widget: vol / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "vol",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: vol / Scroll step",
+          "result": "passed",
+          "detail": {
+            "module": "vol",
+            "label": "Scroll step",
+            "values": [
+              1,
+              10,
+              5
+            ]
+          }
+        },
+        {
+          "name": "widget: vol / Percentage",
+          "result": "passed",
+          "detail": {
+            "module": "vol",
+            "label": "Percentage",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: vol / Middle click",
+          "result": "passed",
+          "detail": {
+            "module": "vol",
+            "label": "Middle click",
+            "values": [
+              "mute",
+              "none"
+            ]
+          }
+        },
+        {
+          "name": "widget: batt / Detail",
+          "result": "passed",
+          "detail": {
+            "module": "batt",
+            "label": "Detail",
+            "values": [
+              "auto",
+              "prefer",
+              "compact"
+            ]
+          }
+        },
+        {
+          "name": "widget: batt / Percentage",
+          "result": "passed",
+          "detail": {
+            "module": "batt",
+            "label": "Percentage",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: batt / Amber below",
+          "result": "passed",
+          "detail": {
+            "module": "batt",
+            "label": "Amber below",
+            "values": [
+              10,
+              40,
+              20
+            ]
+          }
+        },
+        {
+          "name": "widget: batt / Alert below",
+          "result": "passed",
+          "detail": {
+            "module": "batt",
+            "label": "Alert below",
+            "values": [
+              5,
+              20,
+              10
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Now playing",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Now playing",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Sliders",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Sliders",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Quick toggles",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Quick toggles",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Updates",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Updates",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Top processes",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Top processes",
+            "values": [
+              false,
+              true
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Open on hover",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Open on hover",
+            "values": [
+              "off",
+              "open",
+              "always"
+            ]
+          }
+        },
+        {
+          "name": "widget: control / Width",
+          "result": "passed",
+          "detail": {
+            "module": "control",
+            "label": "Width",
+            "values": [
+              320,
+              480,
+              400
+            ]
+          }
+        },
+        {
+          "name": "widget_options",
+          "result": "passed",
+          "detail": {
+            "ws": [
+              {
+                "label": "Min slots",
+                "result": "passed",
+                "values": [
+                  1,
+                  10,
+                  5
+                ]
+              },
+              {
+                "label": "Hide empty",
+                "result": "passed",
+                "values": [
+                  true,
+                  false
+                ]
+              },
+              {
+                "label": "Style",
+                "result": "passed",
+                "values": [
+                  "numbers",
+                  "dots"
+                ]
+              }
+            ],
+            "media": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Title",
+                "result": "passed",
+                "values": [
+                  "title-artist",
+                  "title",
+                  "artist-title"
+                ]
+              },
+              {
+                "label": "Max width",
+                "result": "passed",
+                "values": [
+                  120,
+                  360,
+                  180
+                ]
+              }
+            ],
+            "indicators": [
+              {
+                "label": "Visibility",
+                "result": "passed",
+                "values": [
+                  "hover",
+                  "always",
+                  "active"
+                ]
+              },
+              {
+                "label": "Primary language",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Alternate language",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Model",
+                "result": "passed",
+                "values": [
+                  "tiny",
+                  "base",
+                  "small",
+                  "medium",
+                  "large-v3",
+                  "large-v3-turbo"
+                ]
+              },
+              {
+                "label": "Capture",
+                "result": "passed",
+                "values": [
+                  "region",
+                  "window",
+                  "screen"
+                ]
+              },
+              {
+                "label": "Elapsed time",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Active display",
+                "result": "passed",
+                "values": [
+                  "icon",
+                  "count"
+                ]
+              },
+              {
+                "label": "Primary click",
+                "result": "passed",
+                "values": [
+                  "list",
+                  "quick-add"
+                ]
+              },
+              {
+                "label": "Quick add",
+                "result": "passed",
+                "values": [
+                  5,
+                  15,
+                  30,
+                  60
+                ]
+              },
+              {
+                "label": "At sign-in",
+                "result": "passed",
+                "values": [
+                  "remember",
+                  "off",
+                  "on"
+                ]
+              },
+              {
+                "label": "At sign-in",
+                "result": "passed",
+                "values": [
+                  "remember",
+                  "off",
+                  "on"
+                ]
+              },
+              {
+                "label": "Primary click",
+                "result": "passed",
+                "values": [
+                  "always",
+                  "1h",
+                  "quiet-boundary"
+                ]
+              },
+              {
+                "label": "At sign-in",
+                "result": "passed",
+                "values": [
+                  "remember",
+                  "off",
+                  "on"
+                ]
+              },
+              {
+                "label": "Primary click",
+                "result": "passed",
+                "values": [
+                  "30m",
+                  "1h",
+                  "unplugged",
+                  "always"
+                ]
+              },
+              {
+                "label": "Time remaining",
+                "result": "passed",
+                "values": [
+                  true,
+                  false
+                ]
+              }
+            ],
+            "clock": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Seconds",
+                "result": "passed",
+                "values": [
+                  true,
+                  false
+                ]
+              },
+              {
+                "label": "Date",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Date format",
+                "result": "passed",
+                "values": [
+                  "ddd dd",
+                  "ddd d MMM",
+                  "dd MMM",
+                  "dd-MM"
+                ]
+              },
+              {
+                "label": "Events",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Look ahead",
+                "result": "passed",
+                "values": [
+                  1,
+                  31,
+                  14
+                ]
+              },
+              {
+                "label": "Refresh",
+                "result": "passed",
+                "values": [
+                  5,
+                  60,
+                  15
+                ]
+              }
+            ],
+            "weather": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Update every",
+                "result": "passed",
+                "values": [
+                  5,
+                  60,
+                  20
+                ]
+              }
+            ],
+            "notes": [
+              {
+                "label": "Title provider",
+                "result": "passed",
+                "values": [
+                  "off",
+                  "codex",
+                  "claude"
+                ]
+              }
+            ],
+            "modelusage": [
+              {
+                "label": "In the bar",
+                "result": "passed",
+                "values": [
+                  "Percentages",
+                  "Icon"
+                ]
+              },
+              {
+                "label": "Warn below",
+                "result": "passed",
+                "values": [
+                  1,
+                  100,
+                  25
+                ]
+              },
+              {
+                "label": "Critical below",
+                "result": "passed",
+                "values": [
+                  0,
+                  100,
+                  10
+                ]
+              },
+              {
+                "label": "Refresh every",
+                "result": "passed",
+                "values": [
+                  60,
+                  3600,
+                  900
+                ]
+              },
+              {
+                "label": "Hide account emails",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Square usage cards",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              }
+            ],
+            "fusebox": [
+              {
+                "label": "Server URL",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Management key",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Menubar figure",
+                "result": "passed",
+                "values": [
+                  "sessions",
+                  "serving",
+                  "rpm",
+                  "faults",
+                  "clients"
+                ]
+              },
+              {
+                "label": "Quota meters",
+                "result": "passed",
+                "values": [
+                  "used",
+                  "remaining"
+                ]
+              },
+              {
+                "label": "Hide account emails",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Notify about faults",
+                "result": "passed",
+                "values": [
+                  true,
+                  false
+                ]
+              }
+            ],
+            "updates": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Check every",
+                "result": "passed",
+                "values": [
+                  10,
+                  240,
+                  30
+                ]
+              },
+              {
+                "label": "Download updates automatically",
+                "result": "requires-polkit-fixture"
+              },
+              {
+                "label": "Finish updates automatically after restarting",
+                "result": "requires-polkit-fixture"
+              }
+            ],
+            "gh": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Badge",
+                "result": "passed",
+                "values": [
+                  "dot",
+                  "count",
+                  "off"
+                ]
+              },
+              {
+                "label": "Recent account repos",
+                "result": "passed",
+                "values": [
+                  3,
+                  15,
+                  8
+                ]
+              },
+              {
+                "label": "Repo refresh",
+                "result": "passed",
+                "values": [
+                  1,
+                  30,
+                  5
+                ]
+              },
+              {
+                "label": "CI reports",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Toasts",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              }
+            ],
+            "t3": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Status label",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              }
+            ],
+            "hermes": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Status label",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Activity detail",
+                "result": "passed",
+                "values": [
+                  "full",
+                  "verb",
+                  "generic"
+                ]
+              }
+            ],
+            "remote": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "SSH host",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Display name",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Menubar statistic",
+                "result": "passed",
+                "values": [
+                  "cpu",
+                  "load",
+                  "memory",
+                  "memoryUsed",
+                  "memoryFree",
+                  "disk",
+                  "diskFree",
+                  "rx",
+                  "tx",
+                  "temperature"
+                ]
+              },
+              {
+                "label": "Show server name",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Filesystem",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Network interface",
+                "result": "requires-service-fixture"
+              },
+              {
+                "label": "Update every",
+                "result": "passed",
+                "values": [
+                  2,
+                  60,
+                  5
+                ]
+              }
+            ],
+            "tray": [
+              {
+                "label": "Start expanded",
+                "result": "passed",
+                "values": [
+                  true,
+                  false
+                ]
+              }
+            ],
+            "assistant": [],
+            "notifications": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Grouping",
+                "result": "passed",
+                "values": [
+                  "solo",
+                  "status"
+                ]
+              }
+            ],
+            "vol": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Scroll step",
+                "result": "passed",
+                "values": [
+                  1,
+                  10,
+                  5
+                ]
+              },
+              {
+                "label": "Percentage",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Middle click",
+                "result": "passed",
+                "values": [
+                  "mute",
+                  "none"
+                ]
+              }
+            ],
+            "wifi": [],
+            "bt": [],
+            "batt": [
+              {
+                "label": "Detail",
+                "result": "passed",
+                "values": [
+                  "auto",
+                  "prefer",
+                  "compact"
+                ]
+              },
+              {
+                "label": "Percentage",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Amber below",
+                "result": "passed",
+                "values": [
+                  10,
+                  40,
+                  20
+                ]
+              },
+              {
+                "label": "Alert below",
+                "result": "passed",
+                "values": [
+                  5,
+                  20,
+                  10
+                ]
+              }
+            ],
+            "control": [
+              {
+                "label": "Now playing",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Sliders",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Quick toggles",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Updates",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Top processes",
+                "result": "passed",
+                "values": [
+                  false,
+                  true
+                ]
+              },
+              {
+                "label": "Open on hover",
+                "result": "passed",
+                "values": [
+                  "off",
+                  "open",
+                  "always"
+                ]
+              },
+              {
+                "label": "Width",
+                "result": "passed",
+                "values": [
+                  320,
+                  480,
+                  400
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "plugin_lifecycle",
+          "result": "passed",
+          "detail": {
+            "localGitInstall": true,
+            "enableDisable": true,
+            "updatePreviewAndApply": true,
+            "removalCancelConfirm": true
+          }
+        },
+        {
+          "name": "persistence_and_reset",
+          "result": "passed",
+          "detail": {
+            "shellRestart": true,
+            "resetUndo": true,
+            "preservedUnknownPersonalKey": true
+          }
+        },
+        {
+          "name": "backup",
+          "result": "passed",
+          "detail": {
+            "encryptedResticRepository": true,
+            "keyring": true,
+            "recoveryKeyConfirmation": true,
+            "automaticToggle": true,
+            "snapshot": true,
+            "restoreIntoNewFolder": true,
+            "originalPreserved": true
+          }
+        },
+        {
+          "name": "control_center",
+          "result": "passed",
+          "detail": {
+            "allTabToggles": true,
+            "overviewProtected": true,
+            "reorderCommitCancel": true,
+            "overviewSectionsHoverWidth": true
+          }
+        },
+        {
+          "name": "hotspot",
+          "result": "passed",
+          "detail": {
+            "simulatedKernelRadio": true,
+            "realNetworkManagerAP": true,
+            "rename": true,
+            "joinCard": true,
+            "stop": true,
+            "physicalRadio": "not qualified"
+          }
+        },
+        {
+          "name": "multiple_displays",
+          "result": "passed",
+          "detail": {
+            "secondHeadlessOutput": true,
+            "mirrorTrial": true,
+            "disableTrial": true,
+            "arrangeTrial": true
+          }
+        },
+        {
+          "name": "administration",
+          "result": "passed",
+          "detail": {
+            "retentionDraftChoices": 12,
+            "discard": true,
+            "healthRefresh": true,
+            "resetAllUndo": true,
+            "welcome": true,
+            "software": true,
+            "accountsWindow": true,
+            "passwordWindow": true,
+            "advancedAudioWindow": true,
+            "advancedNetworkWindow": true,
+            "settingsFileVisible": true,
+            "wallpaperFolderVisible": true,
+            "externalBrowserVisible": true
+          }
+        },
+        {
+          "name": "one managed shell at completion",
+          "result": "passed",
+          "detail": {
+            "mainPID": "83759",
+            "shellPIDs": [
+              "83759"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    },
+    "plain-upstream-settings": {
+      "tests": 9,
+      "pages": 0,
+      "settings": 0,
+      "cases": [
+        {
+          "name": "keyboard_stability",
+          "result": "passed",
+          "detail": {
+            "applySwitchRemoveCycles": 8,
+            "managedShellUnchanged": true
+          }
+        },
+        {
+          "name": "workspaces",
+          "result": "passed",
+          "detail": {
+            "modes": [
+              "per-monitor",
+              "shared"
+            ],
+            "layouts": [
+              "dwindle",
+              "scrolling",
+              "floating"
+            ],
+            "perWorkspace": true,
+            "titlebars": true
+          }
+        },
+        {
+          "name": "bar_background",
+          "result": "passed",
+          "detail": {
+            "backgroundChoices": 7,
+            "customHueSaturationLightnessBounds": true
+          }
+        },
+        {
+          "name": "idle_restart_burst",
+          "result": "passed",
+          "detail": {
+            "rapidSavedTimeoutChanges": 8,
+            "idleLockServiceStayedActive": true,
+            "servicePIDs": [
+              "9752",
+              "18165",
+              "18312",
+              "18459",
+              "18606",
+              "18767",
+              "18914",
+              "19061"
+            ]
+          }
+        },
+        {
+          "name": "notifications",
+          "result": "passed",
+          "detail": {
+            "doNotDisturb": true,
+            "customQuietTimes": true,
+            "corners": 4,
+            "realNotification": true
+          }
+        },
+        {
+          "name": "audio",
+          "result": "passed",
+          "detail": {
+            "nativePipeWireOutputs": 2,
+            "nativeMicrophone": true,
+            "volume": true,
+            "mute": true,
+            "balance": true,
+            "defaultOutput": true
+          }
+        },
+        {
+          "name": "plugin_lifecycle",
+          "result": "passed",
+          "detail": {
+            "localGitInstall": true,
+            "enableDisable": true,
+            "updatePreviewAndApply": true,
+            "removalCancelConfirm": true
+          }
+        },
+        {
+          "name": "control_center",
+          "result": "passed",
+          "detail": {
+            "allTabToggles": true,
+            "overviewProtected": true,
+            "reorderCommitCancel": true,
+            "overviewSectionsHoverWidth": true
+          }
+        },
+        {
+          "name": "one managed shell at completion",
+          "result": "passed",
+          "detail": {
+            "mainPID": "10934",
+            "shellPIDs": [
+              "10934"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    },
+    "plain-omarchy": {
+      "tests": 3,
+      "pages": 0,
+      "settings": 0,
+      "cases": [
+        {
+          "name": "one managed shell before Omarchy runtime audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "83759",
+            "shellPIDs": [
+              "83759"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        },
+        {
+          "name": "Omarchy packages in installed Hyprland",
+          "result": "passed",
+          "detail": {
+            "upstreamPomodoroTimer": true,
+            "independentSpacerInstances": true,
+            "upstreamMediaServiceAndNativeWidget": true,
+            "serviceInjection": true,
+            "panelOverlayMenuPayloads": true,
+            "upstreamReplacementAndNativeRestore": true,
+            "installedPackagesUnmodified": true,
+            "mediaPlayback": "local mpv MPRIS title, pause and resume"
+          }
+        },
+        {
+          "name": "one managed shell after Omarchy runtime audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "83759",
+            "shellPIDs": [
+              "83759"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    },
+    "plain-upstream-omarchy": {
+      "tests": 3,
+      "pages": 0,
+      "settings": 0,
+      "cases": [
+        {
+          "name": "one managed shell before Omarchy runtime audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "10934",
+            "shellPIDs": [
+              "10934"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        },
+        {
+          "name": "Omarchy packages in installed Hyprland",
+          "result": "passed",
+          "detail": {
+            "upstreamPomodoroTimer": true,
+            "independentSpacerInstances": true,
+            "upstreamMediaServiceAndNativeWidget": true,
+            "serviceInjection": true,
+            "panelOverlayMenuPayloads": true,
+            "upstreamReplacementAndNativeRestore": true,
+            "installedPackagesUnmodified": true,
+            "mediaPlayback": "local mpv MPRIS title, pause and resume"
+          }
+        },
+        {
+          "name": "one managed shell after Omarchy runtime audit",
+          "result": "passed",
+          "detail": {
+            "mainPID": "10934",
+            "shellPIDs": [
+              "10934"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    },
+    "encrypted-settings": {
+      "tests": 4,
+      "pages": 0,
+      "settings": 0,
+      "cases": [
+        {
+          "name": "idle_restart_burst",
+          "result": "passed",
+          "detail": {
+            "rapidSavedTimeoutChanges": 8,
+            "idleLockServiceStayedActive": true,
+            "servicePIDs": [
+              "1229",
+              "2533",
+              "2665",
+              "2797",
+              "2930",
+              "3062",
+              "3209",
+              "3340"
+            ]
+          }
+        },
+        {
+          "name": "keyboard_stability",
+          "result": "passed",
+          "detail": {
+            "applySwitchRemoveCycles": 8,
+            "managedShellUnchanged": true
+          }
+        },
+        {
+          "name": "plugin_lifecycle",
+          "result": "passed",
+          "detail": {
+            "localGitInstall": true,
+            "enableDisable": true,
+            "updatePreviewAndApply": true,
+            "removalCancelConfirm": true
+          }
+        },
+        {
+          "name": "one managed shell at completion",
+          "result": "passed",
+          "detail": {
+            "mainPID": "2031",
+            "shellPIDs": [
+              "2031"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    },
+    "encrypted-upstream-settings": {
+      "tests": 9,
+      "pages": 0,
+      "settings": 0,
+      "cases": [
+        {
+          "name": "keyboard_stability",
+          "result": "passed",
+          "detail": {
+            "applySwitchRemoveCycles": 8,
+            "managedShellUnchanged": true
+          }
+        },
+        {
+          "name": "workspaces",
+          "result": "passed",
+          "detail": {
+            "modes": [
+              "per-monitor",
+              "shared"
+            ],
+            "layouts": [
+              "dwindle",
+              "scrolling",
+              "floating"
+            ],
+            "perWorkspace": true,
+            "titlebars": true
+          }
+        },
+        {
+          "name": "bar_background",
+          "result": "passed",
+          "detail": {
+            "backgroundChoices": 7,
+            "customHueSaturationLightnessBounds": true
+          }
+        },
+        {
+          "name": "idle_restart_burst",
+          "result": "passed",
+          "detail": {
+            "rapidSavedTimeoutChanges": 8,
+            "idleLockServiceStayedActive": true,
+            "servicePIDs": [
+              "1239",
+              "18090",
+              "18237",
+              "18398",
+              "18545",
+              "18692",
+              "18839",
+              "18986"
+            ]
+          }
+        },
+        {
+          "name": "notifications",
+          "result": "passed",
+          "detail": {
+            "doNotDisturb": true,
+            "customQuietTimes": true,
+            "corners": 4,
+            "realNotification": true
+          }
+        },
+        {
+          "name": "audio",
+          "result": "passed",
+          "detail": {
+            "nativePipeWireOutputs": 2,
+            "nativeMicrophone": true,
+            "volume": true,
+            "mute": true,
+            "balance": true,
+            "defaultOutput": true
+          }
+        },
+        {
+          "name": "plugin_lifecycle",
+          "result": "passed",
+          "detail": {
+            "localGitInstall": true,
+            "enableDisable": true,
+            "updatePreviewAndApply": true,
+            "removalCancelConfirm": true
+          }
+        },
+        {
+          "name": "control_center",
+          "result": "passed",
+          "detail": {
+            "allTabToggles": true,
+            "overviewProtected": true,
+            "reorderCommitCancel": true,
+            "overviewSectionsHoverWidth": true
+          }
+        },
+        {
+          "name": "one managed shell at completion",
+          "result": "passed",
+          "detail": {
+            "mainPID": "10887",
+            "shellPIDs": [
+              "10887"
+            ],
+            "currentInvocationJournal": "passed"
+          }
+        }
+      ]
+    }
+  },
+  "prebuiltChecks": [
+    {
+      "command": "scripts/check-prebuilt --catalogue",
+      "result": "passed",
+      "output": "496 derivations build locally; 25 expected local builds allowed.\n23 configuration builds: apparmor-closure-rules-security.wrappers.1Password-BrowserSupport, apparmor-closure-rules-security.wrappers.Hyprland, apparmor-closure-rules-security.wrappers.fusermount3, apparmor-closure-rules-security.wrappers.gamemoded, apparmor-closure-rules-security.wrappers.gnome-keyring-daemon, apparmor-closure-rules-security.wrappers.op, apparmor-closure-rules-security.wrappers.pkexec, check-sshd-config, cybexos-boot-theme, cybexos-hardware-drivers.json, dconf-db, initrd-linux-7.3, linux-7.3-modules-shrunk, pam.d, plymouth-initrd-plugins, plymouth-initrd-themes, plymouth-logos, sane-config, security-wrapper-1Password-BrowserSupport-x86_64-unknown-linux-musl, security-wrapper-Hyprland-x86_64-unknown-linux-musl, security-wrapper-gamemoded-x86_64-unknown-linux-musl, security-wrapper-op-x86_64-unknown-linux-musl, sshd.conf-final\n8 pointer theme downloads checked."
+    },
+    {
+      "command": "scripts/check-prebuilt --nvidia",
+      "result": "passed",
+      "output": "480 derivations build locally; 28 expected local builds allowed.\n23 configuration builds: apparmor-closure-rules-security.wrappers.1Password-BrowserSupport, apparmor-closure-rules-security.wrappers.Hyprland, apparmor-closure-rules-security.wrappers.fusermount3, apparmor-closure-rules-security.wrappers.gamemoded, apparmor-closure-rules-security.wrappers.gnome-keyring-daemon, apparmor-closure-rules-security.wrappers.op, apparmor-closure-rules-security.wrappers.pkexec, check-sshd-config, cybexos-boot-theme, cybexos-hardware-drivers.json, dconf-db, initrd-linux-7.3, linux-7.3-modules-shrunk, pam.d, plymouth-initrd-plugins, plymouth-initrd-themes, plymouth-logos, sane-config, security-wrapper-1Password-BrowserSupport-x86_64-unknown-linux-musl, security-wrapper-Hyprland-x86_64-unknown-linux-musl, security-wrapper-gamemoded-x86_64-unknown-linux-musl, security-wrapper-op-x86_64-unknown-linux-musl, sshd.conf-final\n8 pointer theme downloads checked."
+    }
+  ],
+  "installerNetworking": {
+    "kind": "isolated-installer-network-evidence",
+    "checks": {
+      "initial": {
+        "phase": "development",
+        "diskTouched": false
+      },
+      "ethernetReplug": {
+        "result": "passed",
+        "interface": "enp0s2"
+      },
+      "wifiScan": {
+        "result": "passed",
+        "security": "WPA2"
+      },
+      "wrongPassword": {
+        "result": "passed",
+        "error": "Wi-Fi activation failed",
+        "failedProfileRemoved": true
+      },
+      "httpsOverWifi": {
+        "result": "passed",
+        "address": "192.168.88.12",
+        "onlyDefaultRoute": "wlan0"
+      },
+      "accessPointReturn": {
+        "result": "passed",
+        "automatic": true,
+        "verifiedHttps": true
+      },
+      "networkManagerRestart": {
+        "result": "passed",
+        "automatic": true,
+        "verifiedHttps": true
+      },
+      "noDiskChanges": {
+        "result": "passed",
+        "diskTouched": false
+      },
+      "result": "passed"
+    },
+    "isoSha256": "19b3b4cb09614251459b50fa9c6b4df2923cb0d8e5e1ca38c2a44f91d3ff1bf6",
+    "scope": "actual ISO installer and NetworkManager with simulated Wi-Fi radios; no physical radio or installation qualification"
+  },
+  "result": "passed",
+  "resourceCleanup": {
+    "checkedAt": "2026-10-31T00:14:11.336374+00:00",
+    "leases": [
+      {
+        "lease": "02b1ca643ccb428ca0c9bf0f802e43ec",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "17eebd6f4bee4f12bd48b947f044477e",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "1c251815b52440efbf24f1ca95a0714a",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "1e44c4cfca2b43cf8df1f94a85e1bd69",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "2485277f76e24a21ac00c08d6f76f3fc",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "34c85ebbc81c4f2d9b1de7dbe862f728",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "3ae74f2eff51433da072c1df286cf7bf",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "59ad8af613a94d118777703a311bd045",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "5c6a32393cd6465dbdbe61157fba73df",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "6c46f76e918b4f11a5b4a4c181a894a2",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "7a072e042cd14f14b775c43873107c2b",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "7eaef03c660043e08fd795abcbaf416d",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "85a12ad6fde245a99f6237875af27d1a",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "8efb2cb1885d4e759e4bc6ab3b2a45ae",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "920f592990c545f391e60fde1562e528",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "b647d97001824b50a785b4f5c13141ae",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "c37472bc8fad429bbbf2e790cc937302",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "ce78f69cbee7412f8dff286e21c2420f",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "e085507230c94a8d9b83baae02b48fee",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "e61ebe0bb3f84bf988fba3ea1f25f6f5",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "f18a9a9da4c940d396014d237096bc67",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "f44723b0b2104043aa9eaca9a12c0904",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "f826b44efbf14aac8303c9624068bc54",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      },
+      {
+        "lease": "fdeb423d1ae5488f863b82bfb30f2ef3",
+        "status": "closed",
+        "remaining": [],
+        "preserved_volumes": [],
+        "errors": []
+      }
+    ],
+    "ciReservationsReleased": [
+      "ci-job-04486a87735c4b7aa6d5bf10a737f0b9",
+      "ci-job-09843c0898ae44959fc6810843c3775f",
+      "ci-job-0a20df8f0c2746fb97f82291e4a87259",
+      "ci-job-164e81eea1e24ee88d2f9ce0d2df365d",
+      "ci-job-18fae8bfa358436d80a6b6bf6df69e51",
+      "ci-job-217a91f29d4d4cd58ab28414b3895b51",
+      "ci-job-252cfd69fc524ca4b04ee1f1b84154ae",
+      "ci-job-27012d52c2824ffcacd7218c99e705ae",
+      "ci-job-3757bce5e59e483c8c21a5f62823aa57",
+      "ci-job-3c9bc27da004493bba81b75a605942e9",
+      "ci-job-4ac752e4415246b28348d61c777ce15c",
+      "ci-job-8130c57ebcc54035ac91d9a6c7ef83af",
+      "ci-job-8d9137a06ad74358b23cbe2f53c48e06",
+      "ci-job-90448b01d7684064b87c427338039d22",
+      "ci-job-994c0846933443fbb092e62b88dfef3b",
+      "ci-job-a39068d828954cc08064e93e24759e0b",
+      "ci-job-a75a5530381d4323915083684e55dd20",
+      "ci-job-beea1dbb3e4f4760827723fa8b89c72d",
+      "ci-job-c0a182a71a8b433b92e4ccb54f96d910",
+      "ci-job-c6f950a800214974b97e2f9449f7882e",
+      "ci-job-d64b635b98254c189c7b0a123e45558b",
+      "ci-job-d9f379d237e144afb73e3e2e086b6423"
+    ],
+    "taskProcesses": [],
+    "taskMounts": [],
+    "leaseWorkspacesAbsent": true,
+    "pxeStagingAbsent": true,
+    "shortSourceTemporaryDirectoriesAbsent": true
+  },
+  "temporaryArtifactCleanup": {
+    "checkedAt": "2026-10-31T00:15:15.008557+00:00",
+    "directory": "/data/tmp/cybexos-release-audit-20261030-E9cTK9",
+    "bytesBeforeRemoval": 7353118,
+    "diskBytesBeforeRemoval": 7745536,
+    "directoryAbsent": true,
+    "diskBytesAfterRemoval": 0,
+    "finalDuplicateISOStoreOutputAbsent": true,
+    "supersededStagingDirectoryAbsent": true
+  },
+  "retainedArtifacts": [
+    {
+      "path": "/data/pxe/iso/cybexos-1.0.0-beta.31.iso",
+      "bytes": 7457329152,
+      "reason": "Final VM-qualified testing ISO served through PXE"
+    },
+    {
+      "path": "/data/pxe/iso/cybexos-1.0.0-beta.31.iso.sha256",
+      "bytes": 92,
+      "reason": "SHA-256 checksum for the served ISO"
+    },
+    {
+      "path": "/home/john/Code/CybexOS/docs/measurements/release-vm-audit-2026-10-30.md",
+      "bytes": 16225,
+      "reason": "Human-readable audit, fixes and qualification limits"
+    },
+    {
+      "path": "/home/john/Code/CybexOS/docs/measurements/release-vm-audit-2026-10-30.json",
+      "bytes": 137232,
+      "reason": "Machine-readable exact-source qualification and cleanup evidence"
+    }
+  ]
+}

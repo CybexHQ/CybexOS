@@ -5,6 +5,11 @@ production release, authenticated public NixOS channel or completed physical
 hardware/security qualification. This record describes development work on
 2026-10-22; results on earlier source snapshots do not qualify later edits.
 
+The [2026-10-30–31 VM audit](measurements/release-vm-audit-2026-10-30.md)
+records later fixes and exact-source ISO/runtime evidence for beta.31. The
+historical development matrix below does not replace that image-specific record
+or establish physical/security/publication qualification.
+
 ## Evidence boundaries
 
 | Area | Actually exercised | Remaining work |
@@ -36,13 +41,14 @@ tests and failures; inspect that evidence before using a particular image.
   authenticating the external installation payload; signing a boot executable
   alone is insufficient. Secure Boot installation refuses before erasure;
   disabling firmware verification is not an accepted workaround.
-- The desktop requires Hyprland 0.56.2 and native titlebars. nixos-unstable's
-  prebuilt compositor is 0.56.2; its libraries and the native titlebars build
-  without a compatibility overlay. Real native configuration verification accepts
-  the product configuration and rejects an invalid declaration. It also exposed
-  an upstream verifier/event-loop interaction, now handled without scheduling
-  runtime timers during parsing. Installed startup/rendering and runtime health
-  passed on a development snapshot; repeat against the final source identity.
+- The reviewed desktop runtime series include Hyprland 0.56 and 0.57 with
+  native titlebars. Beta.31 uses Nixpkgs' prebuilt 0.56.2; both its plain and
+  encrypted VMs staged, booted and confirmed an upstream update to prebuilt
+  0.57.0, then passed runtime checks and rollback. The titlebar package selects the
+  implementation for that compositor without a compatibility overlay. Native
+  configuration verification accepts the product configuration and rejects
+  invalid declarations. See the image-specific audit for exact source identity,
+  the read-only verifier fix and the complete plain/encrypted results.
 - Mandatory access control coverage remains incomplete. AppArmor enablement
   and the exact Chromium namespace exception do not reproduce the prior
   enforcing policy. Qualify enforced native service/application confinement
