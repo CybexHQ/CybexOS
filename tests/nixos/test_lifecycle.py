@@ -597,7 +597,7 @@ class EngineTests(unittest.TestCase):
         def systemctl(*args):
             if args[2] in inactive:
                 raise CommandFailure('systemctl', 3, 'inactive')
-            return 'active'
+            return 'active\n'  # unstripped, like the real Runner
         def run(*args, **kwargs):
             if args[:2] == ('cat', OLD_SYSTEM + '/etc/cybexos/health-services.json'):
                 original.calls.append(args)

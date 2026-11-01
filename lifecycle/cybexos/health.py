@@ -49,8 +49,10 @@ def declared_units(declaration):
 
 
 def unit_active(run, unit):
+    # The updater's Runner returns raw output ("active\n"); a baseline that
+    # misread it would excuse every declared unit.
     try:
-        return run('systemctl', 'is-active', unit) == 'active'
+        return run('systemctl', 'is-active', unit).strip() == 'active'
     except Exception:
         return False
 

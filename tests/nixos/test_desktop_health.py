@@ -87,6 +87,13 @@ class SystemHealthTests(unittest.TestCase):
         with self.assertRaisesRegex(Failure, 'NetworkManager.service'):
             system_services(lambda *args: 'inactive', declaration, {'xps-ipu7-abi.service'})
 
+    def test_baseline_reads_the_updater_runner_raw_output(self):
+        # The engine's Runner returns systemctl output unstripped.
+        declaration = {'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service']}
+        def run(*args):
+            return 'failed\n' if args[-1] == 'xps-ipu7-abi.service' else 'active\n'
+        self.assertEqual(inactive_units(run, declaration), ['xps-ipu7-abi.service'])
+
     def test_preexisting_arguments_name_only_system_units(self):
         self.assertEqual(preexisting_arguments(['--preexisting=xps-ipu7-abi.service']), {'xps-ipu7-abi.service'})
         self.assertEqual(preexisting_arguments([]), set())
