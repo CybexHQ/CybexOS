@@ -326,8 +326,12 @@ assert (let auth = encrypted.security.pam.services.sddm-autologin.rules.auth; in
 assert !(machine.config.systemd.services.display-manager.serviceConfig ? KeyringMode);
 assert !(builtins.elem "v4l2-relayd-ipu7.service" (health machine.config).units);
 assert (health machine.config).userUnits == [ "hypridle.service" ];
-assert builtins.all (unit: builtins.elem unit (health xps).units)
-  [ "xps-ipu7-abi.service" "v4l2-relayd-ipu7.service" "xps-haptic-touchpad.service" ];
+# Optional XPS devices are reported, never required: a camera or haptics
+# failure must not hold back or roll back an update. Thermal protection is required.
+assert builtins.all (unit: builtins.elem unit (health xps).reportedUnits && !(builtins.elem unit (health xps).units))
+  [ "xps-ipu7-abi.service" "v4l2-relayd-ipu7.service" "xps-ipu7-camera-init.service" "xps-haptic-touchpad.service" "intel_lpmd.service" ];
+assert builtins.elem "thermald.service" (health xps).units;
+assert (health machine.config).reportedUnits == [ ] && (health machine.config).reportedUserUnits == [ ];
 # The ISO carries only the runtime-matched haptic helper, not the XPS camera,
 # audio or power profile. A generic installed machine has no such service.
 assert installer.systemd.services ? xps-haptic-touchpad;
@@ -336,7 +340,8 @@ assert builtins.length installer.systemd.services.xps-haptic-touchpad.serviceCon
 assert xps.systemd.services.xps-haptic-touchpad.serviceConfig.ExecCondition == [];
 assert installer.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=100\n";
 assert xps.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=100\n";
-assert (health xps).userUnits == [ "hypridle.service" "xps-speaker-tuning.service" ];
+assert (health xps).userUnits == [ "hypridle.service" ];
+assert (health xps).reportedUserUnits == [ "xps-speaker-tuning.service" ];
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.Type == "oneshot";
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.RemainAfterExit;
 assert builtins.elem "xps-ipu7-abi.service" xps.systemd.services.v4l2-relayd-ipu7.requires;
@@ -355,8 +360,9 @@ assert builtins.elem "orca" (names generic.environment.systemPackages);
 assert !generic.services.thermald.enable;
 assert !(generic.systemd.services ? intel_lpmd);
 assert !(builtins.elem "thermald.service" (health generic).units);
-assert builtins.all (unit: builtins.elem unit (health xps).units)
-  [ "thermald.service" "intel_lpmd.service" "xps-ipu7-camera-init.service" ];
+assert builtins.elem "thermald.service" (health xps).units;
+assert builtins.all (unit: builtins.elem unit (health xps).reportedUnits)
+  [ "intel_lpmd.service" "xps-ipu7-camera-init.service" ];
 # Adaptive thermald (DPTF tables), PPD for profiles, and no rival profile manager.
 assert xps.services.thermald.enable && xps.services.thermald.configFile == null;
 assert xps.services.power-profiles-daemon.enable;

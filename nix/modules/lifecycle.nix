@@ -30,22 +30,33 @@ in {
       example = [ "my-critical-service.service" ];
       description = "Additional systemd units that must be active before a deployment can be accepted.";
     };
+    reportedHealthServices = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "my-optional-device.service" ];
+      description = "Systemd units whose failure is reported after a deployment but never rejects or rolls it back.";
+    };
   };
   config = lib.mkMerge [ (lib.mkIf (cfg.enable || cfg.installationMedium) {
     # The medium authenticates its own release with the same trust and policy.
     environment.etc."cybexos/trust.json".text = builtins.toJSON { schema = 1; keys = cfg.updates.trustKeys; };
     environment.etc."cybexos/update.json".text = builtins.toJSON { schema = 1; channel = cfg.updates.channel; branch = "nixos-unstable"; };
   }) (lib.mkIf cfg.enable {
+    # units and userUnits must work: a deployment that breaks one is rolled
+    # back. The reported lists cover optional devices such as a camera or
+    # speaker tuning: a failure there is shown after the deployment, but never
+    # holds back the whole update. Release qualification catches those.
     environment.etc."cybexos/health-services.json".text = builtins.toJSON {
       schema = 1;
       units = lib.unique ([ "multi-user.target" "NetworkManager.service" "display-manager.service" ]
         ++ lib.optional config.services.libreswan.enable "ipsec.service"
-        ++ lib.optional cfg.hardware.xps.enable "xps-haptic-touchpad.service"
+        ++ cfg.updates.additionalHealthServices);
+      userUnits = lib.optional config.systemd.user.services.hypridle.enable "hypridle.service";
+      reportedUnits = lib.unique (lib.optional cfg.hardware.xps.enable "xps-haptic-touchpad.service"
         ++ lib.optionals (cfg.hardware.xps.enable && cfg.hardware.xps.camera)
           [ "xps-ipu7-abi.service" "v4l2-relayd-ipu7.service" ]
-        ++ cfg.updates.additionalHealthServices);
-      userUnits = lib.optional config.systemd.user.services.hypridle.enable "hypridle.service"
-        ++ lib.optional cfg.hardware.xps.enable "xps-speaker-tuning.service";
+        ++ cfg.updates.reportedHealthServices);
+      reportedUserUnits = lib.optional cfg.hardware.xps.enable "xps-speaker-tuning.service";
     };
     systemd.tmpfiles.rules = [
       "d /var/lib/cybexos 0755 root root -"

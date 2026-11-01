@@ -334,6 +334,20 @@ class NativeDiagnostics(unittest.TestCase):
         self.assertIn('awaiting-boot', warnings['deployment'])
         self.assertIn('Repeated crashes', warnings['shell'])
 
+    def test_reported_devices_are_listed_as_reported_only(self):
+        declaration = {'schema': 1, 'units': ['NetworkManager.service'], 'userUnits': ['personal.service'],
+                       'reportedUnits': ['xps-ipu7-abi.service'], 'reportedUserUnits': ['xps-speaker-tuning.service']}
+        result = self.probe({
+            ('systemctl', 'is-active', 'xps-ipu7-abi.service'): (3, 'failed'),
+            ('systemctl', '--user', 'is-active', 'xps-speaker-tuning.service'): (0, 'active'),
+        }, declaration)
+        warnings = {check['name']: check['detail'] for check in result['checks'] if check['state'] == 'warning'}
+        self.assertEqual(warnings, {'xps-ipu7-abi.service': 'failed (reported only)'})
+        self.assertIn(('systemctl', '--user', 'is-active', 'xps-speaker-tuning.service'), self.calls)
+        bad = declaration | {'reportedUnits': ['--all'], 'reportedUserUnits': []}
+        self.assertEqual(self.probe(declaration=bad)['overall'], 'warning')
+        self.assertFalse(any('--all' in command for command in self.calls))
+
     def test_unavailable_and_malformed_responses_never_mean_healthy(self):
         for command in [('cybex', 'update', 'status'), ('hyprctl', '-j', 'configerrors'), ('cybex', 'shell', 'status'),
                         ('systemctl', '--user', 'is-active', 'quickshell.service')]:

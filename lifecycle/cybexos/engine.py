@@ -543,8 +543,9 @@ class Engine:
             failed.add(unit['unit'])
         return failed
 
-    def reject_new_failures(self, before):
-        newly_failed = self.failed_units() - before
+    def reject_new_failures(self, before, reported=()):
+        # Reported units (an optional camera, haptics) are shown, never a reason to roll back.
+        newly_failed = self.failed_units() - before - set(reported)
         if newly_failed:
             raise Failure('Activation introduced failed system units: ' + ', '.join(sorted(newly_failed))
                           + '. Inspect their journals and correct the configuration before retrying.')
@@ -562,6 +563,19 @@ class Engine:
                 for key in empty):
             return empty
         return {key: sorted(baseline[key]) for key in empty}
+
+    def health_report(self, command):
+        """Reported (optional) units that are not running; empty when unknown."""
+        empty = {'units': [], 'userUnits': []}
+        try:
+            report = parse(self.run(command, 'report', timeout=120))
+        except Failure:
+            return empty
+        if not isinstance(report, dict) or any(
+                not isinstance(report.get(key), list) or not all(isinstance(unit, str) for unit in report[key])
+                for key in empty):
+            return empty
+        return {key: sorted(report[key]) for key in empty}
 
     def health(self, command, mode, record):
         # Like reject_new_failures, declared health judges what a deployment
@@ -618,14 +632,16 @@ class Engine:
                 self.run('cybexos-boot-trial', '--restore', record['previousSystem'])
                 previously_failed = self.failed_units()
                 self.switch(record['system'], 'test')
-                self.reject_new_failures(previously_failed)
+                warnings = self.health_report(record['system'] + '/sw/bin/cybexos-health')
+                self.reject_new_failures(previously_failed, warnings['units'])
                 self.health(record['system'] + '/sw/bin/cybexos-health', 'system', record)
                 self.health(record['system'] + '/sw/bin/cybexos-health', 'desktop', record)
                 if config_digest(self.working) != record['baseline']:
                     raise Failure('Personal configuration changed during activation. Working edits retained; stage again.')
                 self.select_config(tx / 'config', identifier)
                 self.profile(record['system'])
-                self.reject_new_failures(previously_failed)
+                self.reject_new_failures(previously_failed, warnings['units'])
+                self.status(healthWarnings=warnings)
                 if self.packages_only(record, tx):
                     # Only the installed packages changed: the same kernel, initrd,
                     # boot parameters and configuration apart from Software's own
@@ -765,6 +781,7 @@ class Engine:
             self.run.log = self.tx(record['id']) / 'build.log'
             self.health('cybexos-health', 'system', record)
             self.health('cybexos-health', 'desktop-required', record)
+            self.status(healthWarnings=self.health_report('cybexos-health'))
             self.run('cybexos-boot-trial', '--commit', record['system'])
             tx = self.tx(record['id'])
             channel = read(tx / 'channel.json')

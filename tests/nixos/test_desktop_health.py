@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lifecycle'))
 from cybexos.common import Failure
 from cybexos.desktop_check import compositor_command, verify_compositor
 from cybexos.health import (LIVE_BEGIN, LIVE_END, USER_UNIT, baseline, desktop, desktop_sessions,
-                            inactive_units, preexisting_arguments, system_services, user_services)
+                            inactive_units, preexisting_arguments, reported, system_services, user_services)
 
 SYSTEM = '/nix/store/' + 'a' * 32 + '-nixos-system-test'
 GUARD = Path(__file__).resolve().parents[1] / 'lib/quickshell-live'
@@ -129,6 +129,24 @@ class SystemHealthTests(unittest.TestCase):
                          {'units': ['xps-ipu7-abi.service'], 'userUnits': ['xps-speaker-tuning.service']})
         self.assertEqual(baseline(run, declaration, [])['userUnits'], [])
 
+    def test_reported_devices_are_listed_never_required(self):
+        declaration = {'schema': 1, 'units': ['NetworkManager.service'], 'userUnits': ['hypridle.service'],
+                       'reportedUnits': ['xps-ipu7-abi.service', 'xps-haptic-touchpad.service'],
+                       'reportedUserUnits': ['xps-speaker-tuning.service']}
+        down = {'xps-ipu7-abi.service', 'xps-speaker-tuning.service'}
+        def run(*args):
+            return 'failed\n' if args[-1] in down else 'active\n'
+        system_services(run, declaration)
+        user_services([], run, declaration)
+        self.assertEqual(reported(run, declaration, [('owner', ['runuser', '-u', 'owner', '--'])]),
+                         {'units': ['xps-ipu7-abi.service'], 'userUnits': ['xps-speaker-tuning.service']})
+        self.assertEqual(reported(run, {'schema': 1, 'units': ['NetworkManager.service']}, []),
+                         {'units': [], 'userUnits': []})
+        for invalid in ({'schema': 1, 'reportedUnits': ['--all']}, {'schema': 1, 'reportedUnits': 'camera.service'},
+                        {'schema': 1, 'reportedUserUnits': ['graphical-session.target']}, None):
+            with self.subTest(invalid=invalid), self.assertRaises(Failure):
+                reported(run, invalid, [])
+
     def test_only_signed_in_hyprland_sessions_are_checked(self):
         with tempfile.TemporaryDirectory(prefix='cybexos-health-runtime-') as directory:
             runtime = Path(directory)
@@ -153,7 +171,8 @@ class SystemHealthTests(unittest.TestCase):
             (root / 'systemctl').write_text('#!/bin/sh\n[ "$2" = xps-ipu7-abi.service ] && { echo failed; exit 3; }\necho active\n')
             (root / 'systemctl').chmod(0o755)
             declaration = root / 'health-services.json'
-            declaration.write_text(json.dumps({'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service']}))
+            declaration.write_text(json.dumps({'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service'],
+                                               'reportedUnits': ['xps-ipu7-abi.service', 'NetworkManager.service']}))
             source = (Path(__file__).resolve().parents[2] / 'lifecycle/bin/cybexos-health').read_text()
             command = root / 'cybexos-health'
             sessions = root / 'run-user'
@@ -177,6 +196,12 @@ class SystemHealthTests(unittest.TestCase):
             self.assertEqual(json.loads(recorded.stdout), {'units': ['xps-ipu7-abi.service'], 'userUnits': []})
             self.assertEqual(health('--preexisting=xps-speaker-tuning.service', mode='desktop').returncode, 0)
             self.assertIn('Invalid health argument', health('--preexisting=multi-user.target', mode='desktop').stderr)
+            shown = health(mode='report')
+            self.assertEqual(shown.returncode, 0, shown.stderr)
+            self.assertEqual(json.loads(shown.stdout), {'units': ['xps-ipu7-abi.service'], 'userUnits': []})
+            unknown = health(mode='desktop-baseline')
+            self.assertEqual(unknown.returncode, 1)
+            self.assertIn('Unknown health mode', unknown.stderr)
 
     def test_invalid_or_missing_declaration_cannot_skip_health(self):
         for declaration in (None, {'schema': 1, 'units': []}, {'schema': 2, 'units': ['ipsec.service']},

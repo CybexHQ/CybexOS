@@ -50,8 +50,8 @@ reviewed signature accepts this layout; Linux 7.2.11 has the same mismatch.
 A task-local unstripped PSYS build matched the stock layout for eight inspected
 structures, but the ninth could not be parsed and no processed frames were
 available. That probe does not authorize extending the signature. The managed
-ABI service fails closed and blocks camera initialization and update health
-confirmation on this configuration. This is a concrete XPS camera release
+ABI service fails closed and blocks camera initialization on this configuration;
+update health reports it without holding back updates. This is a concrete XPS camera release
 blocker, despite the complete XPS system building successfully. Do not disable
 the guard or omit the camera profile to qualify a machine that has that camera.
 

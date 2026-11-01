@@ -129,7 +129,8 @@ working installed Hyprland graphics stack.
    editable Google DNS default also needs qualification on restricted networks.
 8. **The exact Dell XPS camera profile has a known blocker.** The IPU7
    private-ABI guard rejects the selected kernel layout; the camera stack
-   builds but initialization and update health fail closed. Generic webcam
+   builds but initialization fails closed; update health reports it without
+   holding back updates. Generic webcam
    support does not resolve this machine-specific issue. See
    [the existing camera blocker](hardware-security.md).
 

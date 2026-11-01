@@ -118,7 +118,7 @@ in {
       aliases = [ "org.freedesktop.intel_lpmd.service" ];
       after = [ "power-profiles-daemon.service" "upower.service" ];
     };
-    cybexos.updates.additionalHealthServices = [ "intel_lpmd.service" ];
+    cybexos.updates.reportedHealthServices = [ "intel_lpmd.service" ];
   }) (lib.mkIf (xps.enable && xps.camera) {
     environment.systemPackages = [ (pkgs.writeShellApplication {
       name = "xps-ipu7-camera-frame-check";
@@ -229,7 +229,7 @@ in {
         systemctl start v4l2-relayd-ipu7.service
       '';
     };
-    cybexos.updates.additionalHealthServices = [ "xps-ipu7-camera-init.service" ];
+    cybexos.updates.reportedHealthServices = [ "xps-ipu7-camera-init.service" ];
     systemd.tmpfiles.rules = [ "d /run/camera 0750 root video -" ];
   }) ]))
   (lib.mkIf ((cfg.enable && xps.enable) || cfg.installationMedium) {

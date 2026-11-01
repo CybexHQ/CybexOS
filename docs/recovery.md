@@ -67,33 +67,41 @@ With Secure Boot, signed Lanzaboote UKIs are selected through systemd-boot's
 `bootctl` interface instead; its plain menu is hidden too and appears when a
 key is held during start.
 
-System health requires the boot target, NetworkManager and login manager to be
-active. When Libreswan is enabled, its managed `ipsec.service` must also be
-active so Cisco IPsec connections have their required daemon. Add critical
+System health requires what a person needs to use and repair the computer: the
+boot target, NetworkManager, the login manager and, in an authenticated
+desktop, the idle lock. When Libreswan is enabled, its managed `ipsec.service`
+must also be active so Cisco IPsec connections have their required daemon.
+Exact XPS hardware also requires thermald, its thermal protection. Add critical
 personal services in `/etc/nixos/local/*.nix`, for example
 `cybexos.updates.additionalHealthServices = [ "personal.service" ];`.
 The shared modules generate `/etc/cybexos/health-services.json` for the updater;
 disabled optional services are not required. Failed checks identify the unit
 and retain the pending recovery record instead of accepting the deployment.
-Selected XPS hardware also requires its haptic daemon and, in an authenticated
-desktop, speaker tuning. The selected processed camera requires a separate
-booted-kernel ABI check and the relay; an ABI failure blocks relay startup and
-trial acceptance. These service checks do not prove processed frames, privacy,
-image quality or suspend/resume; those still require physical qualification.
 
-Declared health judges what a deployment changes. Before activation the
-updater runs `cybexos-health baseline`, which records the declared system units
-and signed-in desktop units that are already inactive, and keeps that baseline
-in the pending record. Those units do not fail the candidate, its trial boot,
+Optional devices are reported, not required. On exact XPS hardware these are
+the haptic touchpad daemon, Intel LPMd, the processed camera's booted-kernel ABI
+check, initialization and relay, and, in the desktop, speaker tuning;
+`cybexos.updates.reportedHealthServices` adds more. A reported unit that is not
+running is listed as `healthWarnings` in `cybex update status`, as a failed
+service in `cybex doctor` and in the diagnostics report. It never rejects or
+rolls back a deployment, even one that broke it, and is not counted among the
+units a deployment newly failed: holding back a whole update, security fixes
+included, over a camera or speaker filter is the wrong trade. Hardware
+regressions are caught by release qualification instead. An ABI failure still
+blocks camera relay startup. These checks do not prove processed frames,
+privacy, image quality or suspend/resume; those require physical qualification.
+
+Required health judges what a deployment changes. Before activation the updater
+runs `cybexos-health baseline`, which records the required system units and
+signed-in desktop units that are already inactive, and keeps that baseline in
+the pending record. Those units do not fail the candidate, its trial boot,
 confirmation, or restoration of the generation that already lacked them;
-`cybex update status` lists them as `preexistingHealth`. Any other declared
+`cybex update status` lists them as `preexistingHealth`. Any other required
 unit, including one that was active before, still fails closed. An explicit
 rollback, which has no activation baseline, records the running system's state
-instead. Without the baseline, a hardware blocker such as the camera's ABI
-guard on an unreviewed kernel, or speaker tuning while a kernel regression
-hides the internal speakers, rejected every deployment, and the camera also
-blocked the rollback after it, leaving restoration pending and every preview
-blocked.
+instead. Without the baseline, a required unit that was already failing
+rejected every deployment and the rollback after it, leaving restoration
+pending and every preview blocked.
 
 From live media, unlock/mount the target filesystem and ESP, inspect
 `/var/lib/cybexos/transactions` and its deployment records, and select the

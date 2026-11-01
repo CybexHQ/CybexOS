@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 from cybexos.common import read
-from cybexos.health import (USER_UNIT, baseline, desktop, desktop_sessions, preexisting_arguments,
+from cybexos.health import (USER_UNIT, baseline, desktop, desktop_sessions, preexisting_arguments, reported,
                             system_services, user_services)
 
 
@@ -19,11 +19,14 @@ try:
     if mode == 'baseline':
         # What the running system already lacks, recorded before the updater changes it.
         print(json.dumps(baseline(run, declaration, desktop_sessions(run, Path('/run/user')))))
+    elif mode == 'report':
+        # Optional units that are not running: shown, never rejected.
+        print(json.dumps(reported(run, declaration, desktop_sessions(run, Path('/run/user')))))
     elif mode == 'system':
         system_services(run, declaration, preexisting_arguments(sys.argv[2:]))
         if not Path('/run/booted-system').exists():
             raise ValueError('Booted system identity missing')
-    else:
+    elif mode in ('desktop', 'desktop-required'):
         preexisting = preexisting_arguments(sys.argv[2:], USER_UNIT)
         sessions = desktop_sessions(run, Path('/run/user'))
         for _, prefix in sessions:
@@ -33,6 +36,8 @@ try:
             desktop(prefix, run, guard, expected)
         if not sessions and mode == 'desktop-required':
             raise ValueError('No authenticated Cybex OS desktop session. Sign in before confirming.')
+    else:
+        raise ValueError('Unknown health mode: ' + mode)
 except Exception as error:
     print(str(error), file=sys.stderr)
     sys.exit(1)

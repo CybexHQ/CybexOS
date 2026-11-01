@@ -22,7 +22,8 @@ sys.path.insert(0, str(ROOT / 'lifecycle'))
 from cybexos.common import CommandFailure, Failure, Runner, atomic, digest, locked, parse, read, syncdir
 from cybexos import inputs, trust
 from cybexos.engine import Engine, config_digest, configuration_paths, copy_config
-from cybexos.health import USER_UNIT, baseline, preexisting_arguments, system_services, user_services
+from cybexos.health import (USER_UNIT, baseline, preexisting_arguments, reported, system_services,
+                            user_services)
 
 REV_OLD, REV_NEW = '1' * 40, '2' * 40
 NAR_OLD, NAR_NEW = 'sha256-' + 'A' * 43 + '=', 'sha256-' + 'B' * 43 + '='
@@ -588,13 +589,15 @@ class EngineTests(unittest.TestCase):
         self.engine.apply(record['id'], record['reviewToken'])
         self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-boot')
 
-    CAMERA = ['xps-ipu7-abi.service', 'v4l2-relayd-ipu7.service']
+    DOWN = ['ipsec.service', 'personal.service']
+    CAMERA = ['v4l2-relayd-ipu7.service', 'xps-ipu7-abi.service']
     SPEAKER = 'xps-speaker-tuning.service'
 
     def declared_health(self, inactive):
-        """Every system declares the XPS camera and speaker tuning; `inactive` is what systemctl reports, live."""
-        declaration = {'schema': 1, 'units': ['multi-user.target', 'NetworkManager.service', *self.CAMERA],
-                       'userUnits': ['hypridle.service', self.SPEAKER]}
+        """Required and reported (optional) units; `inactive` is what systemctl reports, live."""
+        declaration = {'schema': 1, 'units': ['multi-user.target', 'NetworkManager.service', *self.DOWN],
+                       'userUnits': ['hypridle.service', 'personal-agent.service'],
+                       'reportedUnits': self.CAMERA, 'reportedUserUnits': [self.SPEAKER]}
         session = ['runuser', '-u', 'owner', '--']
         original = self.runner
         def systemctl(*args):
@@ -607,6 +610,8 @@ class EngineTests(unittest.TestCase):
                 original.calls.append(args)
                 if args[1] == 'baseline':
                     return json.dumps(baseline(systemctl, declaration, [('owner', session)]))
+                if args[1] == 'report':
+                    return json.dumps(reported(systemctl, declaration, [('owner', session)]))
                 if args[1] == 'system':
                     system_services(systemctl, declaration, preexisting_arguments(args[2:]))
                 else:
@@ -614,76 +619,71 @@ class EngineTests(unittest.TestCase):
                 return ''
             if args[0].endswith('/bin/switch-to-configuration') and inactive:
                 original.calls.append(args)
-                raise CommandFailure(args[0], 4, 'warning: the following units failed: xps-ipu7-abi.service')
+                raise CommandFailure(args[0], 4, 'warning: the following units failed: ' + sorted(inactive)[0])
             return original(*args, **kwargs)
         run.log = None
         self.engine.run = run
 
-    def test_blocked_camera_does_not_block_unrelated_deployment_or_its_trial_boot(self):
-        # The XPS camera's kernel ABI guard fails closed on an unreviewed
-        # kernel, before and after this deployment. That must not reject the
-        # candidate, its trial boot or confirmation.
-        self.declared_health(set(self.CAMERA))
+    def boot_candidate(self):
+        self.engine.boot_id = lambda: 'different-boot'
+        self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
+        self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
+
+    def test_already_failing_required_unit_does_not_block_deployment_or_trial_boot(self):
+        # A required unit that was failing before this deployment, such as a
+        # VPN daemon, must not reject the candidate, its trial boot or
+        # confirmation: the deployment did not break it.
+        self.declared_health(set(self.DOWN))
         record = self.engine.stage('upstream')
         self.engine.apply(record['id'], record['reviewToken'])
         status = read(self.engine.status_path)
         self.assertEqual(status['state'], 'awaiting-boot')
-        self.assertEqual(status['preexistingHealth'], {'units': sorted(self.CAMERA), 'userUnits': []})
-        flags = tuple('--preexisting=' + unit for unit in sorted(self.CAMERA))
+        self.assertEqual(status['preexistingHealth'], {'units': self.DOWN, 'userUnits': []})
+        flags = tuple('--preexisting=' + unit for unit in self.DOWN)
         self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'system', *flags), self.runner.calls)
-        self.assertEqual(read(self.engine.pending_path)['preexistingHealth'],
-                         {'units': sorted(self.CAMERA), 'userUnits': []})
-        self.engine.boot_id = lambda: 'different-boot'
-        self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
-        self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
+        self.assertEqual(read(self.engine.pending_path)['preexistingHealth'], {'units': self.DOWN, 'userUnits': []})
+        self.boot_candidate()
         self.engine.recover()
         self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-login')
         self.engine.confirm()
         self.assertEqual(read(self.engine.status_path)['state'], 'done')
         self.assertEqual(self.runner.calls.count(('cybexos-health', 'system', *flags)), 2)
 
-    def test_declared_unit_that_was_active_still_blocks_and_rollback_completes(self):
-        # Only units already inactive before the change are tolerated. The
-        # camera breaking in this deployment rejects it, and restoring the
-        # previous generation (camera active again) then passes as before.
+    def test_required_unit_broken_by_the_deployment_still_blocks_and_rollback_completes(self):
         inactive = set()
         self.declared_health(inactive)
         original = self.engine.run
         def run(*args, **kwargs):
             if args == (NEW_SYSTEM + '/bin/switch-to-configuration', 'test'):
-                inactive.add('xps-ipu7-abi.service')
+                inactive.add('ipsec.service')
             if args == (OLD_SYSTEM + '/bin/switch-to-configuration', 'test'):
                 inactive.clear()
             return original(*args, **kwargs)
         run.log = None
         self.engine.run = run
         record = self.engine.stage('upstream')
-        with self.assertRaisesRegex(Failure, 'xps-ipu7-abi.service is not active'):
+        with self.assertRaisesRegex(Failure, 'ipsec.service is not active'):
             self.engine.apply(record['id'], record['reviewToken'])
         self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
         self.assertEqual(read(self.engine.status_path)['preexistingHealth'], {'units': [], 'userUnits': []})
         self.assertFalse(self.engine.pending_path.exists())
 
-    def test_failing_desktop_service_does_not_block_unrelated_deployment(self):
-        # XPS speaker tuning fails on every boot while a kernel regression
-        # hides the internal speakers. Neither the candidate nor its
-        # confirmation may be rejected for that.
-        self.declared_health({self.SPEAKER})
+    def test_already_failing_desktop_unit_does_not_block_deployment(self):
+        self.declared_health({'personal-agent.service'})
         record = self.engine.stage('upstream')
         self.engine.apply(record['id'], record['reviewToken'])
-        self.assertEqual(read(self.engine.status_path)['preexistingHealth'], {'units': [], 'userUnits': [self.SPEAKER]})
-        flag = '--preexisting=' + self.SPEAKER
+        self.assertEqual(read(self.engine.status_path)['preexistingHealth'],
+                         {'units': [], 'userUnits': ['personal-agent.service']})
+        flag = '--preexisting=personal-agent.service'
         self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'system'), self.runner.calls)
         self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'desktop', flag), self.runner.calls)
-        self.engine.boot_id = lambda: 'different-boot'
-        self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
-        self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
+        self.boot_candidate()
         self.engine.recover()
         self.engine.confirm()
         self.assertEqual(read(self.engine.status_path)['state'], 'done')
         self.assertIn(('cybexos-health', 'desktop-required', flag), self.runner.calls)
 
-    def test_desktop_service_broken_by_the_deployment_still_blocks(self):
+    def test_desktop_unit_broken_by_the_deployment_still_blocks(self):
         inactive = set()
         self.declared_health(inactive)
         original = self.engine.run
@@ -701,11 +701,43 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
         self.assertFalse(self.engine.pending_path.exists())
 
+    def test_reported_devices_never_block_or_roll_back_but_are_shown(self):
+        # A camera whose kernel ABI guard fails, newly failing in this very
+        # activation, and speaker tuning without its speakers: the update is
+        # accepted and confirmed, and both are listed as health warnings.
+        inactive = {*self.CAMERA, self.SPEAKER}
+        self.declared_health(inactive)
+        original = self.engine.run
+        switched = False
+        def run(*args, **kwargs):
+            nonlocal switched
+            if args == (NEW_SYSTEM + '/bin/switch-to-configuration', 'test'):
+                switched = True
+            if args[:2] == ('systemctl', 'list-units'):
+                return json.dumps([{'unit': 'xps-ipu7-abi.service', 'sub': 'failed'}] if switched else [])
+            return original(*args, **kwargs)
+        run.log = None
+        self.engine.run = run
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        warnings = {'units': self.CAMERA, 'userUnits': [self.SPEAKER]}
+        status = read(self.engine.status_path)
+        self.assertEqual(status['state'], 'awaiting-boot')
+        self.assertEqual(status['healthWarnings'], warnings)
+        self.assertEqual(status['preexistingHealth'], {'units': [], 'userUnits': []})
+        self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'desktop'), self.runner.calls)
+        self.boot_candidate()
+        self.engine.recover()
+        self.engine.confirm()
+        status = read(self.engine.status_path)
+        self.assertEqual(status['state'], 'done')
+        self.assertEqual(status['healthWarnings'], warnings)
+
     def test_failed_activation_restores_a_generation_that_already_lacked_a_unit(self):
-        # Formerly a wedge: the previous generation's own health failed on the
-        # blocked camera, so restoration never completed and every preview
-        # stayed blocked.
-        self.declared_health(set(self.CAMERA))
+        # Formerly a wedge: the previous generation's own health failed on a
+        # unit that was already down, so restoration never completed and every
+        # preview stayed blocked.
+        self.declared_health(set(self.DOWN))
         record = self.engine.stage('upstream')
         original = self.engine.run
         def run(*args, **kwargs):
@@ -718,13 +750,13 @@ class EngineTests(unittest.TestCase):
             self.engine.apply(record['id'], record['reviewToken'])
         self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
         self.assertFalse(self.engine.pending_path.exists())
-        flags = tuple('--preexisting=' + unit for unit in sorted(self.CAMERA))
+        flags = tuple('--preexisting=' + unit for unit in self.DOWN)
         self.assertIn((OLD_SYSTEM + '/sw/bin/cybexos-health', 'system', *flags), self.runner.calls)
 
     def test_restoration_without_a_recorded_baseline_uses_the_running_system(self):
         # An explicit rollback, or a recovery journaled before baselines were
         # recorded, judges restoration against what the running system lacks.
-        self.declared_health(set(self.CAMERA))
+        self.declared_health(set(self.DOWN))
         record = self.engine.stage('upstream')
         pending = read(self.engine.tx(record['id']) / 'deployment.json') | {'phase': 'recovery', 'preserveWorking': True}
         self.assertNotIn('preexistingHealth', pending)

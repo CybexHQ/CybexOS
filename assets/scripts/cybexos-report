@@ -284,13 +284,17 @@ def diagnostics():
             or not isinstance(declaration.get('userUnits'), list)):
         record('services', 'warning', 'Health service declaration is missing or invalid')
     else:
-        for scope, units in (('system', declaration['units']), ('user', declaration['userUnits'])):
-            for unit in units:
+        # Reported units are optional devices: listed here, never required by updates.
+        for scope, units, note in (('system', declaration['units'], ''), ('user', declaration['userUnits'], ''),
+                                   ('system', declaration.get('reportedUnits', []), ' (reported only)'),
+                                   ('user', declaration.get('reportedUserUnits', []), ' (reported only)')):
+            for unit in units if isinstance(units, list) else [None]:
                 if not isinstance(unit, str) or not re.fullmatch(r'[A-Za-z0-9_.@:-]+\.(service|target)', unit):
                     record('services', 'warning', 'Invalid health service declaration')
                     continue
                 code, output = run(['systemctl', *(['--user'] if scope == 'user' else []), 'is-active', unit])
-                record(unit, 'ok' if code == 0 and output == 'active' else 'warning', output)
+                active = code == 0 and output == 'active'
+                record(unit, 'ok' if active else 'warning', output if active else output + note)
     code, output = run([tool('cybex'), 'update', 'status'])
     deployment = json_or_text(output)
     state = deployment.get('state') if isinstance(deployment, dict) else None

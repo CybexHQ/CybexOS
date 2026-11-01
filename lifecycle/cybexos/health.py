@@ -112,6 +112,27 @@ def baseline(run, declaration, sessions):
     return {'units': inactive_units(run, declaration), 'userUnits': sorted(missing)}
 
 
+def reported_units(declaration):
+    """Optional units that health reports but never fails on (both lists may be absent)."""
+    if not isinstance(declaration, dict) or declaration.get('schema') != 1:
+        raise Failure('Health service declaration is missing or invalid; inspect /etc/cybexos/health-services.json')
+    units, user_units = declaration.get('reportedUnits', []), declaration.get('reportedUserUnits', [])
+    if (not isinstance(units, list) or not all(isinstance(unit, str) and SYSTEM_UNIT.fullmatch(unit) for unit in units)
+            or not isinstance(user_units, list)
+            or not all(isinstance(unit, str) and USER_UNIT.fullmatch(unit) for unit in user_units)):
+        raise Failure('Invalid reported health unit declaration')
+    return units, user_units
+
+
+def reported(run, declaration, sessions):
+    """Reported units that are not active now. Never a reason to reject a deployment."""
+    units, user_units = reported_units(declaration)
+    missing = set()
+    for _, prefix in sessions:
+        missing.update(unit for unit in user_units if not user_unit_active(prefix, run, unit))
+    return {'units': [unit for unit in units if not unit_active(run, unit)], 'userUnits': sorted(missing)}
+
+
 def declared_user_units(declaration):
     if (not isinstance(declaration, dict) or declaration.get('schema') != 1
             or not isinstance(declaration.get('userUnits'), list)):
