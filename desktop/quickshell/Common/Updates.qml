@@ -69,6 +69,8 @@ Singleton {
     readonly property string selectedScope: sourcesLoaded ? Helpers.scope(sources, selectedSources) : ""
     readonly property var actions: Helpers.capabilities(deployment, runActive || !statusLoaded || statusError !== "", available, selectedScope)
     readonly property bool ready: deployment.state === "ready"
+    // A Cybex OS release published after this update was prepared, or "".
+    readonly property string newerRelease: sourcesLoaded ? Helpers.newerRelease(deployment, sources) : ""
     readonly property bool rebootRecommended: ["awaiting-boot", "awaiting-login"].includes(deployment.state) || Helpers.firmwareRestart(deployment)
     readonly property string rebootRecommendation: deployment.state === "awaiting-login"
         ? "Confirm this boot after signing in. No further restart is needed."
@@ -169,6 +171,11 @@ Singleton {
     function restage() {
         if (!runActive && selectedScope !== "" && ["ready", "stale"].includes(deployment.state)
                 && selectedScope !== deployment.scope) request(["stage", selectedScope]);
+    }
+    // Replace a prepared update with one that includes a newer Cybex OS release.
+    function prepareAgain() {
+        if (newerRelease !== "" && !runActive)
+            request(["stage", Helpers.scope(sources, [...new Set(selectedSources.concat(["cybexos"]))])]);
     }
     // After a failed combined preview: keep the installed Cybex OS.
     function prepareUpstream() { if (upstreamOnlyAvailable && !runActive) request(["stage", "upstream"]); }

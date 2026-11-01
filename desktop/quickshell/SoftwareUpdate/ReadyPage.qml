@@ -126,6 +126,58 @@ Item {
                 }
             }
 
+            // A Cybex OS release published after this update was prepared.
+            // Installing the prepared update stays possible; nothing is
+            // replaced until the person prepares again.
+            Rectangle {
+                objectName: "updateNewerRelease"
+                visible: root.service.newerRelease !== ""
+                width: parent.width
+                height: Math.max(newer.implicitHeight, prepareAgain.height) + Theme.scaled(24)
+                radius: Theme.chipRadius + 3
+                color: Theme.cardFill
+                border.width: 1
+                border.color: Theme.hairlineSoft
+                Column {
+                    id: newer
+                    x: Theme.scaled(14)
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - prepareAgain.width - Theme.scaled(40)
+                    spacing: Theme.scaled(2)
+                    Text {
+                        width: parent.width
+                        text: I18n.format("Cybex OS %1 is available", [root.service.newerRelease])
+                        color: Theme.textHi
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.primary
+                        font.weight: Theme.weightSemibold
+                        wrapMode: Text.Wrap
+                        textFormat: Text.PlainText
+                    }
+                    Text {
+                        width: parent.width
+                        text: I18n.tr("It was released after this update was prepared. Prepare again to include it.")
+                        color: Theme.textDim
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.secondary
+                        wrapMode: Text.Wrap
+                        textFormat: Text.PlainText
+                    }
+                }
+                UpdateButton {
+                    id: prepareAgain
+                    objectName: "updatePrepareAgain"
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.scaled(12)
+                    anchors.verticalCenter: parent.verticalCenter
+                    primary: true
+                    glyph: "download"
+                    text: I18n.tr("Prepare Again")
+                    enabled: !root.service.runActive && !root.service.requestPending
+                    onTriggered: root.service.prepareAgain()
+                }
+            }
+
             SectionTitle {
                 visible: root.review.components.length > 0
                 text: I18n.tr("Important changes")
@@ -397,7 +449,7 @@ Item {
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - keepGlyph.width - later.width - install.width - parent.spacing * 3
+                width: parent.width - keepGlyph.width - check.width - later.width - install.width - parent.spacing * 4
                 objectName: "updateRequestError"
                 text: root.service.requestFailure !== "" ? root.service.requestFailure
                     : root.firmwareOnly ? I18n.tr("Keep your computer on and follow any instructions for your devices.")
@@ -409,6 +461,16 @@ Item {
                 maximumLineCount: 3
                 elide: Text.ElideRight
                 textFormat: Text.PlainText
+            }
+            // A forced check, as on the up-to-date page; a newer Cybex OS
+            // release then appears above.
+            UpdateButton {
+                id: check
+                objectName: "updateCheck"
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.service.busy ? I18n.tr("Checking…") : I18n.tr("Check Now")
+                enabled: !root.service.busy && !root.service.requestPending
+                onTriggered: { root.service.refreshStatus(); root.service.check(true); }
             }
             UpdateButton {
                 id: later

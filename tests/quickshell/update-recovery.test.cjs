@@ -219,6 +219,30 @@ test("the review groups components, apps and tools, falling back to package chan
     assert.equal(H.component("unknown").label, "unknown");
 });
 
+test("a Cybex OS release published after an update was prepared is offered, once and only for updates", () => {
+    const prepared = { state: "ready", changeKind: "update", scope: "upstream", availableVersion: "1.0.1" };
+    const found = version => ({ upstream: { state: "available" }, cybexos: { state: "available", available: version } });
+    assert.equal(H.newerRelease(prepared, found("1.0.2")), "1.0.2");
+    assert.equal(H.newerRelease({ ...prepared, scope: "both", availableVersion: "1.0.2" }, found("1.0.2")), "",
+        "the prepared update already has it");
+    assert.equal(H.newerRelease(prepared, found("1.0.1")), "");
+    assert.equal(H.newerRelease({ ...prepared, availableVersion: "1.0.3" }, found("1.0.2")), "", "never an older release");
+    assert.equal(H.newerRelease(prepared, found("1.0.2-beta.1")), "1.0.2-beta.1");
+    assert.equal(H.newerRelease({ ...prepared, availableVersion: "1.0.2-beta.3" }, found("1.0.2-rc.1")), "1.0.2-rc.1");
+    assert.equal(H.newerRelease({ ...prepared, availableVersion: "1.0.2-rc.1" }, found("1.0.2")), "1.0.2");
+    assert.equal(H.newerRelease({ ...prepared, availableVersion: "1.0.10" }, found("1.0.9")), "", "numeric, not text, order");
+    // A Software or configuration change keeps its own selection; the
+    // offer is only for prepared updates that are still awaiting review.
+    for (const changeKind of ["software", "configuration", "region", "maintenance"])
+        assert.equal(H.newerRelease({ ...prepared, changeKind }, found("1.0.2")), "", changeKind);
+    for (const state of ["idle", "building", "awaiting-boot", "stale", "failed"])
+        assert.equal(H.newerRelease({ ...prepared, state }, found("1.0.2")), "", state);
+    assert.equal(H.newerRelease(prepared, { cybexos: { state: "current", available: "1.0.2" } }), "");
+    assert.equal(H.newerRelease(prepared, { cybexos: { state: "available", available: "next" } }), "");
+    assert.equal(H.newerRelease({ ...prepared, availableVersion: "" }, found("1.0.2")), "");
+    assert.equal(H.newerRelease(undefined, undefined), "");
+});
+
 test("release notes, sizes and labels stay short and honest", () => {
     assert.deepEqual(H.noteItems("## Highlights\n- One\n* Two\n\n1. Three\n• Four", 3), { items: ["One", "Two", "Three"], more: true });
     assert.deepEqual(H.noteItems(""), { items: [], more: false });

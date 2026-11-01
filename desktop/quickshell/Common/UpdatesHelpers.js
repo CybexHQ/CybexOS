@@ -194,6 +194,30 @@ function keptRelease(deployment) {
         components: summary(value).components, transaction: value.transaction || "" };
 }
 
+// A semantic release version as comparable parts (a beta before an rc before
+// the release itself), or null.
+function releaseOrder(value) {
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|rc)\.([1-9]\d*))?$/.exec(String(value || ""));
+    return match ? [Number(match[1]), Number(match[2]), Number(match[3]),
+        { beta: 0, rc: 1 }[match[4]] ?? 2, Number(match[5] || 0)] : null;
+}
+
+// A Cybex OS release that a later check found after an update was prepared.
+// The review offers to prepare again instead of installing the older set.
+// Only a prepared update: a Software or configuration change keeps its own
+// selection, which preparing an update again would not carry over.
+function newerRelease(deployment, sources) {
+    const vendor = ((sources || {}).cybexos) || {};
+    const value = deployment || {};
+    const found = releaseOrder(vendor.available), prepared = releaseOrder(value.availableVersion);
+    if (value.state !== "ready" || value.changeKind !== "update" || vendor.state !== "available" || !found || !prepared)
+        return "";
+    for (let part = 0; part < found.length; part++)
+        if (found[part] !== prepared[part])
+            return found[part] > prepared[part] ? vendor.available : "";
+    return "";
+}
+
 // A kept release is announced once per person; the version is remembered.
 function announce(kept, announced) {
     return !!kept && kept.version !== announced;
@@ -345,6 +369,6 @@ function downloadSize(bytes) {
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, scope, scopeLabel, capabilities, firmwareRestart,
     overviewVisible, indicator, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
-    announce, releaseNotes, versionParts,
+    announce, releaseNotes, versionParts, releaseOrder, newerRelease,
     summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize
 };

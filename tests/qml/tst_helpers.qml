@@ -22,6 +22,13 @@ Item {
             compare(result.more, false);
         }
 
+        function test_newer_release_after_preparation() {
+            const prepared = { state: "ready", changeKind: "update", availableVersion: "1.0.1" };
+            compare(Updates.newerRelease(prepared, { cybexos: { state: "available", available: "1.0.2" } }), "1.0.2");
+            compare(Updates.newerRelease(prepared, { cybexos: { state: "available", available: "1.0.1" } }), "");
+            compare(Updates.releaseOrder("1.0.2-rc.1"), [1, 0, 2, 1, 1]);
+        }
+
         function test_format_boundaries() {
             compare(Format.clamp01(-0.1), 0);
             compare(Format.clamp01(1.1), 1);
