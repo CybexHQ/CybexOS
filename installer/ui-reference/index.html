@@ -518,8 +518,8 @@ const SCREENS = {
     const ok = S.online;
     const rows = [
       ["Firmware", S.checks > 0 ? "ok" : "run", "UEFI · Secure Boot off", ""],
-      ["Network", !ok ? "warn" : S.checks > 1 ? "ok" : "run", ok ? (S.wifi ? `Wi-Fi · ${esc(S.wifi)}` : "Ethernet · enp5s0 · 192.168.1.42") : "Not connected", ok ? "" : "Connect to verify the release and download parts of your desktop"],
-      ["Release", !ok ? "wait" : S.checks > 2 ? "ok" : S.checks > 1 ? "run" : "wait", ok && S.checks > 2 ? `Cybex OS ${VERSION} · signature verified` : "Waiting for the network", ok && S.checks > 2 ? "stable channel · exact revision 9dce94a…" : ""],
+      ["Network", !ok ? "warn" : S.checks > 1 ? "ok" : "run", ok ? (S.wifi ? `Wi-Fi · ${esc(S.wifi)}` : "Ethernet · enp5s0 · 192.168.1.42") : "Not connected", ok ? "" : "Connect to download parts of your desktop"],
+      ["Release", !ok ? "wait" : S.checks > 2 ? "ok" : S.checks > 1 ? "run" : "wait", ok && S.checks > 2 ? `Cybex OS ${VERSION}` : "Waiting for the network", ok && S.checks > 2 ? "Bundled installation source" : ""],
       ["Disks", S.checks > 3 ? "ok" : "run", "3 found · 2 can be used", ""],
       ["Graphics", S.checks > 3 ? "ok" : "run", S.nvidia ? "Intel Arc + NVIDIA GeForce RTX 4070" : "AMD Radeon 780M", S.nvidia ? "NVIDIA driver choice on the review page" : ""],
     ];
@@ -611,7 +611,7 @@ const SCREENS = {
       ["Encryption", S.encrypted ? "On · LUKS2" : `<span style="color:var(--amber)">Off · files are readable by anyone with the disk</span>`, "disk", S.encrypted ? "unlocked with your password at startup" : ""],
       ["Applications", appsOn === APPS.length ? "Everything included" : `${appsOn} of ${APPS.length} groups`, "apps", APPS.filter(a => !S.apps[a[0]]).map(a => a[1]).join(", ") ? "off: " + APPS.filter(a => !S.apps[a[0]]).map(a => a[1]).join(", ") : "all 9 groups · change any time later"],
       ...(S.nvidia ? [["Graphics", `NVIDIA · ${S.nvidiaOpen ? "open kernel driver" : "proprietary legacy driver"}`, "gpu", S.nvidiaOpen ? "Turing or newer (GTX 16, RTX 20 and up)" : "Maxwell, Pascal or Volta"]] : []),
-      ["Release", `Cybex OS ${VERSION}`, "", "signature verified · stable channel"],
+      ["Release", `Cybex OS ${VERSION}`, "", "bundled installation source · stable channel"],
     ];
     return `${topBar(3)}<div class="body">
       <h1 class="mid">Ready when you are.</h1>

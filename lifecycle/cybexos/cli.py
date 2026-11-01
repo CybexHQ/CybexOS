@@ -327,11 +327,9 @@ def main():
         engine = object.__new__(Engine)
         engine.state = Path(os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))) / 'cybexos'
         engine.state.mkdir(parents=True, exist_ok=True)
-        engine.machine_state = Path('/var/lib/cybexos')
         engine.working = Path('/etc/nixos')
         engine.release = Path('/etc/cybexos/release.json')
         engine.policy = Path('/etc/cybexos/update.json')
-        engine.trust = Path('/etc/cybexos/trust.json')
         from .common import Runner
         engine.run = Runner()
         print(json.dumps(engine.check()))

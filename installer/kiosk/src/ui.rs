@@ -357,7 +357,7 @@ impl App {
             Check {
                 label: s("Network"),
                 value: s(if net.ethernet_cable { "Cable connected, no address yet" } else { "Not connected" }),
-                detail: s(if network_issue.is_empty() { "Needed to verify the release and download parts of your desktop" } else { network_issue }),
+                detail: s(if network_issue.is_empty() { "Needed to download parts of your desktop" } else { network_issue }),
                 state: 3,
             }
         });
@@ -368,7 +368,7 @@ impl App {
             _ if state.development => Check { label: s("Release"), value: s(format!("Cybex OS {}", self.statics.version)), detail: s("Bundled installation source"), state: 0 },
             _ => Check {
                 label: s("Release"),
-                value: s(format!("Cybex OS {} · signature verified", self.statics.version)),
+                value: s(format!("Cybex OS {}", self.statics.version)),
                 detail: s(state.release.split(" • ").nth(1).unwrap_or("")),
                 state: 0,
             },
@@ -752,7 +752,7 @@ impl App {
             row(
                 "Release",
                 format!("Cybex OS {}", self.statics.version),
-                if state.development { "bundled installation source".into() } else { "signature verified".into() },
+                if state.development { "bundled installation source".into() } else { "exact release source".into() },
                 "",
                 "",
                 false,

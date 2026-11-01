@@ -12,7 +12,6 @@ from pathlib import Path
 import re
 import shutil
 import secrets as random_secrets
-import socket
 import subprocess
 import sys
 import tempfile
@@ -26,10 +25,9 @@ from cybexos.credentials import validate_password
 from cybexos.hardware import detect, validate_hardware
 from cybexos.installer_network import ensure_internet, retry_download
 from cybexos.software import packages as software_packages
-from cybexos.trust import REPO, Fetcher, validate_release, verify, version
+from cybexos.trust import REPO, version
 
 ETC = Path('/etc/cybexos')
-CACHE = Path('/run/cybexos-installer-cache')
 LOCK = Path('/run/cybexos-installer.lock')
 # Whole disks only: eMMC boot and RPMB areas (mmcblk0boot0, mmcblk0rpmb) never match.
 DISK_PATTERN = r'/dev/(sd[a-z]+|vd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)'
@@ -120,12 +118,8 @@ class Cancelled(Exception):
     """A deliberate cancellation before disk preparation."""
 
 
-class UnreleasedMedia(Failure):
-    """There is no publisher trust for a production installation."""
-
-
-class ReleaseUnavailable(UnreleasedMedia):
-    """The medium's signed release could not be read: not published yet, or offline."""
+class DevelopmentMedia(Failure):
+    """A prerelease medium, installable only with explicit development consent."""
 
 
 def ask(label, default=None, check=None):
@@ -185,59 +179,6 @@ def build_progress():
     finally:
         finished.set()
         reporter.join()
-
-
-def authenticate_media(fetch, etc, recover_network=None):
-    """Authenticate the exact release this medium was built and tested from.
-
-    Media install only their own source. A channel that later advances must not
-    change what an already-qualified ISO installs, so no channel is consulted to
-    select a release. The medium's channel policy is applied to its own
-    immutable release manifest and becomes the installed machine's choice.
-    """
-    media, policy, trust = read(etc / 'release.json'), read(etc / 'update.json'), read(etc / 'trust.json')
-    if not isinstance(trust, dict) or not isinstance(trust.get('keys'), dict) or not trust['keys']:
-        raise UnreleasedMedia('Production installation is blocked: no owner-controlled publisher trust keys are configured. Nothing has been erased')
-    if not isinstance(policy, dict) or policy.get('channel') not in ('stable', 'beta'):
-        raise Failure('Installation medium has no supported release channel. Nothing has been erased')
-    if (not isinstance(media, dict) or not isinstance(media.get('revision'), str) or not isinstance(media.get('narHash'), str)
-            or not re.fullmatch('[0-9a-f]{40}', media['revision'])
-            or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', media['narHash'])
-            or not isinstance(media.get('architecture'), str) or not isinstance(media.get('nixos'), str)):
-        raise Failure('Installation medium was not built from an exact committed release source. Nothing has been erased')
-    try:
-        version(media.get('version'))
-    except Failure as error:
-        raise Failure(f'{str(error).rstrip(".")}. The installation medium was not authenticated; nothing has been erased') from error
-    url = f'https://github.com/{REPO}/releases/download/v{media["version"]}/manifest.json'
-    try:
-        try:
-            document, signature = fetch.get(url), fetch.get(url + '.sig')
-        except Failure as error:
-            cause = error
-            while cause is not None and not isinstance(cause, socket.gaierror):
-                reason = getattr(cause, 'reason', None)
-                cause = reason if isinstance(reason, BaseException) else cause.__cause__
-            if cause is None or recover_network is None:
-                raise
-            recover_network()
-            document, signature = fetch.get(url), fetch.get(url + '.sig')
-    except Failure as error:
-        # Unpublished or unreachable: nothing read contradicts the medium, so
-        # resolve_source may install its content-verified bundle. A release
-        # that is read must verify and match; that never falls back.
-        raise ReleaseUnavailable(f'Release v{media["version"]} could not be read ({str(error).rstrip(".")}). '
-                                 'Nothing has been erased') from error
-    try:
-        release = verify(document, signature, trust, 'release')
-        # The medium's own version is the floor, so the channel policy also
-        # rejects a stable-channel installation of a prerelease medium.
-        validate_release(release, media['version'], media['architecture'], media['nixos'], policy['channel'])
-    except Failure as error:
-        raise Failure(f'{str(error).rstrip(".")}. The installation medium was not authenticated; nothing has been erased') from error
-    if any(release[field] != media[field] for field in ('version', 'revision', 'narHash')):
-        raise Failure('Published release identity differs from this installation medium. Nothing has been erased')
-    return release, policy['channel']
 
 
 NIXPKGS_BRANCH = 'nixos-unstable'
@@ -644,18 +585,18 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
         if (not re.fullmatch('[0-9a-f]{40}', revision)
                 or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', nar_hash)
                 or source != f'github:{REPO}/' + revision):
-            raise Failure('Installation requires an authenticated exact release source')
-        # Lock generation evaluates vendor flake metadata. Authenticate its
-        # downloaded bytes before that evaluation and before touching the disk.
+            raise Failure('Installation requires an exact release revision and content identity')
+        # Lock generation evaluates vendor flake metadata. Check its downloaded
+        # bytes before that evaluation and before touching the disk.
         # Keep narHash out of the machine URL: its plain exact revision is the
         # stable lock-file contract shared with the updater.
         fetched = parse(run('nix', 'flake', 'prefetch', '--json',
                             source + '?' + urlencode({'narHash': nar_hash})))
         if not isinstance(fetched, dict) or fetched.get('hash') != nar_hash:
-            raise Failure('Installation source does not match its authenticated NAR identity. No disk has been erased.')
+            raise Failure('Installation source does not match its content identity. No disk has been erased.')
         source_path = fetched.get('storePath')
         if not isinstance(source_path, str) or not re.fullmatch(r'/nix/store/[0-9a-z]{32}-[^/]+', source_path):
-            raise Failure('Authenticated installation source has no store path. No disk has been erased.')
+            raise Failure('Installation source has no store path. No disk has been erased.')
     # The initial machine uses the Nixpkgs revision this release was tested
     # with; resolving the moving branch here would install an untested set.
     nixpkgs = vendor_nixpkgs(source_path)
@@ -850,69 +791,50 @@ def main():
 
 
 def resolve_source(args, runner):
-    # Select and authenticate the source before collecting choices: a medium
-    # that cannot be authenticated never asks for passwords or a disk.
+    # Select the source before collecting choices: a medium that cannot install
+    # never asks for passwords or a disk. Media install only their own bundled
+    # source, so a release published later never changes what a tested ISO
+    # installs; the installed machine then follows its channel's releases.
     if not args.development_source:
-        try:
-            release, channel = authenticate_media(Fetcher(CACHE), ETC, lambda: ensure_network(runner))
-        except UnreleasedMedia as unreleased:
-            if not isinstance(unreleased, ReleaseUnavailable):
-                trust = read(ETC / 'trust.json')
-                if not isinstance(trust, dict) or trust.get('keys') != {}:
-                    raise Failure('Installation medium has invalid publisher trust configuration. Nothing has been erased')
-            media = read(ETC / 'release.json')
+        media = read(ETC / 'release.json')
+        version(media.get('version') if isinstance(media, dict) else None)
+        if '-' not in media['version']:
             # Final media install the exact bundled source without a testing
-            # opt-in. This proves content identity, not a publisher signature.
-            # With a configured publisher, that is only while the medium's
-            # release cannot be read (not published yet, or offline); a release
-            # that is read must verify and match it (authenticate_media).
-            version(media.get('version'))
-            if '-' not in media['version']:
-                source_path = Path((ETC / 'installer-source').read_text().strip()).resolve()
-                metadata = parse(runner('nix', 'flake', 'metadata', '--json', f'path:{source_path}'))
-                nar_hash = metadata['locked']['narHash']
-                if (nar_hash != media.get('narHash')
-                        or not re.fullmatch('[0-9a-f]{40}', media.get('revision', ''))):
-                    raise Failure('Bundled source identity differs from this installation medium. Nothing has been erased')
-                channel = read(ETC / 'update.json').get('channel')
-                if channel not in ('stable', 'beta'):
-                    raise Failure('Installation requires a supported release channel. Nothing has been erased')
-                args.bundled_source = True
-                if isinstance(unreleased, ReleaseUnavailable):
-                    print(f'Cybex OS {media["version"]}: its signed release could not be read ({unreleased.__cause__}); '
-                          'installing the medium\'s own verified source.', file=sys.stderr, flush=True)
-                return (f'path:{metadata["path"]}', media['revision'], nar_hash, channel,
-                        f'Cybex OS {media["version"]} • bundled source verified')
-            if getattr(args, 'json_ui', False):
-                event('development-required', message='This is an unreleased development build. Use it only for testing on a backed-up or disposable disk.')
-                request = ui_request()
-                if request != {'action': 'development', 'consent': True}:
-                    raise Cancelled()
-                args.development_source = Path((ETC / 'installer-source').read_text().strip())
-            elif args.plan_file or not sys.stdin.isatty():
-                raise
-            else:
-                print('\nCybex OS development installation\n'
-                  'This ISO is an unreleased development build. It has no publisher trust keys\n'
-                  'and cannot install an authenticated production release.\n'
-                  'Use it only for testing on a disposable disk. You will review the disk before erasing it.')
-                if not yes_no('Continue with the bundled unreleased test build?', False):
-                    raise Cancelled()
-                args.development_source = Path((ETC / 'installer-source').read_text().strip())
-    if args.development_source:
-        source_path = args.development_source.resolve()
-        metadata = parse(runner('nix', 'flake', 'metadata', '--json', f'path:{source_path}'))
-        source = f'path:{metadata["path"]}'
-        revision, nar_hash = 'UNRELEASED-' + metadata['locked']['narHash'], metadata['locked']['narHash']
-        # Unreleased sources still install the medium's own channel policy.
-        policy = read(ETC / 'update.json')
-        channel = policy.get('channel') if isinstance(policy, dict) else None
-        label = 'UNRELEASED TEST INSTALLATION: this source has not been authenticated as a published release.'
-    else:
-        source = f'github:{REPO}/' + release['revision']
-        revision, nar_hash = release['revision'], release['narHash']
-        # The installer shows the release without its prerelease suffix or channel.
-        label = f'Authenticated Cybex OS {release["version"].partition("-")[0]} • exact revision {revision}'
+            # opt-in, once its content matches the medium's own release identity.
+            source_path = Path((ETC / 'installer-source').read_text().strip()).resolve()
+            metadata = parse(runner('nix', 'flake', 'metadata', '--json', f'path:{source_path}'))
+            nar_hash = metadata['locked']['narHash']
+            if (nar_hash != media.get('narHash')
+                    or not re.fullmatch('[0-9a-f]{40}', media.get('revision', ''))):
+                raise Failure('Bundled source identity differs from this installation medium. Nothing has been erased')
+            channel = read(ETC / 'update.json').get('channel')
+            if channel not in ('stable', 'beta'):
+                raise Failure('Installation requires a supported release channel. Nothing has been erased')
+            args.bundled_source = True
+            return (f'path:{metadata["path"]}', media['revision'], nar_hash, channel,
+                    f'Cybex OS {media["version"]} • bundled source verified')
+        if getattr(args, 'json_ui', False):
+            event('development-required', message='This is an unreleased development build. Use it only for testing on a backed-up or disposable disk.')
+            request = ui_request()
+            if request != {'action': 'development', 'consent': True}:
+                raise Cancelled()
+        elif args.plan_file or not sys.stdin.isatty():
+            raise DevelopmentMedia('This prerelease development medium installs only with explicit consent. Nothing has been erased')
+        else:
+            print('\nCybex OS development installation\n'
+              'This ISO is a prerelease development build, not a final release.\n'
+              'Use it only for testing on a disposable disk. You will review the disk before erasing it.')
+            if not yes_no('Continue with the bundled unreleased test build?', False):
+                raise Cancelled()
+        args.development_source = Path((ETC / 'installer-source').read_text().strip())
+    source_path = args.development_source.resolve()
+    metadata = parse(runner('nix', 'flake', 'metadata', '--json', f'path:{source_path}'))
+    source = f'path:{metadata["path"]}'
+    revision, nar_hash = 'UNRELEASED-' + metadata['locked']['narHash'], metadata['locked']['narHash']
+    # Unreleased sources still install the medium's own channel policy.
+    policy = read(ETC / 'update.json')
+    channel = policy.get('channel') if isinstance(policy, dict) else None
+    label = 'UNRELEASED TEST INSTALLATION: this source is not a published release.'
     if channel not in ('stable', 'beta'):
         raise Failure('Installation requires a supported release channel. Nothing has been erased')
     return source, revision, nar_hash, channel, label
@@ -1037,8 +959,8 @@ if __name__ == '__main__':
             message = str(error).partition('. Use cybex update log')[0]
         event('error', message=message, log='/run/cybexos-installer.log')
         print(f'\nInstallation stopped: {message}.\nPrivate diagnostics: sudo less /run/cybexos-installer.log', file=sys.stderr)
-        if isinstance(error, UnreleasedMedia):
-            print('This development medium cannot perform an authenticated production installation.\n'
+        if isinstance(error, DevelopmentMedia):
+            print('This development medium installs only with explicit consent.\n'
                   'For an isolated test on a disposable disk, explicitly run:\n'
                   '  sudo cybexos-install --development-source "$(cat /etc/cybexos/installer-source)"', file=sys.stderr)
         sys.exit(1)

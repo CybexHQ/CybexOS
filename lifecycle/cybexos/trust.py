@@ -1,12 +1,15 @@
-"""Authenticated metadata; no Nix evaluation or privilege escalation here."""
-import base64
-import datetime as dt
+"""Release discovery. The GitHub repository is the trust root.
+
+A Cybex OS release is a published GitHub release of REPO with a semantic tag.
+There are no publisher signatures: HTTPS to GitHub and the repository's own
+access control authenticate a release. Staging pins the tag's exact commit
+and the content hash of what it downloads, and a release's own source declares
+its version and requirements. No Nix evaluation or privilege escalation here.
+"""
 import hashlib
 import http.client
 from pathlib import Path
 import re
-import subprocess
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,20 +19,20 @@ from .common import Failure, atomic, parse, read
 API = 1
 REPO = 'CybexHQ/CybexOS'
 # The Nixpkgs branch a release follows: release.json's "nixos" and an entry of
-# signed release metadata's "nixos" list. A branch identity, not a version.
+# a release's release/compatibility.json "nixos" list. A branch, not a version.
 NIXOS = 'unstable'
-# GitHub Pages of the repository: promote.yml publishes the signed channels.
-PAGES_HOST = f'{REPO.split("/")[0].lower()}.github.io'
-CHANNEL_BASE = f'https://{PAGES_HOST}/{REPO.split("/")[1]}/channels'
+GITHUB_API = f'https://api.github.com/repos/{REPO}'
+HOSTS = {'api.github.com'}
 SEMVER = re.compile(r'^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(beta|rc)\.([1-9][0-9]*))?$')
+COMPATIBILITY = {'schema', 'configurationApi', 'pluginApi', 'minUpdater', 'architectures', 'nixos'}
 
 
 class EndpointNotFound(Failure):
-    """An HTTP 404, distinguished from authentication and network failures."""
+    """An HTTP 404, distinguished from rate limits and network failures."""
 
 
 class NoPublishedRelease(Failure):
-    """The initial channel document has not been published yet."""
+    """No release has been published for this channel yet."""
 
 
 def version(value):
@@ -52,17 +55,18 @@ class Fetcher:
         self.cache = Path(cache)
         self.cache.mkdir(parents=True, exist_ok=True)
 
-    def get(self, url, limit=2 * 1024 * 1024):
-        https(url, {PAGES_HOST, 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
-        name = hashlib.sha256(url.encode()).hexdigest()
+    def get(self, url, limit=2 * 1024 * 1024, accept='application/vnd.github+json'):
+        https(url, HOSTS)
+        name = hashlib.sha256((accept + ' ' + url).encode()).hexdigest()
         body, meta = self.cache / name, self.cache / (name + '.json')
         old = read(meta, {})
-        headers = {'User-Agent': 'CybexOS-updater/1', 'Accept': 'application/octet-stream'}
+        headers = {'User-Agent': 'CybexOS-updater/1', 'Accept': accept, 'X-GitHub-Api-Version': '2022-11-28'}
         if old.get('etag') and body.exists():
+            # GitHub does not count a 304 against the anonymous rate limit.
             headers['If-None-Match'] = old['etag']
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
-                https(response.url, {PAGES_HOST, 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'})
+                https(response.url, HOSTS)
                 data = response.read(limit + 1)
                 if len(data) > limit:
                     raise Failure('Release response exceeds its size limit')
@@ -81,132 +85,65 @@ class Fetcher:
             raise Failure('Release endpoint unreachable; its status is unknown. Retry when connected.') from error
 
 
-def verify(document, signature, trust, purpose):
-    if len(document) > 2 * 1024 * 1024:
-        raise Failure('Metadata exceeds its size limit')
-    envelope = parse(signature)
-    if not isinstance(envelope, dict) or set(envelope) != {'keyId', 'signature'}:
-        raise Failure('Invalid signature envelope')
-    if not isinstance(envelope['keyId'], str) or not isinstance(envelope['signature'], str):
-        raise Failure('Invalid signature envelope types')
-    key = trust.get('keys', {}).get(envelope['keyId'])
-    if not key or purpose not in key.get('purposes', []):
-        raise Failure('Publisher signing key is not trusted for this metadata')
-    now = dt.datetime.now(dt.timezone.utc)
-    try:
-        end = timestamp(key['notAfter'])
-        start = timestamp(key['notBefore']) if 'notBefore' in key else None
-        if start is not None and start >= end:
-            raise Failure('Publisher signing key has an invalid validity interval')
-        if start is not None and now < start:
-            raise Failure('Publisher signing key is not valid yet')
-        if now >= end:
-            raise Failure('Publisher signing key has expired')
-        raw = base64.b64decode(envelope['signature'], validate=True)
-        if len(raw) != 64:
-            raise ValueError('signature length')
-    except (KeyError, ValueError, TypeError) as error:
-        raise Failure('Malformed signing key or signature') from error
-    with tempfile.TemporaryDirectory(prefix='cybexos-signature-') as directory:
-        directory = Path(directory)
-        (directory / 'key').write_text(key['publicKey'])
-        (directory / 'body').write_bytes(document)
-        (directory / 'sig').write_bytes(raw)
-        result = subprocess.run(['openssl', 'pkeyutl', '-verify', '-pubin', '-inkey', str(directory / 'key'),
-                                 '-rawin', '-in', str(directory / 'body'), '-sigfile', str(directory / 'sig')],
-                                capture_output=True, timeout=10)
-        if result.returncode:
-            raise Failure('Invalid publisher signature; update rejected')
-    return parse(document)
+def discover(fetch, channel, installed):
+    """The newest published release on a channel: its version, exact commit and notes.
 
-
-def timestamp(value):
-    try:
-        value = dt.datetime.fromisoformat(value.replace('Z', '+00:00'))
-        if value.utcoffset() is None:
-            raise ValueError('missing timezone')
-        return value
-    except (ValueError, TypeError, AttributeError) as error:
-        raise Failure('Invalid metadata validity timestamp; a timezone is required') from error
-
-
-def expiry(value):
-    if dt.datetime.now(dt.timezone.utc) >= timestamp(value):
-        raise Failure('Channel metadata expired; update status is unknown')
-
-
-def validate_release(release, installed, architecture, nixos, channel):
-    required = {'schema', 'version', 'revision', 'narHash', 'architectures', 'nixos', 'configurationApi',
-                'pluginApi', 'minUpdater', 'notes', 'assets', 'vendorInputs'}
-    if not isinstance(release, dict) or set(release) != required:
-        raise Failure('Unsupported or incomplete release metadata')
-    for name in ('schema', 'configurationApi', 'pluginApi', 'minUpdater'):
-        if type(release[name]) is not int or release[name] < 1:
-            raise Failure('Invalid release API metadata type')
-    for name in ('architectures', 'nixos'):
-        if not isinstance(release[name], list) or not release[name] or any(not isinstance(x, str) for x in release[name]):
-            raise Failure('Invalid supported platform metadata')
-    if release['schema'] != 1 or release['configurationApi'] != 1 or release['pluginApi'] != 1 or release['minUpdater'] > API:
-        raise Failure('Release requires a newer updater or incompatible configuration/plugin API')
-    if architecture not in release['architectures'] or nixos not in release['nixos']:
-        raise Failure('Release does not support this architecture or NixOS branch')
-    selected_version = version(release['version'])
-    if channel == 'stable' and '-' in release['version']:
-        raise Failure('Stable channel contains a prerelease')
-    if selected_version < version(installed):
-        raise Failure('Channel downgrade rejected. Use explicit generation rollback instead.')
-    if not isinstance(release['revision'], str) or not re.fullmatch(r'[0-9a-f]{40}', release['revision']):
-        raise Failure('Release revision must be an exact Git commit')
-    if not isinstance(release['narHash'], str) or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', release['narHash']):
-        raise Failure('Release source content identity is invalid')
-    if not isinstance(release['notes'], str) or len(release['notes']) > 100000:
-        raise Failure('Release notes are invalid')
-    if not isinstance(release['vendorInputs'], list) or any(not isinstance(x, str) or not re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_-]*', x) for x in release['vendorInputs']):
-        raise Failure('Invalid vendor dependency declaration')
-    if not isinstance(release['assets'], list) or not release['assets']:
-        raise Failure('Release assets are missing')
-    names = set()
-    for asset in release['assets']:
-        if not isinstance(asset, dict) or set(asset) != {'name', 'url', 'sha256', 'bytes'}:
-            raise Failure('Invalid release asset')
-        if any(not isinstance(asset[x], str) for x in ('name', 'url', 'sha256')) or asset['name'] in names:
-            raise Failure('Invalid or duplicate release asset')
-        names.add(asset['name'])
-        prefix = f'https://github.com/{REPO}/releases/download/v{release["version"]}/'
-        if not asset['url'].startswith(prefix) or not re.fullmatch(r'[A-Za-z0-9._-]+', asset['name']) or asset['url'] != prefix + asset['name']:
-            raise Failure('Asset does not belong to the selected immutable release')
-        if not re.fullmatch('[0-9a-f]{64}', asset['sha256']) or type(asset['bytes']) is not int or asset['bytes'] < 1:
-            raise Failure('Invalid asset identity')
-    return release
-
-
-def discover(fetch, trust, channel, installed, architecture, nixos, highest=0):
+    Stable is the newest release that is neither marked as a prerelease nor
+    has a prerelease version; beta is the newest of all published releases.
+    Drafts and tags that are not semantic versions are ignored.
+    """
     if channel not in ('stable', 'beta'):
         raise Failure('Unknown release channel')
-    base = f'{CHANNEL_BASE}/{channel}.json'
     try:
-        body = fetch.get(base)
+        listing = parse(fetch.get(f'{GITHUB_API}/releases?per_page=100'))
     except EndpointNotFound as error:
-        # A fresh development installation has no vendor releases yet. Only
-        # absence of this first document is neutral: signatures, manifests and
-        # previously authenticated channels must still report real failures.
-        if highest:
-            raise Failure('The previously published Cybex OS channel is unavailable (HTTP 404).') from error
-        raise NoPublishedRelease('No Cybex OS release has been published for this channel yet.') from error
-    channel_doc = verify(body, fetch.get(base + '.sig'), trust, 'channel')
-    if not isinstance(channel_doc, dict) or set(channel_doc) != {'schema', 'channel', 'sequence', 'expires', 'manifest', 'sha256'} or type(channel_doc['schema']) is not int or channel_doc['schema'] != 1 or channel_doc['channel'] != channel:
-        raise Failure('Invalid channel metadata')
-    expiry(channel_doc['expires'])
-    if type(channel_doc['sequence']) is not int or channel_doc['sequence'] < max(1, highest):
-        raise Failure('Channel replay rejected')
-    url = channel_doc['manifest']
-    if not isinstance(url, str) or not re.fullmatch(rf'https://github.com/{re.escape(REPO)}/releases/download/v[0-9A-Za-z.-]+/manifest.json', url):
-        raise Failure('Channel manifest URL is invalid')
-    body = fetch.get(url)
-    if hashlib.sha256(body).hexdigest() != channel_doc['sha256']:
-        raise Failure('Release manifest content identity mismatch')
-    release = verify(body, fetch.get(url + '.sig'), trust, 'release')
-    validate_release(release, installed, architecture, nixos, channel)
-    if url != f'https://github.com/{REPO}/releases/download/v{release["version"]}/manifest.json':
-        raise Failure('Channel and release version disagree')
-    return release, channel_doc['sequence']
+        raise Failure('The Cybex OS release repository is unavailable (HTTP 404).') from error
+    if not isinstance(listing, list):
+        raise Failure('Invalid release listing')
+    eligible = []
+    for item in listing:
+        if not isinstance(item, dict) or item.get('draft') is not False:
+            continue
+        tag = item.get('tag_name')
+        try:
+            key = version(tag[1:]) if isinstance(tag, str) and tag.startswith('v') else None
+        except Failure:
+            key = None
+        if key is None:
+            continue
+        if not isinstance(item.get('prerelease'), bool):
+            raise Failure('Invalid release listing')
+        if channel == 'stable' and (item['prerelease'] or '-' in tag):
+            continue
+        notes = item.get('body') if isinstance(item.get('body'), str) else ''
+        eligible.append((key, tag, notes[:100000]))
+    if not eligible:
+        raise NoPublishedRelease('No Cybex OS release has been published for this channel yet.')
+    key, tag, notes = max(eligible)
+    if key < version(installed):
+        raise Failure('Channel downgrade rejected. Use explicit generation rollback instead.')
+    revision = fetch.get(f'{GITHUB_API}/commits/{urllib.parse.quote(tag)}', limit=64,
+                         accept='application/vnd.github.sha').decode('ascii', 'replace').strip()
+    if not re.fullmatch('[0-9a-f]{40}', revision):
+        raise Failure('Release tag does not name an exact Git commit')
+    return {'version': tag[1:], 'revision': revision, 'notes': notes}
+
+
+def validate_source(version_text, compatibility, release, installed):
+    """A release's own source declares its version and what it requires."""
+    if not isinstance(version_text, str) or version_text.strip() != release['version']:
+        raise Failure('Release tag and its VERSION file disagree')
+    if not isinstance(compatibility, dict) or set(compatibility) != COMPATIBILITY:
+        raise Failure('Unsupported or incomplete release compatibility metadata')
+    for name in ('schema', 'configurationApi', 'pluginApi', 'minUpdater'):
+        if type(compatibility[name]) is not int or compatibility[name] < 1:
+            raise Failure('Invalid release API metadata type')
+    for name in ('architectures', 'nixos'):
+        if (not isinstance(compatibility[name], list) or not compatibility[name]
+                or any(not isinstance(x, str) for x in compatibility[name])):
+            raise Failure('Invalid supported platform metadata')
+    if (compatibility['schema'] != 1 or compatibility['configurationApi'] != 1 or compatibility['pluginApi'] != 1
+            or compatibility['minUpdater'] > API):
+        raise Failure('Release requires a newer updater or incompatible configuration/plugin API')
+    if installed['architecture'] not in compatibility['architectures'] or installed['nixos'] not in compatibility['nixos']:
+        raise Failure('Release does not support this architecture or NixOS branch')

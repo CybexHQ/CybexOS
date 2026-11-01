@@ -119,10 +119,9 @@ lost, so a restarted screen or service never interrupts an installation.
 The flow is **Welcome → Disk → You → Software → Review → Installing → Done**:
 
 - **Welcome** sets the language and keyboard and shows the system check:
-  firmware (UEFI, Secure Boot), network, release verification, disks, graphics
-  and memory. Final media use **Get started**, with no beta/test-build prompt.
-  A bundled source is labelled as such; a verified publisher signature is
-  shown only when one exists. Without a network, **Connect to Wi-Fi** opens
+  firmware (UEFI, Secure Boot), network, release, disks, graphics and memory.
+  Final media use **Get started**, with no beta/test-build prompt; the release
+  row names the verified bundled source. Without a network, **Connect to Wi-Fi** opens
   the network sheet, which uses the desktop's own NetworkManager helper.
 - **Disk** lists usable whole disks with model, size and contents; the only
   usable disk is preselected. **More options** shows serial numbers and the
@@ -175,7 +174,8 @@ and transfer time, and the completion status retains the elapsed time.
 
 A stop before any disk change explains the cause and the next steps: Secure Boot
 (with **Restart into firmware settings**; the installer never turns Secure Boot
-off), a legacy BIOS boot, an unauthenticated medium or a missing network. A
+off), a legacy BIOS boot, a medium whose bundled source does not match it or a
+missing network. A
 failure after the disk was changed says so and opens the log. The menu (⋯) has
 the installation log, a recovery shell on tty2 (Alt+F1 returns), the text
 installer, restart into firmware settings, restart and power off.
@@ -310,8 +310,7 @@ installer of a representative installation, including the free apps of the
 default software profiles. `nixos-install` copies those paths
 from the medium instead of downloading them. The machine-specific initrd and
 configuration are built during installation; the other profiles, unfree apps
-(proprietary applications, Steam) and NVIDIA drivers still download. Release
-authentication always needs the internet.
+(proprietary applications, Steam) and NVIDIA drivers still download.
 
 ### Design reference and previews
 
@@ -338,7 +337,7 @@ starts with that exact Nixpkgs revision and content hash, retaining
 nixos-unstable as its upstream update source. Installation never resolves a newer
 branch head implicitly. Later upstream-only updates advance this machine-owned
 input independently of Cybex OS. This does not make installation fully offline:
-release authentication and packages not bundled on the medium require internet.
+packages not bundled on the medium require internet.
 
 Use a backed-up target disk of at least 64 GiB. Installation erases only the
 explicitly selected whole disk after its graphical confirmation. Its serial is
@@ -354,19 +353,19 @@ Its layout and minimum disk size come from the shared Nix module contract.
 
 `nixos-generate-config` records actual hardware and filesystems. DMI/PCI/ACPI/
 EDID detection selects narrowly scoped XPS/NVIDIA declarations. The machine
-flake follows the nixos-unstable Nixpkgs input and pins the authenticated Cybex OS exact
+flake follows the nixos-unstable Nixpkgs input and pins the medium's exact Cybex OS
 revision/NAR identity. The complete target is built and installed through the
 shared modules. First login installs missing vendor-skill discovery symlinks
 and never overwrites a pre-existing personal skill.
 
-Production media install only their own exact tested source. Before asking for
-choices, the installer fetches the immutable signed manifest for the medium's
-`/etc/cybexos/release.json` version (`releases/download/vVERSION/manifest.json`)
-over public HTTPS, verifies its Ed25519 signature and supported metadata, and
-requires its version, exact revision and NAR to equal the medium's. A channel is
-never consulted to select a newer release; the medium's channel policy still
-applies (stable rejects a prerelease medium). Any mismatch stops before disk
-erasure and vendor evaluation. The medium's channel is written to `machine.nix`
+### Release identity
+
+Media install only their own exact tested source, bundled on the medium. Before
+asking for choices, the installer checks that the bundled source's NAR equals
+the medium's committed `/etc/cybexos/release.json` identity; a mismatch stops
+before disk erasure and vendor evaluation. It does not contact GitHub, so a
+release published later never changes what a tested ISO installs; the installed
+machine follows its channel's [releases](releasing.md) from then on. The medium's channel is written to `machine.nix`
 as an explicit `cybexos.updates.channel`, so a later stable vendor release does
 not move a beta machine; the vendor default is `beta` for prerelease versions and
 `stable` otherwise, and the administrator may change it. The boot menu and
@@ -374,18 +373,13 @@ installer screens show the version without its prerelease suffix (`1.0.0` for
 `1.0.0-beta.25`) and no channel; the ISO name, release metadata and installed
 system keep the full version.
 
-Publisher-authenticated installation requires owner-controlled trust keys and
-an authenticated published release. When those keys are deliberately empty,
-final media install their exact bundled source after checking its NAR against
-the medium's committed release identity, without a development consent step.
-This is content verification, not publisher authentication. A configured
-publisher's authentication failure never falls back to this path. For isolated development qualification,
-`cybexos-install --development-source /path/to/source` explicitly selects an
-unreleased content-addressed test source. The graphical welcome on an unsigned
-development ISO explains this limitation and offers the bundled test build,
-requiring explicit consent (default: no) before disk selection. Automated use
-still requires `--development-source`. Such a result is not an authenticated
-release qualification.
+Final media (a version without a prerelease suffix) install without a
+development consent step. A prerelease medium is a development build: its
+graphical welcome explains this and offers the bundled test build, requiring
+explicit consent (default: no) before disk selection. Automated use requires
+`cybexos-install --development-source /path/to/source`, which explicitly selects
+an unreleased content-addressed test source. Such a result is not a release
+qualification.
 
 Secure Boot is not disabled. Native Lanzaboote configuration is provided, but
 fresh enrollment/signed installation media and out-of-tree-module signing have

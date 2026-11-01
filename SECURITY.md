@@ -5,11 +5,14 @@ privileged update lifecycle. The NixOS port is unreleased and is not yet
 production-qualified. Report security issues privately through the repository's
 GitHub security advisories; do not include credentials or personal archives.
 
-Nixpkgs supplies upstream packages. Cybex OS releases and stable/beta channel
-manifests use explicit Ed25519 publisher trust. Source revision and NAR identity
-must match authenticated metadata. Invalid signatures, expiry, replay, API
-incompatibility and normal-update downgrades are rejected. No production trust
-key has been supplied; the checked-in trust set is empty and fails closed.
+Nixpkgs supplies upstream packages. Cybex OS releases are published GitHub
+releases of `CybexHQ/CybexOS`; the repository is the trust root, and there are
+no publisher signatures. Updates fetch release metadata over HTTPS from the
+GitHub API only, pin the tag's exact commit and the content hash of what they
+download, and reject downgrades, a published version whose content changed,
+and incompatible API declarations. Whoever controls the repository can publish
+an update to every installed machine: protect it with two-factor
+authentication and restrict who may create `v*` tags.
 
 Secrets never belong in Nix expressions or source archives. Use root-owned
 runtime paths and service credentials. The Nix store is publicly readable.

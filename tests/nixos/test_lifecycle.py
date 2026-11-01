@@ -15,7 +15,7 @@ import tempfile
 import threading
 import unittest
 import urllib.request
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'lifecycle'))
@@ -44,12 +44,20 @@ def lock():
     }}
 
 
+STORE_SOURCE = '/nix/store/' + 'e' * 32 + '-source'
+COMPATIBILITY = {'schema': 1, 'configurationApi': 1, 'pluginApi': 1, 'minUpdater': 1,
+                 'architectures': ['x86_64-linux'], 'nixos': ['unstable']}
+INSTALLED = {'version': '1.0.0', 'architecture': 'x86_64-linux', 'nixos': 'unstable'}
+
+
 def release():
-    return {'schema':1,'version':'1.1.0','revision':REV_NEW,'narHash':NAR_NEW,
-            'architectures':['x86_64-linux'],'nixos':['unstable'],'configurationApi':1,'pluginApi':1,
-            'minUpdater':1,'notes':'A qualified release','vendorInputs':['lanzaboote'],
-            'assets':[{'name':'source.tar.gz','url':'https://github.com/CybexHQ/CybexOS/releases/download/v1.1.0/source.tar.gz',
-                       'sha256':'f'*64,'bytes':1}]}
+    return {'version': '1.1.0', 'revision': REV_NEW, 'notes': 'A qualified release'}
+
+
+def listing(*entries):
+    """A GitHub release listing: (tag, prerelease, draft) entries, newest first."""
+    return json.dumps([{'tag_name': tag, 'prerelease': prerelease, 'draft': draft, 'body': 'Notes for ' + tag}
+                       for tag, prerelease, draft in entries]).encode()
 
 
 class ConfigurationIdentityTests(unittest.TestCase):
@@ -145,43 +153,76 @@ class ConfigurationIdentityTests(unittest.TestCase):
 
 
 class TrustTests(unittest.TestCase):
+    """Keyless release discovery: the GitHub repository is the trust root."""
+    API = 'https://api.github.com/repos/CybexHQ/CybexOS'
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
-        self.key = self.base / 'key'
-        subprocess.run(['openssl','genpkey','-algorithm','Ed25519','-out',str(self.key)],check=True,capture_output=True)
-        public = subprocess.check_output(['openssl','pkey','-in',str(self.key),'-pubout'],text=True)
-        self.trust = {'keys':{'test':{'publicKey':public,'notAfter':'2099-01-01T00:00:00Z','purposes':['release','channel']}}}
 
-    def sign(self, body):
-        path=self.base / 'body';path.write_bytes(body)
-        raw=subprocess.check_output(['openssl','pkeyutl','-sign','-rawin','-inkey',str(self.key),'-in',str(path)])
-        import base64
-        return json.dumps({'keyId':'test','signature':base64.b64encode(raw).decode()}).encode()
+    def fetch(self, releases, commits=None):
+        api = self.API
+        class Fetch:
+            requests = []
+            def get(inner, url, limit=None, accept='application/vnd.github+json'):
+                inner.requests.append((url, accept))
+                if url == api + '/releases?per_page=100':
+                    return releases
+                tag = url.removeprefix(api + '/commits/')
+                if tag != url and accept == 'application/vnd.github.sha':
+                    return (commits or {}).get(tag, REV_NEW).encode()
+                raise AssertionError('Unexpected request ' + url)
+        return Fetch()
 
-    def test_actual_ed25519_signature_and_exact_bytes(self):
-        body=json.dumps(release()).encode(); sig=self.sign(body)
-        self.assertEqual(trust.verify(body,sig,self.trust,'release'),release())
-        with self.assertRaises(Failure): trust.verify(body+b' ',sig,self.trust,'release')
-        with self.assertRaises(Failure): trust.verify(body,sig,{'keys':{}},'release')
+    def test_newest_published_release_per_channel(self):
+        releases = listing(('v1.2.0-beta.1', True, False), ('v1.3.0', False, True), ('nightly', False, False),
+                           ('v1.1.0', False, False), ('v1.1.0-rc.2', False, False), ('v1.0.0', False, False))
+        fetch = self.fetch(releases, {'v1.1.0': REV_NEW, 'v1.2.0-beta.1': REV_OLD})
+        self.assertEqual(trust.discover(fetch, 'stable', '1.0.0'),
+                         {'version': '1.1.0', 'revision': REV_NEW, 'notes': 'Notes for v1.1.0'})
+        self.assertEqual(trust.discover(fetch, 'beta', '1.0.0')['version'], '1.2.0-beta.1')
+        self.assertEqual(trust.discover(fetch, 'beta', '1.0.0')['revision'], REV_OLD)
+        # A release marked as a prerelease, or with a prerelease version, is beta only.
+        self.assertEqual(trust.discover(self.fetch(listing(('v1.4.0', True, False), ('v1.1.0', False, False))),
+                                        'stable', '1.0.0')['version'], '1.1.0')
+        with self.assertRaises(Failure):
+            trust.discover(fetch, 'nightly', '1.0.0')
 
-    def test_only_an_unpublished_initial_channel_404_is_neutral(self):
-        from urllib.error import HTTPError
-        base = trust.CHANNEL_BASE + '/beta.json'
-        with patch('urllib.request.urlopen', side_effect=HTTPError(base, 404, 'Not Found', {}, None)):
-            fetch = trust.Fetcher(self.base / '404-cache')
-            with self.assertRaises(trust.NoPublishedRelease):
-                trust.discover(fetch, self.trust, 'beta', '1.0.0-beta.7', 'x86_64-linux', 'unstable')
-            with self.assertRaisesRegex(Failure, 'previously published'):
-                trust.discover(fetch, self.trust, 'beta', '1.0.0-beta.7', 'x86_64-linux', 'unstable', 1)
-        class MissingSignature:
-            def get(inner, url):
-                if url == base:
-                    return b'{}'
-                raise trust.EndpointNotFound('missing signature')
-        with self.assertRaises(trust.EndpointNotFound):
-            trust.discover(MissingSignature(), self.trust, 'beta', '1.0.0-beta.7', 'x86_64-linux', 'unstable')
+    def test_nothing_published_and_unavailable_listing(self):
+        with self.assertRaises(trust.NoPublishedRelease):
+            trust.discover(self.fetch(listing()), 'stable', '1.0.0')
+        with self.assertRaises(trust.NoPublishedRelease):
+            trust.discover(self.fetch(listing(('v1.1.0-beta.1', True, False), ('v1.2.0', False, True))), 'stable', '1.0.0')
+        class Missing:
+            def get(self, url, limit=None, accept=None):
+                raise trust.EndpointNotFound('gone')
+        with self.assertRaisesRegex(Failure, 'repository is unavailable'):
+            trust.discover(Missing(), 'stable', '1.0.0')
+        for body in (b'{}', b'[{"tag_name":"v1.1.0","prerelease":"no","draft":false}]',
+                     b'[{"tag_name":"v1.1.0","tag_name":"v9.0.0","prerelease":false,"draft":false}]'):
+            with self.subTest(body=body), self.assertRaises(Failure):
+                trust.discover(self.fetch(body), 'stable', '1.0.0')
+
+    def test_downgrade_and_inexact_tags_rejected(self):
+        with self.assertRaisesRegex(Failure, 'downgrade'):
+            trust.discover(self.fetch(listing(('v1.0.0', False, False))), 'stable', '1.1.0')
+        self.assertEqual(trust.discover(self.fetch(listing(('v1.0.0', False, False))), 'stable', '1.0.0')['version'], '1.0.0')
+        for answer in ('main', 'a' * 39, 'A' * 40, ''):
+            with self.subTest(answer=answer), self.assertRaisesRegex(Failure, 'exact Git commit'):
+                trust.discover(self.fetch(listing(('v1.1.0', False, False)), {'v1.1.0': answer}), 'stable', '1.0.0')
+
+    def test_only_the_github_api_is_contacted(self):
+        for url in ('https://example.com/releases', 'http://api.github.com/repos/CybexHQ/CybexOS/releases',
+                    'https://cybexhq.github.io/CybexOS/channels/stable.json',
+                    'https://user:token@api.github.com/repos/CybexHQ/CybexOS/releases'):
+            with self.subTest(url=url), self.assertRaises(Failure):
+                trust.Fetcher(self.base / 'cache').get(url)
+        redirected = Mock(); redirected.url = 'https://example.com/releases'
+        redirected.__enter__ = Mock(return_value=redirected); redirected.__exit__ = Mock(return_value=False)
+        with patch('cybexos.trust.urllib.request.urlopen', return_value=redirected), \
+                self.assertRaisesRegex(Failure, 'outside the trusted GitHub endpoints'):
+            trust.Fetcher(self.base / 'cache').get(self.API + '/releases?per_page=100')
 
     def test_interrupted_chunked_metadata_retains_cache_and_independent_upstream_result(self):
         class Interrupted(http.server.BaseHTTPRequestHandler):
@@ -196,7 +237,7 @@ class TrustTests(unittest.TestCase):
                 self.close_connection = True
             def log_message(self, *args):
                 pass
-        endpoint = 'https://cybexhq.github.io/CybexOS/channels/stable.json'
+        endpoint = 'https://api.github.com/repos/CybexHQ/CybexOS/releases?per_page=100'
         requests = []
         real_urlopen = urllib.request.urlopen
         with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Interrupted) as server:
@@ -212,7 +253,7 @@ class TrustTests(unittest.TestCase):
                 return response
             try:
                 fetcher = trust.Fetcher(self.base / 'cache')
-                cached = fetcher.cache / hashlib.sha256(endpoint.encode()).hexdigest()
+                cached = fetcher.cache / hashlib.sha256(('application/vnd.github+json ' + endpoint).encode()).hexdigest()
                 atomic(cached, b'previous complete cached metadata')
                 with patch('cybexos.trust.urllib.request.urlopen', side_effect=transport):
                     with self.assertRaisesRegex(Failure, 'endpoint unreachable'):
@@ -223,8 +264,7 @@ class TrustTests(unittest.TestCase):
                     release_file = self.base / 'release.json'
                     atomic(release_file, {'version': '1.0.0', 'architecture': 'x86_64-linux', 'nixos': 'unstable'})
                     policy = self.base / 'policy.json'; atomic(policy, {'channel': 'stable'})
-                    keys = self.base / 'trust.json'; atomic(keys, {'keys': {}})
-                    engine = Engine(self.base / 'state', working, FakeRunner(), release_file, policy, keys)
+                    engine = Engine(self.base / 'state', working, FakeRunner(), release_file, policy)
                     result = engine.check()
                 self.assertEqual(result['upstream']['state'], 'available')
                 self.assertEqual(result['cybexos']['state'], 'unavailable')
@@ -234,58 +274,23 @@ class TrustTests(unittest.TestCase):
                 server.shutdown()
                 thread.join(timeout=5)
 
-    def test_expiry_and_purpose(self):
-        body=b'{}';sig=self.sign(body)
-        self.trust['keys']['test']['purposes']=['channel']
-        with self.assertRaises(Failure): trust.verify(body,sig,self.trust,'release')
-        self.trust['keys']['test']['notAfter']='2000-01-01T00:00:00Z'
-        with self.assertRaises(Failure): trust.verify(body,sig,self.trust,'channel')
+    def test_release_source_declares_its_version_and_requirements(self):
+        trust.validate_source('1.1.0\n', COMPATIBILITY, release(), INSTALLED)
+        with self.assertRaisesRegex(Failure, 'VERSION'):
+            trust.validate_source('1.1.1\n', COMPATIBILITY, release(), INSTALLED)
+        for field, value in [('minUpdater', 2), ('configurationApi', 2), ('pluginApi', 2), ('schema', 2),
+                             ('architectures', ['aarch64-linux']), ('nixos', ['26.05']), ('nixos', []),
+                             ('minUpdater', '1'), ('architectures', 'x86_64-linux')]:
+            with self.subTest(field=field, value=value), self.assertRaises(Failure):
+                trust.validate_source('1.1.0', COMPATIBILITY | {field: value}, release(), INSTALLED)
+        incomplete = dict(COMPATIBILITY); incomplete.pop('pluginApi')
+        for declaration in (incomplete, COMPATIBILITY | {'extra': 1}, None):
+            with self.subTest(declaration=declaration), self.assertRaises(Failure):
+                trust.validate_source('1.1.0', declaration, release(), INSTALLED)
 
-    def test_key_rotation_validity_start_and_malformed_dates(self):
-        body=b'{}';sig=self.sign(body)
-        key=self.trust['keys']['test']
-        key['notBefore']='2000-01-01T00:00:00Z'
-        self.assertEqual(trust.verify(body,sig,self.trust,'release'),{})
-        for start in ['2098-01-01T00:00:00Z', '2099-01-01T00:00:00Z',
-                      '2000-01-01', 'invalid', None]:
-            key['notBefore']=start
-            with self.subTest(start=start),self.assertRaises(Failure):
-                trust.verify(body,sig,self.trust,'release')
-        for value in ['2099-01-01', None]:
-            with self.subTest(expiry=value),self.assertRaises(Failure):
-                trust.expiry(value)
-
-    def test_duplicate_fields_rejected(self):
-        body=b'{"schema":1,"schema":2}'
-        with self.assertRaises(Failure): trust.verify(body,self.sign(body),self.trust,'release')
-
-    def test_metadata_compatibility_and_downgrades(self):
-        for field, value in [('version','0.9.0'),('revision','main'),('narHash','sha256:checksum'),('minUpdater',2),('configurationApi',2),('pluginApi',2),('architectures',['aarch64-linux']),('nixos',['27.05']),('nixos',['26.05'])]:
-            data=release();data[field]=value
-            with self.subTest(field=field),self.assertRaises(Failure):
-                trust.validate_release(data,'1.0.0','x86_64-linux','unstable','stable')
-        data=release();data['version']='1.1.0-beta.1'
-        with self.assertRaises(Failure): trust.validate_release(data,'1.0.0','x86_64-linux','unstable','stable')
-
-    def test_channel_manifest_chain_and_replay(self):
-        body=json.dumps(release()).encode()
-        url='https://github.com/CybexHQ/CybexOS/releases/download/v1.1.0/manifest.json'
-        channel={'schema':1,'channel':'stable','sequence':4,'expires':'2099-01-01T00:00:00Z','manifest':url,'sha256':hashlib.sha256(body).hexdigest()}
-        channel_body=json.dumps(channel).encode()
-        base='https://cybexhq.github.io/CybexOS/channels/stable.json'
-        data={base:channel_body,base+'.sig':self.sign(channel_body),url:body,url+'.sig':self.sign(body)}
-        class Fetch:
-            def get(self,url): return data[url]
-        candidate, sequence=trust.discover(Fetch(),self.trust,'stable','1.0.0','x86_64-linux','unstable',4)
-        self.assertEqual(sequence,4);self.assertEqual(candidate['revision'],REV_NEW)
-        with self.assertRaises(Failure): trust.discover(Fetch(),self.trust,'stable','1.0.0','x86_64-linux','unstable',5)
-        data[url]=body+b' '
-        with self.assertRaises(Failure): trust.discover(Fetch(),self.trust,'stable','1.0.0','x86_64-linux','unstable',4)
-
-    def test_asset_url_identity(self):
-        for value in ['https://example.com/source.tar.gz','https://github.com/CybexHQ/CybexOS/releases/download/main/source.tar.gz']:
-            data=release();data['assets'][0]['url']=value
-            with self.assertRaises(Failure): trust.validate_release(data,'1.0.0','x86_64-linux','unstable','stable')
+    def test_repository_compatibility_declaration_is_valid(self):
+        trust.validate_source((ROOT / 'VERSION').read_text(), read(ROOT / 'release/compatibility.json'),
+                              {'version': (ROOT / 'VERSION').read_text().strip()}, INSTALLED)
 
 
 class InputTests(unittest.TestCase):
@@ -353,7 +358,12 @@ class FakeRunner:
         if args[:3]==('nix','flake','archive'):
             return json.dumps({'path':'/nix/store/'+'c'*32+'-config','inputs':{'nixpkgs':{'path':'/nix/store/'+'d'*32+'-source','inputs':{}}}})
         if args[:3]==('nix','flake','prefetch'):
-            return json.dumps({'hash': NAR_NEW, 'storePath': '/nix/store/' + 'e'*32 + '-source'})
+            return json.dumps({'hash': NAR_NEW, 'storePath': STORE_SOURCE})
+        # The selected release's own declarations in its downloaded source.
+        if args[:2] == ('cat', STORE_SOURCE + '/VERSION'):
+            return '1.1.0\n'
+        if args[:2] == ('cat', STORE_SOURCE + '/release/compatibility.json'):
+            return json.dumps(COMPATIBILITY)
         # The prebuilt check: a candidate whose plan holds nothing to build.
         if args[:3]==('nix','eval','--raw') and any(a.endswith('.toplevel.drvPath') for a in args):
             return '/nix/store/'+'a'*32+'-nixos-system-cybexos.drv'
@@ -398,9 +408,9 @@ class EngineTests(unittest.TestCase):
         self.release=base/'release.json';atomic(self.release,{'version':'1.0.0','architecture':'x86_64-linux','nixos':'unstable'})
         self.policy=base/'update.json';atomic(self.policy,{'channel':'stable'})
         self.runner=FakeRunner()
-        self.engine=Engine(base/'state',self.working,self.runner,self.release,self.policy,base/'trust.json',self.system,self.booted)
+        self.engine=Engine(base/'state',self.working,self.runner,self.release,self.policy,self.system,self.booted)
         copy_config(self.config,base/'deployed');(self.engine.state/'deployed').symlink_to(base/'deployed')
-        self.engine.channel=lambda:(release(),4)
+        self.engine.channel=lambda:release()
         self.sentinel=config_digest(self.config)
         self.personal=base/'personal-data';self.personal.write_text('VPN key, widgets, preferences, plugin data and service database sentinel')
 
@@ -1017,7 +1027,7 @@ class EngineTests(unittest.TestCase):
                 self.engine.run = run
                 stdout, stderr = io.StringIO(), io.StringIO()
                 with self.subTest(output=output, log=log_path), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                    with patch.object(self.engine, 'channel', return_value=(release(), 4)) as channel:
+                    with patch.object(self.engine, 'channel', return_value=release()) as channel:
                         result = self.engine.check()
                     channel.assert_called_once_with()
                     self.assert_unknown_upstream(result, reason)
@@ -1072,7 +1082,7 @@ class EngineTests(unittest.TestCase):
         self.engine.run = run
         stdout, stderr = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            with patch.object(self.engine, 'channel', return_value=(release(), 4)) as channel:
+            with patch.object(self.engine, 'channel', return_value=release()) as channel:
                 result = self.engine.check()
         channel.assert_called_once_with()
         self.assert_unknown_upstream(result, 'malformed package-source metadata')
@@ -1122,10 +1132,30 @@ class EngineTests(unittest.TestCase):
             self.assertFalse(self.engine.pending_path.exists())
             self.assertEqual(read(self.engine.status_path)['state'],'failed')
 
-    def test_identity_mismatch_rejected_before_build(self):
-        self.engine.channel=lambda:(release()|{'narHash':NAR_OLD},4)
-        with self.assertRaises(Failure):self.engine.stage('cybexos')
-        self.assertFalse(any(args[:2]==('nix','build') for args in self.runner.calls))
+    def test_release_source_disagreements_are_rejected_before_build(self):
+        # The tag, the release's own VERSION and compatibility declaration and
+        # the content Nix locks must agree before anything is built.
+        original = self.runner
+        cases = {
+            'version': lambda args: '1.2.0\n' if args[:2] == ('cat', STORE_SOURCE + '/VERSION') else None,
+            'updater': lambda args: json.dumps(COMPATIBILITY | {'minUpdater': 2})
+                       if args[:2] == ('cat', STORE_SOURCE + '/release/compatibility.json') else None,
+            'content': lambda args: json.dumps({'hash': NAR_OLD, 'storePath': STORE_SOURCE})
+                       if args[:3] == ('nix', 'flake', 'prefetch') else None,
+            'no store path': lambda args: json.dumps({'hash': NAR_NEW}) if args[:3] == ('nix', 'flake', 'prefetch') else None,
+        }
+        for name, reply in cases.items():
+            def run(*args, **kwargs):
+                answer = reply(tuple(map(str, args)))
+                if answer is not None:
+                    original.calls.append(tuple(map(str, args)))
+                    return answer
+                return original(*args, **kwargs)
+            run.log = None
+            self.engine.run = run
+            with self.subTest(case=name), self.assertRaises(Failure):
+                self.engine.stage('cybexos')
+            self.assertFalse(any(args[:2]==('nix','build') for args in self.runner.calls))
 
     def test_stale_review_and_personal_edits(self):
         record=self.engine.stage('upstream')
@@ -1355,7 +1385,6 @@ class EngineTests(unittest.TestCase):
         self.assertFalse(self.engine.pending_path.exists())
         self.assertEqual((self.engine.state / 'deployed').resolve(), self.engine.tx(record['id']) / 'config')
         self.assertTrue((self.engine.tx(record['id']) / 'good.json').is_file())
-        self.assertEqual(read(self.engine.state / 'channel-sequences.json'), {'stable': 4})
         self.assertEqual(self.runner.calls.count(('cybexos-boot-trial', '--commit', NEW_SYSTEM)), 1)
 
     def test_interrupted_confirmation_completes_after_success_marker(self):
@@ -1473,14 +1502,18 @@ class EngineTests(unittest.TestCase):
         with self.assertRaises(Failure):self.engine.apply(record['id'],record['reviewToken'])
         self.assertTrue((self.working/'local/during-activation.nix').exists())
 
-    def test_authentication_and_nar_verification_precede_input_evaluation(self):
-        self.engine.stage('cybexos')
-        prefetch=next(i for i,args in enumerate(self.runner.calls) if args[:3]==('nix','flake','prefetch'))
-        update=next(i for i,args in enumerate(self.runner.calls) if args[:3]==('nix','flake','update'))
-        self.assertLess(prefetch,update)
-        self.assertTrue(any('narHash=' in arg for arg in self.runner.calls[prefetch]))
+    def test_release_pinning_and_declarations_precede_input_evaluation(self):
+        record = self.engine.stage('cybexos')
+        calls = self.runner.calls
+        prefetch = next(i for i, args in enumerate(calls)
+                        if args[:5] == ('nix', 'flake', 'prefetch', '--json', 'github:CybexHQ/CybexOS/' + REV_NEW))
+        declared = calls.index(('cat', STORE_SOURCE + '/release/compatibility.json'))
+        update = next(i for i, args in enumerate(calls) if args[:3] == ('nix', 'flake', 'update'))
+        self.assertLess(prefetch, declared)
+        self.assertLess(declared, update)
+        self.assertEqual(read(self.engine.tx(record['id']) / 'release.json'), release() | {'narHash': NAR_NEW})
         self.runner.calls.clear()
-        self.engine.channel=lambda:(_ for _ in ()).throw(Failure('invalid signature'))
+        self.engine.channel=lambda:(_ for _ in ()).throw(Failure('Release listing unavailable'))
         with self.assertRaises(Failure):self.engine.stage('cybexos')
         self.assertFalse(self.runner.calls)
 
@@ -1507,17 +1540,6 @@ class SourceTests(unittest.TestCase):
         flake=(ROOT/'flake.nix').read_text()
         self.assertIn('modules = [ module ./nix/modules/installer.nix',flake)
         self.assertIn('cybexos.nixosModules.default',(ROOT/'templates/machine/flake.nix').read_text())
-
-    def test_release_gate_rejects_fixture_reports_and_wrong_revision(self):
-        spec=importlib.util.spec_from_file_location('release_manage',ROOT/'release/manage.py')
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        checks={name:{'result':'passed','evidence':'actual-evidence'} for name in module.REQUIRED}
-        report={'revision':REV_NEW,'narHash':NAR_NEW,'checks':checks,'kind':'installation-update-and-physical-qualification'}
-        module.gate(report,REV_NEW,NAR_NEW)
-        with self.assertRaises(Failure):module.gate(report,REV_OLD,NAR_NEW)
-        with self.assertRaises(Failure):module.gate(report|{'kind':'fixtures'},REV_NEW,NAR_NEW)
-        checks['encrypted-install']['result']='skipped'
-        with self.assertRaises(Failure):module.gate(report,REV_NEW,NAR_NEW)
 
 
 class LiveLifecycleTests(unittest.TestCase):

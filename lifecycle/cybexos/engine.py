@@ -8,11 +8,10 @@ import shutil
 from subprocess import TimeoutExpired
 import time
 import uuid
-from urllib.parse import urlencode
 
 from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse, read, syncdir
 from . import inputs
-from .trust import REPO, Fetcher, NoPublishedRelease, discover, version
+from .trust import REPO, Fetcher, NoPublishedRelease, discover, validate_source, version
 from . import review, firmware, prebuilt
 from .progress import NixProgress
 
@@ -130,11 +129,9 @@ def config_digest(path):
 class Engine:
     def __init__(self, state='/var/lib/cybexos', working='/etc/nixos', run=None,
                  release='/etc/cybexos/release.json', policy='/etc/cybexos/update.json',
-                 trust='/etc/cybexos/trust.json', system='/run/current-system',
-                 booted='/run/booted-system'):
+                 system='/run/current-system', booted='/run/booted-system'):
         self.state, self.working = Path(state), Path(working)
-        self.machine_state = self.state
-        self.release, self.policy, self.trust = map(Path, (release, policy, trust))
+        self.release, self.policy = map(Path, (release, policy))
         self.current_system = Path(system)
         self.booted_system = Path(booted)
         self.run = run or Runner()
@@ -190,13 +187,31 @@ class Engine:
 
     def channel(self):
         installed, policy = read(self.release), read(self.policy)
-        highest = read(getattr(self, 'machine_state', self.state) / 'channel-sequences.json', {}).get(policy['channel'], 0)
-        candidate, sequence = discover(Fetcher(self.state / 'cache'), read(self.trust), policy['channel'],
-                                       installed['version'], installed['architecture'], installed['nixos'], highest)
-        if (candidate['version'] == installed['version'] and re.fullmatch('[0-9a-f]{40}', installed.get('revision', ''))
-                and (candidate['revision'] != installed['revision'] or candidate['narHash'] != installed.get('narHash'))):
+        candidate = discover(Fetcher(self.state / 'cache'), policy['channel'], installed['version'])
+        if self.replaced(candidate, installed, candidate['revision'] != installed.get('revision')):
             raise Failure('Published version was replaced with different source content. Update rejected.')
-        return candidate, sequence
+        return candidate
+
+    @staticmethod
+    def replaced(candidate, installed, differs):
+        """The installed version now names other source content."""
+        return (candidate['version'] == installed['version'] and differs
+                and bool(re.fullmatch('[0-9a-f]{40}', installed.get('revision', ''))))
+
+    def release_source(self, candidate):
+        """Download the selected release once, pin its content and read its own declarations."""
+        installed = read(self.release)
+        fetched = parse(self.nix('flake', 'prefetch', '--json', f'github:{REPO}/' + candidate['revision'], step='inputs'))
+        nar_hash, store = fetched.get('hash'), fetched.get('storePath')
+        if (not isinstance(nar_hash, str) or not re.fullmatch(r'sha256-[A-Za-z0-9+/]{43}=', nar_hash)
+                or not isinstance(store, str) or not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+', store)):
+            raise Failure('Downloaded release source has no valid content identity')
+        validate_source(self.run('cat', store + '/VERSION', sensitive=True),
+                        parse(self.run('cat', store + '/release/compatibility.json', sensitive=True)),
+                        candidate, installed)
+        if self.replaced(candidate, installed, nar_hash != installed.get('narHash')):
+            raise Failure('Published version was replaced with different source content. Update rejected.')
+        return candidate | {'narHash': nar_hash}
 
     def check(self):
         result = {'upstream': {}, 'cybexos': {}, 'firmware': firmware.discover(self.run, refresh=True),
@@ -246,10 +261,10 @@ class Engine:
                 'Nixpkgs (nixos-unstable) package-source status is unknown. ' + problem +
                 ' Run `' + ' '.join(UPSTREAM_METADATA) + '` locally for read-only diagnostics.'}
         try:
-            candidate, sequence = self.channel()
+            candidate = self.channel()
             result['cybexos'] = {'state': 'available' if version(candidate['version']) > version(read(self.release)['version']) else 'current',
                                 'installed': read(self.release)['version'], 'available': candidate['version'],
-                                'revision': candidate['revision'], 'notes': candidate['notes'], 'sequence': sequence}
+                                'revision': candidate['revision'], 'notes': candidate['notes']}
         except NoPublishedRelease:
             result['cybexos'] = {'state': 'unpublished', 'installed': read(self.release)['version']}
         except (Failure, KeyError, TypeError, ValueError) as error:
@@ -306,18 +321,13 @@ class Engine:
                     self.status(state='ready', phase='Device firmware ready for review', firmware=device_firmware,
                                 packageChanges=[], changes='', reviewToken=record['reviewToken'])
                     return record
-                # Authentication and metadata compatibility precede lock mutation,
-                # evaluation, download of selected code, and activation.
-                candidate, sequence = self.channel() if scope in ('cybexos', 'both') else (None, None)
+                # Release selection and compatibility precede lock mutation,
+                # evaluation of selected code, and activation.
+                candidate = self.channel() if scope in ('cybexos', 'both') else None
                 if candidate:
                     # Lock generation evaluates the selected flake to learn its
-                    # inputs. Verify its content before allowing that evaluation,
-                    # rather than checking the NAR only after generating a lock.
-                    source = f'github:{REPO}/' + candidate['revision']
-                    source += '?' + urlencode({'narHash': candidate['narHash']})
-                    fetched = parse(self.nix('flake', 'prefetch', '--json', source, step='inputs'))
-                    if fetched.get('hash') != candidate['narHash']:
-                        raise Failure('Downloaded source does not match its authenticated NAR identity')
+                    # inputs. Pin its content and check its declarations first.
+                    candidate = self.release_source(candidate)
                 config = tx / 'config'
                 baseline = config_digest(self.working)
                 copy_config(self.working, config)
@@ -357,12 +367,8 @@ class Engine:
                 if candidate:
                     selected = inputs.identity(new, 'cybexos')
                     if selected.get('rev') != candidate['revision'] or selected.get('narHash') != candidate['narHash']:
-                        raise Failure('Selected source does not match authenticated revision and NAR identity')
-                    dependencies = set(inputs.resolved(new, 'cybexos').get('inputs', {})) - {'nixpkgs'}
-                    if dependencies != set(candidate['vendorInputs']):
-                        raise Failure('Selected vendor dependencies differ from the authenticated declaration')
+                        raise Failure('Selected source does not match the release revision and its downloaded content')
                     atomic(tx / 'release.json', candidate)
-                    atomic(tx / 'channel.json', {'channel': read(self.policy)['channel'], 'sequence': sequence})
                 self.status(state='building', phase='Downloading inputs and building the complete system')
                 self.archive(config, tx)
                 if kind in ('update', 'software'):
@@ -784,11 +790,6 @@ class Engine:
             self.status(healthWarnings=self.health_report('cybexos-health'))
             self.run('cybexos-boot-trial', '--commit', record['system'])
             tx = self.tx(record['id'])
-            channel = read(tx / 'channel.json')
-            if channel:
-                high = read(self.state / 'channel-sequences.json', {})
-                high[channel['channel']] = max(high.get(channel['channel'], 0), channel['sequence'])
-                atomic(self.state / 'channel-sequences.json', high, 0o644)
             atomic(tx / 'good.json', {'at': int(time.time())})
             self.finish_confirmation(record)
 

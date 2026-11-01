@@ -23,7 +23,6 @@ in {
       default = if builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+-.+" cfg.release.version != null then "beta" else "stable";
       defaultText = lib.literalMD ''`"beta"` for a prerelease `cybexos.release.version`, otherwise `"stable"`'';
     };
-    trustKeys = lib.mkOption { type = lib.types.attrs; default = (builtins.fromJSON (builtins.readFile ../../release/keys/trust.json)).keys; description = "Publisher Ed25519 public keys and validity/purposes. No private keys."; };
     additionalHealthServices = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
@@ -38,8 +37,7 @@ in {
     };
   };
   config = lib.mkMerge [ (lib.mkIf (cfg.enable || cfg.installationMedium) {
-    # The medium authenticates its own release with the same trust and policy.
-    environment.etc."cybexos/trust.json".text = builtins.toJSON { schema = 1; keys = cfg.updates.trustKeys; };
+    # The medium installs its own release and passes its channel policy on.
     environment.etc."cybexos/update.json".text = builtins.toJSON { schema = 1; channel = cfg.updates.channel; branch = "nixos-unstable"; };
   }) (lib.mkIf cfg.enable {
     # units and userUnits must work: a deployment that breaks one is rolled

@@ -4,7 +4,7 @@ The machine owns `/etc/nixos/flake.nix` and `flake.lock`:
 
 ```nix
 inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-inputs.cybexos.url = "github:CybexHQ/CybexOS/EXACT_AUTHENTICATED_REVISION";
+inputs.cybexos.url = "github:CybexHQ/CybexOS/EXACT_RELEASE_REVISION";
 inputs.cybexos.inputs.nixpkgs.follows = "nixpkgs";
 ```
 
@@ -172,11 +172,13 @@ selected scope. Flathub apps update separately, right away, from Software's
 Updates tab ([Flathub](software-and-defaults.md#flathub)); the system review
 covers the NixOS generation and Cybex OS source.
 
-Before the first Cybex OS release is published, HTTP 404 for the initial
-channel document is neutral: the unpublished source is hidden and contributes
-no error. Confirmed NixOS package updates remain selected and can be prepared
-and installed independently. Missing signatures or manifests, invalid metadata
-and the disappearance of a previously authenticated channel remain errors.
+Before the first Cybex OS release is published on a machine's channel, an empty
+release listing is neutral: the unpublished source is hidden and contributes no
+error. Confirmed NixOS package updates remain selected and can be prepared and
+installed independently. An unavailable release repository, an invalid listing,
+a tag that does not name an exact commit, a downgrade and a release whose own
+`VERSION` or compatibility declaration does not fit remain errors
+([releases](releasing.md)).
 
 An upstream discovery failure keeps `upstream.state` at `unreachable` and
 explains that the Nixpkgs package-source status is unknown. A confirmed GitHub
@@ -219,8 +221,8 @@ does not roll back a successfully activated OS. Reboots and shutdowns remain
 explicit. The optional terminal CLI is `cybexos-firmware-update interactive`;
 the desktop has no separate firmware button or terminal launch.
 
-`cybex update stage upstream|cybexos|both|local` authenticates selected release
-metadata before evaluation, snapshots the entire personal configuration and
+`cybex update stage upstream|cybexos|both|local` pins and checks a selected
+release before evaluation, snapshots the entire personal configuration and
 updates only the chosen inputs. Cybex OS-only updates include its source-declared
 vendor dependency graph while preserving root upstream/personal inputs. They
 never select code from a moving branch. After a failed combined preview, select
@@ -258,7 +260,7 @@ A failed deployment is quarantined by complete system identity. Inspect the
 cause before using `cybex update retry-failed ID` to explicitly allow another
 preview of it. Retry permission covers prior failures of that exact system and
 is consumed only after a successful preview. Recovery is separate from
-authenticated normal updates; a channel
+normal updates; a channel
 cannot use a lower semantic version as a normal update.
 
 nixos-unstable is a rolling branch: advancing it is routine, including when
@@ -304,17 +306,14 @@ A package you deliberately build from source goes in
 `scripts/check-prebuilt`, `--nvidia` and `--catalogue` (every Software profile
 app); each lists any other build and exits 1.
 
-## Release delivery prerequisite
+## Release delivery
 
-The public audit on 2026-10-26 found that the stable and beta channel URLs
-returned HTTP 404, the public GitHub release list was empty, and the repository's
-publisher trust configuration contained no keys. Desktop/backend fixes cannot
-publish or authenticate a vendor release by themselves. Deployment operators
-must provision the real publisher public keys and publish qualified signed
-release/channel metadata through the documented release procedure. Never
-invent a trust key or fall back to an unauthenticated branch. An unpublished
-channel is quietly skipped; other delivery failures remain visible. Independent
-NixOS package updates remain usable when their source check succeeds.
+Cybex OS updates arrive only as published GitHub releases of `CybexHQ/CybexOS`;
+there are no publisher keys or channel documents ([releases](releasing.md)).
+An installed machine never follows a branch: a release that is not published,
+or that is a draft, is not offered. An unpublished channel is quietly skipped;
+other delivery failures remain visible. Independent NixOS package updates remain
+usable when their source check succeeds.
 
 See [the investigation](measurements/update-system-audit-2026-10-26.md) for the
 original failures and [the implementation record](measurements/update-system-fix-2026-10-26.md)

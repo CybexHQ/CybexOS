@@ -85,36 +85,24 @@ workstation or PXE image is changed by this branch.
    Review external links and integrations independently. The code's production
    identity is the exact new repository; development source paths continue to
    work locally before this infrastructure step.
-3. Relabel isolated CI runners **nerdos-isolated**, and provision protected
-   environments **nerdos-release** and **nerdos-channel** with the existing
-   publisher isolation/review rules. Secrets retain their unbranded names:
-   `RELEASE_ED25519_PRIVATE_KEY`, `CHANNEL_ED25519_PRIVATE_KEY`, and the
-   `IMMUTABILITY_CHECK_TOKEN`; variables retain `RELEASE_KEY_ID` and
-   `CHANNEL_KEY_ID`. Check the workflows and [release guide](releasing.md)
-   before setting permissions. Do not expose these secrets to untrusted PRs.
-4. Production trust is still empty. Supply owner-controlled public Ed25519
-   keys, validity dates and purposes in `release/keys/trust.json` through the
-   reviewed first-release process. This rename does not generate, rotate,
-   relabel or replace signing keys. No RPM/GPG key or package repository exists
-   in the supported product.
-5. Configure the repository's Pages channel publication so the updater can
-   reach `https://digitalpals.github.io/NerdOS/channels/{beta,stable}.json`
-   and detached `.sig` documents. The channel base is derived centrally from
-   `REPO` in `lifecycle/nerdos/trust.py`. GitHub Pages project URLs do not follow
-   repository redirects. There is no old-channel fallback or old installed
-   population to bridge in this unreleased, fresh-install NixOS product.
-   A future custom channel domain requires explicit source/host-allowlist and
-   authenticated-delivery review; setting a website CNAME alone is insufficient.
+3. Relabel isolated CI runners **nerdos-isolated**. Releases have no signing
+   keys, protected environments or secrets ([release guide](releasing.md)).
+4. Releases are keyless: the repository is the trust root. Protect `v*` tags
+   and maintainer accounts on the new repository before the first release.
+   No RPM/GPG key or package repository exists in the supported product.
+5. The updater finds releases through the GitHub API of `REPO` in
+   `lifecycle/nerdos/trust.py`; there are no channel documents or Pages site to
+   configure. There is no old-repository fallback or old installed population to
+   bridge in this fresh-install NixOS product.
 6. Qualify the **same final source revision and NAR** used for release artifacts:
    source checks, both fresh ISO installations, password/LUKS login, real staged
    upstream/vendor/combined/local update and recovery, personal persistence,
    plugins, hardware and security. Preserve the existing blockers in
    [validation status](validation.md), including Secure Boot installation.
    Never treat this rename's build/fixture results as physical qualification.
-7. After those gates pass, follow `docs/releasing.md`: create a new semantic
-   tag, publish an immutable signed release with its complete qualification
-   report, verify public assets, then promote a signed channel with a strictly
-   increasing sequence. Do not edit historical tags or published release assets.
+7. After those gates pass, follow `docs/releasing.md`: set a new `VERSION` and
+   publish it with `release/publish`. Do not edit historical tags or published
+   release assets.
 
 There is no Fedora package-domain switch, bridge release, compatibility expiry
 release or tested straggler command for this fresh-install architecture.

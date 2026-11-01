@@ -4,8 +4,8 @@
 
 - Direct commits and pushes to `main` are supported. Do not require a pull
   request or passing GitHub Actions checks before pushing.
-- The NixOS qualification workflow runs manually or through the release
-  workflow. Ordinary pushes and pull requests do not start it.
+- The NixOS qualification workflow runs manually. Ordinary pushes, pull
+  requests and releases do not start it.
 
 ## NixOS installation and lifecycle contract
 
@@ -34,7 +34,7 @@
   configuration build locally; fix an uncached Nixpkgs build through
   configuration, never an overlay, and check releases with
   `scripts/check-prebuilt`. Cybex OS follows the machine Nixpkgs and is pinned
-  to an authenticated exact release revision and NAR identity. Do not change
+  to a published GitHub release's exact revision and NAR identity. Do not change
   `system.stateVersion` during routine updates.
 - Preserve password fallback, encryption-gated automatic login after disk
   unlock (once per boot, keyring unlocked from the disk passphrase), firewall

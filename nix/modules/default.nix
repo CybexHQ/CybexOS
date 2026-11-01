@@ -41,7 +41,7 @@ in {
       default = false;
       internal = true;
       description = ''
-        The installation ISO's own runtime: the shared release, trust, update,
+        The installation ISO's own runtime: the shared release, update,
         network and boot-branding contract, without the desktop. The medium
         carries the desktop as an offline payload but never runs it.
       '';
@@ -137,11 +137,15 @@ in {
     boot.consoleLogLevel = mkDefault 0;
     # Label boot generations while keeping the upstream NixOS os-release ID.
     system.nixos.label = lib.mkOverride 900 "CybexOS-${cfg.release.version}-${config.system.nixos.release}";
-    environment.etc."cybexos/release.json".text = builtins.toJSON {
+    environment.etc."cybexos/release.json".text = let
+      # The same declaration the updater reads from a release's source.
+      compatibility = builtins.fromJSON (builtins.readFile ../../release/compatibility.json);
+    in builtins.toJSON {
       inherit (cfg.release) version revision narHash;
-      # The Nixpkgs branch this release follows, compared with signed release
-      # metadata (nixos: [ "unstable" ]); not the rolling 26.11 version number.
-      configurationApi = 1; pluginApi = 1; updaterApi = 1; nixos = "unstable";
+      inherit (compatibility) configurationApi pluginApi;
+      # The Nixpkgs branch this release follows, compared with a release's
+      # declared "nixos" list; not the rolling 26.11 version number.
+      updaterApi = 1; nixos = "unstable";
       architecture = pkgs.stdenv.hostPlatform.system;
     };
   }) (mkIf cfg.enable {

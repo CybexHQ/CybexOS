@@ -14,7 +14,7 @@ or establish physical/security/publication qualification.
 
 | Area | Actually exercised | Remaining work |
 | --- | --- | --- |
-| Source lifecycle and trust | Python command-boundary fixtures; real isolated Ed25519 signing/verification; input ownership, failed evaluation/build and durable recovery cases | Real signed-delivery/updater matrix on installed machines |
+| Source lifecycle and releases | Python command-boundary fixtures; keyless release discovery through the real Fetcher over isolated HTTPS (`tests/nixos-native`); input ownership, failed evaluation/build and durable recovery cases | Real release delivery and updater matrix on installed machines |
 | Desktop source | JavaScript source suites, QML lint, ownership/theme/package tests and C++ notification-image tests passed on development snapshots | Repeat required checks on the final source identity |
 | Public plugins | Actual Quickshell engine under isolated headless Sway: API 1 replacement, N/N+1/rollback and all six supported Omarchy kinds | Installed Hyprland session, real player/audio/input and third-party dependency coverage |
 | System boot | Real isolated NixOS VM boot; installed password/sudo and SDDM login; Hyprland/titlebars and Quickshell rendering; sole managed shell/current journal health; API 1 personal widget using a machine-added executable; candidate namespace/compositor/QML validation | Repeat on the final source identity; suspend, peripherals and physical authentication |
@@ -26,7 +26,7 @@ or establish physical/security/publication qualification.
 | Flathub and foreign programs | The Flathub backend against real Flatpak 1.18.4 and flathub.org in a throwaway home on the development host: the remote from the shipped repository file, search, an app's details, installing `org.vim.Vim` (and again), an app Flathub lacks, removal with its unused runtimes, and removing an app already gone; fixture suites for policy, validation, failures and dead workers; the real Software app in Quickshell under headless Sway with a scripted `cybex` (search, an app page with its sandbox, install → open, Installed with a confirmed removal, Flathub updates, the offer on a catalogue app NixOS cannot install yet); a NixOS VM session (`checks.x86_64-linux.hyprland-pointer`): the account's remote added once at sign-in and a removal kept, `cybex software flathub status`, a real transient worker, the shell's `XDG_DATA_DIRS` with Flatpak's exports, a distribution-style pigz (standard loader, no Nix library path) running through nix-ld, and AppImage binfmt registration; `scripts/check-prebuilt` (nothing compiles) and parity | A real Flathub install, launch and update inside an installed Cybex OS session (the VM has no network); Flatpak apps' fonts, icons, pointer theme, portals and file chooser under Hyprland; a real AppImage and downloaded vendor binaries; an ISO built from this source |
 | Default apps | `cybexos-apps` against real GIO and xdg-terminal-exec in disposable XDG directories (the nine roles, a choice waiting for its app and applied once it appears, reset to the system default keeping other associations, the terminal list, the web mail handlers never becoming an implicit default, Alacritty-style terminal options, the Files command); the catalogue generator resolving every role option against cache.nixos.org and Flathub; the real Software app in Quickshell under headless Sway with a scripted `cybex` and `cybexos-apps` (Firefox at once with Undo, Ghostty through the install list then used, Thunderbird from Flathub, Reset to Cybex picks, the offer on Firefox's page); the terminal theme targets rendered and Ghostty's and foot's configurations checked by the programs themselves; a NixOS VM session (`checks.x86_64-linux.hyprland-pointer`): the roles with Cybex OS's picks, a web mail handler chosen and reset, `cybexos-apps files` opening Nautilus in real Hyprland, and the seeded terminal configurations and themes | A real NixOS or Flathub install of an option in an installed session, then links, files and shortcuts opening it; Ghostty, Alacritty and foot running with the theme and Cybex OS's window options; email links through Gmail or Outlook in a real browser; an ISO built from this source |
 | Hardware | Pinned Intel camera HAL/GStreamer and PSYS packages built; private-ABI parser self-test passed | Actual kernel/private ABI and processed camera frames, both XPS SKUs, NVIDIA, fingerprint/FIDO2, Secure Boot and peripheral/power matrix |
-| Release delivery | Publisher-side signature, asset, qualification, sequence and downgrade regression checks | Protected workflow execution, owner keys, immutable publication, public asset verification, Pages promotion and durable custom cache |
+| Release delivery | `release/publish` against a throwaway Git origin with a recording `gh`; channel selection, downgrade, exact-commit and source-declaration checks | A published release installed through the staged updater, and a durable custom cache |
 
 Fixtures simulate command boundaries. They are regression coverage and cannot
 establish a successful installation, an applied update or recovery from a real
@@ -56,10 +56,9 @@ tests and failures; inspect that evidence before using a particular image.
   and the exact Chromium namespace exception do not reproduce the prior
   enforcing policy. Qualify enforced native service/application confinement
   and negative access tests, alongside packet-level firewall tests.
-- Production publisher trust is deliberately empty. An owner must provision
-  real public keys, publish an authenticated exact revision and configure
-  protected GitHub environments and immutable Releases. Do not substitute a
-  development key or a moving branch.
+- Releases have no publisher keys: the GitHub repository is the trust root
+  ([releases](releasing.md)). Protect `v*` tags and maintainer accounts;
+  never let a machine follow a moving branch.
 - T3 Code's native wrapped AppImage builds but remains runtime-unqualified.
   Cisco IKEv1/IPsec uses the maintained Nixpkgs Libreswan plugin rather than the
   archived, vulnerable vpnc plugin. Real gateway authentication/routing/DNS and
@@ -120,7 +119,7 @@ sentinels for personal packages, VPNs, services, widget code/placement/preferenc
 plugin state and service data, and check them after updates and rollback.
 Hardware/security checks require representative physical machines.
 
-Only a complete same-revision `installation-update-and-physical-qualification`
-report containing every check required by `release/manage.py` passes the release
-gate. See [release operations](releasing.md) for trust and publication. Do not
-promote the development evidence in this document to a production-readiness claim.
+No workflow gates a release; the owner decides how far a release is qualified
+before publishing it ([release operations](releasing.md)). Record what was
+actually exercised on the exact released revision, and do not promote the
+development evidence in this document to a production-readiness claim.

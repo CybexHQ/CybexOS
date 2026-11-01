@@ -19,6 +19,6 @@ Use isolated environments. Do not deploy a development shell onto the running
 workstation without authorization. Any live Quickshell test must use
 `tests/lib/quickshell-live`, including its final PID/service/journal checks.
 
-Release workflows are protected operations and require complete same-revision
-qualification, operator-owned signing keys and immutable GitHub Releases. See
+Publishing a release reaches every installed machine on its channel; do it only
+with the owner's explicit decision, with `release/publish`. See
 [release operations](docs/releasing.md).

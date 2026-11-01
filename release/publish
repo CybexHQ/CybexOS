@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Publish a Cybex OS release: tag the current main commit and create its GitHub
+# release. The GitHub repository is the trust root; there is no signing step.
+# Installed machines take the newest release on their channel: a prerelease
+# version (1.2.3-beta.1) reaches only beta, any other version reaches both.
+#
+#   release/publish VERSION [--dry-run] [ASSET...]
+#
+# VERSION must equal the committed VERSION file. release/notes.md is the
+# release text. Optional assets (an ISO, its checksum) are uploaded with it.
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+REPO=${CYBEXOS_RELEASE_REPO:-CybexHQ/CybexOS}
+
+fail() { echo "release/publish: $*" >&2; exit 1; }
+
+version=${1:-}
+[[ -n $version ]] || fail 'usage: release/publish VERSION [--dry-run] [ASSET...]'
+shift
+dry_run=0
+if [[ ${1:-} == --dry-run ]]; then dry_run=1; shift; fi
+assets=("$@")
+
+[[ $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(beta|rc)\.[1-9][0-9]*)?$ ]] \
+    || fail "$version is not a semantic release version (1.2.3 or 1.2.3-beta.1)"
+[[ $(<VERSION) == "$version" ]] || fail "VERSION is $(<VERSION), not $version; commit the version first"
+python3 -c 'import json, sys; c = json.load(open("release/compatibility.json")); sys.exit(c.get("schema") != 1)' \
+    || fail 'release/compatibility.json is missing or invalid'
+[[ -s release/notes.md ]] || fail 'release/notes.md is empty'
+for asset in "${assets[@]}"; do
+    [[ -f $asset ]] || fail "asset $asset does not exist"
+done
+[[ -z $(git status --porcelain) ]] || fail 'commit or stash local changes first'
+[[ $(git rev-parse --abbrev-ref HEAD) == main ]] || fail 'publish from main'
+git fetch --quiet origin main
+[[ $(git rev-parse HEAD) == "$(git rev-parse origin/main)" ]] || fail 'main must equal origin/main; push or pull first'
+
+tag=v$version
+if git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+    fail "$tag already exists; a published version is never reused"
+fi
+kind=(--latest)
+if [[ $version == *-* ]]; then kind=(--prerelease --latest=false); fi
+revision=$(git rev-parse HEAD)
+if ((dry_run)); then
+    echo "Would publish $tag at $revision to $REPO (${kind[*]}) with ${#assets[@]} asset(s)."
+    exit 0
+fi
+git tag --annotate "$tag" --message "Cybex OS $version"
+git push --quiet origin "refs/tags/$tag"
+gh release create "$tag" --repo "$REPO" --verify-tag --title "Cybex OS $version" \
+    --notes-file release/notes.md "${kind[@]}" "${assets[@]}"
+echo "Published $tag at $revision to $REPO."

@@ -1,23 +1,15 @@
 """Installer safety and hardware detection regression fixtures, not ISO tests."""
-import base64
 import contextlib
 import copy
-import hashlib
-import http.server
 import importlib.machinery
 import importlib.util
 import io
 import json
 import os
-import socket
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
-import threading
 import unittest
-import urllib.parse
-import urllib.request
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -850,24 +842,17 @@ class TestedNixpkgsTests(unittest.TestCase):
                 self.assertNotIn('installed', seen)
 
 
-REVISION, OTHER_REVISION = '1' * 40, '3' * 40
+REVISION = '1' * 40
 NAR, OTHER_NAR = 'sha256-' + 'A' * 43 + '=', 'sha256-' + 'B' * 43 + '='
-RELEASES = 'https://github.com/CybexHQ/CybexOS/releases/download/'
+DEVELOPMENT_SOURCE = '/nix/store/' + 'a' * 32 + '-source'
 
 
-def manifest(version='1.0.0-beta.1', **changes):
-    release = {'schema':1, 'version':version, 'revision':REVISION, 'narHash':NAR,
-               'architectures':['x86_64-linux'], 'nixos':['unstable'], 'configurationApi':1, 'pluginApi':1,
-               'minUpdater':1, 'notes':'Qualified medium', 'vendorInputs':['lanzaboote'],
-               'assets':[{'name':f'cybexos-{version}-x86_64-linux.iso', 'url':f'{RELEASES}v{version}/cybexos-{version}-x86_64-linux.iso',
-                          'sha256':'f' * 64, 'bytes':1}]}
-    release.update(changes)
-    return release
+class MediaSourceTests(unittest.TestCase):
+    """A medium installs only its own bundled source and never asks GitHub.
 
-
-class MediaAuthenticationTests(unittest.TestCase):
-    """Production media selection with real Ed25519 signatures and the real
-    Fetcher. Only the network transport is replaced by a loopback server."""
+    A release published later must not change what a tested ISO installs; the
+    installed machine follows its channel's releases from then on.
+    """
 
     def setUp(self):
         timezone = patch.object(installer, 'known_timezone', return_value=True)
@@ -875,78 +860,24 @@ class MediaAuthenticationTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix='cybexos-installer-media-')
         self.addCleanup(directory.cleanup)
         self.base = Path(directory.name)
-        self.keys = {}
-        for name in ('publisher', 'untrusted'):
-            key = self.base / name
-            subprocess.run(['openssl', 'genpkey', '-algorithm', 'Ed25519', '-out', str(key)], check=True, capture_output=True)
-            self.keys[name] = key
-        public = subprocess.check_output(['openssl', 'pkey', '-in', str(self.keys['publisher']), '-pubout'], text=True)
-        self.trust = {'schema':1, 'keys':{'publisher':{'publicKey':public, 'notAfter':'2099-01-01T00:00:00Z',
-                                                         'purposes':['release', 'channel']}}}
         self.etc = self.base / 'etc'; self.etc.mkdir()
         (self.etc / 'installer').write_text('fresh-install-only\n')
-        self.medium(version='1.0.0-beta.1', channel='beta')
-        self.served, self.requests = {}, []
-        self.publish(manifest())
-        # A channel that has since advanced must never select what this
-        # medium installs; serve it so any request for it is observable.
-        newer = manifest('1.0.0-beta.2', revision=OTHER_REVISION, narHash=OTHER_NAR)
-        self.publish(newer)
-        moved = json.dumps({'schema':1, 'channel':'beta', 'sequence':9, 'expires':'2099-01-01T00:00:00Z',
-                            'manifest':RELEASES + 'v1.0.0-beta.2/manifest.json',
-                            'sha256':hashlib.sha256(json.dumps(newer).encode()).hexdigest()}).encode()
-        channel = 'https://cybexhq.github.io/CybexOS/channels/beta.json'
-        self.served[channel], self.served[channel + '.sig'] = moved, self.sign(moved)
-        self.transport()
+        (self.etc / 'installer-source').write_text(str(self.base))
+        self.medium()
+        self.requests = []
+        network = patch('urllib.request.urlopen', side_effect=lambda request, **_: self.requests.append(request) or self.fail(
+            'An installation medium contacted ' + getattr(request, 'full_url', str(request))))
+        network.start(); self.addCleanup(network.stop)
 
-    def medium(self, channel='beta', **changes):
-        release = {'version':'1.0.0-beta.1', 'revision':REVISION, 'narHash':NAR, 'configurationApi':1, 'pluginApi':1,
-                   'updaterApi':1, 'nixos':'unstable', 'architecture':'x86_64-linux'}
+    def medium(self, version='1.0.0', channel='stable', **changes):
+        release = {'version': version, 'revision': REVISION, 'narHash': NAR, 'configurationApi': 1, 'pluginApi': 1,
+                   'updaterApi': 1, 'nixos': 'unstable', 'architecture': 'x86_64-linux'}
         release.update(changes)
         (self.etc / 'release.json').write_text(json.dumps(release))
-        (self.etc / 'update.json').write_text(json.dumps({'schema':1, 'channel':channel, 'branch':'nixos-unstable'}))
-        (self.etc / 'trust.json').write_text(json.dumps(self.trust))
+        (self.etc / 'update.json').write_text(json.dumps({'schema': 1, 'channel': channel, 'branch': 'nixos-unstable'}))
 
-    def sign(self, body, key='publisher', key_id='publisher'):
-        document = self.base / 'signed-body'; document.write_bytes(body)
-        raw = subprocess.check_output(['openssl', 'pkeyutl', '-sign', '-rawin', '-inkey', str(self.keys[key]), '-in', str(document)])
-        return json.dumps({'keyId':key_id, 'signature':base64.b64encode(raw).decode()}).encode()
-
-    def publish(self, release, at=None, body=None, signature=None):
-        url = RELEASES + f'v{at or release["version"]}/manifest.json'
-        body = json.dumps(release).encode() if body is None else body
-        self.served[url] = body
-        self.served[url + '.sig'] = self.sign(body) if signature is None else signature
-
-    def transport(self):
-        served = self.served
-        class Release(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):
-                body = served.get(urllib.parse.unquote(self.path[1:]))
-                self.send_response(200 if body is not None else 404)
-                self.send_header('Content-Length', str(len(body or b'')))
-                self.end_headers()
-                self.wfile.write(body or b'')
-            def log_message(self, *args):
-                pass
-        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Release)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        def stop():
-            server.shutdown(); server.server_close(); thread.join(timeout=5)
-        self.addCleanup(stop)
-        real_urlopen = urllib.request.urlopen
-        def urlopen(request, timeout=30):
-            self.requests.append(request.full_url)
-            local = urllib.request.Request(f'http://127.0.0.1:{server.server_port}/' + urllib.parse.quote(request.full_url, safe=''),
-                                           headers=dict(request.header_items()))
-            response = real_urlopen(local, timeout=timeout)
-            # Adapt only the test transport. Production endpoint checks,
-            # bounded reads and cache publication remain in the path.
-            response.url = request.full_url
-            return response
-        transport = patch('cybexos.trust.urllib.request.urlopen', side_effect=urlopen)
-        transport.start(); self.addCleanup(transport.stop)
+    def bundle(self, nar=NAR, path=STORE_SOURCE):
+        return Mock(return_value=json.dumps({'path': path, 'locked': {'narHash': nar}}))
 
     def main(self, *arguments, runner=None):
         plan_file = self.base / 'plan.json'
@@ -957,7 +888,7 @@ class MediaAuthenticationTests(unittest.TestCase):
         output = io.StringIO()
         argv = ['cybexos-install', '--plan-file', str(plan_file), '--secrets-fd', str(read_end), *arguments]
         try:
-            with patch.object(installer, 'ETC', self.etc), patch.object(installer, 'CACHE', self.base / 'cache'), \
+            with patch.object(installer, 'ETC', self.etc), \
                     patch.object(installer, 'INSTALL_LOG', self.base / 'installer.log'), \
                     patch.object(installer, 'LOCK', self.base / 'installer.lock'), \
                     patch.object(installer.os, 'geteuid', return_value=0), patch.object(installer, 'Runner', return_value=runner or Mock(return_value='')), \
@@ -968,44 +899,47 @@ class MediaAuthenticationTests(unittest.TestCase):
                 os.close(read_end)
         return install, output.getvalue()
 
-    def assert_rejected(self, pattern, network=True):
+    def test_final_medium_installs_its_exact_bundle_without_testing_consent(self):
+        for channel in ('stable', 'beta'):
+            with self.subTest(channel=channel):
+                self.medium(channel=channel)
+                install, output = self.main(runner=self.bundle())
+                self.assertEqual(install.call_args.args[2:5], ('path:' + STORE_SOURCE, REVISION, NAR))
+                self.assertEqual(install.call_args.kwargs['channel'], channel)
+                self.assertIn('Cybex OS 1.0.0 • bundled source verified', output)
+                self.assertNotIn('TEST', output)
+        self.assertEqual(self.requests, [])
+
+    def test_final_medium_rejects_a_different_bundle_before_disk_selection(self):
+        for changes in ({'narHash': OTHER_NAR}, {'revision': 'uncommitted'}):
+            self.medium(**changes)
+            with self.subTest(changes=changes), patch.object(installer, 'interactive') as choices, \
+                    self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs') as raised:
+                self.main(runner=self.bundle())
+            self.assertIn('erased', str(raised.exception))
+            choices.assert_not_called()
+
+    def test_invalid_media_are_rejected_before_disk_selection(self):
+        for changes, pattern in (({'version': '1.0'}, 'semantic release version'),
+                                 ({'version': None}, 'semantic release version')):
+            with self.subTest(changes=changes):
+                runner = Mock()
+                self.medium(**changes)
+                with self.assertRaisesRegex(installer.Failure, pattern):
+                    self.main(runner=runner)
+                runner.assert_not_called()
+        self.medium(channel='nightly')
+        with self.assertRaisesRegex(installer.Failure, 'supported release channel'):
+            self.main(runner=self.bundle())
+
+    def test_prerelease_medium_requires_explicit_consent(self):
+        self.medium(version='1.0.0-beta.1', channel='beta')
         runner = Mock()
-        with self.assertRaisesRegex(installer.Failure, pattern) as raised:
+        with self.assertRaisesRegex(installer.DevelopmentMedia, 'explicit consent') as raised:
             self.main(runner=runner)
         self.assertIn('erased', str(raised.exception))
         runner.assert_not_called()
-        if network:
-            media_version = json.loads((self.etc / 'release.json').read_text())['version']
-            self.assertEqual(self.requests[:1], [RELEASES + f'v{media_version}/manifest.json'])
-        else:
-            self.assertEqual(self.requests, [], 'blocked medium contacted a release endpoint')
-        return raised.exception
-
-    def test_production_medium_installs_its_exact_authenticated_release(self):
-        install, output = self.main()
-        install.assert_called_once()
-        args, kwargs = install.call_args
-        self.assertEqual(args[2:5], ('github:CybexHQ/CybexOS/' + REVISION, REVISION, NAR))
-        self.assertEqual(kwargs['channel'], 'beta')
-        self.assertEqual(args[0], plan())
-        self.assertIn('Authenticated Cybex OS 1.0.0 • exact revision ' + REVISION, output)
-        self.assertNotIn('beta', output.lower())
-        # Only this medium's immutable manifest is consulted; the moved
-        # channel and its newer release are never fetched or selected.
-        self.assertEqual(self.requests, [RELEASES + 'v1.0.0-beta.1/manifest.json', RELEASES + 'v1.0.0-beta.1/manifest.json.sig'])
-
-    def test_release_dns_failure_recovers_once_then_verifies_the_signed_release(self):
-        body = json.dumps(manifest()).encode()
-        error = installer.Failure('Publisher unreachable')
-        error.__cause__ = urllib.error.URLError(socket.gaierror(-2, 'Name or service not known'))
-        fetch = Mock()
-        fetch.get.side_effect = [error, body, self.sign(body)]
-        recover = Mock()
-        release, channel = installer.authenticate_media(fetch, self.etc, recover)
-        self.assertEqual(release['revision'], REVISION)
-        self.assertEqual(channel, 'beta')
-        recover.assert_called_once_with()
-        self.assertEqual(fetch.get.call_count, 3)
+        self.assertEqual(self.requests, [])
 
     def test_second_installer_is_blocked_before_source_selection(self):
         with (self.base / 'installer.lock').open('a') as active, patch.object(installer, 'run_installation') as work:
@@ -1013,145 +947,20 @@ class MediaAuthenticationTests(unittest.TestCase):
             with self.assertRaisesRegex(installer.Failure, 'Another installer is running'):
                 self.main()
             work.assert_not_called()
-        self.assertEqual(self.requests, [])
 
-    def test_differing_identity_is_rejected_before_installation(self):
-        for change in ({'revision':OTHER_REVISION}, {'narHash':OTHER_NAR}):
-            with self.subTest(change=change):
-                self.requests.clear()
-                self.publish(manifest(**change))
-                self.assert_rejected('differs from this installation medium')
-        # A validly signed newer release served at this medium's tag is still
-        # a different identity, never a substitute.
-        self.requests.clear()
-        self.publish(manifest('1.0.0-beta.2'), at='1.0.0-beta.1')
-        self.assert_rejected('differs from this installation medium')
-
-    def test_invalid_signatures_and_unsupported_metadata_are_rejected(self):
-        body = json.dumps(manifest()).encode()
-        cases = [(dict(body=body + b' ', signature=self.sign(body)), 'Invalid publisher signature'),
-                 (dict(signature=self.sign(body, key='untrusted')), 'Invalid publisher signature'),
-                 (dict(signature=self.sign(body, key='untrusted', key_id='untrusted')), 'not trusted'),
-                 (dict(signature=b'{"keyId":"publisher"}'), 'signature envelope'),
-                 (dict(body=json.dumps(manifest(schema=2)).encode()), 'newer updater'),
-                 (dict(body=json.dumps(manifest(minUpdater=2)).encode()), 'newer updater'),
-                 (dict(body=json.dumps(manifest(channel='beta')).encode()), 'Unsupported or incomplete'),
-                 (dict(body=json.dumps(manifest(architectures=['aarch64-linux'])).encode()), 'architecture'),
-                 (dict(body=b'{"schema":1,"schema":1}'), 'Duplicate metadata')]
-        for options, pattern in cases:
-            with self.subTest(pattern=pattern, options=sorted(options)):
-                self.requests.clear()
-                self.publish(manifest(), **options)
-                self.assert_rejected(pattern)
-        self.requests.clear()
-        del self.served[RELEASES + 'v1.0.0-beta.1/manifest.json']
-        self.assert_rejected('HTTP 404')
-
-    def test_unauthenticatable_media_are_blocked_without_network(self):
-        keys, self.trust['keys'] = self.trust['keys'], {}
-        self.medium()
-        self.assert_rejected('no owner-controlled publisher trust keys', network=False)
-        self.trust['keys'] = keys
-        for changes, pattern in (({'revision':'uncommitted'}, 'exact committed release'),
-                                 ({'narHash':'unavailable'}, 'exact committed release'),
-                                 ({'architecture':None}, 'exact committed release'),
-                                 ({'version':'1.0'}, 'semantic release version')):
-            with self.subTest(changes=changes):
-                self.requests.clear()
-                self.medium(**changes)
-                self.assert_rejected(pattern, network=False)
-        self.requests.clear()
-        self.medium(channel='nightly')
-        self.assert_rejected('supported release channel', network=False)
-
-    def test_channel_policy_applies_to_the_medium_release(self):
-        # The stable channel never authenticates a prerelease medium.
-        self.medium(channel='stable')
-        self.assert_rejected('Stable channel contains a prerelease')
-        for medium_channel in ('stable', 'beta'):
-            with self.subTest(channel=medium_channel):
-                self.requests.clear()
-                self.medium(version='1.0.0', channel=medium_channel)
-                self.publish(manifest('1.0.0'))
-                release, channel = installer.authenticate_media(installer.Fetcher(self.base / 'cache'), self.etc)
-                self.assertEqual((release['version'], release['revision'], channel), ('1.0.0', REVISION, medium_channel))
-                self.assertEqual(self.requests, [RELEASES + 'v1.0.0/manifest.json', RELEASES + 'v1.0.0/manifest.json.sig'])
-
-    def test_development_source_keeps_medium_channel_without_release_lookup(self):
-        runner = Mock(return_value=json.dumps({'path':'/nix/store/' + 'a' * 32 + '-source', 'locked':{'narHash':NAR}}))
-        install, output = self.main('--development-source', str(self.base), runner=runner)
+    def test_development_source_keeps_medium_channel(self):
+        self.medium(version='1.0.0-beta.1', channel='beta')
+        install, output = self.main('--development-source', str(self.base), runner=self.bundle(path=DEVELOPMENT_SOURCE))
         args, kwargs = install.call_args
-        self.assertEqual(args[2], 'path:/nix/store/' + 'a' * 32 + '-source')
+        self.assertEqual(args[2], 'path:' + DEVELOPMENT_SOURCE)
         self.assertEqual(kwargs['channel'], 'beta')
         self.assertIn('UNRELEASED TEST INSTALLATION', output)
-        self.assertEqual(self.requests, [])
-
-    def test_final_unsigned_medium_installs_its_exact_bundle_without_testing_consent(self):
-        self.trust['keys'] = {}
-        self.medium(version='1.0.0', channel='stable')
-        (self.etc / 'installer-source').write_text(str(self.base))
-        runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
-        install, output = self.main(runner=runner)
-        self.assertEqual(install.call_args.args[2:5], ('path:' + STORE_SOURCE, REVISION, NAR))
-        self.assertEqual(install.call_args.kwargs['channel'], 'stable')
-        self.assertIn('bundled source verified', output)
-        self.assertNotIn('TEST', output)
-        self.assertEqual(self.requests, [])
-
-    def test_final_unsigned_medium_rejects_a_different_bundle_before_disk_selection(self):
-        self.trust['keys'] = {}
-        self.medium(version='1.0.0', channel='stable')
-        (self.etc / 'installer-source').write_text(str(self.base))
-        for changes in ({'narHash': OTHER_NAR}, {'revision': 'uncommitted'}):
-            self.medium(version='1.0.0', channel='stable', **changes)
-            runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
-            with self.subTest(changes=changes), self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs'):
-                self.main(runner=runner)
-
-    def test_final_signed_medium_installs_its_verified_bundle_until_its_release_is_published(self):
-        self.medium(version='1.0.0', channel='stable')
-        (self.etc / 'installer-source').write_text(str(self.base))
-        self.served.clear()
-        runner = Mock(return_value=json.dumps({'path': STORE_SOURCE, 'locked': {'narHash': NAR}}))
-        install, output = self.main(runner=runner)
-        self.assertEqual(install.call_args.args[2:5], ('path:' + STORE_SOURCE, REVISION, NAR))
-        self.assertEqual(install.call_args.kwargs['channel'], 'stable')
-        self.assertIn('bundled source verified', output)
-        self.assertNotIn('TEST', output)
-        # It looked for its own signed release first, and only that.
-        self.assertEqual(self.requests, [RELEASES + 'v1.0.0/manifest.json'])
-        # The bundle must still be this medium's exact content.
-        self.medium(version='1.0.0', channel='stable', narHash=OTHER_NAR)
-        with self.assertRaisesRegex(installer.Failure, 'Bundled source identity differs'):
-            self.main(runner=runner)
-
-    def test_final_signed_medium_offline_installs_its_verified_bundle(self):
-        self.medium(version='1.0.0', channel='stable')
-        fetch = Mock()
-        fetch.get.side_effect = installer.Failure('Release endpoint unreachable; its status is unknown. Retry when connected.')
-        with self.assertRaisesRegex(installer.ReleaseUnavailable, 'could not be read') as raised:
-            installer.authenticate_media(fetch, self.etc)
-        self.assertIn('erased', str(raised.exception))
-
-    def test_final_signed_medium_blocks_a_published_release_that_does_not_verify(self):
-        self.medium(version='1.0.0', channel='stable')
-        (self.etc / 'installer-source').write_text(str(self.base))
-        body = json.dumps(manifest('1.0.0')).encode()
-        for options, pattern in ((dict(signature=self.sign(body, key='untrusted')), 'Invalid publisher signature'),
-                                 (dict(body=json.dumps(manifest('1.0.0', revision=OTHER_REVISION)).encode()),
-                                  'differs from this installation medium')):
-            with self.subTest(pattern=pattern):
-                self.requests.clear()
-                self.publish(manifest('1.0.0'), **options)
-                self.assert_rejected(pattern)
 
     def test_interactive_unreleased_medium_requires_explicit_consent_before_choices(self):
-        self.trust['keys'] = {}
-        self.medium()
-        (self.etc / 'installer-source').write_text(str(self.base))
+        self.medium(version='1.0.0-beta.1', channel='beta')
         args = installer.argparse.Namespace(development_source=None, plan_file=None, serial_console=False)
-        runner = Mock(return_value=json.dumps({'path':'/nix/store/' + 'a' * 32 + '-source', 'locked':{'narHash':NAR}}))
-        with patch.object(installer, 'ETC', self.etc), patch.object(installer, 'CACHE', self.base / 'cache'), patch.object(sys.stdin, 'isatty', return_value=True), \
+        runner = self.bundle(path=DEVELOPMENT_SOURCE)
+        with patch.object(installer, 'ETC', self.etc), patch.object(sys.stdin, 'isatty', return_value=True), \
              patch('builtins.input', return_value='n'), patch.object(installer, 'interactive') as choices, \
              patch.object(installer, 'install') as install, contextlib.redirect_stdout(io.StringIO()), \
              self.assertRaises(installer.Cancelled):
@@ -1159,12 +968,12 @@ class MediaAuthenticationTests(unittest.TestCase):
         runner.assert_not_called()
         choices.assert_not_called()
         install.assert_not_called()
-        with patch.object(installer, 'ETC', self.etc), patch.object(installer, 'CACHE', self.base / 'cache'), patch.object(sys.stdin, 'isatty', return_value=True), \
+        with patch.object(installer, 'ETC', self.etc), patch.object(sys.stdin, 'isatty', return_value=True), \
              patch('builtins.input', return_value='y'), \
              patch.object(installer, 'interactive', return_value=(plan(), {'password':'qualification-password-123'})), \
              patch.object(installer, 'install') as install, contextlib.redirect_stdout(io.StringIO()):
             installer.run_installation(args, runner)
-        self.assertEqual(install.call_args.args[2], 'path:/nix/store/' + 'a' * 32 + '-source')
+        self.assertEqual(install.call_args.args[2], 'path:' + DEVELOPMENT_SOURCE)
         self.assertEqual(self.requests, [])
 
 

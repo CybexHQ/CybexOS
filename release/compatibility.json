@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "configurationApi": 1,
+  "pluginApi": 1,
+  "minUpdater": 1,
+  "architectures": ["x86_64-linux"],
+  "nixos": ["unstable"]
+}

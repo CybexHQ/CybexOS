@@ -1,6 +1,6 @@
 # Commands and recovery
 
-- `cybex update check`: independent upstream and authenticated Cybex OS status.
+- `cybex update check`: independent upstream and Cybex OS release status.
 - `cybex update stage upstream|cybexos|both|local`: build and validate a staged
   complete configuration, preserving the working configuration.
 - `cybex update status`: durable progress, actual closure changes, the

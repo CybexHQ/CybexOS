@@ -1,7 +1,7 @@
 # Evaluation parity is distinct from installation/boot qualification. The ISO
 # runs only the installer; the product it installs is the payload system it
 # carries. Compare that payload with an ordinary machine importing the public
-# module, and check the medium's own shared release, trust and network contract.
+# module, and check the medium's own shared release, update and network contract.
 { nixpkgs, pkgs, module, installer, system, inputSources, inputNarHashes }:
 let
   lock = builtins.fromJSON (builtins.readFile ../../flake.lock);
@@ -217,9 +217,8 @@ assert ui.serviceConfig.Type == "notify" && builtins.elem "cybexos-installer-spl
 assert builtins.elem "cybexos-installer-ui.service" installer.systemd.services.plymouth-quit.after;
 assert installer.systemd.services.cybexos-installerd.serviceConfig.KillMode == "process";
 assert installer.systemd.services.cybexos-installerd.serviceConfig.OOMPolicy == "continue";
-# It authenticates and installs with the same release, trust and update policy.
+# It installs with the same release and update policy.
 assert medium "release.json" == payload.environment.etc."cybexos/release.json".text;
-assert medium "trust.json" == payload.environment.etc."cybexos/trust.json".text;
 assert medium "update.json" == payload.environment.etc."cybexos/update.json".text;
 assert installer.services.resolved.enable && installer.systemd.services ? cybexos-network-defaults;
 assert builtins.elem payload.system.path installer.isoImage.storeContents;
