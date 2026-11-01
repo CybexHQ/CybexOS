@@ -85,6 +85,27 @@ and was deleted. Afterwards `query_status` reported `running`, the list and
 the summary showed only `cybexos-1.0.7.iso` (`count: 1`), and
 `iventoy.service` was `active`.
 
+## Publication
+
+Published as the GitHub release `v1.0.7` (latest, not a prerelease) on
+2026-11-01 at 17:08Z, without assets: the ISO is over GitHub's 2 GiB asset
+limit. The tag is the ISO's own commit, `781d7ce6`, not the later commit with
+this record and the 1.0.7 release notes: a machine installed from the ISO
+reports 1.0.7 at `781d7ce6`, and the updater rejects a release of its installed
+version that names other source content. `release/publish` tags only the
+current `main`, so the tag and release were created by hand with its checks
+(`VERSION` and `release/compatibility.json` at that commit, no existing tag,
+the commit on `origin/main`). The release body is `release/notes.md` as
+committed afterwards. GitHub's `commits/v1.0.7` returns `781d7ce6…`, and
+`nix flake prefetch github:CybexHQ/CybexOS/781d7ce6…` gives the NAR above.
+
+Before publishing, `scripts/check-prebuilt --nvidia` and `--catalogue` also
+passed on a `git archive` export of `781d7ce6` (29 and 26 expected local
+builds, nothing else). No file under `nix/` or `lifecycle/` changed since
+1.0.6, so the kernel, early-boot image and login screen are unchanged and the
+update is designed to install without a restart; a 1.0.6 to 1.0.7 update was
+not run.
+
 ## Not exercised
 
 - Wiz's history on the installed desktop: qualification does not sign in an
