@@ -222,6 +222,7 @@ var NOTE_CLAUDE_EFFORTS = NOTE_CLAUDE_EFFORT_CHOICES.map(
 var ASSISTANT_AGENTS = ["auto", "claude", "codex"];
 var ASSISTANT_CLAUDE_MODELS = ["default"].concat(NOTE_CLAUDE_MODELS);
 var ASSISTANT_CODEX_MODELS = ["default"].concat(NOTE_CODEX_MODELS);
+var ASSISTANT_HISTORY = ["month", "forever", "session"];
 
 // Group kinds that rest on a visible pill fill rather than transparent
 // furniture. Cluster.qml reads this so the decision lives beside the map.
@@ -490,6 +491,9 @@ function defaults() {
         // Off until enabled: the screen button attaches a screenshot only
         // to the question it was pressed for.
         assistantScreenContext: false,
+        // How long Wiz keeps conversations (cybexos_assistant/history.py):
+        // "month" (30 days), "forever", or "session" (never saved to disk).
+        assistantHistory: "month",
         // Where the character was left. Runtime state, persisted so a shell
         // reload or a new session finds it there; -1 is the default corner.
         assistantShown: false,
@@ -1517,6 +1521,7 @@ function merge(raw, context) {
             d.assistantCodexModel),
         assistantSpeak: boolIn(parsed.assistantSpeak, d.assistantSpeak),
         assistantScreenContext: boolIn(parsed.assistantScreenContext, d.assistantScreenContext),
+        assistantHistory: enumIn(parsed.assistantHistory, ASSISTANT_HISTORY, d.assistantHistory),
         assistantShown: boolIn(parsed.assistantShown, d.assistantShown),
         assistantScreen: textIn(parsed.assistantScreen, 64, d.assistantScreen),
         assistantX: intIn(parsed.assistantX, -1, 32768, 1, d.assistantX),

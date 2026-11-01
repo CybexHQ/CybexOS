@@ -84,14 +84,24 @@ ShellRoot {
             Assistant.toggleShown(Screens.focused ? Screens.focused.name : "");
         }
 
-        // Opens the box with the keyboard, as a tap of Super+I does.
+        // Opens the box with the keyboard, as a tap of Super+I does: a new
+        // conversation unless the last one still needs you.
         function compose(): void {
-            Assistant.openComposer(true);
+            Assistant.openFresh(true);
         }
 
+        // A question of its own, in a new conversation.
         function ask(text: string): void {
-            Assistant.openComposer(false);
-            Assistant.send(text);
+            Assistant.ask(text);
+        }
+
+        // The conversation history in the box, and one conversation from it.
+        function history(): void {
+            Assistant.openHistory();
+        }
+
+        function open(id: string): void {
+            Assistant.openConversation(id);
         }
 
         // "Check this computer": the question that starts from `cybex doctor`.
@@ -108,7 +118,10 @@ ShellRoot {
                 authChecking: Assistant.authChecking, hasDraft: Assistant.draft.trim() !== "",
                 x: Settings.assistantX, y: Settings.assistantY, size: Assistant.characterSize,
                 turn: Assistant.turn ? Assistant.turn.status : "", pose: Assistant.pose,
-                composing: Assistant.composing, listening: Assistant.listening});
+                composing: Assistant.composing, listening: Assistant.listening,
+                historyOpen: Assistant.historyOpen, continuing: Assistant.continuing,
+                conversations: Assistant.conversations.length,
+                turnConversation: Assistant.turn ? Assistant.turn.conversation || "" : ""});
         }
     }
 

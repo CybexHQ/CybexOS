@@ -471,14 +471,15 @@ test("Ask Wiz closes the launcher, then asks as Super+I and Enter would", () => 
     assert.match(timer, /interval: Theme\.launcherFadeOutDuration \+ 40/);
     assert.match(timer,
         /ProviderHelpers\.askHandoff\(root\.pendingQuestion,\s*root\.assistantState\(\)\);\s*root\.pendingQuestion = "";/);
-    // The same two calls as the assistant's `ask` IPC; send() itself keeps
-    // the question behind the sign-in prompt when no agent is signed in.
+    // The same call as the assistant's `ask` IPC: a new conversation, and
+    // send() itself keeps the question behind the sign-in prompt when no
+    // agent is signed in.
     assert.match(timer,
-        /handoff\.mode === "send"\) \{[^}]*Assistant\.openComposer\(false\);\s*Assistant\.send\(handoff\.text\);/);
+        /handoff\.mode === "send"\) \{[^}]*Assistant\.ask\(handoff\.text\);/);
     assert.match(shell,
-        /function ask\(text: string\): void \{\s*Assistant\.openComposer\(false\);\s*Assistant\.send\(text\);/);
+        /function ask\(text: string\): void \{\s*Assistant\.ask\(text\);/);
     assert.match(timer,
-        /handoff\.mode === "draft"\) \{\s*Assistant\.draft = handoff\.text;\s*Assistant\.openComposer\(true\);/);
+        /handoff\.mode === "draft"\) \{[^}]*Assistant\.draft = handoff\.text;\s*Assistant\.openFresh\(true\);/);
     // Nothing about the screen is attached on the launcher's behalf.
     assert.doesNotMatch(ask, /attachScreen|askAboutScreen|screenPath|screenshot/);
 });

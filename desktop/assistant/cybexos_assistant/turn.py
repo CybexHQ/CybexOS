@@ -22,9 +22,11 @@ def classify(error):
 
 class Turn:
     def __init__(self, identifier, agent, prompt, home, memory, publish, screenshot=False,
-                 approval_policy="always"):
+                 approval_policy="always", conversation=None):
         self.id = identifier
         self.agent = agent
+        # The history entry this question belongs to (history.py).
+        self.conversation = conversation
         self.prompt = prompt
         self.status = "running"
         self.step = "Thinking"
@@ -57,7 +59,7 @@ class Turn:
             "approvals": [entry["card"] for entry in self._approvals.values()],
             "startedAt": self.started_at, "finishedAt": self.finished_at, "undo": list(self.undo),
             "plugins": list(self.plugins), "staged": self.staged, "screenshot": self.screenshot,
-            "resumable": resumable,
+            "resumable": resumable, "conversation": self.conversation,
         }
 
     def updated(self):

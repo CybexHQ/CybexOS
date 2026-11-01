@@ -4,6 +4,8 @@
 AssistantApproval AssistantApproval.qml
 AssistantButton AssistantButton.qml
 AssistantComposer AssistantComposer.qml
+AssistantConversationRow AssistantConversationRow.qml
+AssistantHistory AssistantHistory.qml
 AssistantReply AssistantReply.qml
 AssistantSetup AssistantSetup.qml
 AssistantSurface AssistantSurface.qml

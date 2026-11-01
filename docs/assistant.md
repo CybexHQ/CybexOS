@@ -40,6 +40,33 @@ listen or speak unless asked to for one question.
 - **Ask** by hovering the character, or tap `Super+I`, then type and press
   Enter. Hovering opens the box without taking the keyboard; clicking it or
   the shortcut does.
+- **Each box is a conversation.** Clicking the character, tapping `Super+I`,
+  Ask Wiz in the launcher and `cybex assistant ask` start a new conversation
+  once the box has closed (a click elsewhere, `Esc`, the close button or the
+  menubar button). The exception keeps an answer from getting lost: while a
+  question is still running or waiting for your answer, or its answer has not
+  been seen, Wiz opens that one instead. Hovering opens the box as it was
+  left. **Reply** under an answer, or a conversation picked from History,
+  continues it.
+- **History.** The new box lists your three most recent conversations under
+  the suggestions (fewer when the screen has no room); **History** opens them
+  all in the box, grouped by day and searchable across questions and
+  answers. A conversation still running says **Working**, one waiting for
+  you **Your move**. Picking one shows its questions and answers above the
+  field; what you type continues it with the agent it started with, even if
+  Settings now prefers the other. Its **⋯** button offers **Continue in a
+  terminal**, **Copy conversation**, **New conversation** and **Delete
+  conversation**. History can be read while Wiz works on another question
+  (the clock button on the working pill); a new question waits until he is
+  free.
+- **Deleting and clearing.** Hovering a row in History shows its delete
+  button; the conversation goes at once and **Undo** brings it back until the
+  box closes or another is deleted. **Clear history…** asks once, inside the
+  box, and removes every conversation, stopping one still running (a change
+  it already staged stays in Software Update). Only Wiz's history is
+  cleared: Claude Code's and Codex's own session files stay, so their own
+  `--resume` lists are untouched. Settings → Assistant → Conversations shows
+  the count and opens or clears the history too.
 - **Ask Wiz from the launcher.** When what you type in the launcher
   (`Super+Space`) matches no app or action, its one row is **Ask Wiz**, with
   your words quoted under him. Enter or a click closes the launcher and asks
@@ -61,7 +88,8 @@ listen or speak unless asked to for one question.
 - **Replies** stay under the character until closed. Copy, Reply (continue the
   conversation), Speak, Undo (when it changed preferences or files), and
   Continue in a terminal (opens the same Claude Code or Codex session in
-  Kitty, for longer coding work) appear under a reply.
+  Kitty, for longer coding work) appear under a reply. Undo belongs to the
+  latest answer only, so an older one can never overwrite later edits.
 - **From a terminal**, `cybex assistant ask "…"` asks the same assistant and
   prints the reply. With **Ask first** selected, approval cards appear on screen.
   `cybex assistant status` prints the service's state as JSON.
@@ -117,6 +145,7 @@ Settings → Assistant, stored in `~/.config/cybexos/shell.json`:
 | `assistantCodexModel` | `default`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` | `default` |
 | `assistantSpeak` | spoken replies | `false` |
 | `assistantScreenContext` | offer the screen button | `false` |
+| `assistantHistory` | keep conversations: `month` (30 days), `forever`, `session` (until you log out; nothing saved) | `month` |
 | `assistantShown` | the character is on screen | `false` |
 | `assistantScreen`, `assistantX`, `assistantY` | where it was left | primary display, top right |
 
@@ -236,9 +265,18 @@ the shortcut and the service; nothing in `shell.json` is lost.
   surface, the character, the composer, the working pill and the reply card.
 - `desktop/quickshell/Bar/Modules/Assistant.qml` — the menubar button.
 
-State lives in `~/.local/state/cybexos/assistant/state.json` (the current
-conversation id per agent and the last finished reply). Screenshots live in
-`$XDG_RUNTIME_DIR/cybexos/assistant/` only for the question that used them.
+State lives in `~/.local/state/cybexos/assistant/`: `state.json` keeps the
+last answer for the box (only while its conversation exists and
+conversations are saved), and `conversations/<id>.json` (directory `0700`,
+files `0600`, `history.py`) holds one conversation each: its agent, the
+agent's session id, its title (the first question) and every question with
+its answer, status and times. Screenshots and approval cards are never
+stored; screenshots live in `$XDG_RUNTIME_DIR/cybexos/assistant/` only for
+the question that used them. The service applies `assistantHistory` when it
+starts and whenever it lists conversations: with `month` it forgets
+conversations untouched for 30 days, with `session` it removes the stored
+files and keeps conversations in memory only. At most 500 are kept, the
+oldest going first. Clearing removes the files and the kept answer.
 
 ### Protocol
 
@@ -250,15 +288,19 @@ Requests:
 
 | Method | Params | Result |
 | --- | --- | --- |
-| `hello` | `{client, protocol: 1}` | `{protocol, agents, turn, conversation, speech}` |
+| `hello` | `{client, protocol: 1}` | `{protocol, agents, turn, conversations, speech}` |
 | `auth.status` | `{}` | `{agents}` — refresh installation/sign-in status |
 | `auth.login` | `{agent: "claude" \| "codex"}` | `{argv, cwd}` — the agent's own login command, which the shell runs in the background |
-| `turn.start` | `{text, agent, model?, screenshot?, context?}` | `{turn}`; error `-32001` while a turn runs |
+| `turn.start` | `{text, agent, model?, conversation?, screenshot?, context?}` | `{turn}`; error `-32001` while a turn runs, `-32002` for a conversation no longer in the history. Without `conversation` the question starts a new one; with it, it continues that conversation with its own agent |
 | `turn.stop` | `{}` | `{stopped}` |
 | `approval.respond` | `{id, decision: "allow" \| "always" \| "deny"}` | `{ok}` |
 | `turn.undo` | `{id}` | `{restored: [path], skipped: [path]}` |
-| `conversation.reset` | `{}` | `{ok}` |
-| `conversation.handoff` | `{}` | `{argv, cwd}` — the terminal command that resumes the session |
+| `conversation.list` | `{query?}` | `{conversations: [summary]}`, newest first; `query` matches titles, questions and answers without case |
+| `conversation.open` | `{id}` | `{conversation}`: the summary with `turns` (`id, prompt, text, status, error, errorKind, startedAt, finishedAt`) and `resumable` |
+| `conversation.delete` | `{id}` | `{ok}`; stops its running question first |
+| `conversation.restore` | `{id}` | `{conversation: summary}` — the one deleted last only |
+| `conversation.clear` | `{}` | `{ok}`; stops a running question, removes every conversation and the kept answer |
+| `conversation.handoff` | `{id?}` | `{argv, cwd}` — the terminal command that resumes that conversation's session (default: the latest answer's) |
 | `speech.say` | `{text, language?}` | `{id, sentences}` |
 | `speech.stop` | `{}` | `{ok}` |
 
@@ -279,7 +321,11 @@ the same for every turn.
 
 Notifications:
 
-- `turn.updated {turn}` — a complete snapshot after any change except text.
+- `turn.updated {turn}` — a complete snapshot after any change except text;
+  `null` after the history was cleared.
+- `conversations.updated {conversations}` — the summaries after a question
+  starts or finishes, or a conversation is deleted, restored, cleared or
+  pruned.
 - `agents.updated {agents}` — refreshed installation/sign-in status.
 - `turn.delta {id, text}` — reply text appended while streaming.
 - `speech.progress {id, index}`, `speech.done {id, status}`.
@@ -306,13 +352,29 @@ A turn snapshot:
   "plugins": [{"id": "personal.cputemp", "name": "CPU temperature"}],
   "staged": "8f3a2c…",
   "screenshot": false,
-  "resumable": true
+  "resumable": true,
+  "conversation": "c-5d1e…"
+}
+```
+
+A conversation summary:
+
+```json
+{
+  "id": "c-5d1e…",
+  "agent": "claude",
+  "title": "Why is my Wi-Fi dropping after suspend?",
+  "preview": "Power saving turns back on when the card resumes…",
+  "status": "completed",
+  "turns": 2,
+  "createdAt": 1761223000000,
+  "updatedAt": 1761223400000
 }
 ```
 
 `ready` (apply cards only) is true when the lifecycle status shows that
 transaction built and checked. Errors: `-32001` busy, `-32002` no such
-pending approval or nothing to undo, `-32003` nothing to resume, `-32602`
+pending approval, nothing to undo, or no such conversation, `-32003` nothing to resume, `-32602`
 invalid params (including a screenshot outside
 `$XDG_RUNTIME_DIR/cybexos/assistant/`, which the service creates `0700` and
 empties when it starts), `-32601` unknown method.

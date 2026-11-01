@@ -854,11 +854,12 @@ Singleton {
             root.pendingQuestion = "";
             if (handoff.mode === "send") {
                 // What `cybexos-runtime ipc assistant ask` does.
-                Assistant.openComposer(false);
-                Assistant.send(handoff.text);
+                Assistant.ask(handoff.text);
             } else if (handoff.mode === "draft") {
+                // A new conversation's question, waiting in the box until
+                // it can be sent.
                 Assistant.draft = handoff.text;
-                Assistant.openComposer(true);
+                Assistant.openFresh(true);
             }
         }
     }

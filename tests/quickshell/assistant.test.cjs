@@ -269,3 +269,62 @@ test("the installation feature carries the service, the agents and the menubar",
     assert.match(repo("lifecycle/cybexos/cli.py"), /for name in \('agent', 'assistant', 'backup', 'report', 'doctor'\):/);
     assert.match(read("Common/Settings.qml"), /readonly property bool assistantConfigured:\s*Quickshell\.env\("CYBEXOS_ASSISTANT"\) !== "0"/);
 });
+
+test("conversation history: day headings, time labels and live status", () => {
+    const now = new Date(2026, 10, 1, 14, 32).getTime();
+    const minutes = n => now - n * 60000;
+    const days = n => now - n * 24 * 3600000;
+    assert.equal(A.historyGroup(minutes(5), now), "today");
+    assert.equal(A.historyGroup(days(1), now), "yesterday");
+    assert.equal(A.historyGroup(days(4), now), "week");
+    assert.equal(A.historyGroup(days(9), now), "older");
+    assert.deepEqual(A.historyTime(now - 20000, now), { kind: "now", value: 0 });
+    assert.deepEqual(A.historyTime(minutes(2), now), { kind: "minutes", value: 2 });
+    assert.equal(A.historyTime(minutes(180), now).kind, "time");
+    assert.equal(A.historyTime(days(1), now).kind, "yesterday");
+    assert.equal(A.historyTime(days(3), now).kind, "weekday");
+    assert.equal(A.historyTime(days(30), now).kind, "date");
+    const rows = [{ id: "a", updatedAt: minutes(1) }, { id: "b", updatedAt: minutes(90) },
+        { id: "c", updatedAt: days(3) }, { id: "d", updatedAt: days(40) }];
+    assert.deepEqual(A.groupConversations(rows, now).map(group => [group.group, group.rows.map(row => row.id)]),
+        [["today", ["a", "b"]], ["week", ["c"]], ["older", ["d"]]], "empty headings are left out");
+    const row = { id: "a", status: "completed" };
+    assert.equal(A.liveStatus(row, { conversation: "a", status: "waiting" }), "waiting");
+    assert.equal(A.liveStatus(row, { conversation: "b", status: "running" }), "completed");
+    assert.equal(A.liveStatus(row, { conversation: "a", status: "failed" }), "completed",
+        "a finished turn is the list's own status");
+    assert.equal(A.RECENT_LIMIT, 3);
+    assert.equal(A.conversationText({ turns: [{ prompt: "Hi", text: "Hello.\n" },
+        { prompt: "Again", status: "failed", error: "Signed out" }] }), "> Hi\n\nHello.\n\n> Again\n\nSigned out");
+});
+
+test("a click opens a new conversation unless the last one still needs the person", () => {
+    assert.equal(A.opensLastConversation({}), false);
+    assert.equal(A.opensLastConversation({ busy: true }), true, "a question running or waiting");
+    assert.equal(A.opensLastConversation({ unread: true, hasReply: true }), true, "an answer not seen");
+    assert.equal(A.opensLastConversation({ unread: true, hasReply: false }), false);
+    const assistant = read("Common/Assistant.qml");
+    // A click, Super+I and the launcher open fresh; hovering opens the box as left.
+    assert.match(assistant, /function openFresh\(withFocus\) \{[\s\S]*?if \(AssistantHelpers\.opensLastConversation\(\{ busy: busy, unread: unread, hasReply: hasReply \}\)\) \{[\s\S]*?return;\s*\}\s*startNew\(\);\s*openComposer\(withFocus\);/);
+    assert.match(assistant, /else\s*openFresh\(true\);\s*\}\s*\/\/ Continues the conversation of the answer on screen\./,
+        "characterClicked opens fresh when the box is closed");
+    assert.match(assistant, /function toggleComposer\(\) \{[\s\S]*?else\s*openFresh\(true\);\s*\}/);
+    assert.match(assistant, /function ask\(text\) \{[\s\S]*?startNew\(\);/);
+    const window = read("AssistantWindow.qml");
+    assert.match(window, /hoverDwell[\s\S]*?Assistant\.openComposer\(false\)/);
+    assert.doesNotMatch(window, /Assistant\.(?:startNew|openFresh)\(/, "hovering never resets the conversation");
+    // The question names the conversation it continues; "" starts a new one.
+    assert.match(assistant, /conversation: continued,/);
+    assert.match(assistant, /case "conversations\.updated":\s*adoptConversations\(params\.conversations \|\| \[\]\);/);
+    // History is a box view, closed by a click elsewhere, with the keyboard for its search.
+    assert.match(window, /readonly property bool showHistory: Assistant\.historyOpen/);
+    assert.match(window, /showComposer \|\| showHistory \|\| \(showWorking && Assistant\.waiting\)/);
+    assert.match(window, /Assistant\.focusLost\(\);/);
+    // Clearing asks first; deleting one offers Undo.
+    const history = read("Assistant/AssistantHistory.qml");
+    assert.match(history, /onTriggered: Assistant\.confirmingClear = true/);
+    assert.match(history, /objectName: "assistantClearHistory"[\s\S]*?onTriggered: Assistant\.clearHistory\(\)/);
+    assert.match(history, /onTriggered: Assistant\.undoDelete\(\)/);
+    assert.match(read("Settings/AssistantPage.qml"), /settingKey: "assistantHistory"/);
+    assert.match(repo("desktop/assistant/cybexos_assistant/history.py"), /RETENTION = \("month", "forever", "session"\)/);
+});

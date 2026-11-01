@@ -145,6 +145,50 @@ SettingsPage {
 
         SettingsGroup {
             width: parent.width
+            title: I18n.tr("Conversations")
+
+            PickerRow {
+                width: parent.width
+                label: I18n.tr("Keep conversations")
+                settingKey: "assistantHistory"
+                model: [
+                    { value: "month", label: I18n.tr("30 days") },
+                    { value: "forever", label: I18n.tr("Forever") },
+                    { value: "session", label: I18n.tr("Don’t save") }
+                ]
+            }
+            SettingsHint {
+                width: parent.width
+                text: Settings.assistantHistory === "session"
+                    ? I18n.tr("Conversations last until you log out. Nothing is saved on this computer.")
+                    : I18n.tr("Conversations are saved in your home folder. Clearing them leaves Claude Code’s and Codex’s own sessions alone.")
+            }
+            ValueRow {
+                width: parent.width
+                label: I18n.tr("History")
+                value: !Assistant.connected ? I18n.tr("The assistant service is not running")
+                    : Assistant.conversations.length === 0 ? I18n.tr("No conversations yet")
+                    : Assistant.conversations.length === 1 ? I18n.tr("1 conversation")
+                    : I18n.format("%1 conversations", [Assistant.conversations.length])
+
+                SettingsAction {
+                    text: I18n.tr("Open")
+                    enabled: Assistant.connected
+                    onTriggered: Assistant.openHistory()
+                }
+                SettingsAction {
+                    text: I18n.tr("Clear…")
+                    enabled: Assistant.connected && Assistant.conversations.length > 0
+                    onTriggered: {
+                        Assistant.openHistory();
+                        Assistant.confirmingClear = true;
+                    }
+                }
+            }
+        }
+
+        SettingsGroup {
+            width: parent.width
             title: I18n.tr("Voice and screen")
 
             SwitchRow {

@@ -43,8 +43,15 @@ log = Path(os.environ["FAKE_LOG"])
 with log.open("a") as stream:
     stream.write(json.dumps({"agent": "claude", "argv": sys.argv[1:]}) + "\n")
 args = sys.argv[1:]
-session = args[args.index("--resume") + 1] if "--resume" in args else "sess-1"
 home = Path(os.environ["HOME"])
+if "--resume" in args:
+    session = args[args.index("--resume") + 1]
+else:
+    # A new session each time: sess-1, sess-2, …
+    counter = home / ".fake-claude-sessions"
+    number = int(counter.read_text()) + 1 if counter.exists() else 1
+    counter.write_text(str(number))
+    session = f"sess-{number}"
 if session == "gone":
     sys.stderr.write("No conversation found with session ID: gone\n")
     sys.exit(1)
@@ -153,6 +160,7 @@ if sys.argv[1:] == ['login']:
 log = Path(os.environ["FAKE_LOG"])
 home = Path(os.environ["HOME"])
 counter = [100]
+thread = ["th-1"]
 
 def emit(message):
     sys.stdout.write(json.dumps(message) + "\n")
@@ -181,11 +189,11 @@ def notify(method, params):
     emit({"method": method, "params": params})
 
 def final(text, status="completed"):
-    notify("item/started", {"threadId": "th-1", "turnId": "tu-1", "item": {"type": "agentMessage", "id": "m2", "text": ""}})
-    notify("item/agentMessage/delta", {"threadId": "th-1", "turnId": "tu-1", "itemId": "m2", "delta": text})
-    notify("item/completed", {"threadId": "th-1", "turnId": "tu-1",
+    notify("item/started", {"threadId": thread[0], "turnId": "tu-1", "item": {"type": "agentMessage", "id": "m2", "text": ""}})
+    notify("item/agentMessage/delta", {"threadId": thread[0], "turnId": "tu-1", "itemId": "m2", "delta": text})
+    notify("item/completed", {"threadId": thread[0], "turnId": "tu-1",
                               "item": {"type": "agentMessage", "id": "m2", "text": text, "phase": "final_answer"}})
-    notify("turn/completed", {"threadId": "th-1", "turn": {"id": "tu-1", "status": status, "error": None, "items": []}})
+    notify("turn/completed", {"threadId": thread[0], "turn": {"id": "tu-1", "status": status, "error": None, "items": []}})
 
 note({"agent": "codex", "argv": sys.argv[1:]})
 while True:
@@ -194,43 +202,49 @@ while True:
     note({"method": method, "params": params, "jsonrpc": "jsonrpc" in message})
     if method == "initialize":
         emit({"id": identifier, "result": {"userAgent": "fake", "codexHome": str(home), "platformFamily": "unix", "platformOs": "linux"}})
-    elif method in ("thread/start", "thread/resume"):
-        emit({"id": identifier, "result": {"thread": {"id": params.get("threadId", "th-1")}}})
+    elif method == "thread/resume":
+        emit({"id": identifier, "result": {"thread": {"id": params["threadId"]}}})
+    elif method == "thread/start":
+        threads = home / ".fake-codex-threads"
+        number = int(threads.read_text()) + 1 if threads.exists() else 1
+        threads.write_text(str(number))
+        emit({"id": identifier, "result": {"thread": {"id": f"th-{number}"}}})
     elif method == "turn/interrupt":
         emit({"id": identifier, "result": {}})
-        notify("turn/completed", {"threadId": "th-1", "turn": {"id": "tu-1", "status": "interrupted", "error": None, "items": []}})
+        notify("turn/completed", {"threadId": thread[0], "turn": {"id": "tu-1", "status": "interrupted", "error": None, "items": []}})
     elif method == "turn/start":
+        thread[0] = params["threadId"]
         emit({"id": identifier, "result": {"turn": {"id": "tu-1", "status": "inProgress", "items": []}}})
         text = params["input"][0]["text"]
-        notify("turn/started", {"threadId": "th-1", "turn": {"id": "tu-1"}})
-        notify("item/started", {"threadId": "th-1", "turnId": "tu-1", "item": {"type": "agentMessage", "id": "m1", "text": ""}})
-        notify("item/agentMessage/delta", {"threadId": "th-1", "turnId": "tu-1", "itemId": "m1", "delta": "Let me look."})
-        notify("item/completed", {"threadId": "th-1", "turnId": "tu-1",
+        notify("turn/started", {"threadId": thread[0], "turn": {"id": "tu-1"}})
+        notify("item/started", {"threadId": thread[0], "turnId": "tu-1", "item": {"type": "agentMessage", "id": "m1", "text": ""}})
+        notify("item/agentMessage/delta", {"threadId": thread[0], "turnId": "tu-1", "itemId": "m1", "delta": "Let me look."})
+        notify("item/completed", {"threadId": thread[0], "turnId": "tu-1",
                                   "item": {"type": "agentMessage", "id": "m1", "text": "Let me look.", "phase": "commentary"}})
         if "command" in text:
-            notify("item/started", {"threadId": "th-1", "turnId": "tu-1",
+            notify("item/started", {"threadId": thread[0], "turnId": "tu-1",
                                     "item": {"type": "commandExecution", "id": "c1", "command": "rm -rf ~/x"}})
             result = request("item/commandExecution/requestApproval",
-                             {"threadId": "th-1", "turnId": "tu-1", "itemId": "c1", "command": "rm -rf ~/x",
+                             {"threadId": thread[0], "turnId": "tu-1", "itemId": "c1", "command": "rm -rf ~/x",
                               "cwd": str(home), "reason": "Clean up", "startedAtMs": 0, "kind": "command", "environmentId": None})
             final("decision:" + result["decision"])
         elif "permissions" in text:
             result = request("item/permissions/requestApproval", {
-                "threadId": "th-1", "turnId": "tu-1", "reason": "Read project files",
+                "threadId": thread[0], "turnId": "tu-1", "reason": "Read project files",
                 "permissions": {"network": {"enabled": True}, "fileSystem": {"read": [str(home)]}}})
             final(json.dumps(result))
         elif "edit" in text:
             target = home / ("notes.txt" if "ordinary" in text else ".config/cybexos/shell.json")
-            notify("item/started", {"threadId": "th-1", "turnId": "tu-1", "item": {
+            notify("item/started", {"threadId": thread[0], "turnId": "tu-1", "item": {
                 "type": "fileChange", "id": "f1", "status": "inProgress",
                 "changes": [{"path": str(target), "kind": {"type": "update", "move_path": None}, "diff": "-a\n+b"}]}})
             result = request("item/fileChange/requestApproval",
-                             {"threadId": "th-1", "turnId": "tu-1", "itemId": "f1", "startedAtMs": 0})
+                             {"threadId": thread[0], "turnId": "tu-1", "itemId": "f1", "startedAtMs": 0})
             if result["decision"] == "accept":
                 target.write_text("{}\n")
             final("decision:" + result["decision"])
         elif "elicit" in text:
-            result = request("mcpServer/elicitation/request", {"threadId": "th-1", "turnId": "tu-1",
+            result = request("mcpServer/elicitation/request", {"threadId": thread[0], "turnId": "tu-1",
                              "serverName": "x", "mode": "url", "message": "m", "url": "u", "elicitationId": "e", "_meta": None})
             final("elicitation:" + result["action"])
         elif "hang" in text:
@@ -806,7 +820,10 @@ class ClaudeTest(ServiceTest):
         finally:
             await second.close()
         self.assertEqual((hello["turn"]["id"], hello["turn"]["text"]), (turn["id"], "Hello world"))
-        self.assertEqual(hello["conversation"], {"agent": "claude", "resumable": True})
+        self.assertEqual(hello["turn"]["conversation"], turn["conversation"])
+        [row] = hello["conversations"]
+        self.assertEqual((row["id"], row["agent"], row["title"], row["preview"], row["status"], row["turns"]),
+                         (turn["conversation"], "claude", "Hi there", "Hello world", "completed", 1))
         argv = self.harness.entries()[0]["argv"]
         for flag in ("-p", "--permission-prompt-tool", "--include-partial-messages", "--append-system-prompt"):
             self.assertIn(flag, argv)
@@ -925,7 +942,7 @@ class ClaudeTest(ServiceTest):
         self.assertEqual((await self.client.call("nope"))["error"]["code"], -32601)
 
     async def test_resume_after_restart(self):
-        await self.ask("Hi")
+        first = await self.ask("Hi")
         await self.client.finished()
         await self.client.close()
         await self.harness.stop()
@@ -933,42 +950,60 @@ class ClaudeTest(ServiceTest):
         self.assertEqual(server.turn.status, "completed")
         self.client = await Client().open(self.harness.socket)
         hello = await self.client.result("hello")
-        self.assertEqual((hello["turn"]["text"], hello["conversation"]["resumable"]), ("Hello world", True))
-        await self.ask("Hi again")
+        self.assertEqual((hello["turn"]["text"], hello["turn"]["resumable"]), ("Hello world", True))
+        self.assertEqual([row["id"] for row in hello["conversations"]], [first["conversation"]])
+        again = await self.ask("Hi again", conversation=first["conversation"])
+        self.assertEqual(again["conversation"], first["conversation"])
         await self.client.finished()
         argv = self.harness.entries()[-1]["argv"]
         self.assertEqual(argv[argv.index("--resume") + 1], "sess-1")
-        await self.client.result("conversation.reset")
-        hello = await self.client.result("hello")
-        self.assertIsNone(hello["conversation"])
-        self.assertFalse(hello["turn"]["resumable"])
+        # Without a conversation, a question starts a new one.
+        self.client.notifications.clear()
+        fresh = await self.ask("Hi there")
+        self.assertNotEqual(fresh["conversation"], first["conversation"])
+        await self.client.finished()
+        self.assertNotIn("--resume", self.harness.entries()[-1]["argv"])
+
+    def conversation_file(self, record):
+        directory = self.harness.state / "conversations"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / (record["id"] + ".json")
+        path.write_text(json.dumps(record))
+        return path
 
     async def test_a_lost_session_starts_over(self):
         await self.client.close()
         await self.harness.stop()
-        self.harness.state.mkdir(parents=True, exist_ok=True)
-        (self.harness.state / "state.json").write_text(json.dumps(
-            {"version": 1, "conversation": {"agent": "claude", "claude": "gone"}, "turn": None}))
+        self.conversation_file({"id": "c-" + "1" * 16, "agent": "claude", "session": "gone", "title": "Old",
+                                "createdAt": 1, "updatedAt": 2 ** 50,
+                                "turns": [{"id": "t-1", "prompt": "Old", "text": "x", "status": "completed"}]})
         server = await self.harness.start()
         self.client = await Client().open(self.harness.socket)
-        await self.ask("Hi")
+        await self.ask("Hi", conversation="c-" + "1" * 16)
         done = await self.client.finished()
         self.assertEqual((done["status"], done["text"]), ("completed", "Hello world"))
-        self.assertEqual(server.conversation["claude"], "sess-1")
+        self.assertEqual(server.history.get("c-" + "1" * 16)["session"], "sess-1")
         self.assertEqual([entry["argv"].count("--resume") for entry in self.harness.entries()], [1, 0])
 
     async def test_running_turn_is_failed_after_a_restart(self):
         await self.client.close()
         await self.harness.stop()
+        identifier = "c-" + "2" * 16
+        stored = {"id": "t-1", "agent": "claude", "prompt": "p", "status": "running", "text": "half",
+                  "conversation": identifier, "undo": ["~/.config/cybexos/shell.json"]}
+        self.conversation_file({"id": identifier, "agent": "claude", "session": "sess-9", "title": "p",
+                                "createdAt": 1, "updatedAt": 2 ** 50, "turns": [stored]})
         state = self.harness.state / "state.json"
-        state.write_text(json.dumps({"version": 1, "conversation": {"agent": "claude", "claude": "sess-9"},
-                                     "turn": {"id": "t-1", "agent": "claude", "prompt": "p", "status": "running",
-                                              "text": "half", "undo": ["~/.config/cybexos/shell.json"]}}))
+        state.write_text(json.dumps({"version": 2, "turn": stored}))
         server = await self.harness.start()
         self.client = await Client().open(self.harness.socket)
-        turn = (await self.client.result("hello"))["turn"]
+        hello = await self.client.result("hello")
+        turn = hello["turn"]
         self.assertEqual((turn["status"], turn["error"], turn["undo"]), ("failed", RESTARTED, []))
-        self.assertEqual(server.conversation["claude"], "sess-9")
+        self.assertEqual((turn["conversation"], turn["resumable"]), (identifier, True))
+        self.assertEqual(hello["conversations"][0]["status"], "failed")
+        self.assertEqual(server.history.get(identifier)["session"], "sess-9")
+        await self.harness.stop()
         self.assertEqual(state.stat().st_mode & 0o777, 0o600)
 
 
@@ -1020,6 +1055,154 @@ class CodexTest(ServiceTest):
         await self.ask("image", screenshot=str(shot))
         self.assertEqual((await self.client.finished())["text"], "image:yes")
         self.assertFalse(shot.exists())
+
+
+class HistoryTest(ServiceTest):
+    """Conversations: one per box, continued by id, listed, searched,
+    deleted with Undo and cleared (docs/assistant.md)."""
+
+    def stored(self):
+        directory = self.harness.state / "conversations"
+        return sorted(path.stem for path in directory.glob("c-*.json")) if directory.is_dir() else []
+
+    def settings(self, **values):
+        path = self.harness.home / ".config/cybexos/shell.json"
+        settings = json.loads(path.read_text())
+        settings.update(values)
+        path.write_text(json.dumps(settings))
+
+    async def answer(self, text, **params):
+        self.client.notifications.clear()
+        turn = await self.ask(text, **params)
+        return turn, await self.client.finished()
+
+    async def test_each_box_is_a_conversation_continued_by_id(self):
+        first, _ = await self.answer("Hi")
+        second, _ = await self.answer("Hello there")
+        self.assertNotEqual(first["conversation"], second["conversation"])
+        listed = (await self.client.result("conversation.list"))["conversations"]
+        self.assertEqual([row["id"] for row in listed], [second["conversation"], first["conversation"]])
+        self.assertEqual(sorted([first["conversation"], second["conversation"]]), self.stored())
+        stored = json.loads((self.harness.state / "conversations" / (first["conversation"] + ".json")).read_text())
+        self.assertEqual((stored["session"], stored["title"]), ("sess-1", "Hi"))
+        self.assertEqual(stored, {**stored, "agent": "claude"})
+        mode = (self.harness.state / "conversations").stat().st_mode & 0o777
+        self.assertEqual(mode, 0o700)
+        # Continuing the first resumes its own session, in a new process.
+        again, done = await self.answer("And again", conversation=first["conversation"])
+        self.assertEqual((again["conversation"], done["resumable"]), (first["conversation"], True))
+        argv = self.harness.entries()[-1]["argv"]
+        self.assertEqual(argv[argv.index("--resume") + 1], "sess-1")
+        update = await self.client.until(lambda m: m["method"] == "conversations.updated")
+        self.assertEqual(update["params"]["conversations"][0]["id"], first["conversation"],
+                         "a continued conversation moves to the top")
+        opened = (await self.client.result("conversation.open", {"id": first["conversation"]}))["conversation"]
+        self.assertEqual([(turn["prompt"], turn["text"]) for turn in opened["turns"]],
+                         [("Hi", "Hello world"), ("And again", "Hello world")])
+        self.assertEqual((opened["title"], opened["turns"][-1]["status"], opened["resumable"]),
+                         ("Hi", "completed", True))
+        handoff = await self.client.result("conversation.handoff", {"id": second["conversation"]})
+        self.assertEqual(handoff["argv"][1:], ["--resume", "sess-2"])
+        for params in ({"id": "c-" + "f" * 16}, {"id": 3}, {}):
+            self.assertEqual((await self.client.call("conversation.open", params))["error"]["code"], -32002)
+        missing = await self.client.call("turn.start", {"text": "x", "conversation": "c-" + "f" * 16})
+        self.assertEqual(missing["error"]["code"], -32002)
+        invalid = await self.client.call("turn.start", {"text": "x", "conversation": 7})
+        self.assertEqual(invalid["error"]["code"], -32602)
+
+    async def test_a_conversation_keeps_its_agent(self):
+        codex, _ = await self.answer("Hello", agent="codex")
+        again, done = await self.answer("More", agent="claude", conversation=codex["conversation"])
+        self.assertEqual((again["agent"], done["text"]), ("codex", "Hi there"))
+        methods = lambda name: [entry["params"] for entry in self.harness.entries() if entry.get("method") == name]
+        self.assertEqual((len(methods("thread/start")), methods("turn/start")[-1]["threadId"]), (1, "th-1"))
+        # Another Codex conversation, then back: its own thread is resumed.
+        await self.answer("Something else", agent="codex")
+        self.assertEqual(methods("turn/start")[-1]["threadId"], "th-2")
+        await self.answer("Back", conversation=codex["conversation"])
+        self.assertEqual(methods("thread/resume")[-1]["threadId"], "th-1")
+        self.assertEqual(methods("turn/start")[-1]["threadId"], "th-1")
+        # A running question shows its live status in the list.
+        self.client.notifications.clear()
+        running = await self.ask("hang", agent="codex", conversation=codex["conversation"])
+        await self.client.until(lambda m: m["method"] == "turn.delta")
+        row = (await self.client.result("conversation.list"))["conversations"][0]
+        self.assertEqual((row["id"], row["status"], row["turns"]), (running["conversation"], "running", 4))
+        opened = (await self.client.result("conversation.open", {"id": codex["conversation"]}))["conversation"]
+        self.assertEqual((opened["turns"][-1]["status"], opened["turns"][-1]["text"]), ("running", "Let me look."))
+        busy = await self.client.call("conversation.handoff", {"id": codex["conversation"]})
+        self.assertEqual(busy["error"]["code"], -32001)
+        await self.client.result("turn.stop")
+        await self.client.finished()
+
+    async def test_search_delete_with_undo_and_clear(self):
+        first, _ = await self.answer("Plan a trip echo me")
+        second, _ = await self.answer("Hi")
+        search = lambda query: self.client.result("conversation.list", {"query": query})
+        self.assertEqual([row["id"] for row in (await search("trip"))["conversations"]], [first["conversation"]])
+        self.assertEqual([row["id"] for row in (await search("WORLD"))["conversations"]],
+                         [second["conversation"]], "search covers the answers, without case")
+        self.assertEqual((await search("nothing like this"))["conversations"], [])
+        # Deleting one keeps it for Undo until another is deleted.
+        await self.client.result("conversation.delete", {"id": first["conversation"]})
+        self.assertEqual(self.stored(), [second["conversation"]])
+        restored = await self.client.result("conversation.restore", {"id": first["conversation"]})
+        self.assertEqual(restored["conversation"]["title"], "Plan a trip echo me")
+        self.assertEqual(sorted(self.stored()), sorted([first["conversation"], second["conversation"]]))
+        await self.client.result("conversation.delete", {"id": first["conversation"]})
+        await self.client.result("conversation.delete", {"id": second["conversation"]})
+        gone = await self.client.call("conversation.restore", {"id": first["conversation"]})
+        self.assertEqual(gone["error"]["code"], -32002)
+        # The last answer belonged to a deleted conversation: it is no longer
+        # kept on disk, and it can no longer be continued.
+        state = json.loads((self.harness.state / "state.json").read_text())
+        self.assertIsNone(state["turn"])
+        self.assertFalse((await self.client.result("hello"))["turn"]["resumable"])
+        await self.client.result("conversation.restore", {"id": second["conversation"]})
+        # Clearing stops a running question and removes every conversation.
+        self.client.notifications.clear()
+        await self.ask("hang around")
+        await self.client.until(lambda m: m["method"] == "turn.delta")
+        self.assertEqual(await self.client.result("conversation.clear"), {"ok": True})
+        await self.client.until(lambda m: m["method"] == "turn.updated" and m["params"]["turn"] is None)
+        await self.client.until(lambda m: m["method"] == "conversations.updated"
+                                and m["params"]["conversations"] == [])
+        hello = await self.client.result("hello")
+        self.assertEqual((hello["turn"], hello["conversations"]), (None, []))
+        self.assertEqual(self.stored(), [])
+        self.assertIsNone(json.loads((self.harness.state / "state.json").read_text())["turn"])
+        self.assertTrue((self.harness.home / ".fake-claude-sessions").exists(),
+                        "the agents' own session files are left alone")
+
+    async def test_retention(self):
+        old = {"id": "c-" + "3" * 16, "agent": "claude", "session": "sess-old", "title": "Old",
+               "createdAt": 1, "updatedAt": 1, "turns": [{"id": "t-1", "prompt": "Old", "text": "x",
+                                                          "status": "completed"}]}
+        await self.client.close()
+        await self.harness.stop()
+        directory = self.harness.state / "conversations"
+        directory.mkdir(parents=True)
+        (directory / (old["id"] + ".json")).write_text(json.dumps(old))
+        (directory / "c-nonsense.json").write_text("{")
+        self.settings(assistantHistory="forever")
+        await self.harness.start()
+        self.client = await Client().open(self.harness.socket)
+        self.assertEqual([row["title"] for row in (await self.client.result("hello"))["conversations"]], ["Old"])
+        # The default keeps 30 days.
+        self.settings(assistantHistory="unknown")
+        self.assertEqual((await self.client.result("conversation.list"))["conversations"], [])
+        self.assertNotIn(old["id"], self.stored())
+        # Not saved: kept while the service runs, never on disk.
+        self.settings(assistantHistory="session")
+        await self.client.result("conversation.list")
+        turn, _ = await self.answer("Hi")
+        self.assertEqual(self.stored(), [])
+        self.assertIsNone(json.loads((self.harness.state / "state.json").read_text())["turn"])
+        self.assertEqual(len((await self.client.result("conversation.list"))["conversations"]), 1)
+        # Saving again writes what is in memory.
+        self.settings(assistantHistory="month")
+        await self.client.result("conversation.list")
+        self.assertEqual(self.stored(), [turn["conversation"]])
 
 
 class CommandLineTest(ServiceTest):

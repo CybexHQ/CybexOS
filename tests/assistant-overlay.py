@@ -49,8 +49,18 @@ import json, os, sys, time
 from pathlib import Path
 
 args = sys.argv[1:]
-session = args[args.index("--resume") + 1] if "--resume" in args else "overlay-session"
 home = Path(os.environ["HOME"])
+if "--resume" in args:
+    session = args[args.index("--resume") + 1]
+else:
+    # A new session each time, as Claude Code starts one.
+    counter = home.parent / "claude-sessions"
+    number = int(counter.read_text()) + 1 if counter.exists() else 1
+    counter.write_text(str(number))
+    session = f"overlay-session-{number}"
+if args[:1] == ["-p"]:
+    with (home.parent / "claude-argv.jsonl").open("a") as stream:
+        stream.write(json.dumps(args) + "\n")
 signed_out = home / 'signed-out-claude'
 if args == ['auth', 'status']:
     sys.exit(int(signed_out.exists()))
@@ -220,7 +230,10 @@ class Session:
         launchers.mkdir()
         # A terminal, which the sign-in must not open.
         terminal = launchers / 'cybexos-apps'
+        # Only its terminal is recorded: the shell also asks it for the default
+        # applications (`cybexos-apps status`), which this fake declines.
         terminal.write_text(f'#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n'
+            'if sys.argv[1:2] != ["terminal"]:\n    sys.exit(1)\n'
             'Path(os.environ["HOME"]).joinpath("terminal-argv.json").write_text(json.dumps(sys.argv[1:]))\n'
             'command=sys.argv[sys.argv.index("--")+1:]\nos.execv(command[0], command)\n')
         terminal.chmod(0o700)
@@ -269,6 +282,8 @@ class Session:
     def ipc(self, *args):
         result = subprocess.run(["qs", "ipc", "-p", str(self.shell), "call", "assistant", *args],
                                 env=self.env, capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            print(f"qs ipc call assistant {' '.join(args)} failed: {result.stderr.strip()}", file=sys.stderr)
         return result.stdout.strip()
 
     def shell_state(self):
@@ -439,7 +454,8 @@ def main():
                          'automatic sign-in detection with the saved question')
             argv = json.loads((session.home / 'login-argv.json').read_text())
             assert argv == [str(session.base / 'claude'), 'auth', 'login'], argv
-            assert not (session.home / 'terminal-argv.json').exists(), 'the sign-in opened a terminal'
+            opened = session.home / 'terminal-argv.json'
+            assert not opened.exists(), f'the sign-in opened a terminal: {opened.read_text()}'
 
             # Send real compositor pointer events. Repeated movement must cover
             # the full distance despite the character's scale/rotation/mask.
@@ -523,7 +539,74 @@ def main():
             session.wait(lambda: json.loads(session.preferences.read_text()).get("assistantShown") is False,
                          "the hidden state to be saved")
             hello = session.call("hello", {"client": "overlay-test", "protocol": 1})["result"]
-            assert hello["conversation"] == {"agent": "claude", "resumable": True}, hello
+            assert hello["turn"]["resumable"] is True, hello
+            rows = hello["conversations"]
+            # Every question so far was asked in a box of its own: each is a
+            # conversation, newest first.
+            assert [row["title"] for row in rows] == [
+                "Create a CPU temperature widget", "Clean up my old downloads", "Clean up these downloads",
+                "Make the menubar transparent", "connect my printer"], rows
+
+            # History. Shown again, the character is clicked (Super+I's tap
+            # does the same): a new conversation, with the recent ones under
+            # the suggestions.
+            # `qs ipc call assistant show` lists the target instead of calling it.
+            session.ipc("toggle")
+            session.wait(lambda: session.shell_state().get("shown"), "the character to come back")
+            session.wait(lambda: session.shell_state().get("conversations") == len(rows), "the shell's list")
+            session.ipc("compose")
+            session.wait(lambda: (lambda s: s.get("composing") and s.get("continuing") == ""
+                                  and not s.get("historyOpen"))(session.shell_state()), "a new conversation")
+            session.screenshot("assistant-new-conversation.png")
+            session.ipc("history")
+            session.wait(lambda: session.shell_state().get("historyOpen"), "History")
+            session.screenshot("assistant-history.png")
+            # A conversation opened from History is shown and continued.
+            older = rows[2]
+            session.ipc("open", older["id"])
+            session.wait(lambda: (lambda s: s.get("composing") and s.get("continuing") == older["id"]
+                                  and not s.get("historyOpen"))(session.shell_state()), "the opened conversation")
+            session.screenshot("assistant-conversation.png")
+            session.press("Tell me more")
+            session.press("-k", "Return")
+            more = session.finished("Tell me more")
+            assert more["conversation"] == older["id"] and more["resumable"], more
+            opened = session.call("conversation.open", {"id": older["id"]})["result"]["conversation"]
+            assert [turn["prompt"] for turn in opened["turns"]] == ["Clean up these downloads", "Tell me more"], opened
+            # Claude Code resumed that conversation's own session.
+            stored = json.loads((session.home / ".local/state/cybexos/assistant/conversations"
+                                 / (older["id"] + ".json")).read_text())
+            argv = [json.loads(line) for line in (session.base / "claude-argv.jsonl").read_text().splitlines()][-1]
+            assert "--resume" in argv and argv[argv.index("--resume") + 1] == stored["session"], (argv, stored)
+            session.wait(lambda: session.shell_state().get("turn") == "completed", "the continued answer")
+            # Clicked again, with a real pointer click on Wiz, after the box
+            # closed: a new conversation, not the last one.
+            state = session.wait(lambda: (lambda s: s if s.get("composing") is False else None)(
+                session.shell_state()), "the box to close for the answer")
+            session.pointer.move(state["x"] + state["size"] / 2, state["y"] + state["size"] / 2)
+            time.sleep(0.4)
+            session.pointer.button(True)
+            session.pointer.button(False)
+            session.wait(lambda: (lambda s: s.get("composing") and s.get("continuing") == "")(session.shell_state()),
+                         "a new conversation after the last one")
+            session.pointer.move(20, 880)
+            session.press("-k", "Escape")
+            session.wait(lambda: not session.shell_state().get("composing"), "the box to close")
+            # Deleting and clearing, here over the service socket as the
+            # History buttons do; the shell follows.
+            assert session.call("conversation.delete", {"id": rows[0]["id"]})["result"] == {"ok": True}
+            session.wait(lambda: session.shell_state().get("conversations") == len(rows) - 1, "one fewer")
+            assert session.call("conversation.restore", {"id": rows[0]["id"]})["result"]["conversation"]["id"] == rows[0]["id"]
+            session.wait(lambda: session.shell_state().get("conversations") == len(rows), "the restored one")
+            assert session.call("conversation.clear", {})["result"] == {"ok": True}
+            session.wait(lambda: (lambda s: s.get("conversations") == 0 and s.get("turn") == "")(session.shell_state()),
+                         "the cleared history")
+            assert not list((session.home / ".local/state/cybexos/assistant/conversations").glob("c-*.json"))
+            session.ipc("history")
+            session.wait(lambda: session.shell_state().get("historyOpen"), "the empty History")
+            session.screenshot("assistant-history-empty.png")
+            session.ipc("hide")
+            session.wait(lambda: session.shell_state().get("shown") is False, "the character to hide again")
 
             # The empty notification centre: Wiz idle, asleep under Do Not
             # Disturb. Loading him there must not log a QML error either.
@@ -540,7 +623,7 @@ def main():
             output = session.log()
             errors = [line for line in output.splitlines() if QML_ERRORS.search(line)]
             assert not errors, "\n".join(errors)
-            print("Assistant onboarding/draft preservation, Ask Wiz from the launcher (signed out and in), repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged), hiding and the empty notification centre passed")
+            print("Assistant onboarding/draft preservation, Ask Wiz from the launcher (signed out and in), repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged), hiding, conversation history (new by default, open and continue, delete, restore, clear) and the empty notification centre passed")
         finally:
             session.stop()
 

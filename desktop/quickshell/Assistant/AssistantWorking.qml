@@ -66,7 +66,7 @@ AssistantSurface {
 
         Text {
             id: elapsed
-            anchors.right: stopButton.left
+            anchors.right: historyButton.left
             anchors.rightMargin: Theme.scaled(6)
             anchors.verticalCenter: parent.verticalCenter
             text: root.turn ? AssistantHelpers.elapsedLabel(Assistant.now - root.turn.startedAt) : ""
@@ -74,6 +74,19 @@ AssistantSurface {
             font.family: Theme.fontNumeric
             font.pixelSize: Theme.typography.metadata
             font.features: Theme.tabularNumberFeatures
+        }
+
+        // Other conversations can be read while this one works.
+        AssistantButton {
+            id: historyButton
+            anchors.right: stopButton.left
+            anchors.rightMargin: Theme.scaled(4)
+            anchors.verticalCenter: parent.verticalCenter
+            glyph: "history"
+            accessibleName: I18n.tr("History")
+            color: "transparent"
+            controlHeight: Theme.scaled(28)
+            onTriggered: Assistant.openHistory()
         }
 
         AssistantButton {

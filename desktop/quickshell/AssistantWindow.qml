@@ -19,6 +19,8 @@ import "Common/AssistantHelpers.js" as AssistantHelpers
 //
 // Hovering opens the composer without taking the keyboard, so typing in the
 // window underneath carries on; a click or Super+I gives it the keyboard.
+// A click or Super+I on a closed box starts a new conversation; hovering
+// opens the box as it was left (Assistant.openFresh).
 PanelWindow {
     id: root
 
@@ -52,12 +54,18 @@ PanelWindow {
         { x: root.bubbleX, y: root.bubbleY }, root.size,
         { width: root.width, height: root.height }, Theme.scaled(360), root.topReserve)
 
-    // One surface at a time; the working pill wins, then the reply.
-    readonly property bool showWorking: Assistant.busy && !Assistant.tucked
+    // One surface at a time: History wins, then another conversation read
+    // while a question runs, the working pill, the reply and the composer.
+    readonly property bool showHistory: Assistant.historyOpen
+    readonly property bool readingOther: Assistant.busy && Assistant.composing
+        && Assistant.continuing !== "" && Assistant.continuing !== Assistant.busyConversation
+    readonly property bool showWorking: Assistant.busy && !Assistant.tucked && !showHistory && !readingOther
     readonly property bool showReply: Assistant.replyOpen && !Assistant.composing && !Assistant.busy
-    readonly property bool showComposer: Assistant.composing && !Assistant.busy
-    readonly property bool boxOpen: (showComposer || showWorking || showReply) && !Assistant.capturing
-        && !covered
+        && !showHistory
+    readonly property bool showComposer: Assistant.composing && !showHistory
+        && (!Assistant.busy || readingOther)
+    readonly property bool boxOpen: (showComposer || showWorking || showReply || showHistory)
+        && !Assistant.capturing && !covered
     // The box steps out of the way while the character is dragged.
     readonly property bool dockShown: boxOpen && !dragging
 
@@ -66,7 +74,7 @@ PanelWindow {
     // under a focus grab, so a click anywhere else takes it back (the
     // launcher's arrangement, LauncherWindow.qml).
     readonly property bool keyboardWanted: Assistant.focusRequested && !covered
-        && (showComposer || (showWorking && Assistant.waiting))
+        && (showComposer || showHistory || (showWorking && Assistant.waiting))
     readonly property bool keyboardActive: root.contentItem.Window.active
     property bool grabReady: false
     onKeyboardActiveChanged: {
@@ -125,7 +133,7 @@ PanelWindow {
         onCleared: {
             root.grabReady = false;
             Assistant.focusRequested = false;
-            Assistant.hoverEnded();
+            Assistant.focusLost();
         }
     }
 
@@ -175,7 +183,7 @@ PanelWindow {
         interval: 260
         onTriggered: {
             if (characterHover.hovered && !Assistant.busy && !Assistant.replyOpen
-                    && !Assistant.composing && !root.dragging)
+                    && !Assistant.composing && !Assistant.historyOpen && !root.dragging)
                 Assistant.openComposer(false);
         }
     }
@@ -322,7 +330,8 @@ PanelWindow {
         Item {
             id: dock
 
-            readonly property Item current: root.showWorking ? working
+            readonly property Item current: root.showHistory ? history
+                : root.showWorking ? working
                 : root.showReply ? replyCard : root.showComposer ? composer : null
 
             x: root.dockPlace.x
@@ -344,6 +353,14 @@ PanelWindow {
                 id: composer
                 width: parent.width
                 visible: root.showComposer
+                room: root.dockPlace.room
+            }
+
+            AssistantHistory {
+                id: history
+                width: parent.width
+                visible: root.showHistory
+                room: root.dockPlace.room
             }
 
             AssistantWorking {

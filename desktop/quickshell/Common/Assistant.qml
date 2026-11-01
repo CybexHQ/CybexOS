@@ -27,8 +27,6 @@ Singleton {
     property var agents: ({})
     property bool speechAvailable: false
     property var turn: null
-    // Whether the service holds a conversation the next question continues.
-    property var conversation: null
     // The `cybex agent` default, which "auto" follows.
     property string preferredAgent: ""
 
@@ -37,7 +35,14 @@ Singleton {
     readonly property string agentLabel: AssistantHelpers.AGENT_LABELS[agent] || agent
     readonly property bool agentInstalled: !!(agents[agent] && agents[agent].available)
     readonly property bool agentReady: agentInstalled && agents[agent].auth === "ready"
-    readonly property bool setupRequired: !agentReady
+    // Who answers the next question: a continued conversation keeps the
+    // agent it started with, a new one takes the chosen agent.
+    readonly property string askAgent: continuingRow ? continuingRow.agent
+        : thread && continuing !== "" ? thread.agent : agent
+    readonly property string askAgentLabel: AssistantHelpers.AGENT_LABELS[askAgent] || askAgent
+    readonly property bool askReady: !!(agents[askAgent] && agents[askAgent].available
+        && agents[askAgent].auth === "ready")
+    readonly property bool setupRequired: !askReady
     property bool authChecking: false
     property string signingIn: ""
 
@@ -45,6 +50,26 @@ Singleton {
     readonly property bool waiting: turn !== null && turn.status === "waiting"
     readonly property var approvals: turn && turn.approvals ? turn.approvals : []
     readonly property bool hasReply: AssistantHelpers.finished(turn)
+    // The conversation a running question belongs to.
+    readonly property string busyConversation: busy && turn ? turn.conversation || "" : ""
+
+    // ---- conversation history (docs/assistant.md) -------------------------------
+    // Every conversation, newest first, as the service lists them.
+    property var conversations: []
+    // The conversation the next question continues; "" starts a new one.
+    property string continuing: ""
+    // That conversation's questions and answers, once loaded.
+    property var thread: null
+    readonly property var continuingRow: continuing === "" ? null
+        : conversations.find(row => row.id === continuing) ?? null
+    property bool historyOpen: false
+    property string historyQuery: ""
+    // Search results while a query is typed; the full list otherwise.
+    property var searchResults: []
+    readonly property var historyRows: historyQuery.trim() === "" ? conversations : searchResults
+    // The conversation deleted last, offered back with Undo while the box stays open.
+    property var deletedConversation: null
+    property bool confirmingClear: false
 
     // ---- presence and placement --------------------------------------------
     // The character is out unless game mode wants the screen to itself.
@@ -53,6 +78,7 @@ Singleton {
     readonly property string screenName: screen ? screen.name : ""
 
     // ---- box state -----------------------------------------------------------
+    // The composer: a new conversation, or `continuing` with its transcript.
     property bool composing: false
     // The box was opened by the keyboard or a click, so it takes the keyboard.
     property bool focusRequested: false
@@ -70,7 +96,7 @@ Singleton {
         connected: root.connected, listening: root.listening, waiting: root.waiting,
         busy: root.busy, transcribing: root.transcribing, dragging: root.dragging,
         speaking: root.speaking, celebrating: root.celebrating, failed: root.failed,
-        composing: root.composing, step: root.turn ? root.turn.step || "" : ""
+        composing: root.composing || root.historyOpen, step: root.turn ? root.turn.step || "" : ""
     })
     readonly property string pose: AssistantHelpers.characterPose(characterState)
     // Wiz stands on his own and needs the room.
@@ -167,7 +193,9 @@ Singleton {
         if (!Settings.assistantShown)
             show(Screens.focused ? Screens.focused.name : "");
         tucked = false;
-        if (busy)
+        // While a question runs, the box is its pill; another conversation
+        // can still be read (and answered once Wiz is free).
+        if (busy && (continuing === "" || continuing === busyConversation))
             return;
         composing = true;
         if (withFocus) {
@@ -176,13 +204,47 @@ Singleton {
         }
     }
 
+    // Opened by a click, a tap of Super+I or the launcher: a new conversation,
+    // unless the last one still needs the person (opensLastConversation).
+    // Hovering opens the box as it was left instead (AssistantWindow.qml).
+    function openFresh(withFocus) {
+        if (!available)
+            return;
+        if (!Settings.assistantShown)
+            show(Screens.focused ? Screens.focused.name : "");
+        if (AssistantHelpers.opensLastConversation({ busy: busy, unread: unread, hasReply: hasReply })) {
+            if (busy) {
+                tucked = false;
+            } else {
+                unread = false;
+                closeComposer();
+                replyOpen = true;
+            }
+            return;
+        }
+        startNew();
+        openComposer(withFocus);
+    }
+
+    // The next question starts a new conversation.
+    function startNew() {
+        continuing = "";
+        thread = null;
+        historyOpen = false;
+        confirmingClear = false;
+        replyOpen = false;
+        stopSpeaking();
+    }
+
     function toggleComposer() {
-        if (composing && focusRequested && !listening)
-            closeComposer();
-        else if (busy && Settings.assistantShown)
+        if ((composing || historyOpen) && focusRequested && !listening)
+            closeBox();
+        else if (busy && Settings.assistantShown && !composing && !historyOpen)
             tucked = !tucked;
-        else
+        else if (composing || historyOpen)
             openComposer(true);
+        else
+            openFresh(true);
     }
 
     function closeComposer() {
@@ -198,6 +260,13 @@ Singleton {
             closeComposer();
     }
 
+    // A click elsewhere: History closes with the rest of the box.
+    function focusLost() {
+        if (historyOpen)
+            closeHistory();
+        hoverEnded();
+    }
+
     function closeReply() {
         replyOpen = false;
         unread = false;
@@ -207,6 +276,7 @@ Singleton {
     function closeBox() {
         closeComposer();
         closeReply();
+        closeHistory();
     }
 
     function reviewStagedChange() {
@@ -223,23 +293,194 @@ Singleton {
         if (unread && hasReply) {
             unread = false;
             closeComposer();
+            closeHistory();
             replyOpen = true;
             return;
         }
         unread = false;
-        if (busy) {
+        if (historyOpen) {
+            closeBox();
+            return;
+        }
+        if (busy && !composing) {
             tucked = !tucked;
             return;
         }
         if (composing && focusRequested && draft.trim() === "")
             closeComposer();
+        else if (composing)
+            // The box a hover opened takes the keyboard, as it was.
+            openComposer(true);
+        else
+            openFresh(true);
+    }
+
+    // Continues the conversation of the answer on screen.
+    function reply() {
+        const id = turn ? turn.conversation || "" : "";
+        closeReply();
+        if (id !== "")
+            continueConversation(id);
+        openComposer(true);
+    }
+
+    // ---- the history -------------------------------------------------------------
+    function continueConversation(id) {
+        if (continuing !== id || thread === null || thread.id !== id) {
+            continuing = id;
+            thread = null;
+        }
+        loadThread();
+    }
+
+    function loadThread() {
+        const id = continuing;
+        if (id === "" || !connected)
+            return;
+        request("conversation.open", { id: id }, (result, error) => {
+            if (root.continuing !== id)
+                return;
+            if (error || !result || !result.conversation) {
+                root.continuing = "";
+                root.thread = null;
+                root.notice = error ? error.message : "";
+                return;
+            }
+            root.thread = result.conversation;
+        });
+    }
+
+    function openHistory() {
+        if (!available)
+            return;
+        if (!Settings.assistantShown)
+            show(Screens.focused ? Screens.focused.name : "");
+        historyOpen = true;
+        confirmingClear = false;
+        tucked = false;
+        focusRequested = true;
+        refreshConversations();
+        focusComposer();
+    }
+
+    function closeHistory() {
+        historyOpen = false;
+        historyQuery = "";
+        searchResults = [];
+        confirmingClear = false;
+        deletedConversation = null;
+    }
+
+    // Back from History to the box it was opened from.
+    function backFromHistory() {
+        closeHistory();
+        if (busy && continuing === busyConversation)
+            composing = false;
         else
             openComposer(true);
     }
 
-    function reply() {
-        closeReply();
+    // History's "New": the box for a new conversation.
+    function newConversation() {
+        closeHistory();
+        startNew();
         openComposer(true);
+    }
+
+    // A row in History or under the suggestions.
+    function openConversation(id) {
+        closeHistory();
+        replyOpen = false;
+        if (busy && id === busyConversation) {
+            // Its question is still running: the pill shows it.
+            continuing = id;
+            composing = false;
+            tucked = false;
+            return;
+        }
+        if (turn && turn.conversation === id)
+            unread = false;
+        continueConversation(id);
+        openComposer(true);
+    }
+
+    function refreshConversations() {
+        request("conversation.list", {}, (result, error) => {
+            if (result)
+                root.conversations = result.conversations || [];
+        });
+        search();
+    }
+
+    function search() {
+        const query = historyQuery.trim();
+        if (query === "") {
+            searchResults = [];
+            return;
+        }
+        request("conversation.list", { query: query }, (result, error) => {
+            if (result && root.historyQuery.trim() === query)
+                root.searchResults = result.conversations || [];
+        });
+    }
+
+    onHistoryQueryChanged: searchDelay.restart()
+
+    Timer {
+        id: searchDelay
+        interval: 180
+        onTriggered: root.search()
+    }
+
+    function deleteConversation(id) {
+        const row = conversations.find(entry => entry.id === id) ?? null;
+        request("conversation.delete", { id: id }, (result, error) => {
+            if (error) {
+                root.notice = error.message;
+                return;
+            }
+            root.deletedConversation = row;
+            if (root.continuing === id) {
+                root.continuing = "";
+                root.thread = null;
+            }
+            if (root.turn && root.turn.conversation === id)
+                root.closeReply();
+        });
+    }
+
+    function undoDelete() {
+        const row = deletedConversation;
+        if (!row)
+            return;
+        deletedConversation = null;
+        request("conversation.restore", { id: row.id }, (result, error) => {
+            if (error)
+                root.notice = error.message;
+        });
+    }
+
+    // Every conversation goes, from this computer's history; the agents
+    // keep their own session files.
+    function clearHistory() {
+        confirmingClear = false;
+        request("conversation.clear", {}, (result, error) => {
+            if (error) {
+                root.notice = error.message;
+                return;
+            }
+            root.deletedConversation = null;
+            root.continuing = "";
+            root.thread = null;
+            root.closeReply();
+        });
+    }
+
+    function copyConversation() {
+        if (!thread)
+            return;
+        Quickshell.clipboardText = AssistantHelpers.conversationText(thread);
+        notice = I18n.tr("Copied.");
     }
 
     // ---- Super+I: tap to type, hold to talk ------------------------------------
@@ -289,7 +530,7 @@ Singleton {
             notice = I18n.tr("The assistant service is not running.");
             return;
         }
-        if (!agentReady) {
+        if (!askReady) {
             draft = prompt;
             openComposer(true);
             refreshAuth();
@@ -299,11 +540,13 @@ Singleton {
         const context = { output: screenName, speak: Settings.assistantSpeak, language: I18n.language };
         if (prompt === systemCheckQuestion)
             context.purpose = "system-check";
+        const continued = continuing;
         const params = {
             text: prompt,
-            agent: root.agent,
-            model: AssistantHelpers.modelFor(root.agent, Settings.assistantClaudeModel,
+            agent: root.askAgent,
+            model: AssistantHelpers.modelFor(root.askAgent, Settings.assistantClaudeModel,
                 Settings.assistantCodexModel),
+            conversation: continued,
             screenshot: screenAttached ? screenPath : "",
             context: context
         };
@@ -318,6 +561,7 @@ Singleton {
         replyOpen = false;
         tucked = false;
         unread = false;
+        closeHistory();
         request("turn.start", params, (result, error) => {
             if (error) {
                 // Refused before the service took the screenshot: remove it
@@ -325,12 +569,22 @@ Singleton {
                 if (shot !== "")
                     Quickshell.execDetached(["rm", "-f", "--", shot]);
                 root.draft = prompt;
-                root.notice = error.message || I18n.tr("The assistant could not start.");
+                root.notice = error.code === -32001
+                    ? I18n.tr("Wiz is still working on another question.")
+                    : error.message || I18n.tr("The assistant could not start.");
+                // A conversation deleted meanwhile: the question starts a new one.
+                if (error.code === -32002 && root.continuing === continued) {
+                    root.continuing = "";
+                    root.thread = null;
+                }
                 root.composing = true;
                 if (error.code === -32004)
                     root.refreshAuth();
                 return;
             }
+            // The box reopened by a hover continues this conversation.
+            root.continuing = result.turn ? result.turn.conversation || "" : "";
+            root.thread = null;
             root.adopt(result.turn);
         });
     }
@@ -348,7 +602,19 @@ Singleton {
             return;
         if (!Settings.assistantShown)
             show(Screens.focused ? Screens.focused.name : "");
+        startNew();
         send(systemCheckQuestion);
+    }
+
+    // `cybexos-runtime ipc assistant ask` and the launcher's Ask Wiz: a
+    // question of its own, in a new conversation.
+    function ask(text) {
+        if (!available)
+            return;
+        if (!busy)
+            startNew();
+        openComposer(false);
+        send(text);
     }
 
     function respond(approvalId, decision) {
@@ -375,18 +641,12 @@ Singleton {
         });
     }
 
-    function newConversation() {
-        request("conversation.reset", {}, () => {
-            root.conversation = null;
-        });
-        closeReply();
-        notice = "";
-    }
-
     // Continues the same Claude Code or Codex session in Kitty, for work that
-    // outgrows a box under a character.
-    function handoff() {
-        request("conversation.handoff", {}, (result, error) => {
+    // outgrows a box under a character: the conversation given, else the
+    // answer's.
+    function handoff(id) {
+        const conversation = id || (turn ? turn.conversation || "" : "");
+        request("conversation.handoff", { id: conversation }, (result, error) => {
             if (error || !result || !(Array.isArray(result.argv) || result.argv instanceof Array)) {
                 root.notice = error ? error.message : I18n.tr("Nothing to continue yet.");
                 return;
@@ -411,6 +671,9 @@ Singleton {
         if (!action)
             return;
         if (action.auth) {
+            // The failed question's conversation continues once signed in.
+            if (turn && turn.conversation)
+                continueConversation(turn.conversation);
             openComposer(true);
             signIn(turn ? turn.agent : agent);
         } else if (action.command)
@@ -516,7 +779,7 @@ Singleton {
 
     // ---- voice -----------------------------------------------------------------
     function startListening(latched) {
-        if (!agentReady) {
+        if (!askReady) {
             openComposer(true);
             refreshAuth();
             return;
@@ -644,7 +907,7 @@ Singleton {
     // One screenshot of the display the character is on, taken with the
     // character hidden; it travels with the next question only.
     function attachScreen() {
-        if (!Settings.assistantScreenContext || capturing || screenName === "" || !agentReady)
+        if (!Settings.assistantScreenContext || capturing || screenName === "" || !askReady)
             return;
         capturing = true;
         captureDelay.restart();
@@ -791,6 +1054,9 @@ Singleton {
         case "turn.updated":
             adopt(params.turn);
             break;
+        case "conversations.updated":
+            adoptConversations(params.conversations || []);
+            break;
         case "turn.delta":
             if (turn && params.id === turn.id)
                 turn = Object.assign({}, turn, { text: (turn.text || "") + (params.text || "") });
@@ -822,7 +1088,9 @@ Singleton {
         }
         if (!wasActive || !AssistantHelpers.finished(next))
             return;
-        conversation = { agent: next.agent, resumable: next.resumable === true };
+        // Its transcript now has the answer.
+        if (next.conversation === continuing)
+            thread = null;
         if (next.status === "stopped") {
             draft = next.prompt || "";
             notice = next.undo && next.undo.length > 0
@@ -851,6 +1119,18 @@ Singleton {
         onTriggered: root.celebrating = false
     }
 
+    function adoptConversations(rows) {
+        conversations = rows;
+        if (historyQuery.trim() !== "")
+            searchDelay.restart();
+        // Gone from the history (deleted or cleared elsewhere, or pruned).
+        if (continuing !== "" && !rows.some(row => row.id === continuing) && !(busy && continuing === busyConversation)) {
+            continuing = "";
+            thread = null;
+        } else if (continuing !== "" && composing)
+            loadThread();
+    }
+
     function hello() {
         request("hello", { client: "quickshell", protocol: 1 }, (result, error) => {
             if (error || !result) {
@@ -860,7 +1140,7 @@ Singleton {
             root.helloed = true;
             root.adoptAgents(result.agents || {});
             root.speechAvailable = !!(result.speech && result.speech.available);
-            root.conversation = result.conversation || null;
+            root.adoptConversations(result.conversations || []);
             // A reconnect adopts the service's view of the turn; nothing is
             // replayed.
             const previous = root.turn;
@@ -875,6 +1155,8 @@ Singleton {
     onComposingChanged: {
         if (composing && connected)
             refreshAuth();
+        if (composing && continuing !== "" && thread === null)
+            loadThread();
     }
 
     Socket {
@@ -930,12 +1212,23 @@ Singleton {
         value: root.available
     }
 
-    // The elapsed time in the worker pill.
+    // The service applies "Keep conversations" whenever it lists them.
+    Connections {
+        target: Settings
+
+        function onAssistantHistoryChanged() {
+            if (root.connected)
+                root.refreshConversations();
+        }
+    }
+
+    // The elapsed time in the worker pill, and how long ago a listed
+    // conversation was.
     property double now: Date.now()
     Timer {
         interval: 1000
         repeat: true
-        running: root.busy || root.listening
+        running: root.busy || root.listening || root.historyOpen || root.composing
         triggeredOnStart: true
         onTriggered: root.now = Date.now()
     }

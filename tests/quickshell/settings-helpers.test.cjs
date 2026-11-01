@@ -996,6 +996,12 @@ test("assistant preferences are validated and runtime placement is bounded", () 
     assert.equal(invalid.assistantScreen, "");
     assert.equal(invalid.assistantX, -1);
     assert.equal(invalid.assistantY, 32768);
+    // Conversations are kept 30 days unless chosen otherwise.
+    assert.equal(d.assistantHistory, "month");
+    for (const value of ["forever", "session", "month"])
+        assert.equal(H.merge({ v: 30, assistantHistory: value }).assistantHistory, value);
+    for (const value of [undefined, null, "week", 30, true])
+        assert.equal(H.merge({ v: 30, assistantHistory: value }).assistantHistory, "month");
 });
 
 test("schema-8 validates persisted action and system toggle state", () => {

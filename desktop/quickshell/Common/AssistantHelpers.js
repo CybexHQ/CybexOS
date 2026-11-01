@@ -221,6 +221,82 @@ function copyText(turn) {
     return String(turn && turn.text || "").replace(/\s+$/, "");
 }
 
+// A whole conversation as it is copied: each question, then its answer.
+function conversationText(conversation) {
+    return ((conversation && conversation.turns) || []).map(function(turn) {
+        var answer = turn.status === "failed" ? (turn.error || "") : (turn.text || "");
+        return "> " + String(turn.prompt || "").split("\n").join("\n> ") + "\n\n" + answer.replace(/\s+$/, "");
+    }).join("\n\n");
+}
+
+// ---- conversation history ---------------------------------------------------
+// The new box lists this many recent conversations under its suggestions.
+var RECENT_LIMIT = 3;
+var DAY_MS = 24 * 3600 * 1000;
+
+function startOfDay(ms, offsetDays) {
+    var d = new Date(ms);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (offsetDays || 0)).getTime();
+}
+
+// The heading a conversation is listed under: "today", "yesterday", "week"
+// (the five days before) or "older".
+function historyGroup(at, now) {
+    if (at >= startOfDay(now, 0))
+        return "today";
+    if (at >= startOfDay(now, -1))
+        return "yesterday";
+    if (at >= startOfDay(now, -6))
+        return "week";
+    return "older";
+}
+
+// How a row reads its time: "now", "minutes" (value), "time" (today),
+// "yesterday", "weekday" (the last week) or "date". The view formats the
+// time, weekday and date in the shell's language.
+function historyTime(at, now) {
+    var minutes = Math.floor(Math.max(0, now - at) / 60000);
+    if (minutes < 1)
+        return { kind: "now", value: 0 };
+    if (minutes < 60)
+        return { kind: "minutes", value: minutes };
+    var group = historyGroup(at, now);
+    if (group === "today")
+        return { kind: "time", value: at };
+    if (group === "yesterday")
+        return { kind: "yesterday", value: at };
+    if (group === "week")
+        return { kind: "weekday", value: at };
+    return { kind: "date", value: at };
+}
+
+// Rows under their day headings, newest first, headings in order.
+function groupConversations(rows, now) {
+    var order = ["today", "yesterday", "week", "older"];
+    var groups = {};
+    (rows || []).forEach(function(row) {
+        var key = historyGroup(row.updatedAt || 0, now);
+        (groups[key] = groups[key] || []).push(row);
+    });
+    return order.filter(function(key) { return !!groups[key]; }).map(function(key) {
+        return { group: key, rows: groups[key] };
+    });
+}
+
+// A row's status, live while its question runs in the service.
+function liveStatus(row, turn) {
+    if (row && turn && turn.conversation === row.id && active(turn))
+        return turn.status;
+    return row ? row.status : "";
+}
+
+// Clicking the character, a tap of Super+I or the launcher opens a new
+// conversation, unless the last one still needs the person: a question
+// running or waiting for an answer, or an answer they have not seen.
+function opensLastConversation(state) {
+    return !!(state.busy || (state.unread && state.hasReply));
+}
+
 var exported = {
     EDGE: EDGE,
     GAP: GAP,
@@ -247,7 +323,14 @@ var exported = {
     displayPath: displayPath,
     closureChanges: closureChanges,
     errorAction: errorAction,
-    copyText: copyText
+    copyText: copyText,
+    RECENT_LIMIT: RECENT_LIMIT,
+    historyGroup: historyGroup,
+    historyTime: historyTime,
+    groupConversations: groupConversations,
+    liveStatus: liveStatus,
+    opensLastConversation: opensLastConversation,
+    conversationText: conversationText
 };
 
 if (typeof module !== "undefined" && module.exports)

@@ -1,8 +1,10 @@
-"""The socket, the conversation and the current turn.
+"""The socket, the conversation history and the current turn.
 
 The service owns the agent processes so a Quickshell restart, including one
 the assistant's own change caused, never ends a turn. Clients reconcile with
-`hello`; nothing is replayed after a reconnect.
+`hello`; nothing is replayed after a reconnect. Every question belongs to a
+conversation in the history (history.py): `turn.start` names the one it
+continues, or starts a new one.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import time
 from . import auth, policy, prompt, speech
 from .claude import ClaudeAgent, media_type
 from .codex import CodexAgent
+from .history import History
 from .protocol import (
     BUSY, LOG, MAX_CLIENT_BACKLOG, MAX_LINE, MAX_PROMPT, MAX_SCREENSHOT, NOT_FOUND, PROTOCOL,
     UNAVAILABLE, RpcFault, default_state_dir, encode, error_frame, iter_lines, notification,
@@ -34,7 +37,6 @@ AGENTS = {"claude": ClaudeAgent, "codex": CodexAgent}
 LABELS = {"claude": "Claude Code", "codex": "Codex"}
 DISCOVERY_SECONDS = 30.0
 STOP_WAIT = 8.0
-CONVERSATION_ID = re.compile(r"^[A-Za-z0-9._:-]{1,200}$")
 MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,79}$")
 LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?$")
 RESTARTED = "The assistant service restarted."
@@ -92,15 +94,20 @@ class Server:
         config = Path(self.env.get("XDG_CONFIG_HOME") or self.home / ".config")
         self.settings_path = config / "cybexos" / "shell.json"
         self.socket_path = Path(socket_path)
-        self.state_path = Path(state_dir or default_state_dir(self.home)) / "state.json"
+        state = Path(state_dir or default_state_dir(self.home))
+        self.state_path = state / "state.json"
+        self.history = History(state / "conversations", lambda: policy.read_json(self.settings_path))
         self.status_path = self.env.get("CYBEXOS_ASSISTANT_STATUS") or "/var/lib/cybexos/status.json"
         self.shots = screenshot_dir(self.env)
         self.instructions = prompt.build()
         self.clients = set()
         self.tasks = set()
         self.adapters = {}
-        self.conversation = {"agent": None, "claude": None, "codex": None}
-        self.memory = set()
+        # "Always in this conversation" answers, per conversation.
+        self.memories = {}
+        # The conversation of the turn in progress, which receives the
+        # agent's session id.
+        self.active = None
         self.turn = None
         self.task = None
         self.discovered = (0.0, {})
@@ -112,7 +119,9 @@ class Server:
         self.methods = {
             "hello": self.hello, "turn.start": self.turn_start, "turn.stop": self.turn_stop,
             "approval.respond": self.approval_respond, "turn.undo": self.turn_undo,
-            "conversation.reset": self.conversation_reset, "conversation.handoff": self.conversation_handoff,
+            "conversation.list": self.conversation_list, "conversation.open": self.conversation_open,
+            "conversation.delete": self.conversation_delete, "conversation.restore": self.conversation_restore,
+            "conversation.clear": self.conversation_clear, "conversation.handoff": self.conversation_handoff,
             "speech.say": self.speech_say, "speech.stop": self.speech_stop,
             "auth.status": self.auth_status, "auth.login": self.auth_login,
         }
@@ -172,25 +181,22 @@ class Server:
             adapter = None
         if adapter is None:
             adapter = AGENTS[name](executable, self.home, self.instructions, status_path=self.status_path,
-                                   conversation_id=self.conversation.get(name),
                                    on_conversation=self._conversation_id, env=self.agent_env())
             self.adapters[name] = adapter
         return adapter
 
     def _conversation_id(self, agent, identifier):
-        self.conversation[agent] = identifier or None
-        self.conversation["agent"] = agent if identifier else None
-        self.save()
+        record = self.active
+        if record is None or record["agent"] != agent:
+            return
+        self.history.set_session(record, identifier or None)
         if self.turn is not None:
             self._turn_event("updated", self.turn)
 
-    async def _reset_conversation(self):
+    async def _close_adapters(self):
         adapters, self.adapters = list(self.adapters.values()), {}
         for adapter in adapters:
             await adapter.close()
-        self.memory = set()
-        self.conversation = {"agent": None, "claude": None, "codex": None}
-        self.save()
 
     # ---- notifications -----------------------------------------------------
 
@@ -206,7 +212,14 @@ class Server:
             client.send(frame)
 
     def resumable(self, turn):
-        return self.conversation.get("agent") == turn.agent and bool(self.conversation.get(turn.agent))
+        record = self.history.get(turn.conversation)
+        return bool(record and record["session"] and record["agent"] == turn.agent)
+
+    def summaries(self, query=""):
+        return self.history.summaries(query, self.snapshot(self.turn))
+
+    def publish_history(self):
+        self.publish("conversations.updated", {"conversations": self.summaries()})
 
     def snapshot(self, turn):
         return turn.snapshot(self.resumable(turn)) if turn is not None else None
@@ -222,12 +235,11 @@ class Server:
     # ---- methods -----------------------------------------------------------
 
     async def hello(self, params):
-        agent = self.conversation.get("agent")
         return {
             "protocol": PROTOCOL,
             "agents": await self.agent_status(),
             "turn": self.snapshot(self.turn),
-            "conversation": {"agent": agent, "resumable": bool(self.conversation.get(agent))} if agent else None,
+            "conversations": self.summaries(),
             "speech": {"available": self.speaker.available},
         }
 
@@ -302,6 +314,11 @@ class Server:
         requested = params.get("agent") or "auto"
         if requested not in ("auto", *AGENTS):
             raise RpcFault(-32602, "Unknown agent")
+        continued = params.get("conversation")
+        if continued not in (None, "") and not isinstance(continued, str):
+            raise RpcFault(-32602, "Invalid conversation")
+        if continued and self.history.get(continued) is None:
+            raise RpcFault(NOT_FOUND, "That conversation is no longer in your history.")
         model = params.get("model")
         if model in (None, "", "default"):
             model = None
@@ -313,25 +330,34 @@ class Server:
         # Auth probing yields to other clients; a second start may have won.
         if self.busy():
             raise RpcFault(BUSY, "The assistant is still working on the previous question.")
-        agent = self.resolve(requested, statuses)
+        # A conversation continues with the agent it started with.
+        record = self.history.get(continued) if continued else None
+        if continued and record is None:
+            raise RpcFault(NOT_FOUND, "That conversation is no longer in your history.")
+        agent = record["agent"] if record else self.resolve(requested, statuses)
         if statuses[agent]['available'] and statuses[agent]['auth'] != 'ready':
             raise RpcFault(-32004, f'Sign in to {LABELS[agent]} before asking the assistant. Your question has been kept.')
-        if self.conversation.get("agent") not in (None, agent):
-            await self._reset_conversation()
+        if record is None:
+            record = self.history.create(agent)
         settings = policy.read_json(self.settings_path)
         approval_policy = "ask" if settings.get("assistantApprovalPolicy") == "ask" else "always"
-        turn = Turn("t-" + secrets.token_hex(8), agent, text, self.home, self.memory, self._turn_event,
-                    screenshot=shot is not None, approval_policy=approval_policy)
+        turn = Turn("t-" + secrets.token_hex(8), agent, text, self.home,
+                    self.memories.setdefault(record["id"], set()), self._turn_event,
+                    screenshot=shot is not None, approval_policy=approval_policy, conversation=record["id"])
         turn.snapshots.begin()
         plugins = policy.plugin_manifests(self.home)
         status = policy.read_json(self.status_path)
         self.turn = turn
-        self.task = asyncio.create_task(self._run(turn, text, shot, model, context, plugins, status, requested))
+        self.active = record
+        self.history.begin(record, turn)
+        self.task = asyncio.create_task(self._run(turn, record, text, shot, model, context, plugins, status,
+                                                  requested))
         self.save()
         self._turn_event("updated", turn)
+        self.publish_history()
         return {"turn": self.snapshot(turn)}
 
-    async def _run(self, turn, text, shot, model, context, plugins, status, requested):
+    async def _run(self, turn, record, text, shot, model, context, plugins, status, requested):
         try:
             executable = self.agents().get(turn.agent)
             if not executable:
@@ -343,6 +369,7 @@ class Server:
             if shot is not None:
                 image = (shot.read_bytes(), media_type(shot)) if turn.agent == "claude" else str(shot)
             adapter = self.adapter(turn.agent, executable)
+            await adapter.use(record["session"])
             outcome = await adapter.run(turn, prompt.turn_text(text, context, shot is not None), image, model)
             turn.finish(outcome.get("status", "failed"), outcome.get("text"), outcome.get("error", ""),
                         outcome.get("kind", ""))
@@ -369,8 +396,10 @@ class Server:
             turn.undo = turn.snapshots.finish()
             turn.plugins = policy.new_plugins(plugins, policy.plugin_manifests(self.home))
             turn.staged = policy.staged_transaction(status, policy.read_json(self.status_path))
+            self.history.finish(record, turn)
             self.save()
             self._turn_event("updated", turn)
+            self.publish_history()
 
     async def turn_stop(self, params):
         turn, task = self.turn, self.task
@@ -407,27 +436,93 @@ class Server:
         self._turn_event("updated", turn)
         return {"restored": restored, "skipped": skipped}
 
-    async def conversation_reset(self, params):
-        if self.busy():
-            raise RpcFault(BUSY, "The assistant is still working on the previous question.")
-        await self._reset_conversation()
-        if self.turn is not None:
+    # ---- the history ---------------------------------------------------------
+
+    def _conversation(self, params):
+        identifier = params.get("id")
+        record = self.history.get(identifier) if isinstance(identifier, str) else None
+        if record is None:
+            raise RpcFault(NOT_FOUND, "That conversation is no longer in your history.")
+        return record
+
+    async def conversation_list(self, params):
+        query = params.get("query") or ""
+        if not isinstance(query, str) or len(query) > 200:
+            raise RpcFault(-32602, "Invalid query")
+        if self.history.enforce(keep=self.turn.conversation if self.busy() else None):
+            self.save()
+            self.publish_history()
+        return {"conversations": self.summaries(query.strip())}
+
+    async def conversation_open(self, params):
+        """The whole conversation, the running answer included as it stands."""
+        record = self._conversation(params)
+        turns = list(record["turns"])
+        if self.turn is not None and self.turn.conversation == record["id"] and turns \
+                and turns[-1]["id"] == self.turn.id:
+            turns[-1] = self.history.entry(self.turn)
+        live = self.snapshot(self.turn) if self.turn is not None and self.turn.conversation == record["id"] else None
+        return {"conversation": dict(self.history.summary(record, live), turns=turns,
+                                     resumable=bool(record["session"]))}
+
+    async def _stop_in(self, identifier=None):
+        """Stops the running question when it belongs to `identifier` (any
+        conversation when None) before that conversation is removed."""
+        if self.busy() and (identifier is None or self.turn.conversation == identifier):
+            await self.turn_stop({})
+
+    async def conversation_delete(self, params):
+        record = self._conversation(params)
+        await self._stop_in(record["id"])
+        if self.history.delete(record["id"]) is None:
+            raise RpcFault(NOT_FOUND, "That conversation is no longer in your history.")
+        self.memories.pop(record["id"], None)
+        self.save()
+        self.publish_history()
+        if self.turn is not None and self.turn.conversation == record["id"]:
             self._turn_event("updated", self.turn)
         return {"ok": True}
 
+    async def conversation_restore(self, params):
+        identifier = params.get("id")
+        record = self.history.restore(identifier) if isinstance(identifier, str) else None
+        if record is None:
+            raise RpcFault(NOT_FOUND, "That conversation can no longer be restored.")
+        self.save()
+        self.publish_history()
+        if self.turn is not None and self.turn.conversation == record["id"]:
+            self._turn_event("updated", self.turn)
+        return {"conversation": self.history.summary(record)}
+
+    async def conversation_clear(self, params):
+        """Every conversation, and the last answer kept for the box. The
+        agents' own session files are left alone."""
+        await self._stop_in()
+        self.history.clear()
+        self.memories = {}
+        self.active = None
+        await self._close_adapters()
+        self.turn = None
+        self.save()
+        self.publish("turn.updated", {"turn": None})
+        self.publish_history()
+        return {"ok": True}
+
     async def conversation_handoff(self, params):
-        if self.busy():
+        identifier = params.get("id") or (self.turn.conversation if self.turn is not None else None)
+        record = self.history.get(identifier) if isinstance(identifier, str) else None
+        if self.busy() and (record is None or self.turn.conversation == record["id"]):
             raise RpcFault(BUSY, "Wait until the assistant has answered, then continue in a terminal.")
-        agent = self.conversation.get("agent")
-        identifier = self.conversation.get(agent) if agent else None
-        if not identifier:
+        if record is None or not record["session"]:
             raise RpcFault(UNAVAILABLE, "There is no conversation to continue.")
+        agent, session = record["agent"], record["session"]
         executable = self.agents().get(agent) or agent
-        argv = [executable, "--resume", identifier] if agent == "claude" else [executable, "resume", identifier]
+        argv = [executable, "--resume", session] if agent == "claude" else [executable, "resume", session]
         # The terminal continues the session from disk; a later question
         # here resumes it again instead of forking the history.
-        adapter = self.adapters.pop(agent, None)
-        if adapter is not None:
+        adapter = self.adapters.get(agent)
+        if adapter is not None and adapter.conversation_id == session:
+            self.adapters.pop(agent)
             await adapter.close()
         return {"argv": argv, "cwd": str(self.home)}
 
@@ -447,18 +542,14 @@ class Server:
     # ---- persistence -------------------------------------------------------
 
     def _load(self):
+        self.history.load(("failed", RESTARTED, "crashed"))
         data = policy.read_json(self.state_path)
-        conversation = data.get("conversation") if isinstance(data.get("conversation"), dict) else {}
-        for name in AGENTS:
-            value = conversation.get(name)
-            if isinstance(value, str) and CONVERSATION_ID.fullmatch(value):
-                self.conversation[name] = value
-        if conversation.get("agent") in AGENTS and self.conversation.get(conversation["agent"]):
-            self.conversation["agent"] = conversation["agent"]
         stored = data.get("turn")
         if isinstance(stored, dict) and stored.get("agent") in AGENTS and isinstance(stored.get("id"), str):
+            conversation = stored.get("conversation") if self.history.get(stored.get("conversation")) else None
             turn = Turn(stored["id"], stored["agent"], str(stored.get("prompt") or ""), self.home,
-                        self.memory, self._turn_event, screenshot=bool(stored.get("screenshot")))
+                        self.memories.setdefault(conversation, set()) if conversation else set(),
+                        self._turn_event, screenshot=bool(stored.get("screenshot")), conversation=conversation)
             turn.text = str(stored.get("text") or "")
             turn.started_at = int(stored.get("startedAt") or 0)
             if stored.get("status") in FINAL:
@@ -479,10 +570,14 @@ class Server:
             self.turn = turn
 
     def save(self):
+        """The last answer, for the box after a restart. It is kept only while
+        its conversation is, and only when conversations are saved."""
         turn = self.snapshot(self.turn)
         if turn is not None:
             turn["approvals"] = []
-        document = {"version": 1, "conversation": self.conversation, "turn": turn}
+            if self.history.mode == "session" or self.history.get(turn["conversation"]) is None:
+                turn = None
+        document = {"version": 2, "turn": turn}
         try:
             self.state_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             handle, temporary = tempfile.mkstemp(prefix=".state-", dir=self.state_path.parent)
