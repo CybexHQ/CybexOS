@@ -312,6 +312,10 @@ assert lib.all (c: !(lib.elem "thunderbolt.host_reset=0" c.boot.kernelParams)) [
 # A medium that never appears is explained before the emergency shell.
 assert lib.elem "emergency.target" installer.boot.initrd.systemd.services.cybexos-medium-missing.wantedBy;
 assert installer.boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec == "2min";
+# Ventoy renames init= to vtit=; stage 1 restores it before finding the system.
+assert lib.elem "initrd-find-nixos-closure.service" installer.boot.initrd.systemd.services.cybexos-ventoy-init.requiredBy;
+assert installer.boot.initrd.systemd.services.cybexos-ventoy-init.unitConfig.ConditionKernelCommandLine
+  == [ "rdinit=/vtoy/vtoy" "vtit" "!init" ];
 # A screen that keeps failing asks for the text installer instead of looping.
 assert lib.hasInfix "cybexos-installer-screen-failed"
   installer.systemd.services.cybexos-installer-ui.serviceConfig.ExecStopPost;

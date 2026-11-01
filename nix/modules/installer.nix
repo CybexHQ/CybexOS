@@ -291,6 +291,42 @@ in {
         TimeoutStartSec = "5min";
       };
     };
+    # Ventoy (on a USB stick) boots the ISO file through its own GRUB in both
+    # of its modes, "normal" and "grub2". That GRUB renames every init=
+    # parameter to vtit= and adds rdinit=/vtoy/vtoy: Ventoy's init maps the
+    # ISO file as /dev/mapper/ventoy, which carries the medium's label, then
+    # starts this initrd's own /init. NixOS's stage 1 takes the system to start
+    # only from init=, so without it every Ventoy start ends in emergency mode
+    # ("No init= parameter on the kernel command line"). Only then, overlay
+    # /proc/cmdline with init= restored; the rest of the line stays as it was.
+    # Checked with Ventoy 1.1.18 (Ventoy's grub-core/loader/i386/linux.c,
+    # ventoy_boot_opt_filter).
+    boot.initrd.systemd.services.cybexos-ventoy-init = {
+      description = "Restore the init= parameter that Ventoy renamed";
+      requiredBy = [ "initrd-find-nixos-closure.service" ];
+      before = [ "initrd-find-nixos-closure.service" ];
+      unitConfig = {
+        DefaultDependencies = false;
+        ConditionKernelCommandLine = [ "rdinit=/vtoy/vtoy" "vtit" "!init" ];
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        set -euo pipefail
+        set -f
+        restored=()
+        for o in $(< /proc/cmdline); do
+          case $o in
+            vtit=*) restored+=("init=''${o#vtit=}") ;;
+            *) restored+=("$o") ;;
+          esac
+        done
+        echo "''${restored[*]}" > /run/cybexos-cmdline
+        ${config.boot.initrd.systemd.package.util-linux}/bin/mount --bind /run/cybexos-cmdline /proc/cmdline
+      '';
+    };
     # The iVentoy hook attached its ISO in about 13 s on real hardware, even
     # after its DHCP client failed; two minutes leaves room for slow links.
     boot.initrd.systemd.settings.Manager.DefaultDeviceTimeoutSec = "2min";

@@ -7,9 +7,13 @@ balenaEtcher, Fedora Media Writer, GNOME Disks' *Restore Disk Image*, `dd`
 (`sudo dd if=cybexos-1.0.0.iso of=/dev/sdX bs=4M conv=fsync status=progress`)
 or Rufus in **DD Image** mode. Tools that copy the ISO's files onto a
 FAT-formatted stick, such as Rufus's *ISO Image* mode, cannot work: the image
-holds `nix-store.squashfs`, a file larger than FAT32's 4 GB limit. Booting the
-ISO file from another boot manager (Ventoy, a GRUB `loopback` entry) is not
-qualified. A DVD needs a dual-layer disc.
+holds `nix-store.squashfs`, a file larger than FAT32's 4 GB limit. A Ventoy
+stick can also start the ISO file, in its normal or GRUB2 mode: Ventoy's GRUB
+renames the kernel's `init=` parameter to `vtit=`, and the medium's stage 1
+restores it (`cybexos-ventoy-init` in `nix/modules/installer.nix`; checked with
+Ventoy 1.1.18 in a UEFI VM). Other boot managers' GRUB `loopback` entries are
+not supported: stage 1 does not search disks for the ISO file. A DVD needs a
+dual-layer disc.
 
 Plug the stick into the computer itself rather than a hub, dock or monitor.
 If the installer cannot find its medium within two minutes, it stops and
