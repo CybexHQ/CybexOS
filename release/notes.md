@@ -1,4 +1,4 @@
-# Cybex OS 1.0.4
+# Cybex OS 1.0.5
 
-- Updates that change nothing about starting the computer or logging in install without a restart: the kernel, boot image, boot options, login screen, its sign-in rules and the session it starts are compared first.
-- Installing 1.0.4 itself still asks for one restart, because it changes how the boot splash and the automatic sign-in check are packaged.
+- Dell XPS 14 with the LG OLED panel: the screen no longer freezes for about a second every few seconds, and typed letters no longer repeat. A power-saving feature that kept dropping the panel's link is switched off at startup.
+- Updates that change nothing about starting the computer or logging in install without a restart (from 1.0.4). Coming from 1.0.3 or earlier, this update still asks for one restart.
