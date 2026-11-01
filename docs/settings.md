@@ -91,10 +91,10 @@ with two triples), so one generation and one restart. Recovery-point cleanup is
 a separate maintenance preview, prepared after the regional change is applied.
 
 Settings that build a system change say so on their group heading with
-**Administrator · restart**. SSH Server says **Administrator**, because it needs
-authorization but no restart. Once a system change is prepared, the chip
-follows it through preparing, review in Software Update, and restarting to
-finish.
+**Administrator · restart**. Sudo and SSH Server say **Administrator**, because
+they need authorization but no restart ([sudo](sudo.md), [SSH Server](ssh.md)).
+Once a system change is prepared, the chip follows it through preparing,
+review in Software Update, and restarting to finish.
 
 Displays and Network edits stay on their own page and do not join Changes.
 Applying either starts a keep-or-revert trial. Leaving the page reverts a

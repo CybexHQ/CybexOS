@@ -92,6 +92,12 @@ works after a few attempts, it switches tty1 to the text installer. A screen
 that fails three times within a minute while tty1 is shown asks the installer
 service for the text installer too, unless an installation is running.
 
+The kiosk enables touchpad tapping and tap-drag for devices present at startup
+or plugged in later. Desktop input preferences do not configure this separate
+libinput session. On the exact supported 2026 Dell XPS platforms, the live
+image also runs the installed system's controller-wake and haptic helper;
+other machines skip it.
+
 The boot splash hands over the display without a blank screen, as a display
 manager does. `cybexos-installer-splash` waits for udev, completes the bar and
 runs `plymouth deactivate`: Plymouth releases the display but its last frame
@@ -173,6 +179,12 @@ off), a legacy BIOS boot, an unauthenticated medium or a missing network. A
 failure after the disk was changed says so and opens the log. The menu (⋯) has
 the installation log, a recovery shell on tty2 (Alt+F1 returns), the text
 installer, restart into firmware settings, restart and power off.
+
+Restart and power off show a pending message and prevent repeated requests.
+If systemd refuses the request or it times out, the reason remains on screen
+and the action can be retried. These explicit live-medium actions bypass
+session shutdown inhibitors while retaining normal systemd shutdown and
+filesystem unmounting. They are refused while installation is in progress.
 
 ### Software profiles
 

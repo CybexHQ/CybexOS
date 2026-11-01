@@ -105,3 +105,4 @@ WallpaperPreviewPanel WallpaperPreviewPanel.qml
 WallpaperGrid WallpaperGrid.qml
 WallpaperColourFilter WallpaperColourFilter.qml
 SshServerGroup SshServerGroup.qml
+SudoGroup SudoGroup.qml

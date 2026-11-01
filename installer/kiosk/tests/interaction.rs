@@ -569,6 +569,37 @@ fn click(ui: &InstallerWindow, surface: &MinimalSoftwareWindow, x: f32, y: f32) 
 }
 
 #[test]
+fn restart_click_reports_pending_and_failed_power_requests() {
+    let (ui, app, surface, sent) = software_setup(serde_json::json!({}), true);
+    let store = ui.global::<Store>();
+    let mut state = serde_json::json!({"phase": "complete",
+        "result": {"username": "ada", "hostname": "ada-cybexos", "encrypted": true}});
+    app.borrow_mut().apply_state(serde_json::from_value(state.clone()).unwrap());
+    draw(&surface);
+    click(&ui, &surface, 550.0, 592.0);
+    assert_eq!(sent.take(), vec![serde_json::json!({"action": "power", "kind": "reboot"})]);
+
+    state["power"] = serde_json::json!({"busy": true, "kind": "reboot", "error": ""});
+    app.borrow_mut().apply_state(serde_json::from_value(state.clone()).unwrap());
+    draw(&surface);
+    assert!(store.get_power_busy());
+    assert_eq!(store.get_power_message(), "Restarting…");
+    click(&ui, &surface, 550.0, 592.0);
+    store.invoke_power("poweroff".into());
+    assert!(sent.take().is_empty(), "shutdown pending must disable repeated power actions");
+
+    state["power"] = serde_json::json!({"busy": false, "kind": "reboot",
+        "error": "The power request failed. Please retry."});
+    app.borrow_mut().apply_state(serde_json::from_value(state).unwrap());
+    draw(&surface);
+    assert!(!store.get_power_busy());
+    assert_eq!(store.get_power_message(), "The power request failed. Please retry.");
+    assert_eq!(store.get_screen(), "done", "power errors must retain the successful installation");
+    click(&ui, &surface, 550.0, 592.0);
+    assert_eq!(sent.take(), vec![serde_json::json!({"action": "power", "kind": "reboot"})]);
+}
+
+#[test]
 fn the_software_step_holds_the_password_until_its_continue() {
     let (ui, _app, surface, sent) = software_setup(serde_json::json!({"screen": "account", "username": "ada"}), true);
     let store = ui.global::<Store>();

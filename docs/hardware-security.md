@@ -74,7 +74,9 @@ thermald and camera initialization participate in system health checks when
 applicable; power, thermal safety and repeated sleep require physical tests.
 
 AppArmor, restricted kernel inspection/ptrace, sudo authentication and Polkit
-remain enabled. The replaced system qualified SELinux in enforcing mode.
+remain enabled; sudo stops asking only when the person turns on
+[Sudo without password](sudo.md). The replaced system qualified SELinux in
+enforcing mode.
 Enabling AppArmor on NixOS does not reproduce that broad mandatory access
 control policy: the current explicit application exception supports Chromium
 user namespaces and is not equivalent service/application confinement. A
@@ -93,6 +95,9 @@ persistent APIs. Authentication policy belongs to personal NixOS modules:
 set `cybexos.authentication.fingerprint = true;` or `false`, then preview with
 `cybex update stage local` and apply the reviewed transaction. Settings displays
 the active policy without offering a switch that bypasses the staged lifecycle.
+The exception is **Sudo without password** ([sudo](sudo.md)): every generation
+declares the sudoers include it uses, and Settings owns only whether the
+primary user's one NOPASSWD rule exists, through an authenticated helper.
 Firmware has a separate explicit action in the Update drawer; its device writes
 are outside Nix generations and cannot be undone by a system rollback.
 

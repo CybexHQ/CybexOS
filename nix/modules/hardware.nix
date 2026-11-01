@@ -24,7 +24,7 @@ in {
       hapticIntensity = lib.mkOption { type = lib.types.enum [ "low" "mid" "high" ]; default = "high"; };
     };
   };
-  config = lib.mkIf cfg.enable (lib.mkMerge [ {
+  config = lib.mkMerge [ (lib.mkIf cfg.enable (lib.mkMerge [ {
     hardware.enableRedistributableFirmware = lib.mkDefault true;
     hardware.graphics = { enable = true; enable32Bit = cfg.features.steam; };
     # The other native KMS drivers start in stage 1 on the medium too
@@ -76,15 +76,6 @@ in {
     # firmware/DPTF thermal protection; do not run a competing profile manager.
     services.thermald.enable = lib.mkDefault true;
     cybexos.updates.additionalHealthServices = lib.optional config.services.thermald.enable "thermald.service";
-    environment.etc."cybexos/xps-haptic.conf".text = "intensity=${xps.hapticIntensity}\n";
-    systemd.services.xps-haptic-touchpad = {
-      wantedBy = [ "multi-user.target" ];
-      path = [ pkgs.python3 ];
-      serviceConfig = {
-        ExecStart = "${pkgs.python3}/bin/python3 ${../../hardware/xps/xps-haptic-touchpad}";
-        Restart = "on-failure"; RestartSec = 5;
-      };
-    };
     hardware.graphics.extraPackages = with pkgs; [ intel-media-driver vpl-gpu-rt intel-compute-runtime ];
     environment.etc."cybexos/xps-audio/filter-chain.conf".source = ../../hardware/xps/xps-speaker-filter-chain.conf;
     environment.etc."cybexos/xps-audio/host.conf".source = ../../hardware/xps/xps-speaker-host.conf;
@@ -240,5 +231,24 @@ in {
     };
     cybexos.updates.additionalHealthServices = [ "xps-ipu7-camera-init.service" ];
     systemd.tmpfiles.rules = [ "d /run/camera 0750 root video -" ];
-  }) ]);
+  }) ]))
+  (lib.mkIf ((cfg.enable && xps.enable) || cfg.installationMedium) {
+    # The generic live image needs the same controller wake/click handling as
+    # the installed XPS. Gate it with the installer's exact hardware matcher;
+    # never apply this model's HID reports or power quirks to other laptops.
+    environment.etc."cybexos/xps-haptic.conf".text =
+      "INTENSITY=${toString { low = 10; mid = 50; high = 100; }.${xps.hapticIntensity}}\n";
+    systemd.services.xps-haptic-touchpad = {
+      wantedBy = [ "multi-user.target" ];
+      path = [ pkgs.python3 ];
+      serviceConfig = {
+        ExecCondition = lib.optional cfg.installationMedium (pkgs.writeShellScript "match-xps-touchpad" ''
+          export PYTHONPATH=${cfg.updaterPackage}/lib
+          exec ${pkgs.python3}/bin/python3 -c 'from cybexos.hardware import detect; raise SystemExit(0 if detect()["xps"] else 1)'
+        '');
+        ExecStart = "${pkgs.python3}/bin/python3 ${../../hardware/xps/xps-haptic-touchpad}";
+        Restart = "on-failure"; RestartSec = 5;
+      };
+    };
+  }) ];
 }

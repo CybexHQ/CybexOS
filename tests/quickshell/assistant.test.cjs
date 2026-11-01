@@ -146,6 +146,10 @@ test("readouts: elapsed time, home-relative paths and closure changes", () => {
         [["obsidian", "added"], ["electron", "added"], ["firefox", "changed"]]);
     assert.equal(changes.more, 1);
     assert.deepEqual(A.closureChanges("", 5), { rows: [], more: 0 });
+    assert.deepEqual(A.closureChanges("aws-lc: ∅ → 5.12.0, \u001b[31;1m5.1 MiB\u001b[0m\n"
+        + "bruno: 4.0.0 → 4.3.0, \u001b[32;1m-14.6 MiB\u001b[0m", 5).rows,
+        [{name: "aws-lc", change: "∅ → 5.12.0, 5.1 MiB", kind: "added"},
+         {name: "bruno", change: "4.0.0 → 4.3.0, -14.6 MiB", kind: "changed"}]);
     assert.equal(A.errorAction("auth", "codex").auth, true);
     assert.equal(A.errorAction("crashed", "claude"), null);
     assert.equal(A.copyText({ text: "Done.\n\n" }), "Done.");
@@ -223,7 +227,7 @@ test("the approval card never answers for the person", () => {
         assert.match(card, new RegExp(`Assistant\\.respond\\(root\\.approval\\.id, "${decision}"\\)`));
     assert.doesNotMatch(card, /Component\.onCompleted|Timer \{/, "no card answers itself");
     // A staged change is applied by the updater's own reviewed request.
-    assert.match(read("Assistant/AssistantReply.qml"), /onTriggered: Updates\.show\(\)/);
+    assert.match(read("Assistant/AssistantReply.qml"), /onTriggered: Assistant\.reviewStagedChange\(\)/);
     assert.doesNotMatch(read("Assistant/AssistantReply.qml"), /Updates\.apply\(\)/);
     assert.match(read("Assistant/AssistantReply.qml"),
         /Updates\.deployment\.transaction === turn\.staged/);

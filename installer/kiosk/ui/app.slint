@@ -149,7 +149,7 @@ export component InstallerWindow inherits Window {
         width: 1280px;
         height: 800px;
         page-focus := FocusScope {
-            enabled: Store.sheet == "" && Store.connected;
+            enabled: Store.sheet == "" && Store.connected && !Store.power-busy;
             focus-on-tab-navigation: false;
             if Store.screen == "welcome": WelcomeScreen { }
             if Store.screen == "disk": DiskScreen { }
@@ -173,15 +173,18 @@ export component InstallerWindow inherits Window {
         if Store.sheet == "apps": AppsSheet { }
         if Store.sheet == "gpu": GpuSheet { }
         if Store.sheet == "timezone": TimezoneSheet { }
-        if Store.toast != "": Rectangle {
+        if Store.toast != "" || Store.power-message != "": Rectangle {
             x: (parent.width - self.width) / 2;
             y: 688px;
-            width: toast-text.preferred-width + 36px;
-            height: 42px;
+            width: min(1000px, toast-text.preferred-width + 36px);
+            height: max(42px, toast-text.preferred-height + 24px);
             border-radius: 12px;
             background: Theme.ink;
             toast-text := Text {
-                text: Store.toast;
+                x: 18px;
+                width: parent.width - 36px;
+                text: Store.power-message != "" ? Store.power-message : Store.toast;
+                wrap: word-wrap;
                 color: Theme.accent-ink;
                 font-size: 15px;
                 font-weight: 500;

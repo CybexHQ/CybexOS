@@ -231,7 +231,7 @@ Singleton {
         { id: "power", group: "Devices", label: I18n.tr("Power"), glyph: "power",
             description: I18n.tr("Screen off, lock, suspend and stay awake") },
         { id: "security", group: "System", label: I18n.tr("Security"), glyph: "security",
-            description: I18n.tr("Password, fingerprint, security keys and SSH Server"), system: true },
+            description: I18n.tr("Password, sudo, fingerprint, security keys and SSH Server"), system: true },
         { id: "accounts", group: "System", label: I18n.tr("Online accounts"), glyph: "account_circle",
             description: I18n.tr("Connected accounts and calendar access"), system: true },
         { id: "assistant", group: "System", label: I18n.tr("Assistant"), glyph: "assistant",

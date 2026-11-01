@@ -40,6 +40,11 @@ let
       pam = c.security.pam.services.sshd.text;
       ui = builtins.fromJSON c.environment.etc."cybexos/ssh-server.json".text;
     };
+    sudo = {
+      inherit (c.security.sudo) enable wheelNeedsPassword configFile;
+      # It names the system's visudo, a store path fromJSON would reject.
+      ui = builtins.fromJSON (builtins.unsafeDiscardStringContext c.environment.etc."cybexos/passwordless-sudo.json".text);
+    };
     bootBrand = {
       inherit (c.boot.plymouth) enable theme;
       packages = map toString c.boot.plymouth.themePackages;
@@ -161,6 +166,11 @@ assert !generic.programs.uwsm.enable;
 # Desktop requests run through `pkexec cybexos-request`; NixOS 26.11 made the
 # setuid wrapper opt-in, and the payload installs without proprietary apps.
 assert payload.security.wrappers.pkexec.enable && generic.security.wrappers.pkexec.enable;
+# Settings -> Security -> Sudo without password (docs/sudo.md): the switch's
+# rule directory is sudoers' last line, so its NOPASSWD rule wins over wheel's.
+assert lib.hasSuffix "@includedir /var/lib/cybexos/passwordless-sudo\n\n" generic.security.sudo.configFile;
+assert installed.sudo.ui == { user = payload.cybexos.primaryUser; available = true; passwordRequired = true;
+  visudo = "${generic.security.sudo.package}/bin/visudo"; };
 # Software beyond NixOS packages (docs/software-and-defaults.md): downloaded
 # programs through nix-ld, AppImages through binfmt, and Flathub in Software.
 assert lib.all (c: c.programs.nix-ld.enable && c.programs.appimage.enable && c.programs.appimage.binfmt
@@ -318,6 +328,14 @@ assert !(builtins.elem "v4l2-relayd-ipu7.service" (health machine.config).units)
 assert (health machine.config).userUnits == [ "hypridle.service" ];
 assert builtins.all (unit: builtins.elem unit (health xps).units)
   [ "xps-ipu7-abi.service" "v4l2-relayd-ipu7.service" "xps-haptic-touchpad.service" ];
+# The ISO carries only the runtime-matched haptic helper, not the XPS camera,
+# audio or power profile. A generic installed machine has no such service.
+assert installer.systemd.services ? xps-haptic-touchpad;
+assert !(generic.systemd.services ? xps-haptic-touchpad);
+assert builtins.length installer.systemd.services.xps-haptic-touchpad.serviceConfig.ExecCondition == 1;
+assert xps.systemd.services.xps-haptic-touchpad.serviceConfig.ExecCondition == [];
+assert installer.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=100\n";
+assert xps.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=100\n";
 assert (health xps).userUnits == [ "hypridle.service" "xps-speaker-tuning.service" ];
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.Type == "oneshot";
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.RemainAfterExit;

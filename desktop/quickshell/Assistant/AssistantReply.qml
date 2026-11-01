@@ -205,9 +205,10 @@ AssistantSurface {
                     topPadding: Theme.scaled(4)
 
                     AssistantButton {
+                        objectName: "assistantReviewChange"
                         label: I18n.tr("Review change…")
                         primary: true
-                        onTriggered: Updates.show()
+                        onTriggered: Assistant.reviewStagedChange()
                     }
 
                 }

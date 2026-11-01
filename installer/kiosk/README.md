@@ -110,6 +110,10 @@ reference's icon table.
   Losing the VT (the recovery shell) exits the screen cleanly instead of
   panicking; the unit restarts it, and it waits for tty1 before drawing the
   service's current state again.
+  Touchpads enable tap-to-click and tap-drag as they appear in the kiosk's
+  libinput context, including hotplug. Physical clicks keep their defaults;
+  mice and touchscreens are unaffected. The installed desktop already enables
+  tapping independently. This does not certify a laptop's kernel driver.
   Test the packaged KMS backend through Nix; plain Cargo uses the upstream
   dependencies without this patch.
 - KMS software frames render in cached RAM instead of blending in uncached

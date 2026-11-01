@@ -245,6 +245,18 @@ impl App {
         }
         self.state = Some(state.clone());
         let draft = &state.draft;
+        store.set_power_busy(state.power.busy);
+        store.set_power_message(s(if !state.power.error.is_empty() {
+            &state.power.error
+        } else if state.power.busy {
+            match state.power.kind.as_str() {
+                "poweroff" => "Powering off…",
+                "firmware" => "Restarting into firmware settings…",
+                _ => "Restarting…",
+            }
+        } else {
+            ""
+        }));
 
         // Routing: the worker's phase decides, the draft picks the setup step.
         let screen = match state.phase.as_str() {
@@ -1446,6 +1458,9 @@ fn bind(app: &Shared, window: &InstallerWindow) {
         this.send(json!({"action": "start-over"}));
     });
     on!(on_power, |this, store, kind: SharedString| {
+        if store.get_power_busy() {
+            return;
+        }
         store.set_sheet(s(""));
         let installing = this.state.as_ref().is_some_and(|s| s.phase == "installing");
         if installing {

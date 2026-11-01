@@ -134,6 +134,7 @@ IPC = '''
     property var updateTestBar: null
     property var updateTestPopout: null
     property var updateTestWindow: null
+    property var updateTestAssistant: null
     // Only shown items count: the review and the status page share names.
     function updateFind(item, name) {
         if (!item || item.visible === false) return null;
@@ -158,6 +159,16 @@ IPC = '''
     IpcHandler {
         target: "update-test"
         function refresh(): void { Updates.refreshStatus(); Updates.check(); }
+        function assistantReply(): void {
+            Assistant.show(Screens.focused ? Screens.focused.name : "");
+            Assistant.turn = {id: "review-test", agent: "claude", status: "completed",
+                prompt: "Prepare my system change", text: "The change is ready for review.",
+                staged: Updates.deployment.transaction};
+            Assistant.composing = false;
+            Assistant.replyOpen = true;
+            // An old release's notes must not obscure the staged review.
+            Updates.whatsNew = {version: "previous-release", notes: "Old notes", components: []};
+        }
         function trigger(name: string): void {
             const item = shell.updateItem(name);
             if (item && item.enabled) item.triggered();
@@ -178,6 +189,9 @@ IPC = '''
             const notes = shell.updateItem("updateReleaseNotes");
             const chip = shell.updateItem("updateTestIndicator");
             const rect = chip ? chip.mapToItem(null, 0, 0) : null;
+            const review = shell.updateFind(updateTestAssistant ? updateTestAssistant.contentItem : null,
+                "assistantReviewChange");
+            const reviewRect = review ? review.mapToItem(null, review.width/2, review.height/2) : null;
             const content = updateTestWindow && updateTestWindow.visible ? updateTestWindow.contentItem : null;
             return JSON.stringify({loaded: Updates.statusLoaded && Updates.sourcesLoaded,
                 indicator: Updates.showIndicator, hasUpdates: Updates.hasUpdates,
@@ -191,6 +205,8 @@ IPC = '''
                 wiz: wiz ? {pose: wiz.pose, unread: wiz.unread} : null,
                 stance: view ? view.wiz.pose : null, celebrated: view ? view.celebrated : null,
                 whatsNew: Updates.whatsNew ? Updates.whatsNew.version : null, announced: Updates.announced,
+                assistantReply: Assistant.replyOpen,
+                assistantReview: reviewRect ? {x: reviewRect.x, y: reviewRect.y} : null,
                 notes: notes ? notes.text : null, back: !!shell.updateItem("updateBack"),
                 failureText: failure ? failure.text : null,
                 activity: activity ? activity.text : null, elapsed: elapsed ? elapsed.text : null,
@@ -225,6 +241,8 @@ class Session(welcome.Session):
         assert text.count('    SoftwareUpdateWindow {}\n') == 1
         text = text.replace('    SoftwareUpdateWindow {}\n',
             '    SoftwareUpdateWindow { id: updateWindow; Component.onCompleted: shell.updateTestWindow = updateWindow }\n')
+        text = text.replace('        AssistantWindow {}',
+            '        AssistantWindow { id: reviewAssistant; Component.onCompleted: shell.updateTestAssistant = reviewAssistant }', 1)
         entry.write_text(text)
         chip = shell / 'Bar/Modules/Updates.qml'
         chip.write_text(chip.read_text().replace('        id: chip', '        id: chip\n        objectName: "updateTestIndicator"', 1))
@@ -297,7 +315,7 @@ def main():
         subprocess.run(['cmake','-S',str(ROOT/'desktop/notification-images'),'-B',str(native),'-DBUILD_TESTING=OFF'],check=True,capture_output=True)
         subprocess.run(['cmake','--build',str(native),'--parallel','2'],check=True,capture_output=True)
         session = Session(base, native/'qml')
-        session.env.update(CYBEXOS_WELCOME='0', CYBEXOS_ASSISTANT='0')
+        session.env.update(CYBEXOS_WELCOME='0', CYBEXOS_ASSISTANT='1')
         session.patch_settings(drawerOverview={'updates':True,'processes':False,'media':False})
         for name, body in (('cybex', FAKE), ('systemctl', SYSTEMCTL.replace('REAL', repr(shutil.which('systemctl')))),
                            ('cybexos-session-action', SESSION_ACTION), ('notify-send', NOTIFY_SEND)):
@@ -364,6 +382,28 @@ def main():
             session.wait(lambda:session.state().get('window') and not session.state().get('popout'),
                 'shared review from control center')
             assert not session.calls(), session.calls()
+
+            # Click the real assistant card: it hands focus and the visible
+            # surface to this exact staged review, without applying anything.
+            for already_open in (False, True):
+                session.status(state='ready', transaction='a'*32, reviewToken='b'*64,
+                    scope='local', changeKind='configuration', changes='hello: 1 → 2',
+                    packageChanges=[], highlights=HIGHLIGHTS)
+                session.wait(lambda: session.state().get('state') == 'ready', 'assistant staged change')
+                if not already_open:
+                    session.call('updates', 'close')
+                    session.wait(lambda: not session.state().get('window'), 'review initially closed')
+                session.call('update-test', 'assistantReply')
+                review = session.wait(lambda: session.state().get('assistantReview'), 'assistant review button')
+                mouse.move(review['x'], review['y'])
+                mouse.button(True); mouse.button(False)
+                session.wait(lambda: session.state().get('window') and session.state().get('page') == 'ready'
+                    and not session.state().get('assistantReply') and session.state().get('whatsNew') is None,
+                    'assistant hands off to the staged review')
+                assert not session.calls() and not session.units(), (session.calls(), session.units())
+            session.call('assistant', 'hide')
+            session.status(state='idle')
+            session.wait(lambda: session.state().get('page') == 'available', 'restore available update')
 
             session.fixture(cancel=True)
             session.trigger('updatePrimary')

@@ -131,7 +131,7 @@ test("nothing on the page blocks the UI thread", () => {
 
 test("Security is a System page that IPC, the rail and search reach", () => {
     const settings = read("Common/Settings.qml");
-    assert.match(settings, /\{ id: "security", group: "System", label: "Security", glyph: "security",\s*description: "Password, fingerprint, security keys and SSH Server", system: true \}/);
+    assert.match(settings, /\{ id: "security", group: "System", label: "Security", glyph: "security",\s*description: "Password, sudo, fingerprint, security keys and SSH Server", system: true \}/);
     // Turning SSH Server on asks for an administrator; the heading says so first.
     assert.match(read("Settings/SshServerGroup.qml"), /title: "SSH Server"\s*changeTag: "admin"/);
     const view = read("Settings/SettingsView.qml");
@@ -140,12 +140,34 @@ test("Security is a System page that IPC, the rail and search reach", () => {
     assert.match(read("Settings/qmldir"), /^SecurityPage SecurityPage\.qml$/m);
     const { ROWS, search } = load("SettingsSearchData.js");
     const rows = ROWS.filter(row => row.page === "security");
-    assert.deepEqual(rows.map(row => row.label), ["Enable SSH Server", "Add fingerprint",
+    assert.deepEqual(rows.map(row => row.label), ["Sudo without password", "Enable SSH Server", "Add fingerprint",
         "Use fingerprint to unlock and authorise", "Add security key"]);
     for (const row of rows) {
         assert.equal(row.key, "", "system state, not a shell.json key");
         assert.equal(row.pageLabel, "Security");
     }
-    for (const query of ["ssh", "remote login", "fingerprint", "yubikey", "fido2", "sudo", "security key"])
+    for (const query of ["ssh", "remote login", "fingerprint", "yubikey", "fido2", "sudo", "security key",
+        "nopasswd", "passwordless"])
         assert.ok(search(query).some(row => row.page === "security"), query);
+});
+
+test("Sudo without password is an administrator switch with a Polkit helper", () => {
+    // It follows the Password group, ahead of SSH Server, on the page.
+    const page = read("Settings/SecurityPage.qml");
+    assert.match(page, /title: "Password"[\s\S]*SudoGroup \{ width: parent\.width \}\s*SshServerGroup \{ width: parent\.width \}/);
+    assert.match(read("Settings/qmldir"), /^SudoGroup SudoGroup\.qml$/m);
+    const group = read("Settings/SudoGroup.qml");
+    assert.match(group, /title: "Sudo" \/\/ i18n: untranslated\s*changeTag: "admin"/);
+    assert.match(group, /readonly property SystemSettingsBackend service: SystemSettings\.passwordlessSudo/);
+    assert.match(group, /onToggled: value => root\.service\.run\(\{action: "set-enabled", enabled: value\}\)/);
+    // A personal module that already drops the password shows as on, locked.
+    assert.match(group, /checked: root\.sudoState\.enabled === true \|\| root\.declared/);
+    assert.match(group, /root\.declared \? "Managed in \/etc\/nixos\/local"/);
+    assert.match(group, /hintTone: checked \? "warning" : "info"/);
+    assert.match(read("Common/SystemSettings.qml"),
+        /passwordlessSudo: SystemSettingsBackend \{ domain: "passwordless-sudo" \}/);
+    assert.match(read("Common/SystemSettingsBackend.qml"), /&& domain !== "passwordless-sudo"/,
+        "the rule changes only on request, so it is polled, never monitored");
+    const dispatcher = read("scripts/system-settings.py");
+    assert.match(dispatcher, /'passwordless-sudo': SudoSettings/);
 });

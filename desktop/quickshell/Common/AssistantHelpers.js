@@ -193,7 +193,7 @@ function displayPath(path, home) {
 // "obsidian: ∅ → 1.9.12, +148.2 MiB" becomes {name, change, kind}.
 function closureChanges(text, limit) {
     var rows = [];
-    String(text || "").split("\n").forEach(function(line) {
+    String(text || "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").split("\n").forEach(function(line) {
         var match = /^\s*([^:]+):\s*(.+?)\s*$/.exec(line);
         if (!match)
             return;

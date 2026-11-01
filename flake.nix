@@ -135,6 +135,9 @@
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
         firmware = import ./nix/tests/firmware.nix { inherit pkgs module; };
         hyprland-pointer = import ./nix/tests/hyprland-pointer.nix { inherit pkgs module; };
+        # Settings -> Security -> Sudo without password: Polkit, the helper and real sudo.
+        passwordless-sudo = import ./nix/tests/passwordless-sudo.nix { inherit pkgs module; };
+        installer-power = import ./nix/tests/installer-power.nix { inherit pkgs; };
         # Settings -> Appearance -> Pointer: a download, Hyprland and the next login.
         pointer = import ./nix/tests/pointer.nix { inherit pkgs module; };
         # Wiz on the disk unlock screen, the lock screen and in kitty.

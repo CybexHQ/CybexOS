@@ -131,6 +131,25 @@ class HardwareAssessmentTests(unittest.TestCase):
                          ('usb', '0bda', '8153', 'r8152'))
         self.assertEqual(found['networkIssues'], [])
 
+    def test_live_xps_touchpad_gate_requires_the_exact_supported_platform(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        (dmi / 'sys_vendor').write_text('Dell Inc.')
+        (dmi / 'product_name').write_text('XPS 14 DA14260')
+        self.cpu.write_text('model name : Intel Core Ultra 7\n')
+        for sku in ('0DB9', '0DBA'):
+            (dmi / 'product_sku').write_text(sku)
+            self.assertTrue(self.detect()['xps'])
+        (dmi / 'product_sku').write_text('unknown')
+        self.assertFalse(self.detect()['xps'])
+        (dmi / 'product_sku').write_text('0DB9')
+        (dmi / 'product_name').write_text('XPS 14 9440')
+        # The older CPU signature must not activate this profile.
+        self.cpu.write_text('model name : Intel Core i7\n')
+        self.assertFalse(self.detect()['xps'])
+        (dmi / 'sys_vendor').write_text('Another manufacturer')
+        self.cpu.write_text('model name : Intel Core Ultra 7\n')
+        self.assertFalse(self.detect()['xps'])
+
     def test_inventory_keeps_identity_and_never_manufactures_qualification(self):
         self.pci(driver='nouveau')
         etc = self.root / 'etc'; etc.mkdir()

@@ -230,11 +230,20 @@ pub struct InstallResult {
 
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(default)]
+pub struct Power {
+    pub busy: bool,
+    pub kind: String,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct State {
     pub schema: String,
     pub phase: String,
     pub message: String,
     pub error: String,
+    pub power: Power,
     pub stage: i64,
     pub stages: i64,
     pub elapsed: i64,

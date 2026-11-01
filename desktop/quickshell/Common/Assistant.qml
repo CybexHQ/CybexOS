@@ -209,6 +209,16 @@ Singleton {
         closeReply();
     }
 
+    function reviewStagedChange() {
+        if (!turn || !turn.staged || Updates.deployment.transaction !== turn.staged)
+            return;
+        closeBox();
+        Updates.closeWhatsNew();
+        // Release the overlay's focus and input region before showing the
+        // review window. The turn stays available on the character.
+        Qt.callLater(Updates.show);
+    }
+
     function characterClicked() {
         if (unread && hasReply) {
             unread = false;

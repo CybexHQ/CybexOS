@@ -12,8 +12,10 @@ import "../Common/SecurityHelpers.js" as SecurityHelpers
 //
 // Nothing here is privileged by itself. fprintd asks for authorization (the
 // shell's Polkit dialog) before it adds or removes a fingerprint, and the
-// authentication policy is declared in personal NixOS modules and reviewed
-// through the staged update lifecycle.
+// fingerprint policy is declared in personal NixOS modules and reviewed
+// through the staged update lifecycle. Sudo without password and SSH Server
+// are root-owned switches behind their own Polkit helpers (docs/sudo.md,
+// docs/ssh.md).
 // A key registration is a public key in ~/.config/Yubico/u2f_keys.
 //
 // Every request runs off the UI thread: the shared settings backend for
@@ -147,6 +149,8 @@ SettingsPage {
                 onTriggered: { Settings.closePanel(); Quickshell.execDetached(["cybexos-password"]); }
             }
         }
+
+        SudoGroup { width: parent.width }
 
         SshServerGroup { width: parent.width }
 

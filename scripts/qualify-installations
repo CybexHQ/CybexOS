@@ -704,7 +704,7 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         return code, output
 
     def authorization(self, evidence):
-        print('Installed desktop: exercising real SSH and updater password prompts', flush=True)
+        print('Installed desktop: exercising real SSH, sudo and updater password prompts', flush=True)
         script = self.command('cybexos-runtime path quickshell').strip() + '/scripts/system-settings.py'
         command = ['/run/current-system/sw/bin/python3', '-B', script, 'ssh-server']
         request = json.dumps({'action': 'set-enabled', 'enabled': True}) + '\n'
@@ -718,6 +718,21 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         assert code == 0 and enabled['enabled'] and enabled['active'], enabled
         self.authorize(command, payload=json.dumps({'action': 'set-enabled', 'enabled': False}) + '\n')
         assert not json.loads(self.command('cybexos-ssh-server status'))['enabled']
+        # Settings -> Security -> Sudo without password, then real sudo.
+        # Under the command transport's set -e, a failing sudo is a condition.
+        sudo = 'runuser -u cybexqa -- /run/wrappers/bin/sudo -n true 2>/dev/null && echo none || echo required'
+        command = command[:-1] + ['passwordless-sudo']
+        code, output = self.authorize(command, payload=request, approve=False)
+        cancelled = json.loads(output)
+        assert code == 0 and 'cancelled or denied' in cancelled.get('error', ''), cancelled
+        assert not json.loads(self.command('cybexos-passwordless-sudo status'))['enabled']
+        assert self.command(sudo).strip() == 'required'
+        code, output = self.authorize(command, payload=request)
+        enabled = json.loads(output)
+        assert code == 0 and enabled['enabled'] and self.command(sudo).strip() == 'none', enabled
+        self.authorize(command, payload=json.dumps({'action': 'set-enabled', 'enabled': False}) + '\n')
+        assert not json.loads(self.command('cybexos-passwordless-sudo status'))['enabled']
+        assert self.command(sudo).strip() == 'required'
         code, output = self.authorize(['/run/current-system/sw/bin/cybex', 'update', 'stage', 'local'])
         accepted = json.loads(output)
         assert code == 0 and accepted['accepted'], accepted
@@ -726,6 +741,7 @@ subprocess.run(prefix + ['systemd-run', '--user', '--quiet', '--collect', '--uni
         self.command('cybex update discard ' + candidate['transaction'])
         wait_state(self, ('idle',), timeout=120)
         evidence.update(result='passed', sshCancellation=True, sshEnable=True, sshDisable=True,
+                        sudoCancellation=True, sudoEnable=True, sudoDisable=True,
                         updateStage=True, passwordPrompts='real Quickshell agent and PAM')
 
     def password_change(self, encrypted, evidence=None):

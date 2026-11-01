@@ -15,7 +15,7 @@ import signal
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'lifecycle'))
@@ -194,6 +194,53 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(static['version'], '1.0.0')
         self.assertIn('messagebus', static['reserved'])
         return await self.until(lambda m: m['type'] == 'state' and m['phase'] == 'setup' and m['draft']['timezone'] == 'Europe/Amsterdam')
+
+    async def test_completed_install_accepts_one_power_request_and_blocks_new_disk_actions(self):
+        await self.setup_phase()
+        self.service.handle_event({'event': 'complete', 'username': 'ada', 'encrypted': True})
+        with patch.object(daemon, 'request_power', new_callable=AsyncMock) as power:
+            await self.send(action='power', kind='reboot')
+            pending = await self.until(lambda m: m['type'] == 'state' and m['power']['busy'])
+            self.assertEqual(pending['power'], {'busy': True, 'kind': 'reboot', 'error': ''})
+            await self.send(action='power', kind='poweroff')
+            await self.send(action='review', password=PASSWORD, confirm=PASSWORD)
+            await self.send(action='install')
+            await self.send(action='hello')
+            state = await self.until(lambda m: m['type'] == 'state' and m['power']['busy'])
+            self.assertEqual(state['phase'], 'complete')
+            power.assert_awaited_once_with('reboot')
+        self.assertEqual(self.requests(), [])
+
+    async def test_power_failure_survives_reconnect_and_can_be_retried(self):
+        await self.setup_phase()
+        self.service.handle_event({'event': 'complete', 'username': 'ada', 'encrypted': True})
+        with patch.object(daemon, 'request_power', new_callable=AsyncMock,
+                          side_effect=daemon.Failure('Firmware setup is not supported.')) as power:
+            await self.send(action='power', kind='firmware')
+            failed = await self.until(lambda m: m['type'] == 'state' and m['power']['error'])
+            self.assertEqual(failed['phase'], 'complete')
+            self.assertFalse(failed['power']['busy'])
+            await self.send(action='hello', client='screen')
+            state = await self.until(lambda m: m['type'] == 'state' and m['power']['error'])
+            self.assertEqual(state['power']['error'], 'Firmware setup is not supported.')
+            power.side_effect = None
+            await self.send(action='power', kind='reboot')
+            await self.until(lambda m: m['type'] == 'state' and m['power']['busy'] and not m['power']['error'])
+            await self.send(action='hello')
+            await self.until(lambda m: m['type'] == 'state' and m['power']['busy'])
+            self.assertEqual(power.await_args_list[-1].args, ('reboot',))
+
+    async def test_power_actions_are_refused_while_installing(self):
+        await self.setup_phase()
+        self.service.handle_event({'event': 'started'})
+        with patch.object(daemon, 'request_power', new_callable=AsyncMock) as power:
+            for kind in ('reboot', 'poweroff', 'firmware'):
+                await self.send(action='power', kind=kind)
+                refused = await self.until(lambda m: m['type'] == 'state' and m['power']['error'])
+                self.assertEqual(refused['phase'], 'installing')
+                self.assertFalse(refused['power']['busy'])
+                self.assertIn('Installation is in progress', refused['power']['error'])
+            power.assert_not_called()
 
     async def test_wifi_connect_waits_for_background_poll_and_errors_survive_polling(self):
         await self.setup_phase()
@@ -691,6 +738,58 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         await self.service.shutdown(self.stop)
         self.assertIsNotNone(worker.returncode)
         self.assertEqual(self.requests()[-1], {'action': 'cancel'})
+
+
+class PowerCommandTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='cybex-power-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        helper = self.root / 'systemctl'
+        helper.write_text(f'#!{sys.executable}\n' + '''
+import json, os, sys, time
+from pathlib import Path
+root = Path(os.environ['CYBEX_POWER_TEST'])
+(root / 'args.json').write_text(json.dumps(sys.argv[1:]))
+(root / 'pid').write_text(str(os.getpid()))
+if (root / 'hang').exists():
+    time.sleep(60)
+if (root / 'fail').exists():
+    print('Reboot to firmware setup is not supported.', file=sys.stderr)
+    sys.exit(1)
+''')
+        helper.chmod(0o700)
+        environment = patch.dict(os.environ, {
+            'PATH': str(self.root) + os.pathsep + os.environ.get('PATH', ''),
+            'CYBEX_POWER_TEST': str(self.root)})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    async def test_power_commands_queue_normal_shutdown_without_interactive_inhibitors(self):
+        for kind, arguments in (('reboot', ['reboot']), ('poweroff', ['poweroff']),
+                                ('firmware', ['reboot', '--firmware-setup'])):
+            await daemon.request_power(kind)
+            self.assertEqual(json.loads((self.root / 'args.json').read_text()),
+                ['--no-block', '--no-ask-password', '--check-inhibitors=no', *arguments])
+
+    async def test_failed_command_preserves_the_reason(self):
+        (self.root / 'fail').touch()
+        with self.assertRaisesRegex(daemon.Failure, 'Reboot to firmware setup is not supported'):
+            await daemon.request_power('firmware')
+
+    async def test_timed_out_command_is_killed_and_reaped(self):
+        (self.root / 'hang').touch()
+        with self.assertRaisesRegex(daemon.Failure, 'timed out'):
+            await daemon.request_power('reboot', timeout=0.5)
+        pid = int((self.root / 'pid').read_text())
+        with self.assertRaises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    async def test_missing_command_has_a_visible_error(self):
+        (self.root / 'systemctl').unlink()
+        with patch.dict(os.environ, {'PATH': str(self.root)}):
+            with self.assertRaisesRegex(daemon.Failure, 'could not start'):
+                await daemon.request_power('reboot')
 
 
 if __name__ == '__main__':

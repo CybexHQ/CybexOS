@@ -511,3 +511,33 @@
          #[cfg(feature = "libinput")]
          let mouse_position_property = input::LibInputHandler::init(
              &self.window,
+--- a/i-slint-backend-linuxkms-1.18.1/calloop_backend/input.rs
++++ b/i-slint-backend-linuxkms-1.18.1/calloop_backend/input.rs
+@@ -24,6 +24,7 @@
+ use i_slint_core::window::WindowAdapter;
+ use i_slint_core::{Property, SharedString};
+ use input::LibinputInterface;
++use input::event::EventTrait;
+ use input::event::pointer::{Axis, PointerScrollEvent};
+ use input::event::keyboard::{KeyState, KeyboardEventTrait};
+ use input::event::touch::{TouchEventPosition, TouchEventSlot};
+@@ -347,6 +348,19 @@
+                     }
+                     _ => {}
+                 },
++                input::Event::Device(input::event::DeviceEvent::Added(event)) => {
++                    let mut device = event.device();
++                    // The kiosk owns this context; desktop defaults do not
++                    // reach it. Include touchpads discovered after startup.
++                    if device.config_tap_finger_count() > 0 {
++                        if let Err(error) = device.config_tap_set_enabled(true) {
++                            eprintln!("Could not enable touchpad tapping: {error:?}");
++                        }
++                        if let Err(error) = device.config_tap_set_drag_enabled(true) {
++                            eprintln!("Could not enable touchpad tap-drag: {error:?}");
++                        }
++                    }
++                }
+                 input::Event::Device(input::event::DeviceEvent::Removed(_)) => {
+                     self.repeat_timer.stop();
+                     self.repeat_key = None;

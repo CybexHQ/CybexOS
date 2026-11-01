@@ -11,12 +11,13 @@ from system_settings_keybindings import KeybindingsSettings, reject_duplicates
 from system_settings_region import RegionSettings
 from system_settings_security import SecuritySettings
 from system_settings_ssh import SshSettings
+from system_settings_sudo import SudoSettings
 
 
 def main():
     try:
         if len(sys.argv) != 2 or sys.argv[1] not in ('sound', 'network', 'accounts', 'input', 'keybindings', 'region',
-                                                     'security', 'ssh-server'):
+                                                     'security', 'ssh-server', 'passwordless-sudo'):
             raise ValueError('Unknown settings service')
         raw = sys.stdin.buffer.readline(65537)
         if len(raw) > 65536:
@@ -26,7 +27,8 @@ def main():
             raise ValueError('Invalid settings request')
         service = {'sound': AudioSettings, 'network': NetworkSettings,
                    'accounts': AccountSettings, 'input': InputSettings, 'keybindings': KeybindingsSettings,
-                   'region': RegionSettings, 'security': SecuritySettings, 'ssh-server': SshSettings}[sys.argv[1]]()
+                   'region': RegionSettings, 'security': SecuritySettings, 'ssh-server': SshSettings,
+                   'passwordless-sudo': SudoSettings}[sys.argv[1]]()
         result = service.dispatch(request)
         print(json.dumps({'success': True, **result}), flush=True)
     except ValueError as error:

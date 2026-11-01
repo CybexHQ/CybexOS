@@ -314,7 +314,8 @@ class Daemon:
                       'disks': [], 'hardware': detect(), 'network': {'busy': False, 'error': '', 'message': ''},
                       'region': {'busy': False, 'message': '', 'detected': ''},
                       'firmware': firmware_facts(), 'memory': memory_bytes(), 'graphics': graphics_names(),
-                      'review': None, 'result': None, 'diskTouched': False}
+                      'review': None, 'result': None, 'diskTouched': False,
+                      'power': {'busy': False, 'kind': '', 'error': ''}}
         self.region_attempted = False
         self.region_task = None
         self.network_task = None
@@ -699,6 +700,9 @@ class Daemon:
                 self.screens.add(writer)
             self.send(writer, self.static)
             self.send(writer, self.snapshot())
+        elif self.state['power']['busy']:
+            # A queued shutdown must not race a new disk-writing request.
+            return
         elif action == 'draft' and isinstance(request.get('values'), dict):
             if phase in ('loading', 'development', 'preflight', 'setup', 'review', 'cancelled'):
                 self.change_draft(request['values'])
@@ -756,10 +760,16 @@ class Daemon:
         elif action == 'usb-save' and isinstance(request.get('device'), str):
             self.send(writer, await asyncio.to_thread(save_log, request['device']))
         elif action == 'power' and request.get('kind') in ('reboot', 'poweroff', 'firmware'):
-            if phase != 'installing':
-                command = {'reboot': ['systemctl', 'reboot'], 'poweroff': ['systemctl', 'poweroff'],
-                           'firmware': ['systemctl', 'reboot', '--firmware-setup']}[request['kind']]
-                await run_quiet(command)
+            if phase == 'installing':
+                self.update(power={'busy': False, 'kind': '', 'error':
+                    'Installation is in progress. Keep the computer on until it finishes.'})
+            else:
+                kind = request['kind']
+                self.update(power={'busy': True, 'kind': kind, 'error': ''})
+                try:
+                    await request_power(kind)
+                except Failure as error:
+                    self.update(power={'busy': False, 'kind': kind, 'error': str(error)})
         elif action == 'shell':
             await run_quiet(['chvt', '2'])
         elif action == 'text-installer' and phase != 'installing':
@@ -1083,6 +1093,35 @@ def geoip_zone():
         data = json.loads(response.read(65536))
     zone = data.get('timezone') if isinstance(data, dict) else None
     return zone if isinstance(zone, str) and len(zone) <= 64 else None
+
+
+async def request_power(kind, timeout=15):
+    # This is an explicit action on the live installation medium. Its kiosk
+    # session (or a recovery login) must not veto it. Never force the kernel
+    # reboot: systemd still stops services and unmounts filesystems normally.
+    action = 'poweroff' if kind == 'poweroff' else 'reboot'
+    command = ['systemctl', '--no-block', '--no-ask-password', '--check-inhibitors=no', action]
+    if kind == 'firmware':
+        command.append('--firmware-setup')
+    process = None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command, stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+        _, error = await asyncio.wait_for(process.communicate(), timeout)
+        if process.returncode:
+            detail = error.decode(errors='replace').strip()[:500]
+            raise Failure(f'The power request failed (exit {process.returncode}). '
+                          + (detail or 'Open the recovery shell to check the system journal, then retry.'))
+    except asyncio.TimeoutError as error:
+        raise Failure('The power request timed out. Open the recovery shell to check the system journal, then retry.') from error
+    except OSError as error:
+        raise Failure('The power request could not start. Open the recovery shell to check the system journal, then retry.') from error
+    finally:
+        if process is not None and process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            await process.wait()
 
 
 async def run_quiet(command):
