@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import pwd
 import subprocess
 import sys
 import tempfile
@@ -11,8 +12,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lifecycle'))
 from cybexos.common import Failure
 from cybexos.desktop_check import compositor_command, verify_compositor
-from cybexos.health import (LIVE_BEGIN, LIVE_END, desktop, inactive_units, preexisting_arguments,
-                            system_services, user_services)
+from cybexos.health import (LIVE_BEGIN, LIVE_END, USER_UNIT, baseline, desktop, desktop_sessions,
+                            inactive_units, preexisting_arguments, system_services, user_services)
 
 SYSTEM = '/nix/store/' + 'a' * 32 + '-nixos-system-test'
 GUARD = Path(__file__).resolve().parents[1] / 'lib/quickshell-live'
@@ -94,13 +95,56 @@ class SystemHealthTests(unittest.TestCase):
             return 'failed\n' if args[-1] == 'xps-ipu7-abi.service' else 'active\n'
         self.assertEqual(inactive_units(run, declaration), ['xps-ipu7-abi.service'])
 
-    def test_preexisting_arguments_name_only_system_units(self):
+    def test_preexisting_arguments_name_only_declarable_units(self):
         self.assertEqual(preexisting_arguments(['--preexisting=xps-ipu7-abi.service']), {'xps-ipu7-abi.service'})
+        self.assertEqual(preexisting_arguments(['--preexisting=multi-user.target']), {'multi-user.target'})
         self.assertEqual(preexisting_arguments([]), set())
         for invalid in (['xps-ipu7-abi.service'], ['--preexisting=--all'], ['--preexisting='],
                         ['--preexisting=personal.socket'], ['--force']):
             with self.subTest(invalid=invalid), self.assertRaises(Failure):
                 preexisting_arguments(invalid)
+        self.assertEqual(preexisting_arguments(['--preexisting=xps-speaker-tuning.service'], USER_UNIT),
+                         {'xps-speaker-tuning.service'})
+        with self.assertRaises(Failure):
+            preexisting_arguments(['--preexisting=graphical-session.target'], USER_UNIT)
+
+    def test_desktop_units_inactive_before_the_change_are_tolerated(self):
+        declaration = {'schema': 1, 'userUnits': ['hypridle.service', 'xps-speaker-tuning.service']}
+        def run(*args):
+            return 'activating\n' if args[-1] == 'xps-speaker-tuning.service' else 'active\n'
+        user_services(['runuser', '-u', 'owner', '--'], run, declaration, {'xps-speaker-tuning.service'})
+        with self.assertRaisesRegex(Failure, 'xps-speaker-tuning.service is not active in the desktop session'):
+            user_services([], run, declaration)
+        with self.assertRaisesRegex(Failure, 'hypridle.service'):
+            user_services([], lambda *args: 'failed', declaration, {'xps-speaker-tuning.service'})
+
+    def test_baseline_covers_the_system_and_every_signed_in_desktop(self):
+        declaration = {'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service'],
+                       'userUnits': ['hypridle.service', 'xps-speaker-tuning.service']}
+        def run(*args):
+            missing = {'xps-ipu7-abi.service'} | ({'xps-speaker-tuning.service'} if args[:3] == ('runuser', '-u', 'b') else set())
+            return 'failed\n' if args[-1] in missing else 'active\n'
+        sessions = [('a', ['runuser', '-u', 'a', '--']), ('b', ['runuser', '-u', 'b', '--'])]
+        self.assertEqual(baseline(run, declaration, sessions),
+                         {'units': ['xps-ipu7-abi.service'], 'userUnits': ['xps-speaker-tuning.service']})
+        self.assertEqual(baseline(run, declaration, [])['userUnits'], [])
+
+    def test_only_signed_in_hyprland_sessions_are_checked(self):
+        with tempfile.TemporaryDirectory(prefix='cybexos-health-runtime-') as directory:
+            runtime = Path(directory)
+            uid = os.getuid()
+            (runtime / str(uid)).mkdir()
+            (runtime / 'not-a-session').mkdir()
+            calls = []
+            def run(*args):
+                calls.append(args)
+                return 'active\n'
+            sessions = desktop_sessions(run, runtime)
+            self.assertEqual([name for name, _ in sessions], [pwd.getpwuid(uid).pw_name])
+            self.assertEqual(calls[0][-4:], ('systemctl', '--user', 'is-active', 'hyprland-session.target'))
+            def logged_out(*args):
+                raise subprocess.CalledProcessError(3, args)
+            self.assertEqual(desktop_sessions(logged_out, runtime), [])
 
     def test_command_accepts_the_updater_baseline(self):
         # The packaged command, with a fake systemctl and declaration.
@@ -112,19 +156,27 @@ class SystemHealthTests(unittest.TestCase):
             declaration.write_text(json.dumps({'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service']}))
             source = (Path(__file__).resolve().parents[2] / 'lifecycle/bin/cybexos-health').read_text()
             command = root / 'cybexos-health'
+            sessions = root / 'run-user'
+            sessions.mkdir()
             command.write_text(source.replace("'/etc/cybexos/health-services.json'", repr(str(declaration)))
-                               .replace("'/run/booted-system'", repr(str(root))))
+                               .replace("'/run/booted-system'", repr(str(root)))
+                               .replace("Path('/run/user')", f"Path({str(sessions)!r})"))
             environment = os.environ | {'PATH': f'{root}:{os.environ["PATH"]}',
                                         'PYTHONPATH': str(Path(__file__).resolve().parents[2] / 'lifecycle')}
-            def health(*arguments):
-                return subprocess.run([sys.executable, str(command), 'system', *arguments],
+            def health(*arguments, mode='system'):
+                return subprocess.run([sys.executable, str(command), mode, *arguments],
                                       env=environment, capture_output=True, text=True)
             strict = health()
             self.assertEqual(strict.returncode, 1)
             self.assertIn('xps-ipu7-abi.service is not active', strict.stderr)
             self.assertEqual(health('--preexisting=xps-ipu7-abi.service').returncode, 0)
             self.assertEqual(health('--preexisting=v4l2-relayd-ipu7.service').returncode, 1)
-            self.assertIn('Invalid system health argument', health('--preexisting=--all').stderr)
+            self.assertIn('Invalid health argument', health('--preexisting=--all').stderr)
+            recorded = health(mode='baseline')
+            self.assertEqual(recorded.returncode, 0, recorded.stderr)
+            self.assertEqual(json.loads(recorded.stdout), {'units': ['xps-ipu7-abi.service'], 'userUnits': []})
+            self.assertEqual(health('--preexisting=xps-speaker-tuning.service', mode='desktop').returncode, 0)
+            self.assertIn('Invalid health argument', health('--preexisting=multi-user.target', mode='desktop').stderr)
 
     def test_invalid_or_missing_declaration_cannot_skip_health(self):
         for declaration in (None, {'schema': 1, 'units': []}, {'schema': 2, 'units': ['ipsec.service']},

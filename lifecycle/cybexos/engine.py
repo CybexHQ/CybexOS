@@ -14,7 +14,6 @@ from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse
 from . import inputs
 from .trust import REPO, Fetcher, NoPublishedRelease, discover, version
 from . import review, firmware, prebuilt
-from .health import inactive_units
 from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
@@ -551,21 +550,25 @@ class Engine:
                           + '. Inspect their journals and correct the configuration before retrying.')
 
     def health_baseline(self):
-        """Declared health units the running system already lacks."""
+        """Declared health units the running system and its desktop already lack."""
+        empty = {'units': [], 'userUnits': []}
         try:
-            declaration = parse(self.run('cat', str(self.current_system.resolve()) + '/etc/cybexos/health-services.json'))
-            return sorted(inactive_units(self.run, declaration))
+            baseline = parse(self.run('cybexos-health', 'baseline', timeout=120))
         except Failure:
-            # No baseline without a valid declaration; the declared check
-            # itself still fails closed on it.
-            return []
+            # No baseline; the declared checks themselves still fail closed.
+            return empty
+        if not isinstance(baseline, dict) or any(
+                not isinstance(baseline.get(key), list) or not all(isinstance(unit, str) for unit in baseline[key])
+                for key in empty):
+            return empty
+        return {key: sorted(baseline[key]) for key in empty}
 
-    def system_health(self, command, record):
+    def health(self, command, mode, record):
         # Like reject_new_failures, declared health judges what a deployment
         # changed. Units recorded as inactive before it neither block the
         # candidate nor the restoration of the generation that already lacked them.
-        self.run(command, 'system', *('--preexisting=' + unit for unit in record.get('preexistingHealth', [])),
-                 timeout=120)
+        preexisting = record.get('preexistingHealth', {}).get('units' if mode == 'system' else 'userUnits', [])
+        self.run(command, mode, *('--preexisting=' + unit for unit in preexisting), timeout=120)
 
     def profile(self, system):
         self.run('nix-env', '--profile', '/nix/var/nix/profiles/system', '--set', system)
@@ -616,8 +619,8 @@ class Engine:
                 previously_failed = self.failed_units()
                 self.switch(record['system'], 'test')
                 self.reject_new_failures(previously_failed)
-                self.system_health(record['system'] + '/sw/bin/cybexos-health', record)
-                self.run(record['system'] + '/sw/bin/cybexos-health', 'desktop', timeout=120)
+                self.health(record['system'] + '/sw/bin/cybexos-health', 'system', record)
+                self.health(record['system'] + '/sw/bin/cybexos-health', 'desktop', record)
                 if config_digest(self.working) != record['baseline']:
                     raise Failure('Personal configuration changed during activation. Working edits retained; stage again.')
                 self.select_config(tx / 'config', identifier)
@@ -680,7 +683,7 @@ class Engine:
             self.profile(record['previousSystem'])
             self.run('cybexos-boot-trial', '--restore', record['previousSystem'])
             self.switch(record['previousSystem'], 'test')
-            self.system_health(record['previousSystem'] + '/sw/bin/cybexos-health', record)
+            self.health(record['previousSystem'] + '/sw/bin/cybexos-health', 'system', record)
             if not preserve_working:
                 self.select_config(tx / 'previous-config', record['id'] + '-rollback', fresh=True)
             atomic(tx / 'failed.json', {'reason': reason, 'at': int(time.time())})
@@ -744,7 +747,7 @@ class Engine:
                 self.finish_confirmation(pending)
                 return
             try:
-                self.system_health('cybexos-health', pending)
+                self.health('cybexos-health', 'system', pending)
             except Failure:
                 self.restore(pending, 'Trial boot failed system health')
                 return
@@ -760,8 +763,8 @@ class Engine:
             if self.boot_id() == record['bootId']:
                 raise Failure('Confirmation requires a fresh boot of the selected generation')
             self.run.log = self.tx(record['id']) / 'build.log'
-            self.system_health('cybexos-health', record)
-            self.run('cybexos-health', 'desktop-required', timeout=120)
+            self.health('cybexos-health', 'system', record)
+            self.health('cybexos-health', 'desktop-required', record)
             self.run('cybexos-boot-trial', '--commit', record['system'])
             tx = self.tx(record['id'])
             channel = read(tx / 'channel.json')

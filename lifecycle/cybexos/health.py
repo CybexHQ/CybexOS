@@ -1,4 +1,6 @@
 """Read-only desktop probes used after activation and authenticated trial boot."""
+from pathlib import Path
+import pwd
 import re
 import time
 
@@ -36,6 +38,7 @@ qs_live_end
 
 
 SYSTEM_UNIT = re.compile(r'[A-Za-z0-9_.@:-]+\.(service|target)')
+USER_UNIT = re.compile(r'[A-Za-z0-9_.@:-]+\.service')
 
 
 def declared_units(declaration):
@@ -62,12 +65,12 @@ def inactive_units(run, declaration):
     return [unit for unit in declared_units(declaration) if not unit_active(run, unit)]
 
 
-def preexisting_arguments(arguments):
+def preexisting_arguments(arguments, pattern=SYSTEM_UNIT):
     units = set()
     for argument in arguments:
         unit = argument.removeprefix('--preexisting=')
-        if unit == argument or not SYSTEM_UNIT.fullmatch(unit):
-            raise Failure('Invalid system health argument: ' + argument)
+        if unit == argument or not pattern.fullmatch(unit):
+            raise Failure('Invalid health argument: ' + argument)
         units.add(unit)
     return units
 
@@ -82,18 +85,58 @@ def system_services(run, declaration, preexisting=()):
             raise Failure(f'{unit} is not active; inspect systemctl status {unit} and its journal before retrying')
 
 
-def user_services(prefix, run, declaration):
+def desktop_sessions(run, runtime):
+    """(user, command prefix) for every signed-in Hyprland session."""
+    sessions = []
+    for directory in sorted(Path(runtime).glob('[0-9]*')):
+        try:
+            user = pwd.getpwuid(int(directory.name))
+        except KeyError:
+            continue
+        prefix = ['runuser', '-u', user.pw_name, '--', 'env', f'XDG_RUNTIME_DIR={directory}',
+                  f'DBUS_SESSION_BUS_ADDRESS=unix:path={directory}/bus']
+        try:
+            if run(*prefix, 'systemctl', '--user', 'is-active', 'hyprland-session.target').strip() != 'active':
+                continue
+        except Exception:
+            continue
+        sessions.append((user.pw_name, prefix))
+    return sessions
+
+
+def baseline(run, declaration, sessions):
+    """Declared units the running system and its signed-in desktops already lack."""
+    missing = set()
+    for _, prefix in sessions:
+        missing.update(inactive_user_units(prefix, run, declaration))
+    return {'units': inactive_units(run, declaration), 'userUnits': sorted(missing)}
+
+
+def declared_user_units(declaration):
     if (not isinstance(declaration, dict) or declaration.get('schema') != 1
             or not isinstance(declaration.get('userUnits'), list)):
         raise Failure('Desktop health service declaration is missing or invalid; inspect /etc/cybexos/health-services.json')
     for unit in declaration['userUnits']:
-        if not isinstance(unit, str) or not re.fullmatch(r'[A-Za-z0-9_.@:-]+\.service', unit):
+        if not isinstance(unit, str) or not USER_UNIT.fullmatch(unit):
             raise Failure('Invalid desktop health unit declaration')
-        try:
-            active = run(*prefix, 'systemctl', '--user', 'is-active', unit)
-        except Exception as error:
-            raise Failure(f'{unit} is not active in the desktop session; inspect systemctl --user status {unit} and its journal before retrying') from error
-        if active != 'active':
+    return declaration['userUnits']
+
+
+def user_unit_active(prefix, run, unit):
+    try:
+        return run(*prefix, 'systemctl', '--user', 'is-active', unit).strip() == 'active'
+    except Exception:
+        return False
+
+
+def inactive_user_units(prefix, run, declaration):
+    return [unit for unit in declared_user_units(declaration) if not user_unit_active(prefix, run, unit)]
+
+
+def user_services(prefix, run, declaration, preexisting=()):
+    # The same regression rule as system_services, for the desktop session.
+    for unit in declared_user_units(declaration):
+        if unit not in preexisting and not user_unit_active(prefix, run, unit):
             raise Failure(f'{unit} is not active in the desktop session; inspect systemctl --user status {unit} and its journal before retrying')
 
 

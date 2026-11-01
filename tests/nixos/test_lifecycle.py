@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / 'lifecycle'))
 from cybexos.common import CommandFailure, Failure, Runner, atomic, digest, locked, parse, read, syncdir
 from cybexos import inputs, trust
 from cybexos.engine import Engine, config_digest, configuration_paths, copy_config
-from cybexos.health import preexisting_arguments, system_services
+from cybexos.health import USER_UNIT, baseline, preexisting_arguments, system_services, user_services
 
 REV_OLD, REV_NEW = '1' * 40, '2' * 40
 NAR_OLD, NAR_NEW = 'sha256-' + 'A' * 43 + '=', 'sha256-' + 'B' * 43 + '='
@@ -589,26 +589,28 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-boot')
 
     CAMERA = ['xps-ipu7-abi.service', 'v4l2-relayd-ipu7.service']
+    SPEAKER = 'xps-speaker-tuning.service'
 
     def declared_health(self, inactive):
-        """Every system declares the XPS camera; `inactive` is what systemctl reports, live."""
-        declaration = {'schema': 1, 'units': ['multi-user.target', 'NetworkManager.service', *self.CAMERA]}
+        """Every system declares the XPS camera and speaker tuning; `inactive` is what systemctl reports, live."""
+        declaration = {'schema': 1, 'units': ['multi-user.target', 'NetworkManager.service', *self.CAMERA],
+                       'userUnits': ['hypridle.service', self.SPEAKER]}
+        session = ['runuser', '-u', 'owner', '--']
         original = self.runner
         def systemctl(*args):
-            if args[2] in inactive:
+            if args[-1] in inactive:
                 raise CommandFailure('systemctl', 3, 'inactive')
             return 'active\n'  # unstripped, like the real Runner
         def run(*args, **kwargs):
-            if args[:2] == ('cat', OLD_SYSTEM + '/etc/cybexos/health-services.json'):
+            if args[0].endswith('cybexos-health'):
+                # The packaged command's own argument parsing and checks.
                 original.calls.append(args)
-                return json.dumps(declaration)
-            if args[:2] == ('systemctl', 'is-active'):
-                original.calls.append(args)
-                return systemctl(*args)
-            if args[0].endswith('cybexos-health') and args[1] == 'system':
-                # The packaged command's own argument parsing and check.
-                original.calls.append(args)
-                system_services(systemctl, declaration, preexisting_arguments(args[2:]))
+                if args[1] == 'baseline':
+                    return json.dumps(baseline(systemctl, declaration, [('owner', session)]))
+                if args[1] == 'system':
+                    system_services(systemctl, declaration, preexisting_arguments(args[2:]))
+                else:
+                    user_services(session, systemctl, declaration, preexisting_arguments(args[2:], USER_UNIT))
                 return ''
             if args[0].endswith('/bin/switch-to-configuration') and inactive:
                 original.calls.append(args)
@@ -626,10 +628,11 @@ class EngineTests(unittest.TestCase):
         self.engine.apply(record['id'], record['reviewToken'])
         status = read(self.engine.status_path)
         self.assertEqual(status['state'], 'awaiting-boot')
-        self.assertEqual(status['preexistingHealth'], sorted(self.CAMERA))
+        self.assertEqual(status['preexistingHealth'], {'units': sorted(self.CAMERA), 'userUnits': []})
         flags = tuple('--preexisting=' + unit for unit in sorted(self.CAMERA))
         self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'system', *flags), self.runner.calls)
-        self.assertEqual(read(self.engine.pending_path)['preexistingHealth'], sorted(self.CAMERA))
+        self.assertEqual(read(self.engine.pending_path)['preexistingHealth'],
+                         {'units': sorted(self.CAMERA), 'userUnits': []})
         self.engine.boot_id = lambda: 'different-boot'
         self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
         self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
@@ -658,7 +661,44 @@ class EngineTests(unittest.TestCase):
         with self.assertRaisesRegex(Failure, 'xps-ipu7-abi.service is not active'):
             self.engine.apply(record['id'], record['reviewToken'])
         self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
-        self.assertEqual(read(self.engine.status_path)['preexistingHealth'], [])
+        self.assertEqual(read(self.engine.status_path)['preexistingHealth'], {'units': [], 'userUnits': []})
+        self.assertFalse(self.engine.pending_path.exists())
+
+    def test_failing_desktop_service_does_not_block_unrelated_deployment(self):
+        # XPS speaker tuning fails on every boot while a kernel regression
+        # hides the internal speakers. Neither the candidate nor its
+        # confirmation may be rejected for that.
+        self.declared_health({self.SPEAKER})
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        self.assertEqual(read(self.engine.status_path)['preexistingHealth'], {'units': [], 'userUnits': [self.SPEAKER]})
+        flag = '--preexisting=' + self.SPEAKER
+        self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'system'), self.runner.calls)
+        self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'desktop', flag), self.runner.calls)
+        self.engine.boot_id = lambda: 'different-boot'
+        self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
+        self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
+        self.engine.recover()
+        self.engine.confirm()
+        self.assertEqual(read(self.engine.status_path)['state'], 'done')
+        self.assertIn(('cybexos-health', 'desktop-required', flag), self.runner.calls)
+
+    def test_desktop_service_broken_by_the_deployment_still_blocks(self):
+        inactive = set()
+        self.declared_health(inactive)
+        original = self.engine.run
+        def run(*args, **kwargs):
+            if args == (NEW_SYSTEM + '/bin/switch-to-configuration', 'test'):
+                inactive.add('hypridle.service')
+            if args == (OLD_SYSTEM + '/bin/switch-to-configuration', 'test'):
+                inactive.clear()
+            return original(*args, **kwargs)
+        run.log = None
+        self.engine.run = run
+        record = self.engine.stage('upstream')
+        with self.assertRaisesRegex(Failure, 'hypridle.service is not active in the desktop session'):
+            self.engine.apply(record['id'], record['reviewToken'])
+        self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
         self.assertFalse(self.engine.pending_path.exists())
 
     def test_failed_activation_restores_a_generation_that_already_lacked_a_unit(self):
