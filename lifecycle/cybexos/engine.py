@@ -14,6 +14,7 @@ from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse
 from . import inputs
 from .trust import REPO, Fetcher, NoPublishedRelease, discover, version
 from . import review, firmware, prebuilt
+from .health import inactive_units
 from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
@@ -549,6 +550,23 @@ class Engine:
             raise Failure('Activation introduced failed system units: ' + ', '.join(sorted(newly_failed))
                           + '. Inspect their journals and correct the configuration before retrying.')
 
+    def health_baseline(self):
+        """Declared health units the running system already lacks."""
+        try:
+            declaration = parse(self.run('cat', str(self.current_system.resolve()) + '/etc/cybexos/health-services.json'))
+            return sorted(inactive_units(self.run, declaration))
+        except Failure:
+            # No baseline without a valid declaration; the declared check
+            # itself still fails closed on it.
+            return []
+
+    def system_health(self, command, record):
+        # Like reject_new_failures, declared health judges what a deployment
+        # changed. Units recorded as inactive before it neither block the
+        # candidate nor the restoration of the generation that already lacked them.
+        self.run(command, 'system', *('--preexisting=' + unit for unit in record.get('preexistingHealth', [])),
+                 timeout=120)
+
     def profile(self, system):
         self.run('nix-env', '--profile', '/nix/var/nix/profiles/system', '--set', system)
         self.switch(system, 'boot')
@@ -584,8 +602,12 @@ class Engine:
                 self.status(state='stale', phase=message, error=message, reviewToken=None)
                 raise Failure(message)
             self.git_metadata(self.working)
+            # Recorded before anything changes, and kept in every later pending
+            # record, so trial boot, confirmation and recovery use the same baseline.
+            record = record | {'preexistingHealth': self.health_baseline()}
             atomic(self.pending_path, record | {'phase': 'activation', 'bootId': self.boot_id()})
-            self.status(state='activating', phase='Activating under supervision')
+            self.status(state='activating', phase='Activating under supervision',
+                        preexistingHealth=record['preexistingHealth'])
             try:
                 # Pin the safe persistent boot default before the boot installer
                 # can write a candidate menu. Power loss during profile() must
@@ -594,7 +616,7 @@ class Engine:
                 previously_failed = self.failed_units()
                 self.switch(record['system'], 'test')
                 self.reject_new_failures(previously_failed)
-                self.run(record['system'] + '/sw/bin/cybexos-health', 'system', timeout=120)
+                self.system_health(record['system'] + '/sw/bin/cybexos-health', record)
                 self.run(record['system'] + '/sw/bin/cybexos-health', 'desktop', timeout=120)
                 if config_digest(self.working) != record['baseline']:
                     raise Failure('Personal configuration changed during activation. Working edits retained; stage again.')
@@ -638,11 +660,16 @@ class Engine:
         tx = self.tx(record['id'])
         self.run.log = tx / 'build.log'
         activation_error = read(tx / 'activation-error.json', {}).get('error', '')
+        if 'preexistingHealth' not in record:
+            # An explicit rollback has no activation baseline: the running
+            # system's state is the one this restoration must not be judged by.
+            record = record | {'preexistingHealth': self.health_baseline()}
         # Explicit rollback can start without a pending deployment. Journal it
         # first, and distinguish recovery from a healthy boot trial so a second
         # interruption always resumes restoration, including on the same boot.
         atomic(self.pending_path, record | {'phase': 'recovery', 'preserveWorking': preserve_working})
-        self.status(state='recovering', phase='Restoring previous generation: ' + reason, error=activation_error)
+        self.status(state='recovering', phase='Restoring previous generation: ' + reason, error=activation_error,
+                    preexistingHealth=record['preexistingHealth'])
         try:
             # Disarming the one-shot requires no retained boot entry and must
             # precede even personal backup validation. profile() recreates a
@@ -653,7 +680,7 @@ class Engine:
             self.profile(record['previousSystem'])
             self.run('cybexos-boot-trial', '--restore', record['previousSystem'])
             self.switch(record['previousSystem'], 'test')
-            self.run(record['previousSystem'] + '/sw/bin/cybexos-health', 'system', timeout=120)
+            self.system_health(record['previousSystem'] + '/sw/bin/cybexos-health', record)
             if not preserve_working:
                 self.select_config(tx / 'previous-config', record['id'] + '-rollback', fresh=True)
             atomic(tx / 'failed.json', {'reason': reason, 'at': int(time.time())})
@@ -717,7 +744,7 @@ class Engine:
                 self.finish_confirmation(pending)
                 return
             try:
-                self.run('cybexos-health', 'system', timeout=120)
+                self.system_health('cybexos-health', pending)
             except Failure:
                 self.restore(pending, 'Trial boot failed system health')
                 return
@@ -733,7 +760,7 @@ class Engine:
             if self.boot_id() == record['bootId']:
                 raise Failure('Confirmation requires a fresh boot of the selected generation')
             self.run.log = self.tx(record['id']) / 'build.log'
-            self.run('cybexos-health', 'system', timeout=120)
+            self.system_health('cybexos-health', record)
             self.run('cybexos-health', 'desktop-required', timeout=120)
             self.run('cybexos-boot-trial', '--commit', record['system'])
             tx = self.tx(record['id'])

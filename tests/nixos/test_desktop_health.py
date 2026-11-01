@@ -11,7 +11,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'lifecycle'))
 from cybexos.common import Failure
 from cybexos.desktop_check import compositor_command, verify_compositor
-from cybexos.health import LIVE_BEGIN, LIVE_END, desktop, system_services, user_services
+from cybexos.health import (LIVE_BEGIN, LIVE_END, desktop, inactive_units, preexisting_arguments,
+                            system_services, user_services)
 
 SYSTEM = '/nix/store/' + 'a' * 32 + '-nixos-system-test'
 GUARD = Path(__file__).resolve().parents[1] / 'lib/quickshell-live'
@@ -74,6 +75,49 @@ class SystemHealthTests(unittest.TestCase):
             raise subprocess.CalledProcessError(3, args)
         with self.assertRaisesRegex(Failure, 'ipsec.service.*systemctl status'):
             system_services(inactive, {'schema': 1, 'units': ['ipsec.service']})
+
+    def test_only_units_inactive_before_the_change_are_tolerated(self):
+        declaration = {'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service']}
+        def run(*args):
+            return 'failed' if args[-1] == 'xps-ipu7-abi.service' else 'active'
+        self.assertEqual(inactive_units(run, declaration), ['xps-ipu7-abi.service'])
+        system_services(run, declaration, {'xps-ipu7-abi.service'})
+        with self.assertRaisesRegex(Failure, 'xps-ipu7-abi.service'):
+            system_services(run, declaration, {'v4l2-relayd-ipu7.service'})
+        with self.assertRaisesRegex(Failure, 'NetworkManager.service'):
+            system_services(lambda *args: 'inactive', declaration, {'xps-ipu7-abi.service'})
+
+    def test_preexisting_arguments_name_only_system_units(self):
+        self.assertEqual(preexisting_arguments(['--preexisting=xps-ipu7-abi.service']), {'xps-ipu7-abi.service'})
+        self.assertEqual(preexisting_arguments([]), set())
+        for invalid in (['xps-ipu7-abi.service'], ['--preexisting=--all'], ['--preexisting='],
+                        ['--preexisting=personal.socket'], ['--force']):
+            with self.subTest(invalid=invalid), self.assertRaises(Failure):
+                preexisting_arguments(invalid)
+
+    def test_command_accepts_the_updater_baseline(self):
+        # The packaged command, with a fake systemctl and declaration.
+        with tempfile.TemporaryDirectory(prefix='cybexos-health-') as directory:
+            root = Path(directory)
+            (root / 'systemctl').write_text('#!/bin/sh\n[ "$2" = xps-ipu7-abi.service ] && { echo failed; exit 3; }\necho active\n')
+            (root / 'systemctl').chmod(0o755)
+            declaration = root / 'health-services.json'
+            declaration.write_text(json.dumps({'schema': 1, 'units': ['NetworkManager.service', 'xps-ipu7-abi.service']}))
+            source = (Path(__file__).resolve().parents[2] / 'lifecycle/bin/cybexos-health').read_text()
+            command = root / 'cybexos-health'
+            command.write_text(source.replace("'/etc/cybexos/health-services.json'", repr(str(declaration)))
+                               .replace("'/run/booted-system'", repr(str(root))))
+            environment = os.environ | {'PATH': f'{root}:{os.environ["PATH"]}',
+                                        'PYTHONPATH': str(Path(__file__).resolve().parents[2] / 'lifecycle')}
+            def health(*arguments):
+                return subprocess.run([sys.executable, str(command), 'system', *arguments],
+                                      env=environment, capture_output=True, text=True)
+            strict = health()
+            self.assertEqual(strict.returncode, 1)
+            self.assertIn('xps-ipu7-abi.service is not active', strict.stderr)
+            self.assertEqual(health('--preexisting=xps-ipu7-abi.service').returncode, 0)
+            self.assertEqual(health('--preexisting=v4l2-relayd-ipu7.service').returncode, 1)
+            self.assertIn('Invalid system health argument', health('--preexisting=--all').stderr)
 
     def test_invalid_or_missing_declaration_cannot_skip_health(self):
         for declaration in (None, {'schema': 1, 'units': []}, {'schema': 2, 'units': ['ipsec.service']},

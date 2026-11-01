@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 from cybexos.common import read
-from cybexos.health import desktop, system_services, user_services
+from cybexos.health import desktop, preexisting_arguments, system_services, user_services
 
 
 def run(*argv):
@@ -16,7 +16,7 @@ def run(*argv):
 try:
     mode = sys.argv[1]
     if mode == 'system':
-        system_services(run, read('/etc/cybexos/health-services.json'))
+        system_services(run, read('/etc/cybexos/health-services.json'), preexisting_arguments(sys.argv[2:]))
         if not Path('/run/booted-system').exists():
             raise ValueError('Booted system identity missing')
     else:

@@ -81,6 +81,17 @@ booted-kernel ABI check and the relay; an ABI failure blocks relay startup and
 trial acceptance. These service checks do not prove processed frames, privacy,
 image quality or suspend/resume; those still require physical qualification.
 
+Declared system health judges what a deployment changes. Before activation the
+updater records the declared units the running system already lacks and keeps
+that baseline in the pending record. Those units do not fail the candidate, its
+trial boot, confirmation, or restoration of the generation that already lacked
+them; `cybex update status` lists them as `preexistingHealth`. Any other
+declared unit, including one that was active before, still fails closed. An
+explicit rollback, which has no activation baseline, records the running
+system's state instead. Without the baseline, a hardware blocker such as the
+camera's ABI guard on an unreviewed kernel rejected every deployment and the
+rollback after it, leaving restoration pending and every preview blocked.
+
 From live media, unlock/mount the target filesystem and ESP, inspect
 `/var/lib/cybexos/transactions` and its deployment records, and select the
 retained previous system using its `switch-to-configuration boot` inside

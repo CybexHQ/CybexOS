@@ -35,18 +35,48 @@ qs_live_end
 '''
 
 
-def system_services(run, declaration):
+SYSTEM_UNIT = re.compile(r'[A-Za-z0-9_.@:-]+\.(service|target)')
+
+
+def declared_units(declaration):
     if (not isinstance(declaration, dict) or declaration.get('schema') != 1
             or not isinstance(declaration.get('units'), list) or not declaration['units']):
         raise Failure('System health service declaration is missing or invalid; inspect /etc/cybexos/health-services.json')
     for unit in declaration['units']:
-        if not isinstance(unit, str) or not re.fullmatch(r'[A-Za-z0-9_.@:-]+\.(service|target)', unit):
+        if not isinstance(unit, str) or not SYSTEM_UNIT.fullmatch(unit):
             raise Failure('Invalid system health unit declaration')
-        try:
-            active = run('systemctl', 'is-active', unit)
-        except Exception as error:
-            raise Failure(f'{unit} is not active; inspect systemctl status {unit} and its journal before retrying') from error
-        if active != 'active':
+    return declaration['units']
+
+
+def unit_active(run, unit):
+    try:
+        return run('systemctl', 'is-active', unit) == 'active'
+    except Exception:
+        return False
+
+
+def inactive_units(run, declaration):
+    """Declared units that are not active now: the updater's health baseline."""
+    return [unit for unit in declared_units(declaration) if not unit_active(run, unit)]
+
+
+def preexisting_arguments(arguments):
+    units = set()
+    for argument in arguments:
+        unit = argument.removeprefix('--preexisting=')
+        if unit == argument or not SYSTEM_UNIT.fullmatch(unit):
+            raise Failure('Invalid system health argument: ' + argument)
+        units.add(unit)
+    return units
+
+
+def system_services(run, declaration, preexisting=()):
+    # Health rejects regressions. A declared unit that was already inactive
+    # before the change being checked (the updater records that baseline) does
+    # not fail it: otherwise a hardware blocker such as the XPS camera's kernel
+    # ABI guard would reject every deployment, and the rollback after it.
+    for unit in declared_units(declaration):
+        if unit not in preexisting and not unit_active(run, unit):
             raise Failure(f'{unit} is not active; inspect systemctl status {unit} and its journal before retrying')
 
 

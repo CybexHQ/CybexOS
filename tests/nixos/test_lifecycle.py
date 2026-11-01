@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / 'lifecycle'))
 from cybexos.common import CommandFailure, Failure, Runner, atomic, digest, locked, parse, read, syncdir
 from cybexos import inputs, trust
 from cybexos.engine import Engine, config_digest, configuration_paths, copy_config
+from cybexos.health import preexisting_arguments, system_services
 
 REV_OLD, REV_NEW = '1' * 40, '2' * 40
 NAR_OLD, NAR_NEW = 'sha256-' + 'A' * 43 + '=', 'sha256-' + 'B' * 43 + '='
@@ -586,6 +587,111 @@ class EngineTests(unittest.TestCase):
         record = self.engine.stage('upstream')
         self.engine.apply(record['id'], record['reviewToken'])
         self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-boot')
+
+    CAMERA = ['xps-ipu7-abi.service', 'v4l2-relayd-ipu7.service']
+
+    def declared_health(self, inactive):
+        """Every system declares the XPS camera; `inactive` is what systemctl reports, live."""
+        declaration = {'schema': 1, 'units': ['multi-user.target', 'NetworkManager.service', *self.CAMERA]}
+        original = self.runner
+        def systemctl(*args):
+            if args[2] in inactive:
+                raise CommandFailure('systemctl', 3, 'inactive')
+            return 'active'
+        def run(*args, **kwargs):
+            if args[:2] == ('cat', OLD_SYSTEM + '/etc/cybexos/health-services.json'):
+                original.calls.append(args)
+                return json.dumps(declaration)
+            if args[:2] == ('systemctl', 'is-active'):
+                original.calls.append(args)
+                return systemctl(*args)
+            if args[0].endswith('cybexos-health') and args[1] == 'system':
+                # The packaged command's own argument parsing and check.
+                original.calls.append(args)
+                system_services(systemctl, declaration, preexisting_arguments(args[2:]))
+                return ''
+            if args[0].endswith('/bin/switch-to-configuration') and inactive:
+                original.calls.append(args)
+                raise CommandFailure(args[0], 4, 'warning: the following units failed: xps-ipu7-abi.service')
+            return original(*args, **kwargs)
+        run.log = None
+        self.engine.run = run
+
+    def test_blocked_camera_does_not_block_unrelated_deployment_or_its_trial_boot(self):
+        # The XPS camera's kernel ABI guard fails closed on an unreviewed
+        # kernel, before and after this deployment. That must not reject the
+        # candidate, its trial boot or confirmation.
+        self.declared_health(set(self.CAMERA))
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        status = read(self.engine.status_path)
+        self.assertEqual(status['state'], 'awaiting-boot')
+        self.assertEqual(status['preexistingHealth'], sorted(self.CAMERA))
+        flags = tuple('--preexisting=' + unit for unit in sorted(self.CAMERA))
+        self.assertIn((NEW_SYSTEM + '/sw/bin/cybexos-health', 'system', *flags), self.runner.calls)
+        self.assertEqual(read(self.engine.pending_path)['preexistingHealth'], sorted(self.CAMERA))
+        self.engine.boot_id = lambda: 'different-boot'
+        self.system.unlink(); self.system.symlink_to(NEW_SYSTEM)
+        self.booted.unlink(); self.booted.symlink_to(NEW_SYSTEM)
+        self.engine.recover()
+        self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-login')
+        self.engine.confirm()
+        self.assertEqual(read(self.engine.status_path)['state'], 'done')
+        self.assertEqual(self.runner.calls.count(('cybexos-health', 'system', *flags)), 2)
+
+    def test_declared_unit_that_was_active_still_blocks_and_rollback_completes(self):
+        # Only units already inactive before the change are tolerated. The
+        # camera breaking in this deployment rejects it, and restoring the
+        # previous generation (camera active again) then passes as before.
+        inactive = set()
+        self.declared_health(inactive)
+        original = self.engine.run
+        def run(*args, **kwargs):
+            if args == (NEW_SYSTEM + '/bin/switch-to-configuration', 'test'):
+                inactive.add('xps-ipu7-abi.service')
+            if args == (OLD_SYSTEM + '/bin/switch-to-configuration', 'test'):
+                inactive.clear()
+            return original(*args, **kwargs)
+        run.log = None
+        self.engine.run = run
+        record = self.engine.stage('upstream')
+        with self.assertRaisesRegex(Failure, 'xps-ipu7-abi.service is not active'):
+            self.engine.apply(record['id'], record['reviewToken'])
+        self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
+        self.assertEqual(read(self.engine.status_path)['preexistingHealth'], [])
+        self.assertFalse(self.engine.pending_path.exists())
+
+    def test_failed_activation_restores_a_generation_that_already_lacked_a_unit(self):
+        # Formerly a wedge: the previous generation's own health failed on the
+        # blocked camera, so restoration never completed and every preview
+        # stayed blocked.
+        self.declared_health(set(self.CAMERA))
+        record = self.engine.stage('upstream')
+        original = self.engine.run
+        def run(*args, **kwargs):
+            if args == (NEW_SYSTEM + '/sw/bin/cybexos-health', 'desktop'):
+                raise Failure('Hyprland configuration errors; inspect hyprctl configerrors')
+            return original(*args, **kwargs)
+        run.log = None
+        self.engine.run = run
+        with self.assertRaisesRegex(Failure, 'Hyprland configuration errors'):
+            self.engine.apply(record['id'], record['reviewToken'])
+        self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
+        self.assertFalse(self.engine.pending_path.exists())
+        flags = tuple('--preexisting=' + unit for unit in sorted(self.CAMERA))
+        self.assertIn((OLD_SYSTEM + '/sw/bin/cybexos-health', 'system', *flags), self.runner.calls)
+
+    def test_restoration_without_a_recorded_baseline_uses_the_running_system(self):
+        # An explicit rollback, or a recovery journaled before baselines were
+        # recorded, judges restoration against what the running system lacks.
+        self.declared_health(set(self.CAMERA))
+        record = self.engine.stage('upstream')
+        pending = read(self.engine.tx(record['id']) / 'deployment.json') | {'phase': 'recovery', 'preserveWorking': True}
+        self.assertNotIn('preexistingHealth', pending)
+        atomic(self.engine.pending_path, pending)
+        self.engine.recover()
+        self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
+        self.assertFalse(self.engine.pending_path.exists())
 
     def test_real_systemctl_accepts_snapshot_options(self):
         # Exercise the packaged option parser without accessing the host bus.
