@@ -26,6 +26,25 @@ fi
 if grep -q '^ov08x40 ' /proc/modules && ! grep -q '^intel_cvs ' /proc/modules; then
   modprobe -r ov08x40 || die 'sensor is busy; reboot to apply CVS-first ordering'
 fi
+# CVS claims the GPIO the CS35L57 speaker amplifiers read their speaker ID
+# from, so it is blacklisted from autoloading. The amplifiers read and release
+# that line while probing: load CVS only once every one of them has bound.
+amplifiers_bound() {
+  local device found=false
+  for device in /sys/bus/soundwire/devices/sdw:*:01fa:355[4-7]:*; do
+    [[ -e $device ]] || continue
+    found=true
+    [[ -e $device/driver ]] || return 1
+  done
+  "$found"
+}
+if ! grep -q '^intel_cvs ' /proc/modules; then
+  for _ in {1..120}; do
+    amplifiers_bound && break
+    sleep 0.5
+  done
+  amplifiers_bound || die 'the speaker amplifiers have not bound; loading CVS now would take their speaker-ID line'
+fi
 modprobe intel_cvs
 sleep 2
 modprobe ov08x40

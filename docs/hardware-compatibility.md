@@ -132,7 +132,9 @@ working installed Hyprland graphics stack.
    builds but initialization fails closed; update health reports it without
    holding back updates. Generic webcam
    support does not resolve this machine-specific issue. See
-   [the existing camera blocker](hardware-security.md).
+   [the existing camera blocker](hardware-security.md). Linux 7.3's ipu-bridge
+   also lists the HM1092 IR sensor, which has no driver, so the sensor graph
+   never completes ([matched laptops](laptop-support.md)).
 9. **The XPS 14 OLED panel needs PSR and LOBF off.** On SKU 0DB9 with the LG
    panel (EDID `30e4c607`), PSR2 selective fetch produced full-screen black
    flashes at 120 Hz (`Selective fetch area calculation failed in pipe A`), so

@@ -113,10 +113,18 @@ def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, catalogue=Non
              'nvidiaBusId': nvidia[0] if len(nvidia) == 1 else '',
              'intelBusId': intel[0] if len(intel) == 1 else '',
              'amdgpuBusId': amd[0] if len(amd) == 1 else ''}
-    vendor, product, sku = [text(sysroot / 'class/dmi/id' / name) for name in ('sys_vendor', 'product_name', 'product_sku')]
+    vendor, product, sku, board = [text(sysroot / 'class/dmi/id' / name)
+                                   for name in ('sys_vendor', 'product_name', 'product_sku', 'board_name')]
     cpu = text(cpuinfo)
-    xps = 'Dell' in vendor and any(s in product for s in ('XPS 14', 'XPS 16', 'DA14260', 'DA16260')) \
-        and sku in ('0DB9', '0DBA') and ('Panther' in cpu or 'Ultra' in cpu)
+    # The XPS 14/16 SKUs predate this platform on older models, so they also
+    # need the Core Ultra CPU. The XPS 13's model number is unique to the 2026
+    # design; its Wildcat Lake SKU (0E53) is not sold as Core Ultra.
+    xps = 'Dell' in vendor and (
+        (any(s in product for s in ('XPS 14', 'XPS 16', 'DA14260', 'DA16260'))
+         and sku in ('0DB9', '0DBA') and ('Panther' in cpu or 'Ultra' in cpu))
+        or ('DX13260' in product and sku in ('0E53', '0E54')))
+    # HP keys the ZBook Ultra G1a by its board ID; its product SKU is regional.
+    zbook = vendor == 'HP' and board == '8D01' and 'ZBook Ultra G1a' in product
     acpi = any('OVTI08F4' in p.name for p in (sysroot / 'bus/acpi/devices').glob('*'))
     panel = ''
     for path in sorted((sysroot / 'class/drm').glob('*eDP-*/edid')):
@@ -157,8 +165,10 @@ def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, catalogue=Non
     elif displays and any(not d['driver'] for d in displays):
         graphics_detail = 'A native display driver is not active. Basic graphics can run setup; the desktop still needs a working driver.'
     return {'nvidia': selection['present'], 'nvidiaOpen': selection['recommendedOpen'], 'nvidiaSelection': selection,
-            'nvidiaPrime': prime, 'xps': xps, 'sku': sku, 'panel': panel,
-            'camera': xps and acpi and any(d['vendor'] == '8086' and d['device'] == 'b05d' for d in pci),
+            'nvidiaPrime': prime, 'xps': xps, 'sku': sku, 'panel': panel, 'zbookUltraG1a': zbook,
+            # The processed camera stack is reviewed for the XPS 14/16 only.
+            'camera': xps and sku in ('0DB9', '0DBA') and acpi
+                      and any(d['vendor'] == '8086' and d['device'] == 'b05d' for d in pci),
             'graphicsDevices': displays, 'networkDevices': network, 'networkIssues': issues,
             'firmwareRequests': firmware, 'firmwareLogAvailable': log_available,
             'blockers': selection['blockers'], 'graphicsDetail': graphics_detail}

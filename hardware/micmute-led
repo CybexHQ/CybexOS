@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Keep laptop microphone-mute lights in step with the default microphone.
+#
+# Kernel drivers light *::micmute from an ALSA capture switch (dell-laptop's
+# platform::micmute, HP's hda::micmute). The SoundWire and AMD ACP digital
+# microphones of current laptops have no such switch: PipeWire mutes them in
+# software and the light never changes. This follows the default source's mute
+# state, from whichever control changed it, and sets each light through logind,
+# which lets the active session's owner change LEDs without root.
+set -uo pipefail
+
+leds=()
+for led in /sys/class/leds/*::micmute; do
+  [[ -r $led/max_brightness ]] && leds+=("${led##*/}")
+done
+((${#leds[@]})) || exit 0
+
+last=''
+
+# User services belong to no login session, so logind's "auto" session does
+# not resolve here: address the user's graphical session explicitly.
+session() {
+  busctl --system --no-pager get-property org.freedesktop.login1 /org/freedesktop/login1/user/self \
+    org.freedesktop.login1.User Display | awk '{ gsub(/"/, "", $3); print $3 }'
+}
+
+apply() {
+  local state path led value
+  state=$(pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null) || return 0
+  case $state in
+    *yes) state=on ;;
+    *no) state=off ;;
+    *) return 0 ;;
+  esac
+  [[ $state == "$last" ]] && return 0
+  path=$(session) || return 0
+  [[ $path == /org/freedesktop/login1/session/* ]] || return 0
+  for led in "${leds[@]}"; do
+    value=0
+    [[ $state == on ]] && value=$(<"/sys/class/leds/$led/max_brightness")
+    # logind refuses while another session is in the foreground; the next
+    # mute change, or the next start, applies the state again.
+    busctl --system call org.freedesktop.login1 "$path" org.freedesktop.login1.Session \
+      SetBrightness ssu leds "$led" "$value" >/dev/null || return 0
+  done
+  last=$state
+}
+
+apply
+# A changed source or a new default microphone; pactl ends with the sound
+# server, and systemd then restarts this service.
+while IFS= read -r event; do
+  case $event in
+    *" on source "* | *" on server "*) apply ;;
+  esac
+done < <(pactl subscribe)
+exit 1

@@ -104,6 +104,15 @@ let
       cybexos.hardware.xps = { enable = true; sku = "0DB9"; panel = "30e4c607"; };
     } ];
   }).config;
+  laptop = hardware: (nixpkgs.lib.nixosSystem {
+    inherit system;
+    modules = [ module ./machine.nix { cybexos.hardware = hardware; } ];
+  }).config;
+  # XPS 13 DX13260: Panther Lake (0E54) and Wildcat Lake (0E53).
+  xps13 = laptop { xps = { enable = true; sku = "0E54"; panel = "30e4abcd"; }; };
+  xps13Wcl = laptop { xps = { enable = true; sku = "0E53"; }; };
+  zbook = laptop { zbookUltraG1a.enable = true; };
+  zbookSmartPc = laptop { zbookUltraG1a = { enable = true; smartPc = true; }; };
   secureBoot = (nixpkgs.lib.nixosSystem {
     inherit system;
     modules = [ module ./machine.nix { cybexos.secureBoot = true; } ];
@@ -417,6 +426,48 @@ assert builtins.elem lpmd xps.services.dbus.packages && xps.users.groups ? power
 assert xps.systemd.services.intel_lpmd.wantedBy == [ "multi-user.target" ];
 assert xps.systemd.services.intel_lpmd.aliases == [ "org.freedesktop.intel_lpmd.service" ];
 assert xps.systemd.services.intel_lpmd.serviceConfig == { };
+# XPS 14/16: CVS must not autoload, or it takes the speaker amplifiers'
+# speaker-ID line; the camera initializer loads it once they have all bound.
+assert builtins.elem "intel_cvs" xps.boot.blacklistedKernelModules;
+assert lib.hasInfix "amplifiers_bound" cameraInit.script && cameraInit.serviceConfig.TimeoutStartSec == 120;
+# The XPS 13 has its own display quirks, the codec speaker path until Linux 7.4,
+# no speaker voicing, no CVS blacklist and, on Wildcat Lake, no LPMd policy.
+assert lib.all (p: builtins.elem p xps13.boot.kernelParams) [ "xe.enable_psr=1" "xe.enable_panel_replay=0" ];
+assert !(builtins.elem "xe.enable_dpcd_backlight=1" xps13.boot.kernelParams);
+assert lib.hasInfix "options snd_soc_sof_sdw quirk=1" xps13.boot.extraModprobeConfig;
+assert builtins.elem "xe.enable_panel_replay=0" xps13Wcl.boot.kernelParams;
+assert !(lib.any (lib.hasPrefix "xe.enable_psr") xps13Wcl.boot.kernelParams);
+assert !(lib.hasInfix "snd_soc_sof_sdw" xps13Wcl.boot.extraModprobeConfig);
+assert lib.all (c: !(c.environment.sessionVariables ? CYBEXOS_XPS_2026) && !(c.systemd.user.services ? xps-speaker-tuning)
+  && !(builtins.elem "intel_cvs" c.boot.blacklistedKernelModules) && !(c.systemd.services ? xps-ipu7-camera-init)
+  && c.services.thermald.enable) [ xps13 xps13Wcl ];
+assert xps13.systemd.services ? intel_lpmd && !(xps13Wcl.systemd.services ? intel_lpmd);
+assert lib.all (c: c.systemd.services.xps-haptic-touchpad.unitConfig.ConditionPathExistsGlob
+  == "/sys/bus/i2c/devices/i2c-VEN_06CB:*") [ xps xps13 installer ];
+# The ZBook Ultra G1a runs on stock drivers; only PMF Smart PC is off by default.
+assert lib.hasInfix "options amd_pmf smart_pc_support=0" zbook.boot.extraModprobeConfig;
+assert !(lib.hasInfix "amd_pmf" zbookSmartPc.boot.extraModprobeConfig);
+assert !(lib.hasInfix "amd_pmf" generic.boot.extraModprobeConfig);
+assert !(zbook.systemd.services ? xps-haptic-touchpad) && !zbook.services.thermald.enable;
+# Translated DMA for the XPS's DRAM-less SSD host memory buffer; XPS only.
+assert lib.all (c: builtins.elem "intel_iommu=on" c.boot.kernelParams) [ xps xps13 xps13Wcl ];
+assert lib.all (c: !(builtins.elem "intel_iommu=on" c.boot.kernelParams)) [ generic zbook installer ];
+# The XPS 13 reports neither the XPS 14/16 haptic touchpad nor their speaker voicing.
+assert lib.all (c: !(builtins.elem "xps-haptic-touchpad.service" (health c).reportedUnits)
+  && (health c).reportedUserUnits == [ ]) [ xps13 xps13Wcl zbook ];
+# The configured laptop profile, for cybex doctor.
+assert lib.all ({ c, value }: builtins.fromJSON c.environment.etc."cybexos/hardware-profile.json".text == value) [
+  { c = generic; value = { schema = 1; xps = null; zbookUltraG1a = false; }; }
+  { c = xps13; value = { schema = 1; xps = "0E54"; zbookUltraG1a = false; }; }
+  { c = zbook; value = { schema = 1; xps = null; zbookUltraG1a = true; }; }
+];
+# Microphone-mute lights follow the default microphone wherever a laptop has one.
+assert generic.systemd.user.services.micmute-led.unitConfig.ConditionPathExistsGlob == "/sys/class/leds/*::micmute";
+assert builtins.elem "hyprland-session.target" generic.systemd.user.services.micmute-led.wantedBy;
+assert lib.hasSuffix "/bin/cybexos-micmute-led" generic.systemd.user.services.micmute-led.serviceConfig.ExecStart;
+assert !(installer.systemd.user.services ? micmute-led);
+# Every installed machine gets the regulatory database (6 GHz, full 5 GHz).
+assert lib.all (c: c.hardware.wirelessRegulatoryDatabase) [ generic xps zbook ];
 # The processed camera keeps the previous exact sensor, orientation and format.
 assert relay.input.pipeline == "icamerasrc device-name=ov08x40-uf sharpness=80 ev=-1 saturation=10 ! videoflip method=rotate-180";
 assert relay.input.format == "NV12" && relay.output.format == "NV12";

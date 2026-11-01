@@ -150,6 +150,44 @@ class HardwareAssessmentTests(unittest.TestCase):
         self.cpu.write_text('model name : Intel Core Ultra 7\n')
         self.assertFalse(self.detect()['xps'])
 
+    def test_xps_13_matches_its_model_number_and_both_skus_without_the_camera(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        (dmi / 'sys_vendor').write_text('Dell Inc.')
+        (dmi / 'product_name').write_text('XPS 13 DX13260')
+        # Wildcat Lake is not sold as Core Ultra; the model number is exact.
+        self.cpu.write_text('model name : Intel Core 7 350\n')
+        (self.root / 'bus/acpi/devices/OVTI08F4:00').mkdir(parents=True)
+        self.pci('0000:00:05.0', '8086', 'b05d', '048000')
+        for sku in ('0E53', '0E54'):
+            (dmi / 'product_sku').write_text(sku)
+            found = self.detect()
+            self.assertTrue(found['xps'])
+            self.assertEqual(found['sku'], sku)
+            # The processed camera stack is reviewed for the XPS 14/16 only.
+            self.assertFalse(found['camera'])
+        (dmi / 'product_sku').write_text('0DB9')
+        self.assertFalse(self.detect()['xps'])
+        (dmi / 'product_sku').write_text('0E54')
+        (dmi / 'product_name').write_text('XPS 13 9350')
+        self.assertFalse(self.detect()['xps'])
+
+    def test_zbook_ultra_g1a_matches_vendor_board_and_model_not_the_regional_sku(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        for key, value in {'sys_vendor': 'HP', 'board_name': '8D01', 'product_sku': 'A3ZJ3ET#UUW',
+                           'product_name': 'HP ZBook Ultra G1a 14 inch Mobile Workstation PC'}.items():
+            (dmi / key).write_text(value)
+        found = self.detect()
+        self.assertTrue(found['zbookUltraG1a'])
+        self.assertFalse(found['xps'])
+        (dmi / 'product_sku').write_text('B90JMUA#ABA')
+        self.assertTrue(self.detect()['zbookUltraG1a'])
+        # The same board ID is not enough on another product line.
+        (dmi / 'product_name').write_text('HP ZBook Power 14 inch G12')
+        self.assertFalse(self.detect()['zbookUltraG1a'])
+        (dmi / 'product_name').write_text('HP ZBook Ultra G1a 14 inch Mobile Workstation PC')
+        (dmi / 'board_name').write_text('8D02')
+        self.assertFalse(self.detect()['zbookUltraG1a'])
+
     def test_inventory_keeps_identity_and_never_manufactures_qualification(self):
         self.pci(driver='nouveau')
         etc = self.root / 'etc'; etc.mkdir()

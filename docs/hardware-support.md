@@ -51,6 +51,7 @@ not change the machine-owned hardware configuration or personal update inputs.
 | Secure Boot | Not supported yet. The installation medium is unsigned, so firmware with Secure Boot on refuses to start it, and the installer stops before erasure while Secure Boot is on. Turn Secure Boot off to install. Signed media, owner key enrollment and module signing are still to be completed and qualified. |
 | Exact Dell XPS IPU7 camera | Known private-ABI blocker. The existing guard remains intact; camera initialization fails closed. Update health reports a blocked camera but never holds back or rolls back an update ([Recovery](recovery.md)). This machine is not qualified by omitting its camera or extending a signature without physical frames. |
 | Audio, Bluetooth, input, cameras, sleep and docks | Generic Linux support is included. Model-specific routing, haptics, MIPI cameras, fingerprints, suspend and hotplug require physical tests. |
+| Matched laptops | Dell XPS 13 DX13260 (0E53/0E54), XPS 14 DA14260 (0DB9), XPS 16 DA16260 (0DBA) and HP ZBook Ultra G1a (board 8D01) get exact-match profiles on the stock kernel; see [matched laptops](laptop-support.md) for each quirk, the BIOS settings they need and what still waits for a newer kernel. |
 
 Internet access to the release/cache is required. A bundled desktop payload
 does not remove the network prerequisite. Enterprise Wi-Fi certificates,
@@ -92,7 +93,8 @@ the owner's authorization.
 | NVIDIA desktop and hybrid laptop | Supported newer open branch, Pascal closed 580, PRIME, displays, resume |
 | Broadcom x86 laptop | Exact radio/firmware requirement and usable alternative networking |
 | USB-C dock/adapters | Realtek/ASIX Ethernet, USB Wi-Fi, display/audio/input hotplug |
-| Exact XPS SKU 0DB9/0DBA | Panel, haptics, audio, thermals, sleep and processed camera blocker |
+| Exact XPS SKU 0DB9/0DBA/0E53/0E54 | Panel, haptics, speakers (XPS 14/16 amplifier probe with CVS; XPS 13 codec path), thermals, sleep and processed camera blocker |
+| HP ZBook Ultra G1a (board 8D01) | OLED/IPS panel, speakers and microphones, ISP4 camera, MT7925 Wi-Fi/Bluetooth after s2idle, PMF profiles, BIOS settings |
 
 For each applicable machine exercise USB boot and physical PXE; network
 authentication and HTTPS; disk visibility; encrypted fresh installation;

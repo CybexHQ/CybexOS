@@ -2,8 +2,19 @@
 let
   cfg = config.cybexos;
   xps = cfg.hardware.xps;
+  zbook = cfg.hardware.zbookUltraG1a;
+  # XPS 14 DA14260 (0DB9) and XPS 16 DA16260 (0DBA) share their audio, camera
+  # and haptics. The XPS 13 DX13260 is 0E53 on Wildcat Lake, 0E54 on Panther Lake.
+  xps14or16 = lib.elem xps.sku [ "0DB9" "0DBA" ];
+  # Quirks measured on one exact SKU and panel EDID (docs/hardware-compatibility.md).
+  xpsPsrOff = xps.sku == "0DB9" && xps.panel == "30e4c607";
   camera = pkgs.callPackage ../packages/ipu7.nix { inherit (config.boot.kernelPackages) kernel kernelModuleMakeFlags; };
   lpmd = pkgs.callPackage ../packages/intel-lpmd.nix {};
+  micmuteLed = pkgs.writeShellApplication {
+    name = "cybexos-micmute-led";
+    runtimeInputs = with pkgs; [ coreutils gawk pulseaudio systemd ];
+    text = builtins.readFile ../../hardware/micmute-led;
+  };
   relay = config.services.v4l2-relayd.instances.ipu7;
 in {
   options.cybexos.hardware = {
@@ -23,10 +34,46 @@ in {
       lowPower = lib.mkOption { type = lib.types.bool; default = true; description = "Intel LPMd active-idle optimization on the exact matched XPS platform; retains upstream CPU/platform safety checks"; };
       hapticIntensity = lib.mkOption { type = lib.types.enum [ "low" "mid" "high" ]; default = "high"; };
     };
+    zbookUltraG1a = {
+      enable = lib.mkEnableOption "matched HP ZBook Ultra G1a (board 8D01, AMD Strix Halo)";
+      smartPc = lib.mkOption {
+        type = lib.types.bool; default = false;
+        description = ''
+          AMD PMF Smart PC policies from the BIOS. Off by default: after s2idle on
+          BIOS 01.05.07 and later the policy engine fails every second
+          ("TEE enact cmd failed"), and Linux 7.3 does not restart it on resume.
+          The static power slider and power profiles keep working without it.
+        '';
+      };
+    };
   };
   config = lib.mkMerge [ (lib.mkIf cfg.enable (lib.mkMerge [ {
     hardware.enableRedistributableFirmware = lib.mkDefault true;
+    # Without regulatory.db cfg80211 stays on the world domain, whatever the
+    # access point advertises: 6 GHz and some 5 GHz channels stay passive-only
+    # on Wi-Fi 6E/7 radios such as Intel BE211 and MediaTek MT7925.
+    hardware.wirelessRegulatoryDatabase = lib.mkDefault true;
     hardware.graphics = { enable = true; enable32Bit = cfg.features.steam; };
+    # The matched laptop profile this machine was configured with. cybex doctor
+    # compares it with the hardware it runs on (docs/laptop-support.md).
+    environment.etc."cybexos/hardware-profile.json".text = builtins.toJSON {
+      schema = 1;
+      xps = if xps.enable then xps.sku else null;
+      zbookUltraG1a = zbook.enable;
+    };
+    # Laptop drivers light *::micmute from an ALSA capture switch, which the
+    # SoundWire and AMD ACP digital microphones of current laptops do not
+    # have: PipeWire mutes them in software and the light never changes.
+    # Follow the default microphone instead, through logind.
+    environment.systemPackages = [ micmuteLed ];
+    systemd.user.services.micmute-led = {
+      description = "Microphone mute light follows the default microphone";
+      wantedBy = [ "hyprland-session.target" ];
+      partOf = [ "hyprland-session.target" ];
+      after = [ "pipewire-pulse.service" "wireplumber.service" ];
+      unitConfig.ConditionPathExistsGlob = "/sys/class/leds/*::micmute";
+      serviceConfig = { ExecStart = "${micmuteLed}/bin/cybexos-micmute-led"; Restart = "on-failure"; RestartSec = 2; };
+    };
     # The other native KMS drivers start in stage 1 on the medium too
     # (default.nix). Nouveau's firmware would make the medium's initrd 1.4 GB
     # instead of about 110 MB, so only installed machines carry it there.
@@ -68,15 +115,43 @@ in {
         LIBVA_DRIVER_NAME = "nvidia"; __GLX_VENDOR_LIBRARY_NAME = "nvidia";
       };
   }) (lib.mkIf xps.enable {
-    assertions = [ { assertion = lib.elem xps.sku [ "0DB9" "0DBA" ]; message = "XPS quirks require the exact supported SKU."; } ];
-    boot.kernelParams = lib.optional (lib.hasPrefix "30e4" xps.panel) "xe.enable_dpcd_backlight=1"
-      ++ lib.optional (xps.sku == "0DB9" && xps.panel == "30e4c607") "xe.enable_psr=0";
+    assertions = [
+      { assertion = lib.elem xps.sku [ "0DB9" "0DBA" "0E53" "0E54" ]; message = "XPS quirks require the exact supported SKU."; }
+      { assertion = xps.camera -> xps14or16; message = "The processed XPS camera stack is reviewed for the XPS 14/16 (0DB9/0DBA) only."; }
+    ];
+    boot.kernelParams = lib.optional (xps14or16 && lib.hasPrefix "30e4" xps.panel) "xe.enable_dpcd_backlight=1"
+      ++ lib.optional xpsPsrOff "xe.enable_psr=0"
+      # Stock equivalents of Dell's display quirks for the XPS 13, which are
+      # not upstream (docs/laptop-support.md). Panther Lake: Panel
+      # Replay and PSR2 stutter and corrupt the panel, so keep PSR1 only.
+      # Wildcat Lake: Panel Replay delivers about 40 % of scrolled frames late.
+      ++ lib.optionals (xps.sku == "0E54") [ "xe.enable_psr=1" "xe.enable_panel_replay=0" ]
+      ++ lib.optional (xps.sku == "0E53") "xe.enable_panel_replay=0"
+      # The firmware opts into DMA protection, so the IOMMU is on but maps
+      # internal devices 1:1. The XPS 14's DRAM-less SanDisk SN7100S then
+      # gets no 64 MiB host memory buffer: unremapped, the NVMe driver can
+      # offer it only eight 4 MiB chunks. Translated DMA gives it one segment.
+      ++ [ "intel_iommu=on" ];
+    # XPS 14/16: intel_cvs claims the GPIO (INTC10BC:01 pin 20) from which the
+    # four CS35L57 speaker amplifiers read their speaker ID, and it autoloads
+    # first, so every amplifier fails with -EBUSY and no sound card appears.
+    # The amplifiers read and release the line while probing; the camera
+    # initializer loads CVS explicitly once they have all bound.
+    boot.blacklistedKernelModules = lib.optional xps14or16 "intel_cvs";
+    # XPS 13 Panther Lake: Linux 7.3 lacks the cs42l43 speaker-ID quirk for
+    # 0E54 (7da2aca12375, in 7.4), so both sidecar amplifiers miss their
+    # firmware and the speakers are silent. Drive them from the codec's own
+    # amplifier until then: audible, with less bass.
+    boot.extraModprobeConfig = lib.mkIf (xps.sku == "0E54"
+      && lib.versionOlder config.boot.kernelPackages.kernel.version "7.4") ''
+      options snd_soc_sof_sdw quirk=1
+    '';
     # With PSR off, the driver enables Link Off Between Frames (LOBF) on this
     # panel instead. Its link then drops about every three seconds, and each
     # retrain power-cycles the panel for 1.2 s under the display lock, freezing
     # the whole desktop. Xe has no parameter for LOBF, only this debugfs switch;
     # set it before the display manager's first modeset (docs/hardware-compatibility.md).
-    systemd.services.xps-panel-link = lib.mkIf (xps.sku == "0DB9" && xps.panel == "30e4c607") {
+    systemd.services.xps-panel-link = lib.mkIf xpsPsrOff {
       description = "Keep the XPS panel link on between frames";
       wantedBy = [ "multi-user.target" ];
       before = [ "display-manager.service" ];
@@ -93,12 +168,15 @@ in {
         [ "$found" = 1 ] || { echo "The internal panel's LOBF control is missing." >&2; exit 1; }
       '';
     };
-    environment.sessionVariables.CYBEXOS_XPS_2026 = "1";
     # PPD owns user-selected profiles. Adaptive thermald supplies the separate
     # firmware/DPTF thermal protection; do not run a competing profile manager.
     services.thermald.enable = lib.mkDefault true;
     cybexos.updates.additionalHealthServices = lib.optional config.services.thermald.enable "thermald.service";
     hardware.graphics.extraPackages = with pkgs; [ intel-media-driver vpl-gpu-rt intel-compute-runtime ];
+  }) (lib.mkIf (xps.enable && xps14or16) {
+    # The speaker voicing was measured on the XPS 14's CS35L57 speakers and is
+    # shared with the XPS 16. The XPS 13's cs42l43 speakers have none.
+    environment.sessionVariables.CYBEXOS_XPS_2026 = "1";
     environment.etc."cybexos/xps-audio/filter-chain.conf".source = ../../hardware/xps/xps-speaker-filter-chain.conf;
     environment.etc."cybexos/xps-audio/host.conf".source = ../../hardware/xps/xps-speaker-host.conf;
     environment.systemPackages = [ (pkgs.writeShellApplication {
@@ -123,7 +201,9 @@ in {
         Restart = "on-failure"; RestartSec = 5;
       };
     };
-  }) (lib.mkIf (xps.enable && xps.lowPower) {
+  }) (lib.mkIf (xps.enable && xps.lowPower && xps.sku != "0E53") {
+    # The pinned LPMd carries Intel's Panther Lake policy only; Wildcat Lake
+    # (the XPS 13's 0E53) has a policy in later LPMd releases.
     # LPMd follows the PowerProfiles D-Bus API (PPD here, TuneD's bridge
     # before). PPD alone owns EPP/EPB and platform profiles. Upstream's Panther
     # Lake policy keeps LP-mode CPU restriction off in all three profiles and
@@ -221,7 +301,8 @@ in {
       after = [ "xps-ipu7-abi.service" ];
       before = [ "v4l2-relayd-ipu7.service" ];
       path = with pkgs; [ coreutils gnugrep kmod systemd ];
-      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 60; };
+      # It waits up to 60 s for the speaker amplifiers before loading CVS.
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 120; };
       script = builtins.readFile ../../hardware/xps/camera/xps-ipu7-camera-init;
     };
     systemd.services.xps-ipu7-camera-sleep = {
@@ -253,6 +334,14 @@ in {
     };
     cybexos.updates.reportedHealthServices = [ "xps-ipu7-camera-init.service" ];
     systemd.tmpfiles.rules = [ "d /run/camera 0750 root video -" ];
+  }) (lib.mkIf zbook.enable {
+    # Display, audio (ALC245 with four CS35L54 amplifiers), microphones (ACP
+    # PDM), camera (AMD ISP4), MT7925 Wi-Fi/Bluetooth, the Synaptics reader
+    # and touchpad all run on the stock kernel and firmware; see
+    # docs/laptop-support.md for the BIOS settings they depend on.
+    boot.extraModprobeConfig = lib.mkIf (!zbook.smartPc) ''
+      options amd_pmf smart_pc_support=0
+    '';
   }) ]))
   (lib.mkIf ((cfg.enable && xps.enable) || cfg.installationMedium) {
     # The generic live image needs the same controller wake/click handling as
@@ -262,6 +351,9 @@ in {
       "INTENSITY=${toString { low = 10; mid = 50; high = 100; }.${xps.hapticIntensity}}\n";
     systemd.services.xps-haptic-touchpad = {
       wantedBy = [ "multi-user.target" ];
+      # Only the Synaptics haptic touchpad is driven; without one the daemon
+      # would keep its I2C controller awake while waiting for it.
+      unitConfig.ConditionPathExistsGlob = "/sys/bus/i2c/devices/i2c-VEN_06CB:*";
       path = [ pkgs.python3 ];
       serviceConfig = {
         ExecCondition = lib.optional cfg.installationMedium (pkgs.writeShellScript "match-xps-touchpad" ''

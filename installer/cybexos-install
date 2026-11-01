@@ -671,6 +671,8 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
                 machine += ' '.join(f'{key} = {nix(prime[key])};' for key in ('intelBusId', 'amdgpuBusId', 'nvidiaBusId')) + ' };\n'
             if hardware['xps']:
                 machine += f'    hardware.xps = {{ enable = true; sku = {nix(hardware["sku"])}; panel = {nix(hardware["panel"])}; camera = {str(hardware["camera"]).lower()}; }};\n'
+            if hardware.get('zbookUltraG1a'):
+                machine += '    hardware.zbookUltraG1a.enable = true;\n'
             for key, value in plan.get('features', {}).items():
                 machine += f'    features.{key} = {str(value).lower()};\n'
             machine += '  };\n'

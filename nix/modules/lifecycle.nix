@@ -1,5 +1,6 @@
 { config, lib, pkgs, ... }:
 let cfg = config.cybexos;
+    xps14or16 = cfg.hardware.xps.enable && lib.elem cfg.hardware.xps.sku [ "0DB9" "0DBA" ];
     worker = action: {
       description = "Cybex OS ${action}";
       unitConfig.ConditionPathExists = "!/etc/cybexos/installer";
@@ -50,11 +51,13 @@ in {
         ++ lib.optional config.services.libreswan.enable "ipsec.service"
         ++ cfg.updates.additionalHealthServices);
       userUnits = lib.optional config.systemd.user.services.hypridle.enable "hypridle.service";
-      reportedUnits = lib.unique (lib.optional cfg.hardware.xps.enable "xps-haptic-touchpad.service"
+      # The haptic touchpad and speaker voicing are known on the XPS 14/16; the
+      # XPS 13 starts the haptic daemon only if its touchpad turns out to be one.
+      reportedUnits = lib.unique (lib.optional xps14or16 "xps-haptic-touchpad.service"
         ++ lib.optionals (cfg.hardware.xps.enable && cfg.hardware.xps.camera)
           [ "xps-ipu7-abi.service" "v4l2-relayd-ipu7.service" ]
         ++ cfg.updates.reportedHealthServices);
-      reportedUserUnits = lib.optional cfg.hardware.xps.enable "xps-speaker-tuning.service";
+      reportedUserUnits = lib.optional xps14or16 "xps-speaker-tuning.service";
     };
     systemd.tmpfiles.rules = [
       "d /var/lib/cybexos 0755 root root -"

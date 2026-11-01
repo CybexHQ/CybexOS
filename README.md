@@ -33,6 +33,7 @@ file; personal modules and persistent data are separate from vendor releases.
 - [System check (`cybex doctor`)](docs/system-check.md)
 - [Hardware and security](docs/hardware-security.md)
 - [Hardware support and qualification](docs/hardware-support.md)
+- [Matched laptops: Dell XPS 2026 and HP ZBook Ultra G1a](docs/laptop-support.md)
 - [Validation status](docs/validation.md)
 
 Upstream packages and Cybex OS are independently selectable:

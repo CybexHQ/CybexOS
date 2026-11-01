@@ -686,6 +686,40 @@ class FullNameMachineTests(DiskSafetyTests):
         self.assertIn('  users.users."tester".description = "José García";\n', machine[0])
 
 
+class MatchedLaptopMachineTests(DiskSafetyTests):
+    def machine(self, hardware):
+        efi = Mock(); efi.exists.return_value = True
+        variables = Mock(); variables.glob.return_value = []
+        real_path = Path
+        def path(value, *args):
+            return {'/sys/firmware/efi':efi, '/sys/firmware/efi/efivars':variables}.get(value, real_path(value, *args))
+        choice = plan(); choice.update(encrypted=False, autoLogin=False)
+        machine = []
+        def run(*args, **kwargs):
+            if args[0] == 'nixos-generate-config':
+                (real_path(args[-1]) / 'hardware-configuration.nix').write_text('{}')
+            elif args[:3] == ('nix', 'flake', 'lock'):
+                nix_lock(real_path(str(args[-1]).removeprefix('path:')))
+            elif args[0] == 'nixos-install':
+                machine.append((real_path(args[2]) / 'var/lib/cybexos/working/initial/machine.nix').read_text())
+                raise installer.Failure('stop before fixture system build')
+            return 'unused-credential-hash'
+        with self.trusted_install_directory(), patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE':str(ROOT / 'templates')}), patch.object(installer, 'disk_guard'), patch.object(installer, 'detect', return_value=hardware), patch.object(installer, 'Path', side_effect=path), patch('cybexos.inputs.validate_machine'), patch('cybexos.inputs.identity', return_value={}), self.assertRaisesRegex(installer.Failure, 'stop before fixture system build'):
+            installer.install(choice, {'password':'qualification-password-123'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')
+        return machine[0]
+
+    def test_detected_laptop_profiles_are_recorded_in_the_machine(self):
+        base = {'camera':False, 'nvidia':False, 'nvidiaPrime':{'enable':False}, 'xps':False, 'panel':''}
+        xps13 = self.machine(dict(base, xps=True, sku='0E54', panel='4d104a1b'))
+        self.assertIn('    hardware.xps = { enable = true; sku = "0E54"; panel = "4d104a1b"; camera = false; };\n', xps13)
+        self.assertNotIn('zbookUltraG1a', xps13)
+        zbook = self.machine(dict(base, zbookUltraG1a=True, sku='A3ZJ3ET#UUW', panel='4c83b341'))
+        self.assertIn('    hardware.zbookUltraG1a.enable = true;\n', zbook)
+        self.assertNotIn('hardware.xps', zbook)
+        # Older detection results without the field install no profile.
+        self.assertNotIn('zbookUltraG1a', self.machine(base))
+
+
 class SoftwareMachineTests(DiskSafetyTests):
     def machine_files(self, choice):
         efi = Mock(); efi.exists.return_value = True
