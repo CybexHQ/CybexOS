@@ -133,6 +133,20 @@ working installed Hyprland graphics stack.
    holding back updates. Generic webcam
    support does not resolve this machine-specific issue. See
    [the existing camera blocker](hardware-security.md).
+9. **The XPS 14 OLED panel needs PSR and LOBF off.** On SKU 0DB9 with the LG
+   panel (EDID `30e4c607`), PSR2 selective fetch produced full-screen black
+   flashes at 120 Hz (`Selective fetch area calculation failed in pipe A`), so
+   `nix/modules/hardware.nix` boots with `xe.enable_psr=0`. Without PSR, kernel
+   7.3's Xe driver enables Link Off Between Frames (LOBF) on that panel instead:
+   its link then dropped about every 3.1 s (DPCD lane status `00 00 80 00`), and
+   each retrain (`intel_encoder_link_check_work_fn`) power-cycled the panel for
+   about 1.2 s under the display modeset lock. Hyprland waited in
+   `drm_modeset_lock`, freezing the screen and delaying key releases into key
+   repeats. Xe has no LOBF parameter; `xps-panel-link.service` writes 1 to
+   `/sys/kernel/debug/dri/*/eDP-1/i915_edp_lobf_debug` before the display
+   manager starts (`i915_edp_lobf_info` then reports LOBF disabled). With it,
+   compositor responses stayed under 20 ms instead of 1.1 s freezes every 3 s.
+   Both quirks cost some idle power and apply to no other panel or machine.
 
 RAM is displayed with a warning below about 8 GiB, rather than a qualified hard
 minimum. The optional run-from-memory boot entry recommends at least 16 GB.

@@ -97,6 +97,13 @@ let
       cybexos.hardware.xps = { enable = true; sku = "0DB9"; camera = true; };
     } ];
   }).config;
+  # The LG OLED panel (EDID 30e4c607) on SKU 0DB9: PSR off, and LOBF with it.
+  xpsPanel = (nixpkgs.lib.nixosSystem {
+    inherit system;
+    modules = [ module ./machine.nix {
+      cybexos.hardware.xps = { enable = true; sku = "0DB9"; panel = "30e4c607"; };
+    } ];
+  }).config;
   secureBoot = (nixpkgs.lib.nixosSystem {
     inherit system;
     modules = [ module ./machine.nix { cybexos.secureBoot = true; } ];
@@ -373,6 +380,10 @@ assert installer.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=10
 assert xps.environment.etc."cybexos/xps-haptic.conf".text == "INTENSITY=100\n";
 assert (health xps).userUnits == [ "hypridle.service" ];
 assert (health xps).reportedUserUnits == [ "xps-speaker-tuning.service" ];
+# Only the matched panel loses PSR, and with it LOBF before the login screen starts.
+assert builtins.elem "xe.enable_psr=0" xpsPanel.boot.kernelParams && !(builtins.elem "xe.enable_psr=0" xps.boot.kernelParams);
+assert xpsPanel.systemd.services ? xps-panel-link && !(xps.systemd.services ? xps-panel-link);
+assert builtins.elem "display-manager.service" xpsPanel.systemd.services.xps-panel-link.before;
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.Type == "oneshot";
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.RemainAfterExit;
 assert builtins.elem "xps-ipu7-abi.service" xps.systemd.services.v4l2-relayd-ipu7.requires;

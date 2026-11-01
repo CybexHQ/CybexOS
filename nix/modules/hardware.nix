@@ -71,6 +71,28 @@ in {
     assertions = [ { assertion = lib.elem xps.sku [ "0DB9" "0DBA" ]; message = "XPS quirks require the exact supported SKU."; } ];
     boot.kernelParams = lib.optional (lib.hasPrefix "30e4" xps.panel) "xe.enable_dpcd_backlight=1"
       ++ lib.optional (xps.sku == "0DB9" && xps.panel == "30e4c607") "xe.enable_psr=0";
+    # With PSR off, the driver enables Link Off Between Frames (LOBF) on this
+    # panel instead. Its link then drops about every three seconds, and each
+    # retrain power-cycles the panel for 1.2 s under the display lock, freezing
+    # the whole desktop. Xe has no parameter for LOBF, only this debugfs switch;
+    # set it before the display manager's first modeset (docs/hardware-compatibility.md).
+    systemd.services.xps-panel-link = lib.mkIf (xps.sku == "0DB9" && xps.panel == "30e4c607") {
+      description = "Keep the XPS panel link on between frames";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "display-manager.service" ];
+      requires = [ "sys-kernel-debug.mount" ];
+      after = [ "sys-kernel-debug.mount" ];
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+      script = ''
+        found=0
+        for control in /sys/kernel/debug/dri/*/eDP-1/i915_edp_lobf_debug; do
+          [ -e "$control" ] || continue
+          echo 1 > "$control"
+          found=1
+        done
+        [ "$found" = 1 ] || { echo "The internal panel's LOBF control is missing." >&2; exit 1; }
+      '';
+    };
     environment.sessionVariables.CYBEXOS_XPS_2026 = "1";
     # PPD owns user-selected profiles. Adaptive thermald supplies the separate
     # firmware/DPTF thermal protection; do not run a competing profile manager.
