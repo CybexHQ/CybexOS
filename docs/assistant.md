@@ -24,7 +24,8 @@ listen or speak unless asked to for one question.
 - **Show or hide** the character from its menubar button (the sparkles beside
   the notifications) or with `cybex assistant toggle`. The button shows `…`
   while a question is being worked on, `!` while one needs your answer and a
-  dot for a reply you have not seen. Drag the character anywhere, including to
+  dot for a reply you have not seen. Shown, he flies in from the top-right
+  corner of the screen to his place. Drag the character anywhere, including to
   another display. It stays where it was left, across sessions, and keeps out
   of the way while game mode is on. The welcome guide's own Wiz stands in for
   him while the guide covers the screen, and finishing the guide brings him

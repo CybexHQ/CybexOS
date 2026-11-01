@@ -211,6 +211,22 @@ test("the overlay takes input only on the character and the box, and the keyboar
     assert.doesNotMatch(blur[1], /assistant/, "a full-output surface must not be blurred");
 });
 
+test("shown, the character flies in from the top-right corner, never across from the left", () => {
+    const window = read("AssistantWindow.qml");
+    // Until the surface has its size he waits just past the top-right corner.
+    assert.match(window, /bubbleX: dragging \? dragX : entered \? resting\.x : root\.width/);
+    assert.match(window, /bubbleY: dragging \? dragY : entered \? resting\.y : -root\.size/);
+    // Nothing animates before then, so a zero width cannot start a sweep.
+    for (const axis of ["x", "y"])
+        assert.match(window, new RegExp("Behavior on " + axis + " \\{\\s*enabled: root\\.settled && !root\\.dragging"));
+    assert.match(window, /function enter\(\) \{\s*if \(entered \|\| !visible \|\| width <= 0 \|\| height <= 0\)\s*return;/);
+    // The flight: animation on, then his place. Under the welcome guide, the
+    // other way round, since its own Wiz makes the hop.
+    assert.match(window, /if \(covered\) \{[^}]*entered = true;\s*settled = true;[^}]*\} else \{[^}]*settled = true;\s*entered = true;/);
+    for (const handler of ["Component.onCompleted", "onWidthChanged", "onHeightChanged"])
+        assert.match(window, new RegExp(handler.replace(".", "\\.") + ": Qt\\.callLater\\(root\\.enter\\)"));
+});
+
 test("the menubar button toggles the character on its own display and shows activity", () => {
     const module = read("Bar/Modules/Assistant.qml");
     assert.match(module, /moduleId: "assistant"/);

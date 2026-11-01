@@ -40,8 +40,14 @@ PanelWindow {
     property point dragPoint: Qt.point(0, 0)
     property point pressWindow: Qt.point(0, 0)
     property point pressBubble: Qt.point(0, 0)
-    readonly property real bubbleX: dragging ? dragX : resting.x
-    readonly property real bubbleY: dragging ? dragY : resting.y
+    // Shown, he flies in from just past the top-right corner to his place.
+    // A surface maps before the compositor sizes it, so until the size has
+    // arrived he waits in that corner and nothing animates: otherwise he
+    // would sweep in from the left edge, where a zero width puts him.
+    property bool entered: false
+    property bool settled: false
+    readonly property real bubbleX: dragging ? dragX : entered ? resting.x : root.width
+    readonly property real bubbleY: dragging ? dragY : entered ? resting.y : -root.size
     readonly property var dockPlace: AssistantHelpers.dockPlacement(
         { x: root.bubbleX, y: root.bubbleY }, root.size,
         { width: root.width, height: root.height }, Theme.scaled(360), root.topReserve)
@@ -132,6 +138,34 @@ PanelWindow {
         }
     }
 
+    // ---- entrance ------------------------------------------------------------
+    Component.onCompleted: Qt.callLater(root.enter)
+    onVisibleChanged: {
+        if (!visible) {
+            // Animation off first, so he jumps back to the corner unseen.
+            settled = false;
+            entered = false;
+        }
+        Qt.callLater(root.enter);
+    }
+    onWidthChanged: Qt.callLater(root.enter)
+    onHeightChanged: Qt.callLater(root.enter)
+
+    function enter() {
+        if (entered || !visible || width <= 0 || height <= 0)
+            return;
+        if (covered) {
+            // The welcome guide's own Wiz hops to this place, so this one is
+            // there already when he is uncovered.
+            entered = true;
+            settled = true;
+        } else {
+            // Animation on first, so the move to his place is the flight.
+            settled = true;
+            entered = true;
+        }
+    }
+
     // ---- hover ---------------------------------------------------------------
     readonly property bool pointerInside: characterHover.hovered || dockHover.hovered
 
@@ -191,11 +225,11 @@ PanelWindow {
                 : I18n.tr("Click to ask a question. Drag to move.")
 
             Behavior on x {
-                enabled: !root.dragging && !Theme.reducedMotion
+                enabled: root.settled && !root.dragging && !Theme.reducedMotion
                 NumberAnimation { duration: Theme.expandDuration; easing.type: Easing.OutCubic }
             }
             Behavior on y {
-                enabled: !root.dragging && !Theme.reducedMotion
+                enabled: root.settled && !root.dragging && !Theme.reducedMotion
                 NumberAnimation { duration: Theme.expandDuration; easing.type: Easing.OutCubic }
             }
             Behavior on scale {
