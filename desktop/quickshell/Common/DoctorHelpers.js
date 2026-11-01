@@ -2,7 +2,7 @@
 // report is checked here, so a malformed or newer one is refused rather than
 // half-shown.
 var IDS = ["graphics", "drivers", "firmware-files", "services", "audio", "secure-boot",
-    "firmware-updates", "storage", "battery", "time", "desktop"];
+    "firmware-updates", "storage", "battery", "time", "desktop", "laptop"];
 var STATES = ["ok", "suggestion", "problem", "info", "unknown"];
 // What needs the person, most important first.
 var RANK = {problem: 0, suggestion: 1};

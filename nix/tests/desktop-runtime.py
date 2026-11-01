@@ -94,6 +94,6 @@ report = json.loads(subprocess.run(['cybexos-doctor', '--json'], check=True, cap
                                    timeout=30).stdout)
 assert [check['id'] for check in report['checks']] == [
     'graphics', 'drivers', 'firmware-files', 'services', 'audio', 'secure-boot', 'firmware-updates', 'storage',
-    'battery', 'time', 'desktop'], report
-assert report['overall'] in ('ok', 'suggestion', 'problem') and sum(report['counts'].values()) == 11
+    'battery', 'time', 'desktop', 'laptop'], report
+assert report['overall'] in ('ok', 'suggestion', 'problem') and sum(report['counts'].values()) == 12
 print('Desktop executable, palette, OCR, image, QR, Node, Python, GI, schema and GIO TLS dependency and system check smoke passed')

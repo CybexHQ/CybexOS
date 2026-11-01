@@ -2,8 +2,8 @@
 """Read-only system check of this Cybex OS computer.
 
 cybex doctor looks at graphics, drivers, firmware, services, sound, Secure
-Boot, storage, the battery, the clock and the desktop, and explains what it
-found. It runs as the desktop user: no administrator rights, no network, no
+Boot, storage, the battery, the clock, the desktop and known faults of matched
+laptop models, and explains what it found. It runs as the desktop user: no administrator rights, no network, no
 writes. Each probe has its own time limit and becomes "unknown" rather than
 failing the run. The output names device models, PCI/USB IDs, kernel drivers,
 firmware files and systemd units, never serial numbers, addresses, hostnames,
@@ -35,7 +35,7 @@ CHECKS = (
     ('graphics', 'Graphics'), ('drivers', 'Drivers'), ('firmware-files', 'Firmware files'),
     ('services', 'Services'), ('audio', 'Sound'), ('secure-boot', 'Secure Boot'),
     ('firmware-updates', 'Firmware updates'), ('storage', 'Storage'), ('battery', 'Battery'),
-    ('time', 'Date and time'), ('desktop', 'Desktop'),
+    ('time', 'Date and time'), ('desktop', 'Desktop'), ('laptop', 'Laptop model'),
 )
 TITLES = dict(CHECKS)
 STATES = ('problem', 'suggestion', 'ok', 'info', 'unknown')
@@ -725,11 +725,117 @@ def check_desktop(scrub):
 
 # ---- report ------------------------------------------------------------
 
+# ---- laptop ------------------------------------------------------------
+
+# The matched laptops (docs/laptop-support.md). Keep these in step with the
+# installer's detection in lifecycle/cybexos/hardware.py.
+XPS_MODELS = {'0DB9': ('Dell XPS 14 (2026)', ('XPS 14', 'DA14260')),
+              '0DBA': ('Dell XPS 16 (2026)', ('XPS 16', 'DA16260')),
+              '0E53': ('Dell XPS 13 (2026)', ('DX13260',)),
+              '0E54': ('Dell XPS 13 (2026)', ('DX13260',))}
+# HP BIOS releases that can hang at the start-up screen.
+ZBOOK_FREEZING_BIOS = {(1, 4, 3), (1, 4, 5)}
+LAPTOP_RANK = {'problem': 0, 'suggestion': 1, 'info': 2}
+
+
+def dmi(name):
+    return read(SYS / 'class/dmi/id' / name).strip()
+
+
+def acpi_present(hid):
+    root = SYS / 'bus/acpi/devices'
+    return root.is_dir() and any(root.glob(hid + ':*'))
+
+
+def panel_identity():
+    for path in sorted((SYS / 'class/drm').glob('*eDP-*/edid')):
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if len(data) >= 12:
+            return data[8:12].hex()
+    return ''
+
+
+def laptop_model():
+    vendor, product, sku, board = (dmi(name) for name in ('sys_vendor', 'product_name', 'product_sku', 'board_name'))
+    if 'Dell' in vendor and sku in XPS_MODELS and any(name in product for name in XPS_MODELS[sku][1]):
+        # The XPS 14/16 SKUs also need the Core Ultra CPU, as at installation.
+        cpu = read(PROC / 'cpuinfo')
+        if sku in ('0DB9', '0DBA') and 'Ultra' not in cpu and 'Panther' not in cpu:
+            return None
+        return {'kind': 'xps', 'name': XPS_MODELS[sku][0], 'sku': sku,
+                'profile': f'hardware.xps = {{ enable = true; sku = "{sku}"; panel = "{panel_identity()}"; }};'}
+    if vendor == 'HP' and board == '8D01' and 'ZBook Ultra G1a' in product:
+        return {'kind': 'zbookUltraG1a', 'name': 'HP ZBook Ultra G1a', 'sku': '',
+                'profile': 'hardware.zbookUltraG1a.enable = true;'}
+    return None
+
+
+def laptop_issues(model):
+    """Known model-specific faults this computer shows now, most important first."""
+    issues = []
+    if model['kind'] == 'xps' and model['sku'] in ('0DB9', '0DBA'):
+        root = SYS / 'bus/soundwire/devices'
+        amplifiers = sorted(root.glob('sdw:*:01fa:355[4-7]:*')) if root.is_dir() else []
+        silent = [path for path in amplifiers if not (path / 'driver').exists()]
+        if silent:
+            issues.append(('problem', f"{len(silent)} of {plural(len(amplifiers), 'speaker amplifier')} did not start.",
+                           'The speakers stay silent. Restart the computer; if it persists, '
+                           '`journalctl -k -b | grep -i cs35l56` shows why. The camera driver can take the line '
+                           'the amplifiers read their speaker ID from, which the hardware profile prevents.'))
+    if model['kind'] == 'xps' and model['sku'] == '0E54' \
+            and read(SYS / 'module/snd_soc_sof_sdw/parameters/quirk').strip() == '1':
+        issues.append(('info', "The speakers use the sound codec's own amplifier.",
+                       'This kernel cannot read the speaker ID the two bass amplifiers need. Linux 7.4 can, and '
+                       'the profile then uses them again.'))
+    if model['kind'] == 'zbookUltraG1a':
+        if not acpi_present('MSFT0201'):
+            issues.append(('problem', 'Pluton is off in the BIOS, so the laptop can fail to wake from sleep.',
+                           'Turn on Pluton in the BIOS security settings (F10 at start-up). Waking from sleep '
+                           'needs its ACPI device while the IOMMU is on.'))
+        bios = dmi('bios_version')
+        version = re.search(r'(\d+)\.(\d+)\.(\d+)', bios)
+        if version and tuple(int(part) for part in version.groups()) in ZBOOK_FREEZING_BIOS:
+            issues.append(('problem', f'BIOS {version.group(0)} can freeze at start-up.',
+                           "Install a newer BIOS from Firmware updates or HP's support site."))
+        if not acpi_present('OMNI5C10'):
+            issues.append(('info', 'The camera is turned off in the BIOS.', 'Turn it on there to use it.'))
+    return issues
+
+
+def check_laptop():
+    model = laptop_model()
+    if model is None:
+        return finding('ok', 'No model-specific checks apply to this computer.', model=None)
+    profile = json_or_none(read(ETC / 'cybexos/hardware-profile.json'))
+    profile = profile if isinstance(profile, dict) else {}
+    active = profile.get('xps') == model['sku'] if model['kind'] == 'xps' else profile.get(model['kind']) is True
+    issues = laptop_issues(model)
+    if not active:
+        issues.append(('suggestion', f"This {model['name']} has no hardware profile.",
+                       f"Its fixes apply only with the profile. Add `{model['profile']}` inside `cybexos = {{ … }}` "
+                       'in /etc/nixos/machine.nix, stage it with `cybex update stage local` and apply the change.'))
+    facts = {'model': model['name'], 'sku': model['sku'], 'profile': active,
+             'issues': [{'state': state, 'summary': summary} for state, summary, _ in issues]}
+    if not issues:
+        return finding('ok', f"{model['name']}: its hardware profile is active.", **facts)
+    issues.sort(key=lambda issue: LAPTOP_RANK[issue[0]])
+    state, summary, detail = issues[0]
+    # Further faults by name; the missing profile also with the line to add.
+    others = [other for other in issues[1:] if other[0] != 'info']
+    if others:
+        detail += ' Also: ' + ' '.join(other[1] + (' ' + other[2] if other[0] == 'suggestion' else '')
+                                      for other in others)
+    return finding(state, summary, detail, **facts)
+
+
 def probes(scrub):
     return {'graphics': check_graphics, 'drivers': check_drivers, 'firmware-files': check_firmware_files,
             'services': check_services, 'audio': check_audio, 'secure-boot': check_secure_boot,
             'firmware-updates': check_firmware_updates, 'storage': check_storage, 'battery': check_battery,
-            'time': check_time, 'desktop': lambda: check_desktop(scrub)}
+            'time': check_time, 'desktop': lambda: check_desktop(scrub), 'laptop': check_laptop}
 
 
 def collect(deadline=DEADLINE):

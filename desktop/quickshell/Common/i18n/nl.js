@@ -2216,6 +2216,8 @@ var MESSAGES = {
     "This key is free.": "Deze toets is vrij.",
     "This key is free. Make it open:": "Deze toets is vrij. Laat hem openen:",
     "This key is free. Settings can make it open an app, a website or a command.": "Deze toets is vrij. Instellingen kan er een app, website of opdracht mee laten openen.",
+    "This laptop has a known hardware problem": "Deze laptop heeft een bekend hardwareprobleem",
+    "This laptop's hardware profile is not turned on": "Het hardwareprofiel van deze laptop staat niet aan",
     "This plan stays in the source project and Default mode. Provider, model, traits, and access remain adjustable.": "Dit plan blijft in het bronproject en in de modus Standaard. Provider, model, eigenschappen en toegang blijven aanpasbaar.",
     "This question needs the full T3 Code client.": "Voor deze vraag is de volledige T3 Code-client nodig.",
     "This server reports no temperature sensors.": "Deze server meldt geen temperatuursensoren.",

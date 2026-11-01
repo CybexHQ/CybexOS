@@ -2,8 +2,8 @@
 
 `cybex doctor` is a read-only check of this computer. It looks for missing
 drivers, failed services, missing sound output, low disk space, worn
-batteries, unsynchronized clocks, desktop errors and available firmware
-updates, and explains each finding in one line. It needs no AI account: the
+batteries, unsynchronized clocks, desktop errors, available firmware
+updates and known faults of matched laptops, and explains each finding in one line. It needs no AI account: the
 welcome guide runs it locally, and the Cybex OS Assistant runs it before
 explaining problems and proposing fixes.
 
@@ -39,6 +39,7 @@ so a fresh installation should not show a problem.
 | `battery` | `/sys/class/power_supply/BAT*` full-charge against design capacity | Under 60 % (`suggestion`); no battery is `ok` |
 | `time` | `timedatectl` NTP state, NetworkManager connectivity, uptime | Automatic time off, or unsynchronized after 15 minutes online (`suggestion`); offline or just booted is `info` |
 | `desktop` | `hyprctl -j configerrors`, `cybex shell status` | Hyprland configuration errors or the shell in safe mode (`problem`); outside a Hyprland session it is `unknown` |
+| `laptop` | The [matched laptop](laptop-support.md) this is (DMI vendor, product, SKU, board, CPU), `/etc/cybexos/hardware-profile.json`, and that model's known faults in sysfs | No profile for a matched laptop (`suggestion`, with the exact line to add). XPS 14/16: a SoundWire speaker amplifier without a driver (`problem`). ZBook Ultra G1a: Pluton off, so no `MSFT0201` ACPI device (`problem`); BIOS 01.04.03 or 01.04.05 (`problem`); camera off in the BIOS (`info`). XPS 13 Panther Lake on the codec speaker path (`info`). Other computers are `ok` |
 
 ## Privacy
 
@@ -75,7 +76,7 @@ conversation.
 
 `checks` always holds every id exactly once, in this order: `graphics`,
 `drivers`, `firmware-files`, `services`, `audio`, `secure-boot`,
-`firmware-updates`, `storage`, `battery`, `time`, `desktop`. `overall` is
+`firmware-updates`, `storage`, `battery`, `time`, `desktop`, `laptop`. `overall` is
 `problem` if any check is a problem, else `suggestion` if any is a
 suggestion, else `ok`; `info` and `unknown` never raise it. `summary` and
 `detail` are English sentences for people; `facts` is for the assistant and
@@ -94,6 +95,7 @@ may gain keys:
 | `battery` | `batteries: [{name, capacityPercent, cycleCount, model, manufacturer, status, chargeLimit}]` |
 | `time` | `ntpEnabled`, `ntpSynchronized`, `connectivity`, `uptimeMinutes` |
 | `desktop` | `hyprland: {session, configErrors: [text] \| null}`, `shell: {safeMode: bool \| null, reason}` |
+| `laptop` | `model: name \| null`, `sku`, `profile: bool`, `issues: [{state, summary}]` |
 
 A check that crashed or missed the deadline reports `unknown` with a generic
 summary (and `facts.error`, the exception type, for a crash).

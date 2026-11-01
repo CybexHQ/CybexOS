@@ -29,7 +29,7 @@ doctor = importlib.util.module_from_spec(spec)
 loader.exec_module(doctor)
 
 ORDER = ['graphics', 'drivers', 'firmware-files', 'services', 'audio', 'secure-boot', 'firmware-updates',
-         'storage', 'battery', 'time', 'desktop']
+         'storage', 'battery', 'time', 'desktop', 'laptop']
 HOST = 'fixture-private-host'
 PERSON = 'fixtureperson'
 MACHINE_ID = '0f1e2d3c4b5a69788796a5b4c3d2e1f0'
@@ -274,7 +274,7 @@ class Contract(unittest.TestCase):
         self.assertEqual({identifier: check['state'] for identifier, check in checks.items()},
                          {identifier: 'ok' for identifier in ORDER}, json.dumps(report, indent=1))
         self.assertEqual(report['overall'], 'ok')
-        self.assertEqual(report['counts']['ok'], 11)
+        self.assertEqual(report['counts']['ok'], 12)
         self.assertEqual(checks['graphics']['facts']['gpus'], [
             {'name': 'Intel Corporation Meteor Lake-P [Intel Arc Graphics]', 'vendorDevice': '8086:7d55',
              'driver': 'i915', 'slot': '0000:00:02.0'}])
@@ -558,6 +558,94 @@ class Checks(unittest.TestCase):
         check = self.check('battery')
         self.assertEqual((check['state'], check['summary']), ('ok', 'No battery.'))
 
+    def laptop(self, **dmi):
+        root = self.fixture.sys / 'class/dmi/id'
+        root.mkdir(parents=True, exist_ok=True)
+        for name, value in dmi.items():
+            (root / name).write_text(value + '\n')
+
+    def acpi(self, *names):
+        for name in names:
+            (self.fixture.sys / 'bus/acpi/devices' / name).mkdir(parents=True, exist_ok=True)
+
+    def profile(self, xps=None, zbook=False):
+        (self.fixture.etc / 'cybexos/hardware-profile.json').write_text(
+            json.dumps({'schema': 1, 'xps': xps, 'zbookUltraG1a': zbook}))
+
+    def test_other_computers_have_no_laptop_checks(self):
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('ok', 'No model-specific checks apply to this computer.'))
+        # The XPS 14/16 SKUs alone, on an older CPU, are not the 2026 models.
+        self.laptop(sys_vendor='Dell Inc.', product_name='XPS 14 DA14260', product_sku='0DB9')
+        (self.fixture.proc / 'cpuinfo').write_text('model name : Intel Core i7-1360P\n')
+        self.assertEqual(self.check('laptop')['facts']['model'], None)
+
+    def test_xps_speaker_amplifiers_and_its_profile(self):
+        self.laptop(sys_vendor='Dell Inc.', product_name='XPS 14 DA14260', product_sku='0DB9')
+        (self.fixture.proc / 'cpuinfo').write_text('model name : Intel(R) Core(TM) Ultra 7 365\n')
+        edid = self.fixture.sys / 'class/drm/card1-eDP-1'
+        edid.mkdir(parents=True)
+        (edid / 'edid').write_bytes(bytes(8) + bytes.fromhex('30e4c607') + bytes(116))
+        driver = self.fixture.sys / 'bus/soundwire/drivers/cs35l56'
+        driver.mkdir(parents=True)
+        amplifiers = [self.fixture.sys / 'bus/soundwire/devices' / name for name in
+                      ('sdw:0:2:01fa:3557:01:2', 'sdw:0:2:01fa:3557:01:3', 'sdw:0:3:01fa:3557:01:0',
+                       'sdw:0:3:01fa:3557:01:1')]
+        for amplifier in amplifiers:
+            amplifier.mkdir(parents=True)
+            (amplifier / 'driver').symlink_to(driver)
+        # The codec on link 0 is not an amplifier.
+        (self.fixture.sys / 'bus/soundwire/devices/sdw:0:0:01fa:4245:01:0').mkdir()
+        # Without the profile, the exact line to add.
+        check = self.check('laptop')
+        self.assertEqual(check['state'], 'suggestion')
+        self.assertEqual(check['summary'], 'This Dell XPS 14 (2026) has no hardware profile.')
+        self.assertIn('`hardware.xps = { enable = true; sku = "0DB9"; panel = "30e4c607"; };`', check['detail'])
+        self.assertIn('`cybex update stage local`', check['detail'])
+        self.profile(xps='0DB9')
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('ok', 'Dell XPS 14 (2026): its hardware profile is active.'))
+        self.assertTrue(check['facts']['profile'])
+        # A profile for another SKU is not this machine's.
+        self.profile(xps='0DBA')
+        self.assertEqual(self.check('laptop')['state'], 'suggestion')
+        self.profile(xps='0DB9')
+        (amplifiers[1] / 'driver').unlink()
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('problem', '1 of 4 speaker amplifiers did not start.'))
+        self.assertIn('cs35l56', check['detail'])
+        self.assertIn('laptop:problem', ' '.join(f"{c['id']}:{c['state']}" for c in self.fixture.report()['checks']))
+
+    def test_xps_13_reports_its_codec_speaker_path(self):
+        self.laptop(sys_vendor='Dell Inc.', product_name='XPS 13 DX13260', product_sku='0E54')
+        self.profile(xps='0E54')
+        self.assertEqual(self.check('laptop')['state'], 'ok')
+        quirk = self.fixture.sys / 'module/snd_soc_sof_sdw/parameters/quirk'
+        quirk.parent.mkdir(parents=True)
+        quirk.write_text('1\n')
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('info', "The speakers use the sound codec's own amplifier."))
+
+    def test_zbook_pluton_bios_and_camera(self):
+        self.laptop(sys_vendor='HP', product_name='HP ZBook Ultra G1a 14 inch Mobile Workstation PC',
+                    board_name='8D01', product_sku='A3ZJ3ET#UUW', bios_version='X89 Ver. 01.06.02')
+        self.profile(zbook=True)
+        self.acpi('MSFT0201:00', 'OMNI5C10:00')
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('ok', 'HP ZBook Ultra G1a: its hardware profile is active.'))
+        shutil.rmtree(self.fixture.sys / 'bus/acpi/devices/OMNI5C10:00')
+        check = self.check('laptop')
+        self.assertEqual((check['state'], check['summary']), ('info', 'The camera is turned off in the BIOS.'))
+        shutil.rmtree(self.fixture.sys / 'bus/acpi/devices/MSFT0201:00')
+        self.laptop(bios_version='X89 Ver. 01.04.05')
+        check = self.check('laptop')
+        self.assertEqual(check['state'], 'problem')
+        self.assertEqual(check['summary'], 'Pluton is off in the BIOS, so the laptop can fail to wake from sleep.')
+        self.assertIn('Also: BIOS 01.04.05 can freeze at start-up.', check['detail'])
+        self.assertEqual([issue['state'] for issue in check['facts']['issues']], ['problem', 'problem', 'info'])
+        self.profile(zbook=False)
+        self.assertIn('`hardware.zbookUltraG1a.enable = true;`', self.check('laptop')['detail'])
+
     def test_time_synchronization(self):
         self.fixture.write('timedatectl', 'NTP=yes\nNTPSynchronized=no\n')
         self.assertEqual(self.check('time')['state'], 'suggestion')
@@ -643,7 +731,7 @@ class CommandLine(unittest.TestCase):
             lines = result.stdout.splitlines()
             self.assertEqual(lines[0], 'Cybex OS system check: 1 problem, 1 suggestion')
             rows = [line for line in lines if line and not line.startswith(' ')][1:-1]
-            self.assertEqual(len(rows), 11)
+            self.assertEqual(len(rows), 12)
             self.assertTrue(rows[0].startswith('Problem     Services: 1 service failed: [hostname]-backup.service'))
             self.assertTrue(rows[1].startswith('Suggestion  Firmware updates:'))
             self.assertIn('Note        Secure Boot: Secure Boot is off.', rows)

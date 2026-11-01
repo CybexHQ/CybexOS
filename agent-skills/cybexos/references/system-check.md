@@ -160,3 +160,15 @@ the shell fell back to recovery after repeated crashes or by request: read
 `journalctl --user -b -u quickshell`, disable an identified broken personal
 plugin with `cybex plugin disable ID` (with the person's agreement), then
 `cybex shell recover`. `unknown` outside a Hyprland session is expected.
+
+## laptop
+
+Model-specific faults of the [matched laptops](../../../docs/laptop-support.md),
+which run stock kernels with per-model fixes. `suggestion`: a recognised laptop
+without its hardware profile; `detail` names the exact line for the
+`cybexos = { … }` section of `/etc/nixos/machine.nix`, which goes through the
+normal lifecycle. `problem` on an XPS 14/16: a speaker amplifier did not start;
+read `journalctl -k -b | grep -i cs35l56`. `problem` on the ZBook Ultra G1a:
+Pluton or the BIOS version, both settings only the person can change in the
+firmware setup (F10 at start-up) or through Firmware updates; never suggest
+kernel parameters for them. `info` items are expected states.

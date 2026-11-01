@@ -54,6 +54,9 @@ Singleton {
             return I18n.tr("The clock is not synchronized");
         case "desktop":
             return I18n.tr("The desktop reported a problem");
+        case "laptop":
+            return problem ? I18n.tr("This laptop has a known hardware problem")
+                : I18n.tr("This laptop's hardware profile is not turned on");
         default:
             return check.summary;
         }
