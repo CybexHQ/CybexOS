@@ -282,11 +282,27 @@ later revision normally passes; background preparation tries again for the
 next revision or after a day. Personal configuration previews (`local`) are
 not checked.
 
-A Software change that only alters the installed packages, with the same
-kernel, initrd, boot parameters and personal configuration apart from
-`local/software.json`, becomes the default generation once activation and its
-health checks pass. It needs no trial boot, so the next app can be installed
-straight away. Every other change keeps the trial boot.
+Two kinds of change become the default generation once activation and its
+health checks pass, without a trial boot or restart:
+
+- a Software change that only alters the installed packages, with personal
+  configuration unchanged apart from `local/software.json`;
+- an update (Cybex OS, NixOS or both, without device firmware) that changes
+  nothing starting the computer and logging in use.
+
+Both also require an unchanged boot path, compared by content between the two
+generations: the kernel, early-boot image (initrd) and boot options, and the
+login screen. The login screen check covers SDDM's unit and configuration, the
+PAM files for password login, the greeter and the encryption-gated automatic
+login, and the `cybexos-session` script it starts (not that script's
+desktop-environment wrapper, which names each release's packages). Activation
+does not restart the login screen, so only a boot shows that a changed one still
+works. Every other change keeps the trial boot. To keep releases that leave
+these alone restart-free, the boot splash and the automatic-login encryption
+check are packages named without the release version, and the session file
+starts `/run/current-system/sw/bin/cybexos-session`;
+`checks.x86_64-linux.parity` asserts that a new release version with changed
+desktop and updater packages leaves the whole boot path identical.
 
 Cybex OS's modules
 use NixOS's cached default builds: Hyprland and its portal as Nixpkgs builds

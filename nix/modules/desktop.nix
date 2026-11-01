@@ -3,11 +3,16 @@ let cfg = config.cybexos;
     assistant = pkgs.callPackage ../packages/assistant.nix {};
     titlebars = pkgs.callPackage ../packages/titlebars.nix { hyprland = config.programs.hyprland.package; };
     hermesBridge = pkgs.callPackage ../packages/hermes-bridge.nix {};
+    encryptionCheck = pkgs.callPackage ../packages/encryption-check.nix { source = ../..; };
+    # The login screen must stay identical across releases that do not change
+    # how logging in works, so the updater can skip their test boot: the
+    # session runs the booted generation's own cybexos-session, whose script
+    # (not its desktop-environment wrapper) the updater compares.
     session = pkgs.writeTextDir "share/wayland-sessions/cybexos.desktop" ''
       [Desktop Entry]
       Name=Cybex OS
       Comment=Hyprland with the Cybex OS desktop
-      Exec=${cfg.desktopPackage}/bin/cybexos-session
+      Exec=/run/current-system/sw/bin/cybexos-session
       Type=Application
       DesktopNames=Hyprland
     '';
@@ -56,7 +61,7 @@ in {
     security.pam.services.sddm-autologin.rules.auth.cybexos-encryption = lib.mkIf cfg.autoLogin {
       order = 50; control = "requisite";
       modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-      args = [ "quiet" "${cfg.updaterPackage}/bin/cybexos-verify-encryption" ];
+      args = [ "quiet" "${encryptionCheck}/bin/cybexos-verify-encryption" ];
     };
     # One automatic login per boot: a restarted SDDM daemon would otherwise
     # treat its first display as a fresh boot. The marker lives on tmpfs.

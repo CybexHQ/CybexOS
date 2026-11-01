@@ -33,7 +33,9 @@ generations too: a rollback neither removes nor downgrades them
 ([Flathub](software-and-defaults.md#flathub)).
 
 The previous generation stays the persistent boot default. The candidate is a
-one-shot trial, selected once. A failed boot requires a user-selected reset or
+one-shot trial, selected once. A change whose boot path is unchanged skips the
+trial and becomes the default after activation and health
+([which changes](updates.md)). A failed boot requires a user-selected reset or
 reboot; the next boot returns to the previous default. There is no unattended
 reboot or hardware watchdog reset. A successful fresh boot and authenticated
 Hyprland/Quickshell login must pass `cybex update confirm` before the candidate

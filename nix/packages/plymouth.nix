@@ -1,7 +1,10 @@
 { lib, stdenvNoCC, librsvg, source }:
 stdenvNoCC.mkDerivation {
   pname = "cybexos-plymouth";
-  version = lib.trim (builtins.readFile (source + /VERSION));
+  # Not the release version: the splash is in every boot's early image, so a
+  # release that leaves it alone must leave that image identical, and the
+  # updater then installs the release without a test boot.
+  version = "1";
   src = import ../package-source.nix {
     inherit lib source;
     paths = [ "desktop/plymouth" "assets/wiz" ];

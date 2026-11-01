@@ -210,5 +210,79 @@ class PackagesOnly(unittest.TestCase):
         self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-boot')
 
 
+class UnchangedBoot(unittest.TestCase):
+    """An update that leaves starting the computer and logging in alone."""
+    def setUp(self):
+        lifecycle.EngineTests.setUp(self)
+
+    def generation(self, base, name, changes=None):
+        """A generation's boot path as files: (relative path, content) changes apply."""
+        system = base / name
+        files = {'kernel-params': 'quiet', 'etc/systemd/system/display-manager.service': '[Service]\nExecStart=sddm',
+                 'etc/sddm.conf.d/00-nixos.conf': '[General]\nSessionDir=/nix/store/sessions',
+                 'etc/pam.d/login': 'auth unix', 'etc/pam.d/sddm': 'auth unix', 'etc/pam.d/sddm-greeter': 'auth permit',
+                 'etc/pam.d/sddm-autologin': 'auth requisite pam_exec.so quiet /nix/store/check/bin/check',
+                 'desktop/bin/.cybexos-session-wrapped': 'exec Hyprland', 'desktop/bin/cybexos-session': 'wrapper ' + name}
+        files.update(changes or {})
+        for relative, value in files.items():
+            if value is None:
+                continue
+            path = system / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(value)
+        for link, target in (('kernel', base / 'kernel-image'), ('initrd', base / (files.get('@initrd') or 'initrd-image'))):
+            target.touch()
+            (system / link).symlink_to(target)
+        (system / 'sw/bin').mkdir(parents=True)
+        (system / 'sw/bin/cybexos-session').symlink_to(system / 'desktop/bin/cybexos-session')
+        return str(system)
+
+    def test_only_an_unchanged_kernel_image_options_login_screen_and_session_qualify(self):
+        cases = {
+            'the session wrapper alone': ({'desktop/bin/cybexos-session': 'another release wrapper'}, True),
+            'boot options': ({'kernel-params': 'quiet video=DP-2:d'}, False),
+            'early-boot image': ({'@initrd': 'other-initrd-image'}, False),
+            'automatic-login check': ({'etc/pam.d/sddm-autologin': 'auth requisite pam_exec.so quiet /nix/store/new/bin/check'}, False),
+            'password login': ({'etc/pam.d/login': 'auth unix nullok'}, False),
+            'login screen configuration': ({'etc/sddm.conf.d/00-nixos.conf': '[General]\nSessionDir=/nix/store/other'}, False),
+            'another configuration file': ({'etc/sddm.conf.d/10-theme.conf': '[Theme]'}, False),
+            'login screen unit': ({'etc/systemd/system/display-manager.service': '[Service]\nExecStart=other'}, False),
+            'session script': ({'desktop/bin/.cybexos-session-wrapped': 'exec Hyprland --verbose'}, False),
+        }
+        for name, (changes, expected) in cases.items():
+            with self.subTest(change=name), tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                record = {'changeKind': 'update', 'system': self.generation(base, 'new', changes),
+                          'previousSystem': self.generation(base, 'old')}
+                self.assertEqual(self.engine.boot_unchanged(record), expected)
+                if expected:
+                    for kind in ('configuration', 'software', 'region', 'maintenance'):
+                        self.assertFalse(self.engine.boot_unchanged(record | {'changeKind': kind}), kind)
+                    firmware = {'devices': [{'id': 'bios', 'needsReboot': True}]}
+                    self.assertFalse(self.engine.boot_unchanged(record | {'firmware': firmware}), 'firmware restarts')
+                    self.assertTrue(self.engine.boot_unchanged(record | {'firmware': {'devices': []}}))
+        self.assertFalse(self.engine.boot_unchanged({'changeKind': 'update', 'system': '/missing/new',
+                                                     'previousSystem': '/missing/old'}))
+
+    def test_update_with_an_unchanged_boot_path_needs_no_restart(self):
+        record = self.engine.stage('upstream')
+        with patch.object(type(self.engine), 'boot_unchanged', return_value=True):
+            self.engine.apply(record['id'], record['reviewToken'])
+        calls = self.runner.calls
+        self.assertIn(('cybexos-boot-trial', '--commit', lifecycle.NEW_SYSTEM), calls)
+        self.assertNotIn(('cybexos-boot-trial', lifecycle.NEW_SYSTEM, lifecycle.OLD_SYSTEM), calls)
+        status = read(self.engine.status_path)
+        self.assertEqual((status['state'], status['restart']), ('done', 'None'))
+        self.assertIn('no restart is needed', status['phase'])
+        self.assertFalse(self.engine.pending_path.exists())
+        self.assertTrue((self.engine.tx(record['id']) / 'good.json').is_file())
+
+    def test_update_that_changes_the_boot_path_keeps_its_trial_boot(self):
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        self.assertIn(('cybexos-boot-trial', lifecycle.NEW_SYSTEM, lifecycle.OLD_SYSTEM), self.runner.calls)
+        self.assertEqual(read(self.engine.status_path)['state'], 'awaiting-boot')
+
+
 if __name__ == '__main__':
     unittest.main()

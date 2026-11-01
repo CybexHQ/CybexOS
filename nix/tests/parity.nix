@@ -108,6 +108,28 @@ let
       cybexos.autoLogin = true;
     } ];
   }).config;
+  # The same machine at a later release that changes the desktop and the
+  # updater but not how the computer starts or logs in.
+  nextRelease = (nixpkgs.lib.nixosSystem {
+    inherit system;
+    modules = [ module ./machine.nix ({ options, lib, ... }: {
+      cybexos.encrypted = true;
+      cybexos.autoLogin = true;
+      cybexos.release.version = lib.mkForce "9.9.9";
+      cybexos.desktopPackage = lib.mkForce (options.cybexos.desktopPackage.default.overrideAttrs (_: { version = "9.9.9"; __intentionallyOverridingVersion = true; }));
+      cybexos.updaterPackage = lib.mkForce (options.cybexos.updaterPackage.default.overrideAttrs (_: { version = "9.9.9"; __intentionallyOverridingVersion = true; }));
+    }) ];
+  }).config;
+  # What starting the computer and logging in use (lifecycle engine boot_path).
+  bootPath = c: {
+    initrd = c.system.build.initialRamdisk.drvPath;
+    kernel = toString c.boot.kernelPackages.kernel;
+    params = c.boot.kernelParams;
+    pam = map (name: c.environment.etc."pam.d/${name}".text) [ "login" "sddm" "sddm-autologin" "sddm-greeter" ];
+    loginScreen = toString c.environment.etc."sddm.conf.d/00-nixos.conf".source;
+    displayManager = toString c.systemd.units."display-manager.service".unit;
+    sessions = toString c.services.displayManager.sessionData.desktops;
+  };
   health = c: builtins.fromJSON c.environment.etc."cybexos/health-services.json".text;
   lib = nixpkgs.lib;
   names = map lib.getName;
@@ -313,8 +335,18 @@ assert builtins.isString encrypted.system.build.toplevel.drvPath;
 assert encrypted.services.displayManager.autoLogin.enable;
 assert !encrypted.services.displayManager.sddm.autoLogin.relogin;
 assert encrypted.security.pam.services.sddm-autologin.rules.auth.cybexos-encryption.control == "requisite";
-assert builtins.elem "${encrypted.cybexos.updaterPackage}/bin/cybexos-verify-encryption"
+assert builtins.any (lib.hasSuffix "-cybexos-encryption-check-1/bin/cybexos-verify-encryption")
   encrypted.security.pam.services.sddm-autologin.rules.auth.cybexos-encryption.args;
+# A release that changes the desktop and the updater, but not the boot splash,
+# the encryption check or the session script, starts and logs in exactly as
+# before, so the updater installs it without a test boot.
+assert toString nextRelease.cybexos.desktopPackage != toString encrypted.cybexos.desktopPackage;
+assert toString nextRelease.cybexos.updaterPackage != toString encrypted.cybexos.updaterPackage;
+assert nextRelease.cybexos.release.version != encrypted.cybexos.release.version;
+assert bootPath nextRelease == bootPath encrypted;
+# The splash is in that early image; its package never carries the release version.
+assert builtins.all (theme: !(lib.hasInfix "-${encrypted.cybexos.release.version}" (toString theme)))
+  encrypted.boot.plymouth.themePackages;
 # The disk passphrase cached at unlock reaches GNOME Keyring, once per boot.
 assert encrypted.systemd.services.display-manager.serviceConfig.KeyringMode == "shared";
 assert (let auth = encrypted.security.pam.services.sddm-autologin.rules.auth; in

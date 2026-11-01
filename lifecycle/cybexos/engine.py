@@ -103,6 +103,32 @@ def copy_config(source, target):
     syncdir(target)
 
 
+# The login screen: its unit, configuration and authentication (including the
+# encryption-gated automatic login). Activation does not restart it, so only a
+# boot shows that a changed one still works.
+LOGIN_SCREEN = ('etc/systemd/system/display-manager.service', 'etc/sddm.conf.d', 'etc/pam.d/login',
+                'etc/pam.d/sddm', 'etc/pam.d/sddm-autologin', 'etc/pam.d/sddm-greeter')
+
+
+def boot_path(system):
+    """What starting the computer and logging in use beyond activation and health.
+
+    The kernel, early-boot image and boot options, the login screen, and the
+    session script it starts, compared by content: its desktop-environment
+    wrapper names each release's packages, the script itself does not.
+    """
+    system = Path(system)
+    def content(path):
+        if path.is_dir():
+            return {child.name: content(child) for child in sorted(path.iterdir())}
+        return path.read_bytes() if path.exists() else None
+    session = Path(os.path.realpath(system / 'sw/bin/cybexos-session'))
+    script = session.with_name('.cybexos-session-wrapped')
+    return [os.path.realpath(system / 'kernel'), os.path.realpath(system / 'initrd'),
+            content(system / 'kernel-params'), *(content(system / name) for name in LOGIN_SCREEN),
+            content(script if script.exists() else session)]
+
+
 def config_digest(path):
     h = hashlib.sha256()
     for p in sorted(configuration_paths(path)):
@@ -648,17 +674,19 @@ class Engine:
                 self.profile(record['system'])
                 self.reject_new_failures(previously_failed, warnings['units'])
                 self.status(healthWarnings=warnings)
-                if self.packages_only(record, tx):
-                    # Only the installed packages changed: the same kernel, initrd,
-                    # boot parameters and configuration apart from Software's own
-                    # declaration. Activation and health passed, so the new
-                    # generation becomes the default without a trial boot. The
-                    # recovery record moves to the boot phase first: a crash
-                    # before the commit restores the previous generation.
+                software = self.packages_only(record, tx)
+                if software or self.boot_unchanged(record):
+                    # Only Software's packages changed, or an update left the
+                    # kernel, early-boot image, boot options, login screen and
+                    # session script as they were. Activation and health passed,
+                    # so the new generation becomes the default without a trial
+                    # boot. The recovery record moves to the boot phase first: a
+                    # crash before the commit restores the previous generation.
                     atomic(self.pending_path, record | {'phase': 'boot', 'bootId': self.boot_id()})
                     self.run('cybexos-boot-trial', '--commit', record['system'])
                     atomic(tx / 'good.json', {'at': int(time.time())})
-                    self.finish_confirmation(record, 'Installed. System services and the desktop passed health checks.')
+                    self.finish_confirmation(record, 'Installed. System services and the desktop passed health checks.' if software
+                                             else 'Installed. Starting the computer and logging in are unchanged, so no restart is needed.')
                     return
                 # Keep the previous boot as default and try the candidate once.
                 # A failed boot therefore does not strand the next boot on it.
@@ -802,13 +830,22 @@ class Engine:
             return {str(path.relative_to(root)): (path.read_bytes() if path.is_file() else None)
                     for path in configuration_paths(root)
                     if str(path.relative_to(root)) != 'local/software.json'}
-        def boot(system):
-            system = Path(system)
-            return [os.path.realpath(system / 'kernel'), os.path.realpath(system / 'initrd'),
-                    (system / 'kernel-params').read_text() if (system / 'kernel-params').exists() else None]
         try:
             return (tree(tx / 'config') == tree(self.state / 'deployed')
-                    and boot(record['system']) == boot(record['previousSystem']))
+                    and boot_path(record['system']) == boot_path(record['previousSystem']))
+        except OSError:
+            return False
+
+    def boot_unchanged(self, record):
+        """Does this update leave starting the computer and logging in as they are?
+
+        Activation and health already exercised everything else in the running
+        session. Device firmware still takes its restart.
+        """
+        if record.get('changeKind') != 'update' or ((record.get('firmware') or {}).get('devices')):
+            return False
+        try:
+            return boot_path(record['system']) == boot_path(record['previousSystem'])
         except OSError:
             return False
 
