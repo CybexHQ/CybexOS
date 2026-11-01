@@ -22,7 +22,9 @@ Item {
     readonly property bool update: (deployment.changeKind || "update") === "update"
     readonly property var installed: service.installedComponents
     readonly property var vendor: service.sourcesLoaded ? service.sources.cybexos : ({})
-    readonly property var notes: Helpers.noteItems(vendor.notes || "", 5)
+    // Notes only for a Cybex OS version this computer can install; the check
+    // also returns the installed release's notes when it is current.
+    readonly property var notes: Helpers.noteItems(vendor.state === "available" ? vendor.notes || "" : "", 5)
     readonly property bool bothAvailable: service.sourcesLoaded && service.sources.upstream.state === "available"
         && vendor.state === "available"
     // Up to date on a release the person kept, with its What's New.

@@ -222,6 +222,17 @@ test("the review groups components, apps and tools, falling back to package chan
 test("release notes, sizes and labels stay short and honest", () => {
     assert.deepEqual(H.noteItems("## Highlights\n- One\n* Two\n\n1. Three\n• Four", 3), { items: ["One", "Two", "Three"], more: true });
     assert.deepEqual(H.noteItems(""), { items: [], more: false });
+    // GitHub release notes: wrapped Markdown items stay whole, inline markup is text.
+    const notes = "# Cybex OS 1.0.1\n\nThe first published release.\n\n## Updates\n\n"
+        + "- **Keyless releases.** A release is a published GitHub release of\n  `CybexHQ/CybexOS`. See\n"
+        + "  [the guide](https://example.com/releasing).\n- *Health* judges what changes; xps_speaker_tuning\n"
+        + "  and 2 * 3 stay as written.\n\n1) Settings \u2192 Sudo\n+ ![logo](https://example.com/logo.png)";
+    assert.deepEqual(H.noteItems(notes, 10), { items: [
+        "The first published release.",
+        "Keyless releases. A release is a published GitHub release of CybexHQ/CybexOS. See the guide.",
+        "Health judges what changes; xps_speaker_tuning and 2 * 3 stay as written.",
+        "Settings \u2192 Sudo"], more: false });
+    assert.equal(H.noteItems(notes, 2).more, true);
     assert.equal(H.sizeChange(40e6), "+40 MB");
     assert.equal(H.sizeChange(-2.04e9), "\u22122.0 GB");
     assert.equal(H.sizeChange(1000), "", "a rounding error is not a size change");

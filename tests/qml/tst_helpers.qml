@@ -4,10 +4,23 @@ import "../../desktop/quickshell/Common/Format.js" as Format
 import "../../desktop/quickshell/Common/LayoutHelpers.js" as Layout
 import "../../desktop/quickshell/Common/SysInfoHelpers.js" as SysInfo
 import "../../desktop/quickshell/Common/T3CodeHelpers.js" as T3
+import "../../desktop/quickshell/Common/UpdatesHelpers.js" as Updates
 
 Item {
     TestCase {
         name: "QmlJavaScriptRuntime"
+
+        // Qt's own JavaScript engine, not only Node, must accept these patterns.
+        function test_release_note_items() {
+            const notes = "# Cybex OS 1.0.1\n\nThe first published release.\n\n"
+                + "- **Keyless releases.** A published GitHub release of\n  `CybexHQ/CybexOS`, see\n"
+                + "  [the guide](https://example.com).\n- *Health* judges changes; xps_speaker_tuning and 2 * 3 stay.";
+            const result = Updates.noteItems(notes, 10);
+            compare(result.items.length, 3);
+            compare(result.items[1], "Keyless releases. A published GitHub release of CybexHQ/CybexOS, see the guide.");
+            compare(result.items[2], "Health judges changes; xps_speaker_tuning and 2 * 3 stay.");
+            compare(result.more, false);
+        }
 
         function test_format_boundaries() {
             compare(Format.clamp01(-0.1), 0);

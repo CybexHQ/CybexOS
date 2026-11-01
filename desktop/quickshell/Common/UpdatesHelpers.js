@@ -244,13 +244,39 @@ function summary(deployment) {
     return { components: [], apps: [], tools: rows, background: 0, sizeChange: 0 };
 }
 
-// Release notes as short items: list markers and headings are dropped.
+// Release notes as short plain items. Each Markdown list item or paragraph is
+// one item however its lines wrap; headings are dropped, and emphasis, code
+// and links keep only their text.
 function noteItems(text, limit) {
     const max = limit || 6;
-    const lines = String(text || "").split(/\r?\n/).map(line => line.trim())
-        .filter(line => line !== "" && !/^#/.test(line))
-        .map(line => line.replace(/^(?:[-*\u2022]|\d+\.)\s+/, ""));
-    return { items: lines.slice(0, max), more: lines.length > max };
+    const items = [];
+    let open = false;
+    for (const raw of String(text || "").split(/\r?\n/)) {
+        const line = raw.trim();
+        if (line === "" || /^#/.test(line)) {
+            open = false;
+            continue;
+        }
+        const marker = /^(?:[-*+\u2022]|\d+[.)])\s+/.exec(line);
+        if (marker || !open)
+            items.push(line.slice(marker ? marker[0].length : 0));
+        else
+            items[items.length - 1] += " " + line;
+        open = true;
+    }
+    const plain = items.map(noteText).filter(item => item !== "");
+    return { items: plain.slice(0, max), more: plain.length > max };
+}
+
+function noteText(text) {
+    return text
+        .replace(/!\[[^\]\n]*\]\([^)\n]*\)/g, "")
+        .replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/(\*\*|__)(\S(?:.*?\S)?)\1/g, "$2")
+        .replace(/(^|[^\w*])\*(\S(?:[^*]*?\S)?)\*(?!\w)/g, "$1$2")
+        .replace(/(^|\W)_(\S(?:[^_]*?\S)?)_(?!\w)/g, "$1$2")
+        .trim();
 }
 
 // Net size change in decimal units, signed; "" when it rounds to nothing.
