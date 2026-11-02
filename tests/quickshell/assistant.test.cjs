@@ -258,7 +258,9 @@ test("the installation feature carries the service, the agents and the menubar",
     assert.match(desktop, /CYBEXOS_ASSISTANT = if cfg\.features\.assistant then "1" else "0";/);
     assert.match(desktop, /systemd\.user\.services\.cybexos-assistant = lib\.mkIf cfg\.features\.assistant \{/);
     assert.match(desktop, /ExecStart = "\$\{assistant\}\/bin\/cybexos-assistant serve";/);
-    assert.match(desktop, /path = \[ config\.system\.path \];\s*serviceConfig = \{\s*ExecStart = "\$\{assistant\}/);
+    // The running system's packages through the stable profile link, and no
+    // restart by activation: an app install must not end an answer.
+    assert.match(desktop, /path = \[ sessionPath \];[^}]*restartIfChanged = false;\s*serviceConfig = \{\s*ExecStart = "\$\{assistant\}/);
     const applications = repo("nix/modules/applications.nix");
     // The agentic OS always carries an agent CLI: Codex everywhere, and Claude
     // Code whenever unfree packages are allowed (it is unfree).
