@@ -383,7 +383,14 @@ def unit_active(unit):
         result = subprocess.run(['systemctl', '--user', 'is-active', unit], text=True, capture_output=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
-    return result.stdout.strip() in ('active', 'activating', 'reloading')
+    state = result.stdout.strip()
+    if result.returncode in (0, 3) and state in ('active', 'activating', 'reloading', 'deactivating'):
+        return True
+    if result.returncode in (3, 4) and state in ('inactive', 'failed', 'unknown'):
+        return False
+    # A failed bus connection says nothing about the worker. Keep its record
+    # in progress until the manager can be queried, so it cannot be replaced.
+    return None
 
 
 def current_task(state=None, *, active=unit_active):
@@ -438,19 +445,26 @@ def start(action, ids, *, names=None, run=None, state=None, get=None, allowed=No
         atomic(path, {'schema': 1, 'id': identifier, 'action': action, 'ids': ids,
                       'names': {key: text(value, 60) for key, value in names.items() if key in ids and isinstance(value, str)},
                       'state': 'queued', 'error': '', 'unit': unit, 'createdAt': now, 'updatedAt': now})
-    try:
-        # The worker sees the caller's programs, flatpak included; a user
-        # manager's own PATH need not contain the system profile.
-        spawn(['systemd-run', '--user', '--collect', '--quiet', '--unit', unit,
-               '--description', 'Cybex OS Software: Flathub ' + action,
-               '--setenv', 'PATH=' + os.environ.get('PATH', '/run/current-system/sw/bin'),
-               cybex(), 'software', 'flathub', 'run', identifier], check=True, timeout=30,
-              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except (OSError, subprocess.SubprocessError):
-        task = read(path) or {}
-        atomic(path, task | {'state': 'failed', 'error': "Software couldn't start the change. Try again.",
-                             'updatedAt': time.time(), 'finishedAt': time.time()})
-        raise Failure("Software couldn't start the change. Try again.") from None
+        try:
+            # Keep submission serialized too: a slow start can outlast the
+            # liveness grace period before the unit exists in the manager.
+            # The worker sees the caller's programs, flatpak included; a user
+            # manager's own PATH need not contain the system profile.
+            spawn(['systemd-run', '--user', '--collect', '--quiet', '--unit', unit,
+                   '--description', 'Cybex OS Software: Flathub ' + action,
+                   '--setenv', 'PATH=' + os.environ.get('PATH', '/run/current-system/sw/bin'),
+                   cybex(), 'software', 'flathub', 'run', identifier], check=True, timeout=30,
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            # The submission command can time out after the service starts.
+            # Only fail an unclaimed task, under the worker's lock, so a late
+            # worker cannot race this decision or overwrite a replacement.
+            with locked(path.with_suffix('.run.lock'), skip_busy=True) as idle:
+                task = read(path) or {}
+                if idle and task.get('state') == 'queued':
+                    atomic(path, task | {'state': 'failed', 'error': "Software couldn't start the change. Try again.",
+                                         'updatedAt': time.time(), 'finishedAt': time.time()})
+                    raise Failure("Software couldn't start the change. Try again.") from None
     return {'accepted': True, 'task': identifier}
 
 

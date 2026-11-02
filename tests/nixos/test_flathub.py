@@ -1,8 +1,11 @@
 """Flathub apps for one account, with Flatpak, systemd and Flathub's API as fixtures."""
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -266,6 +269,90 @@ class FlathubTests(unittest.TestCase):
             flathub.start('install', ['org.vim.Vim'], run=self.flatpak, state=self.state, allowed=True, spawn=spawn,
                           active=lambda unit: True, on=True)
         self.assertEqual(read(self.state / 'flathub-task.json')['state'], 'failed')
+
+    def test_worker_liveness_distinguishes_stopped_units_from_manager_failures(self):
+        for code, output, expected in (
+                (0, 'active\n', True), (0, 'activating\n', True),
+                (0, 'reloading\n', True), (3, 'deactivating\n', True),
+                (3, 'inactive\n', False), (3, 'failed\n', False),
+                (4, 'unknown\n', False), (1, '', None), (1, 'inactive\n', None)):
+            with self.subTest(code=code, output=output):
+                result = subprocess.CompletedProcess([], code, output, 'private system manager diagnostics')
+                with mock.patch.object(flathub.subprocess, 'run', return_value=result):
+                    self.assertIs(flathub.unit_active('u.service'), expected)
+
+    def test_unreachable_manager_keeps_running_task_and_blocks_a_duplicate(self):
+        now = time.time()
+        task = {'schema': 1, 'id': 'a' * 32, 'action': 'install', 'ids': ['org.vim.Vim'],
+                'names': {}, 'state': 'running', 'error': '', 'unit': 'u.service',
+                'createdAt': now - 60, 'updatedAt': now - 60}
+        atomic(self.state / 'flathub-task.json', task)
+        spawn = self.spawned()
+        unavailable = subprocess.CompletedProcess([], 1, '', 'Failed to connect to user bus')
+        with mock.patch.object(flathub.subprocess, 'run', return_value=unavailable):
+            self.assertEqual(flathub.current_task(self.state)['state'], 'running')
+            with self.assertRaisesRegex(Failure, 'already changing'):
+                flathub.start('remove', ['org.vim.Vim'], state=self.state, spawn=spawn, on=True)
+        self.assertEqual(read(self.state / 'flathub-task.json'), task)
+        self.assertEqual(spawn.calls, [])
+
+    def test_service_submission_keeps_the_task_locked_until_the_manager_accepts_it(self):
+        second = self.spawned()
+
+        def slow_start(argv, **kwargs):
+            path = self.state / 'flathub-task.json'
+            queued = read(path)
+            atomic(path, queued | {'updatedAt': time.time() - 60})
+            # Model another request while systemd-run is still submitting the
+            # first unit: the unit legitimately does not exist yet.
+            with self.assertRaises(Failure):
+                flathub.start('remove', ['org.vim.Vim'], state=self.state, spawn=second,
+                              active=lambda unit: False, on=True)
+            self.assertEqual(read(path)['id'], queued['id'])
+
+        started = flathub.start('install', ['org.vim.Vim'], state=self.state, allowed=True,
+                                spawn=slow_start, on=True)
+        self.assertEqual(read(self.state / 'flathub-task.json')['id'], started['task'])
+        self.assertEqual(second.calls, [])
+
+    def test_submission_timeout_does_not_fail_or_replace_a_running_worker(self):
+        running, finish = threading.Event(), threading.Event()
+        worker = None
+
+        def run(*args, **kwargs):
+            if args[:2] == ('flatpak', 'install'):
+                running.set()
+                self.assertTrue(finish.wait(5), 'Release the worker after checking submission')
+            return self.flatpak(*args, **kwargs)
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            def spawn(argv, **kwargs):
+                nonlocal worker
+                worker = executor.submit(flathub.work, argv[-1], run=run, state=self.state)
+                self.assertTrue(running.wait(5), 'The service starts before its submission times out')
+                raise subprocess.TimeoutExpired(argv, 30)
+
+            try:
+                started = flathub.start('install', ['org.vim.Vim'], state=self.state, allowed=True,
+                                        spawn=spawn, active=lambda unit: True, on=True)
+                self.assertEqual(read(self.state / 'flathub-task.json')['state'], 'running')
+                with self.assertRaisesRegex(Failure, 'already changing'):
+                    flathub.start('remove', ['org.vim.Vim'], state=self.state, spawn=self.spawned(),
+                                  active=lambda unit: True, on=True)
+            finally:
+                finish.set()
+            self.assertEqual(worker.result(timeout=5), {'state': 'done', 'error': ''})
+        self.assertEqual(read(self.state / 'flathub-task.json')['id'], started['task'])
+
+    def test_submission_timeout_does_not_overwrite_a_completed_worker(self):
+        def spawn(argv, **kwargs):
+            self.assertEqual(flathub.work(argv[-1], run=self.flatpak, state=self.state)['state'], 'done')
+            raise subprocess.TimeoutExpired(argv, 30)
+
+        started = flathub.start('install', ['org.vim.Vim'], state=self.state, allowed=True,
+                                spawn=spawn, on=True)
+        task = read(self.state / 'flathub-task.json')
+        self.assertEqual((task['id'], task['state'], task['error']), (started['task'], 'done', ''))
 
     def test_updates_compare_this_accounts_apps_with_flathub(self):
         self.flatpak.apps += [('org.vim.Vim', 'Vim', '9.1', 'user'), ('org.gimp.GIMP', 'GIMP', '3.0', 'system')]

@@ -7,6 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -416,11 +417,11 @@ class DiskSafetyTests(unittest.TestCase):
     def trusted_install_directory(self):
         # Exercise the installer with ordinary fixture storage while requiring
         # the real invocation to select /run, never world-writable /tmp.
-        create = tempfile.TemporaryDirectory
+        create = tempfile.mkdtemp
         def temporary(*args, **kwargs):
             self.assertEqual(kwargs.pop('dir', None), '/run')
             return create(*args, **kwargs)
-        return patch.object(installer.tempfile, 'TemporaryDirectory', side_effect=temporary)
+        return patch.object(installer, 'mkdtemp', side_effect=temporary)
 
     def setUp(self):
         prebuilt = patch.object(installer, 'seed_prebuilt', return_value={'paths': 12, 'seconds': 0.1})
@@ -661,6 +662,65 @@ class DiskSafetyTests(unittest.TestCase):
             run.assert_not_called(); guard.assert_not_called()
 
 
+class InstallationCleanupTests(unittest.TestCase):
+    setUp = DiskSafetyTests.setUp
+    trusted_install_directory = DiskSafetyTests.trusted_install_directory
+
+    def run_mount_failure(self, encrypted, unmount_fails, root_mount_fails=False):
+        paths, calls = {}, []
+
+        def run(*args, **kwargs):
+            calls.append(args)
+            if args[:3] == ('mount', '-t', 'ext4'):
+                paths['target'] = target = Path(args[-1])
+                self.addCleanup(shutil.rmtree, target.parent, True)
+                (target / 'installed-data').write_text('data on the installed filesystem')
+                if root_mount_fails:
+                    raise installer.Failure('root mount command interrupted after mounting')
+            elif args[:3] == ('mount', '-t', 'vfat'):
+                raise installer.Failure('boot filesystem mount failed')
+            elif args[0] == 'umount' and unmount_fails:
+                raise installer.Failure('installation target is busy')
+            return ''
+
+        choice = plan(); choice.update(encrypted=encrypted, autoLogin=encrypted)
+        with tempfile.TemporaryDirectory(prefix='cybexos-cleanup-log-') as diagnostics, \
+                patch.object(installer, 'INSTALL_LOG', Path(diagnostics) / 'installation.log'), \
+                self.trusted_install_directory(), patch.object(installer, 'check_platform'), \
+                patch.object(installer, 'disk_guard'), patch.object(installer, 'detect', return_value={'camera': False}), \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
+            with self.assertRaises(installer.Failure):
+                installer.install(choice, {'password': 'qualification-password-123'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')
+            if paths['target'].parent.exists():
+                self.assertIn(str(paths['target']), installer.installation_details()['text'])
+        return paths['target'], calls, errors.getvalue()
+
+    def test_failed_unmount_retains_target_files_and_the_open_encryption_mapping(self):
+        for encrypted in (False, True):
+            with self.subTest(encrypted=encrypted):
+                target, calls, errors = self.run_mount_failure(encrypted, unmount_fails=True)
+                self.assertTrue((target / 'installed-data').is_file(), 'Never recursively delete a still-mounted target')
+                self.assertNotIn(('cryptsetup', 'close', 'cybexos-install-root'), calls)
+                self.assertIn(str(target), errors, 'Report the retained mount for recovery')
+
+    def test_unmounted_target_is_cleaned_and_its_encryption_mapping_is_closed(self):
+        for encrypted in (False, True):
+            with self.subTest(encrypted=encrypted):
+                target, calls, _ = self.run_mount_failure(encrypted, unmount_fails=False)
+                self.assertFalse(target.parent.exists())
+                close = ('cryptsetup', 'close', 'cybexos-install-root')
+                self.assertEqual(close in calls, encrypted)
+                if encrypted:
+                    self.assertLess(calls.index(('umount', '-R', target)), calls.index(close))
+
+    def test_interrupted_mount_command_does_not_delete_a_mount_it_failed_to_record(self):
+        with patch.object(Path, 'is_mount', lambda path: path.name == 'target'):
+            target, calls, errors = self.run_mount_failure(True, unmount_fails=False, root_mount_fails=True)
+        self.assertEqual((target / 'installed-data').read_text(), 'data on the installed filesystem')
+        self.assertNotIn(('cryptsetup', 'close', 'cybexos-install-root'), calls)
+        self.assertIn(str(target), errors)
+
+
 class FullNameMachineTests(DiskSafetyTests):
     def test_full_name_becomes_the_account_description(self):
         efi = Mock(); efi.exists.return_value = True
@@ -845,7 +905,7 @@ class TestedNixpkgsTests(unittest.TestCase):
         hardware = {'camera': False, 'nvidia': False, 'nvidiaPrime': {'enable': False}, 'xps': False}
         refreshed = copy.deepcopy(TESTED_NIXPKGS)
         refreshed['locked'].update(rev='f' * 40, narHash='sha256-' + 'F' * 43 + '=')
-        create = tempfile.TemporaryDirectory
+        create = tempfile.mkdtemp
         for name, result in {'reused': None, 'refreshed': refreshed}.items():
             seen = {}
             def run(*args, **kwargs):
@@ -860,7 +920,7 @@ class TestedNixpkgsTests(unittest.TestCase):
                     seen['installed'] = True
                     raise installer.Failure('stop before fixture system build')
                 return 'unused-credential-hash'
-            with self.subTest(name), patch.object(installer.tempfile, 'TemporaryDirectory', side_effect=lambda *a, **k: create(*a, **{x: y for x, y in k.items() if x != 'dir'})), \
+            with self.subTest(name), patch.object(installer, 'mkdtemp', side_effect=lambda *a, **k: create(*a, **{x: y for x, y in k.items() if x != 'dir'})), \
                     patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE': str(ROOT / 'templates')}), self.efi(), patch.object(installer, 'disk_guard'), \
                     patch.object(installer, 'detect', return_value=hardware), self.assertRaises(installer.Failure) as raised:
                 installer.install(choice, {'password': 'qualification-password-123'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')

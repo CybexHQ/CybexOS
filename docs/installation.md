@@ -184,11 +184,18 @@ failure after the disk was changed says so and opens the log. The menu (⋯) has
 the installation log, a recovery shell on tty2 (Alt+F1 returns), the text
 installer, restart into firmware settings, restart and power off.
 
+If the installation target cannot be unmounted, the worker retains its workspace
+and reports the target path in Installation details and on stderr. Unmount it
+from the recovery shell before removing that workspace; its mounted files are
+never recursively cleaned up.
+
 Restart and power off show a pending message and prevent repeated requests.
 If systemd refuses the request or it times out, the reason remains on screen
 and the action can be retried. These explicit live-medium actions bypass
 session shutdown inhibitors while retaining normal systemd shutdown and
 filesystem unmounting. They are refused while installation is in progress.
+This also applies after a service restart while the original worker still holds
+the installer lock, even if the replacement screen shows an error.
 
 ### Software profiles
 

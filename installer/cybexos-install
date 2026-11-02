@@ -14,7 +14,7 @@ import shutil
 import secrets as random_secrets
 import subprocess
 import sys
-import tempfile
+from tempfile import mkdtemp
 import threading
 import time
 from urllib.parse import urlencode
@@ -609,11 +609,31 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
     mounted, opened = False, False
     # Nix's local target store rejects world-writable ancestry, including /tmp.
     # /run is a root-owned trusted parent in the shared NixOS live environment.
-    with tempfile.TemporaryDirectory(prefix='cybexos-install-', dir='/run') as temporary:
+    with contextlib.ExitStack() as cleanup:
+        temporary = mkdtemp(prefix='cybexos-install-', dir='/run')
+        target = Path(temporary) / 'target'
+
+        def clean_workspace():
+            # An unmount failure must never turn temporary-directory cleanup
+            # into recursive deletion of the installed filesystem. Also check
+            # the mount itself: mount may have succeeded before its command
+            # was interrupted and before `mounted` could be recorded.
+            if mounted or target.is_mount():
+                message = (f'Installation target retained at {target}. Unmount it before removing '
+                           f'the workspace {temporary}.')
+                # The graphical worker's stderr is disconnected. Keep the
+                # recovery path available in Installation details as well.
+                with contextlib.suppress(OSError):
+                    with INSTALL_LOG.open('a') as log:
+                        log.write(message + '\n')
+                print(message, file=sys.stderr, flush=True)
+                return
+            shutil.rmtree(temporary)
+
+        cleanup.callback(clean_workspace)
         # Nix's build users must traverse the public target/configuration path.
         # Keep credentials in their separate mode-0700 directory below.
         Path(temporary).chmod(0o755)
-        target = Path(temporary) / 'target'
         target.mkdir()
         target.chmod(0o755)
         try:
@@ -741,8 +761,9 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
             try:
                 if mounted:
                     run('umount', '-R', target)
+                    mounted = False
             finally:
-                if opened:
+                if opened and not mounted and not target.is_mount():
                     run('cryptsetup', 'close', 'cybexos-install-root')
     print(f"\nInstallation complete — welcome, {plan['username']}.\n"
           f"Your computer is {plan['hostname']}. "

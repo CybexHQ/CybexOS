@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 from subprocess import TimeoutExpired
+from tempfile import TemporaryDirectory
 import time
 import uuid
 
@@ -83,6 +84,7 @@ def configuration_paths(source):
 
 def copy_config(source, target):
     source = Path(source).resolve()
+    target = Path(target)
     for path in configuration_paths(source):
         if path.is_symlink() or (not path.is_file() and not path.is_dir()):
             raise Failure('Configuration contains a link or special file. Use runtime secret paths and plain local modules.')
@@ -91,16 +93,28 @@ def copy_config(source, target):
                 raise Failure('Configuration contains a large state file. Keep state and secrets outside the flake.')
             if b'PRIVATE KEY-----' in path.read_bytes():
                 raise Failure('Private key found in configuration. Move it to /var/lib/cybexos/secrets before staging.')
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns('.git'))
-    for path in [target, *Path(target).rglob('*')]:
-        # NAR identities distinguish executable files. Personal package/service
-        # sources must keep that behavior when their staged tree is selected.
-        executable = path.is_file() and bool(path.stat().st_mode & 0o111)
-        path.chmod(0o755 if path.is_dir() or executable else 0o644)
-        if path.is_file():
-            with path.open('rb') as stream:
-                os.fsync(stream.fileno())
-    syncdir(target)
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(f'Configuration copy target already exists: {target}')
+    # Recovery uses the presence of a retained configuration as its completion
+    # boundary. Never publish a partial backup or working selection on failure.
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix='.copy-config-', dir=target.parent) as directory:
+        staged = Path(directory) / 'config'
+        shutil.copytree(source, staged, ignore=shutil.ignore_patterns('.git'))
+        paths = [staged, *staged.rglob('*')]
+        for path in paths:
+            # NAR identities distinguish executable files. Personal package/service
+            # sources must keep that behavior when their staged tree is selected.
+            executable = path.is_file() and bool(path.stat().st_mode & 0o111)
+            path.chmod(0o755 if path.is_dir() or executable else 0o644)
+            if path.is_file():
+                with path.open('rb') as stream:
+                    os.fsync(stream.fileno())
+        for path in reversed(paths):
+            if path.is_dir():
+                syncdir(path)
+        os.rename(staged, target)
+        syncdir(target.parent)
 
 
 # The login screen: its unit, configuration and authentication (including the

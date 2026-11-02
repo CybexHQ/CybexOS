@@ -5,6 +5,7 @@ these tests check what the daemon sends to the one disk-writing worker: the
 reviewed plan, the token-bound install request, and nothing else.
 """
 import asyncio
+import fcntl
 import importlib.machinery
 import importlib.util
 import json
@@ -140,6 +141,7 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
 
         fixtures = [
             patch.object(daemon, 'ETC', etc), patch.object(daemon, 'RUNTIME', run),
+            patch.object(daemon, 'INSTALLER_LOCK', run / 'installer.lock'),
             patch.object(daemon, 'SOCKET', run / 'control.sock'), patch.object(daemon, 'KEYBOARD_ENV', run / 'keyboard.env'),
             patch.object(daemon, 'geoip_zone', return_value='Europe/Amsterdam'),
             patch.object(daemon, 'run_quiet', side_effect=quiet),
@@ -241,6 +243,34 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(refused['power']['busy'])
                 self.assertIn('Installation is in progress', refused['power']['error'])
             power.assert_not_called()
+
+    async def test_a_detached_installer_blocks_power_until_its_lock_is_released(self):
+        await self.setup_phase()
+        with daemon.INSTALLER_LOCK.open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.service.handle_event({'event': 'error', 'message': 'Another installer is running. Return to its window or wait for it to finish'})
+            with patch.object(daemon, 'request_power', new_callable=AsyncMock) as power:
+                for kind in ('reboot', 'poweroff', 'firmware'):
+                    await self.send(action='power', kind=kind)
+                    state = await self.until(lambda m: m['type'] == 'state' and (m['power']['busy'] or m['power']['error']))
+                    self.assertFalse(state['power']['busy'])
+                    self.assertIn('Installation is in progress', state['power']['error'])
+                power.assert_not_called()
+        with patch.object(daemon, 'request_power', new_callable=AsyncMock) as power:
+            await self.send(action='power', kind='reboot')
+            await self.until(lambda m: m['type'] == 'state' and m['power']['busy'])
+            power.assert_awaited_once_with('reboot')
+
+    async def test_restart_checks_the_installer_lock_before_the_new_worker_reports(self):
+        await self.setup_phase()
+        with daemon.INSTALLER_LOCK.open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            restarted = daemon.Daemon([], network_helper='')
+            with patch.object(daemon, 'request_power', new_callable=AsyncMock) as power:
+                await restarted.handle_request(self.writer, {'action': 'power', 'kind': 'poweroff'})
+                power.assert_not_called()
+                self.assertFalse(restarted.state['power']['busy'])
+                self.assertIn('Installation is in progress', restarted.state['power']['error'])
 
     async def test_wifi_connect_waits_for_background_poll_and_errors_survive_polling(self):
         await self.setup_phase()

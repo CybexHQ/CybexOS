@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -61,6 +62,27 @@ def listing(*entries):
 
 
 class ConfigurationIdentityTests(unittest.TestCase):
+    def test_interrupted_copy_does_not_publish_a_partial_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'source', Path(directory) / 'copy'
+            (source / 'local').mkdir(parents=True)
+            (source / 'local/personal.nix').write_text('personal declaration')
+            (source / 'local/service').write_text('#!/bin/sh\nexit 0\n')
+            (source / 'local/service').chmod(0o755)
+            original = shutil.copyfile
+
+            def interrupted(src, dst, **kwargs):
+                original(src, dst, **kwargs)
+                raise OSError('interrupted configuration copy')
+
+            with patch('cybexos.engine.shutil.copyfile', side_effect=interrupted):
+                with self.assertRaisesRegex(shutil.Error, 'interrupted configuration copy'):
+                    copy_config(source, target)
+            self.assertFalse(target.exists(), 'A partial copy must never look like a retained configuration')
+            self.assertEqual(set(Path(directory).iterdir()), {source}, 'Failed staging copies are removed')
+            copy_config(source, target)
+            self.assertEqual(config_digest(source), config_digest(target))
+
     def test_configuration_identity_prunes_git_before_reading_its_tree(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source'
@@ -1397,6 +1419,29 @@ class EngineTests(unittest.TestCase):
         self.engine.recover()
         self.assert_confirmation_completed(record)
         self.assertEqual(self.runner.calls.count(('cybexos-health', 'desktop-required')), 1)
+
+    def test_recovery_retries_an_interrupted_personal_backup_without_losing_edits(self):
+        record = self.engine.stage('upstream')
+        self.engine.apply(record['id'], record['reviewToken'])
+        (self.working / 'local/personal.nix').write_text('edited before rollback')
+        (self.working / 'local/new-module.nix').write_text('new personal service')
+        original = shutil.copyfile
+
+        def interrupted(src, dst, **kwargs):
+            if Path(src).name == 'new-module.nix':
+                raise OSError('interrupted personal backup')
+            return original(src, dst, **kwargs)
+
+        with patch('cybexos.engine.shutil.copyfile', side_effect=interrupted):
+            with self.assertRaisesRegex(shutil.Error, 'interrupted personal backup'):
+                self.engine.rollback(record['id'])
+        self.assertEqual(read(self.engine.status_path)['state'], 'recovery-failed')
+        self.engine.recover()
+        backup = self.engine.tx(record['id']) / 'personal-before-rollback'
+        self.assertEqual((backup / 'local/personal.nix').read_text(), 'edited before rollback')
+        self.assertEqual((backup / 'local/new-module.nix').read_text(), 'new personal service')
+        self.assertEqual(read(self.engine.status_path)['state'], 'rolled-back')
+        self.assertFalse(self.engine.pending_path.exists())
 
     def test_confirmation_status_interruption_keeps_recoverable_pending_record(self):
         record = self.prepare_confirmation()

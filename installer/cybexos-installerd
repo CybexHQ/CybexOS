@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import contextlib
 import datetime
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,7 @@ RUNTIME = Path(os.environ.get('CYBEXOS_INSTALLER_RUNTIME', '/run/cybexos-install
 SOCKET = RUNTIME / 'control.sock'
 KEYBOARD_ENV = RUNTIME / 'keyboard.env'
 INSTALL_LOG = Path('/run/cybexos-installer.log')
+INSTALLER_LOCK = Path('/run/cybexos-installer.lock')
 MAX_LINE = 1024 * 1024
 NAME = re.compile(r'[a-z][a-z0-9-]{0,30}')
 STAGES = 6
@@ -91,6 +93,21 @@ def read_json(path, default=None):
         return json.loads(Path(path).read_text())
     except (OSError, ValueError):
         return default
+
+
+def installer_busy():
+    """A worker from before a daemon restart still owns the installer lock."""
+    try:
+        with INSTALLER_LOCK.open('r') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+        return False
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return None
 
 
 def zoneinfo_root():
@@ -282,6 +299,9 @@ class Daemon:
         self.screens = set()
         self.worker = None
         self.worker_task = None
+        # The unit deliberately leaves an installation running on restart.
+        # Guard power actions before the replacement worker can report busy.
+        self.other_installer = installer_busy() is not False
         self.password = ''
         self.token = ''
         self.reviewed = None
@@ -449,6 +469,7 @@ class Daemon:
         elif kind == 'preflight-error':
             self.update(phase='preflight', error=str(value.get('message', ''))[:600])
         elif kind == 'ready':
+            self.other_installer = False  # This worker acquired the exclusive lock.
             disks = [self.disk_view(disk) for disk in value.get('disks', []) if isinstance(disk, dict)]
             self.state.update(disks=disks, hardware=value.get('hardware') or {}, release=str(value.get('release', ''))[:300],
                               development=bool(value.get('development')))
@@ -488,6 +509,7 @@ class Daemon:
             self.password = ''
             message = str(value.get('message', ''))[:600]
             if 'Another installer is running' in message:
+                self.other_installer = True
                 # This service restarted while an installation it started
                 # keeps running (KillMode=process); its log shows progress.
                 message = ('An installation that started before this screen restarted is still running. '
@@ -760,7 +782,7 @@ class Daemon:
         elif action == 'usb-save' and isinstance(request.get('device'), str):
             self.send(writer, await asyncio.to_thread(save_log, request['device']))
         elif action == 'power' and request.get('kind') in ('reboot', 'poweroff', 'firmware'):
-            if phase == 'installing':
+            if phase == 'installing' or (self.other_installer and installer_busy() is not False):
                 self.update(power={'busy': False, 'kind': '', 'error':
                     'Installation is in progress. Keep the computer on until it finishes.'})
             else:
