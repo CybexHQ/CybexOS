@@ -228,7 +228,7 @@ test("every shipped vendor group is ordered and the sheet reads well", { skip: !
     assert.deepEqual(labels["Workspaces: Switch to workspace 1–10"], [["Super", "1…0"]]);
     assert.deepEqual(labels["Windows: Move focus"], [["Super", "← → ↑ ↓"]]);
     assert.deepEqual(labels["Windows: Overview"], [["Super", "Tab"]]);
-    assert.deepEqual(labels["Dictation: Dictate in English"],
+    assert.deepEqual(labels["Dictation: Start or stop dictation"],
         [["Super", "Ctrl", "X"], ["F9"], ["Mic mute"]]);
     assert.deepEqual(labels["Capture: Screenshot a region or window"], [["Super", "`"], ["Print"]]);
     assert.deepEqual(labels["Capture: Scrolling screenshot"], [["Alt", "Print"], ["Super", "Alt", "`"]]);

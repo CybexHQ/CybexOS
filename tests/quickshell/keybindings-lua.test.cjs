@@ -25,13 +25,25 @@ function run(source, features = '', preferences, raw) {
             leftovers:fs.readdirSync(path.dirname(statePath)).filter(name => name.startsWith('.keybindings-'))};
     } finally { fs.rmSync(temporary, {recursive:true, force:true}); }
 }
-test('defaults exactly match 6f4aa2d, including dispatchers, descriptions, flags and gates', () => {
+test('defaults preserve the baseline with the reviewed dictation changes, including flags and gates', () => {
     const baseline = path.join(root, 'tests/fixtures/keybindings/bindings-6f4aa2d.lua');
     for (const features of ['', 'developer_tools=true, podman=true', 'assistant=true, private_portal=true, proprietary_apps=true',
         'developer_tools=true, podman=true, assistant=true, private_portal=true, proprietary_apps=true, connected_widgets=true, xps_2026=true']) {
         const old = run(`dofile(${JSON.stringify(baseline)})\nprint(json.encode(registered()))`, features).output[0];
+        // Keep the historical fixture intact. Dictation now delegates language
+        // selection to Settings and routes all three keys through Quickshell,
+        // with no binding allowed on the lock screen (8f3239cd).
+        const expected = old.flatMap(row => {
+            if (row.options.description === 'Dictation: Dictate in Dutch') return [];
+            if (row.options.description === 'Dictation: Dictate in English') return [{
+                ...row,
+                dispatcher: {name: 'global', args: ['quickshell:dictationToggle']},
+                options: {description: 'Dictation: Start or stop dictation'}
+            }];
+            return [row];
+        });
         const current = run(`require('bindings')\nrequire('keybinding_preferences')\nprint(json.encode(registered()))`, features);
-        assert.deepEqual(current.output[0], old, features);
+        assert.deepEqual(current.output[0], expected, features);
         assert.equal(current.state.error, null);
         assert.deepEqual(current.leftovers, []);
     }
