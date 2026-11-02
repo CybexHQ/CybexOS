@@ -540,7 +540,7 @@ def main():
             def saved_icon():
                 saved = json.loads((home / '.config/cybexos/shell.json').read_text())
                 return saved['v'], saved.get('controlIcon', 'cybex'), saved.get('controlIconPrompt', True)
-            wait(lambda: saved_icon() == (32, 'cybex', True), 'the choice saved in schema 32')
+            wait(lambda: saved_icon() == (33, 'cybex', True), 'the choice saved in schema 33')
 
             # The narrow window: icon rail, compact chip.
             subprocess.run(['swaymsg', '[title="Cybex OS Settings"]', 'resize', 'set', '640', '620'],
@@ -559,16 +559,16 @@ def main():
             ipc('settings', 'close')
             wait(lambda: not state()['open'] and not state()['history'], 'closing forgets the trail')
 
-            # The Control Center opens by its button at the top left, also
+            # The Control Center opens by its button at the far right, also
             # from IPC and the keyboard, which name no section; its drawer
             # tabs keep it there.
             def popout():
                 return json.loads(ipc('settings-test', 'popout'))
             ipc('popouts', 'toggle', 'control')
-            wait(lambda: popout() == {'open': True, 'name': 'control', 'island': 'left'},
-                 'the Control Center drawer on the left')
+            wait(lambda: popout() == {'open': True, 'name': 'control', 'island': 'right'},
+                 'the Control Center drawer on the right')
             time.sleep(1)
-            screenshot('18-control-center-left.png')
+            screenshot('18-control-center-right.png')
             ipc('popouts', 'toggle', 'control')
             wait(lambda: not popout()['open'], 'the Control Center drawer closed')
             log = (base / 'qs.log').read_text()

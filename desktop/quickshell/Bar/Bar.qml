@@ -345,17 +345,6 @@ PanelWindow {
             : col === "center" ? centerCluster : rightCluster;
     }
 
-    // A column's clusters in bar order: the left one may lead with the
-    // Control Center button, drawn before the launcher.
-    function clustersFor(col) {
-        return col === "left" && leadCluster.visible ? [leadCluster, leftCluster] : [clusterFor(col)];
-    }
-
-    // The Control Center button at the start of the left column sits in the
-    // bar's corner, before the launcher, as the Apple menu does on a Mac.
-    readonly property bool controlLeads: Settings.mods.left.length > 0
-        && Settings.mods.left[0].id === "control" && Settings.mods.left[0].on === true
-
     // A drawn widget's center, in contentFrame coordinates, or undefined when
     // it is not on screen to have one.
     function widgetCenterX(id) {
@@ -400,15 +389,14 @@ PanelWindow {
         const tolerance = Theme.chipHeight / 2;
         let bestDistance = Infinity;
         for (const col of ["left", "center", "right"]) {
-            // Stay within the column's clusters so dragging off fixed controls
-            // such as the launcher cannot pick up a neighbouring widget.
-            const hit = clustersFor(col).some(cluster => {
-                if (!cluster || cluster.width <= 0)
-                    return false;
-                const origin = cluster.mapToItem(contentFrame, 0, 0).x;
-                return pos.x >= origin - tolerance && pos.x <= origin + cluster.width + tolerance;
-            });
-            if (!hit)
+            // Stay within the cluster so dragging off fixed controls such as
+            // the launcher cannot pick up a neighbouring widget.
+            const cluster = clusterFor(col);
+            if (!cluster || cluster.width <= 0)
+                continue;
+            const origin = cluster.mapToItem(contentFrame, 0, 0).x;
+            if (pos.x < origin - tolerance
+                    || pos.x > origin + cluster.width + tolerance)
                 continue;
             for (const entry of Settings.mods[col]) {
                 const slot = slotRegistry[entry.id];
@@ -500,7 +488,7 @@ PanelWindow {
             if (slot && slot.active && slot.width > 0)
                 return slot.mapToItem(contentFrame, slot.width, 0).x + gap;
         }
-        const cluster = clustersFor(dragDrop.col)[0];
+        const cluster = clusterFor(dragDrop.col);
         return cluster ? cluster.mapToItem(contentFrame, 0, 0).x : 0;
     }
 
@@ -956,23 +944,13 @@ PanelWindow {
             }
         }
 
-        // LEFT — the Control Center button when it leads the left column,
-        // the launcher, then workspaces and media.
+        // LEFT — the launcher, then workspaces and media.
         Row {
             id: leftSection
             anchors.left: parent.left
             anchors.leftMargin: Theme.barPadding
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.barSpacing
-
-            Cluster {
-                id: leadCluster
-                host: barWindow
-                col: "left"
-                visible: barWindow.controlLeads
-                model: barWindow.controlLeads ? Settings.mods.left.slice(0, 1) : []
-                onImplicitWidthChanged: barWindow.scheduleFit()
-            }
 
             BarIcon {
                 host: barWindow
@@ -1002,7 +980,7 @@ PanelWindow {
                 id: leftCluster
                 host: barWindow
                 col: "left"
-                model: barWindow.controlLeads ? Settings.mods.left.slice(1) : Settings.mods.left
+                model: Settings.mods.left
                 onImplicitWidthChanged: barWindow.scheduleFit()
             }
         }

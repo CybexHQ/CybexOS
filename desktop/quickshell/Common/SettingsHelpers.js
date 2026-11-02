@@ -1,7 +1,7 @@
 // Pure settings-schema helpers shared by QML and Node tests.
 // Keep this file free of Qt APIs so persistence stays deterministic.
 
-var VERSION = 32;
+var VERSION = 33;
 
 var BAR_STYLES = ["hug", "floating", "attached"];
 var PALETTE_MODES = ["wallpaper", "fixed"];
@@ -73,13 +73,13 @@ function controlIconIn(value, fallback) {
 // the digitalpals.model-usage Omarchy plugin (see ModelUsage/README.md).
 // Schema 28 adds `fusebox`, the Fusebox server widget, beside Model Usage.
 // Schema 30 adds `assistant`, the button that shows and hides the Cybex OS
-// Assistant, before the notification and status widgets. Schema 32 moves
-// the default `control` to the start of the left column; a saved layout keeps
-// wherever its person put it.
+// Assistant, before the notification and status widgets. Schema 32 moved
+// the default `control` to the start of the left column; schema 33 puts it
+// back at the far right (migrateMods).
 var MODULE_IDS = [
-    "control", "ws", "media", "indicators", "clock", "weather", "notes", "modelusage", "fusebox", "updates", "gh",
+    "ws", "media", "indicators", "clock", "weather", "notes", "modelusage", "fusebox", "updates", "gh",
     "t3", "hermes", "remote", "tray", "assistant",
-    "notifications", "vol", "wifi", "bt", "batt"
+    "notifications", "vol", "wifi", "bt", "batt", "control"
 ];
 
 var RETIRED_MODULE_IDS = ["bell", "idle", "usage"];
@@ -288,7 +288,7 @@ function defaultMods() {
         return { id: id, on: on, detail: "auto" };
     }
     return {
-        left: [mod("control", true), mod("ws", true), mod("media", true)],
+        left: [mod("ws", true), mod("media", true)],
         center: [mod("indicators", true), mod("clock", true), mod("weather", false),
             mod("notes", true)],
         right: [
@@ -296,7 +296,7 @@ function defaultMods() {
             mod("t3", false),
             mod("hermes", false), mod("remote", false),
             mod("tray", false), mod("assistant", true), mod("notifications", true), mod("vol", true),
-            mod("wifi", true), mod("bt", true), mod("batt", true)
+            mod("wifi", true), mod("bt", true), mod("batt", true), mod("control", true)
         ]
     };
 }
@@ -999,8 +999,6 @@ function repoListIn(value, fallback) {
 // Sanitize a persisted module layout: known ids only, first occurrence wins,
 // ids a newer schema knows about but the file does not are appended at their
 // default column's end so shipping a new module never requires migration.
-// The one exception is the Control Center button, which goes back to the
-// front of its default column, the top left.
 function normalizeMods(raw) {
     var base = defaultMods();
     if (!raw || typeof raw !== "object")
@@ -1030,13 +1028,8 @@ function normalizeMods(raw) {
         });
     });
     MODULE_IDS.forEach(function(id) {
-        if (seen[id])
-            return;
-        var entry = { id: id, on: defaultOn[id], detail: "auto" };
-        if (id === "control")
-            next[defaultCol[id]].unshift(entry);
-        else
-            next[defaultCol[id]].push(entry);
+        if (!seen[id])
+            next[defaultCol[id]].push({ id: id, on: defaultOn[id], detail: "auto" });
     });
     return next;
 }
@@ -1438,17 +1431,14 @@ function migrateMods(raw, sourceVersion, context) {
             id: "assistant", on: true, detail: "auto"
         });
     }
-    var next = normalizeMods(migrated);
-    // A layout from before schema 24 had the button at the far right, where
-    // it always lived then; it stays there rather than taking today's
-    // default place at the top left.
-    if (typeof sourceVersion !== "number" || sourceVersion < 24) {
-        ["left", "center", "right"].forEach(function(col) {
-            next[col] = next[col].filter(function(entry) { return entry.id !== "control"; });
-        });
-        next.right.push({ id: "control", on: true, detail: "auto" });
-    }
-    return next;
+    // Schema 32 put the Control Center button first in the left column, before
+    // the launcher; schema 33 returns it to the far right. A schema-32 layout
+    // that still starts with it goes back there, keeping its visibility and
+    // detail; anywhere else it stays where its person put it.
+    if (sourceVersion === 32 && migrated.left.length > 0
+            && migrated.left[0] && migrated.left[0].id === "control")
+        migrated.right.push(migrated.left.shift());
+    return normalizeMods(migrated);
 }
 
 // Stored legacy values are explicit choices, even when equal to an old

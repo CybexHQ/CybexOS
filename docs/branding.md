@@ -69,8 +69,8 @@ they are VM qualification, not of physical displays.
 
 ### The Control Center button and the prompt icon
 
-The Control Center button starts the bar's left column, in its top-left
-corner before the launcher, and its drawer opens on that side. Settings ->
+The Control Center button ends the bar's right column by default; moved to
+the left section, its drawer opens on that side instead. Settings ->
 Bar & Control Center -> Control Center -> Button icon chooses its icon: the
 Cybex OS mark (the default), the operating system's logo (NixOS), or any Nerd
 Font icon, searched by name in `desktop/quickshell/assets/nerd-icons`

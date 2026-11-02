@@ -266,7 +266,6 @@ test("plugin hit-testing identifies the instance and ignores hidden widgets", ()
         slotRegistryRevision: 0, contentFrame: {}, Theme: { chipHeight: 30 },
         pluginsFor: col => col === "right" ? area : { entries: [] },
         clusterFor: () => null,
-        clustersFor: () => [null],
     };
     const hit = barMethod("widgetAtPoint", context);
     assert.equal(hit({ x: 120, y: 15 }).pluginKey, "timer#one");
@@ -293,40 +292,4 @@ test("plugin drops persist instance keys and cancelled drags do not write", () =
     context.dragWidget = { pluginKey: "timer#two" };
     commit();
     assert.equal(writes.length, 1);
-});
-
-// The Control Center button at the start of the left column is drawn before
-// the launcher, in the bar's corner; dragging still treats both left
-// clusters as one column.
-test("a leading Control Center button sits before the launcher and stays draggable", () => {
-    const bar = fs.readFileSync(path.join(shellDir, "Bar/Bar.qml"), "utf8");
-    const left = bar.slice(bar.indexOf("id: leftSection"), bar.indexOf("id: leftCluster"));
-    assert.ok(left.indexOf("id: leadCluster") < left.indexOf('glyph: "apps"'),
-        "the leading button comes before the launcher");
-    assert.match(bar, /readonly property bool controlLeads: Settings\.mods\.left\.length > 0\s*&& Settings\.mods\.left\[0\]\.id === "control" && Settings\.mods\.left\[0\]\.on === true/);
-    assert.match(bar, /model: barWindow\.controlLeads \? Settings\.mods\.left\.slice\(0, 1\) : \[\]/);
-    assert.match(bar, /model: barWindow\.controlLeads \? Settings\.mods\.left\.slice\(1\) : Settings\.mods\.left/);
-
-    const lead = { visible: true, width: 30, mapToItem: (_frame, x) => ({ x: x + 8 }) };
-    const main = { width: 200, mapToItem: (_frame, x) => ({ x: x + 80 }) };
-    const clusters = barMethod("clustersFor", {
-        leadCluster: lead, leftCluster: main,
-        clusterFor: col => col === "left" ? main : null
-    });
-    const order = col => [...clusters(col)];
-    assert.ok(order("left").length === 2 && order("left")[0] === lead && order("left")[1] === main);
-    lead.visible = false;
-    assert.ok(order("left").length === 1 && order("left")[0] === main);
-
-    // The button itself, left of the launcher, can be picked up.
-    lead.visible = true;
-    const slot = { active: true, width: 30, mapToItem: (_frame, x) => ({ x: x + 8 }) };
-    const pick = barMethod("widgetAtPoint", {
-        slotRegistryRevision: 0, contentFrame: {}, Theme: { chipHeight: 30 },
-        pluginsFor: () => ({ entries: [] }),
-        clustersFor: col => col === "left" ? [lead, main] : [null],
-        Settings: { mods: { left: [{ id: "control" }, { id: "ws" }], center: [], right: [] } },
-        slotRegistry: { control: slot }
-    });
-    assert.deepEqual({ ...pick({ x: 20, y: 15 }) }, { id: "control", fromCol: "left" });
 });

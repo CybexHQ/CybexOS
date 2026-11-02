@@ -147,8 +147,8 @@ function edge(name) {
 }
 
 // The screen edge an edge drawer pins to: the side of the bar section it
-// opened from, so the Control Center button at the top left opens its drawer
-// on the left. Anything but the left section keeps the right edge; a panel
+// opened from, so a Control Center button moved to the left section opens its
+// drawer on the left. Anything but the left section keeps the right edge; a panel
 // without an edge returns "".
 function edgeSide(name, island) {
     if (edge(name) === "")
