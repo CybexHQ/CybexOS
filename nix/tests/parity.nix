@@ -62,6 +62,7 @@ let
     };
     fonts = map toString c.fonts.packages;
     compositor = c.programs.hyprland.package.version;
+    dictation = toString c.cybexos.dictationPackage;
     firewall = { inherit (c.networking.firewall) enable allowedTCPPorts allowedUDPPorts allowedUDPPortRanges; };
     pam = map (name: c.security.pam.services.${name}.text) [ "login" "sddm" "cybexos-lock" "polkit-1" ];
     managedShell = c.systemd.user.services.quickshell.serviceConfig;
@@ -353,6 +354,8 @@ assert machine.config.services.logind.settings.Login.HandleLidSwitch == "suspend
 assert machine.config.services.logind.settings.Login.HandleLidSwitchExternalPower == "suspend";
 assert machine.config.services.logind.settings.Login.HandleLidSwitchDocked == "suspend";
 assert builtins.elem "cybexos-lid-guard.service" (health machine.config).units;
+assert builtins.elem (builtins.unsafeDiscardStringContext machine.config.cybexos.dictationPackage.drvPath)
+  machine.config.system.build.cybexosExpectedBuilds;
 assert builtins.elem "display-manager.service" machine.config.systemd.services.cybexos-lid-guard.before;
 assert installer.services.logind.settings.Login.HandleLidSwitch == "ignore";
 assert !(installer.systemd.services ? cybexos-lid-guard);

@@ -75,8 +75,11 @@ in {
     systemd.services.display-manager.serviceConfig.KeyringMode = lib.mkIf cfg.autoLogin "shared";
     environment.etc."cybexos/runtime".source = "${cfg.desktopPackage}/share/cybexos/runtime";
     environment.etc."cybexos/titlebars.so".source = "${titlebars}/lib/omarchy-hyprland-titlebars/titlebars.so";
-    # Cybex OS's own builds outside systemPackages (nix/modules/prebuilt.nix).
-    cybexos.updates.expectedBuilds = [ titlebars ] ++ lib.optional cfg.features.connectedWidgets hermesBridge;
+    # Cybex OS's own builds (nix/modules/prebuilt.nix), including Voxtype's
+    # product-owned dictation patch. Its Nixpkgs metadata still names the
+    # upstream recipe, so it must be declared explicitly rather than mistaken
+    # for a Nixpkgs package awaiting its binary cache.
+    cybexos.updates.expectedBuilds = [ titlebars cfg.dictationPackage ] ++ lib.optional cfg.features.connectedWidgets hermesBridge;
     environment.etc."cybexos/fingerprint-enabled" = lib.mkIf cfg.authentication.fingerprint { text = "enabled\n"; };
     environment.etc."cybexos/proprietary-enabled" = lib.mkIf cfg.features.proprietary { text = "enabled\n"; };
     environment.etc."cybexos/developer-enabled" = lib.mkIf cfg.features.developer { text = "enabled\n"; };

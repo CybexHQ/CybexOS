@@ -2,7 +2,7 @@
 
 - Closed-lid laptops stay awake when a connected external display blanks through DPMS or drops its DisplayPort connection briefly. A three-second disconnect grace matches the existing display helper. Sustained disconnection still suspends through the existing lock path, and closing an undocked laptop still suspends immediately.
 - The display-aware lid guard retains protection across service restarts and participates in updater health checks. Manual suspend and battery-only idle suspend keep their existing behavior.
-- Dictation shows live words in a recording pill, offers an optional enhanced model, and adds language and live-text choices. The Voxtype fixes preserve recording audio and keep typing focused on the original application.
+- Dictation shows live words in a recording pill, offers an optional enhanced model, and adds language and live-text choices. The Voxtype fixes preserve recording audio and keep typing focused on the original application. Updates allow the product's patched dictation engine to build locally while keeping Nixpkgs dependencies subject to the prebuilt check.
 - Wiz gains a wide conversation view, change tracking with Undo, clearer approvals and progress, notifications, desktop tools and scheduled routines.
 - Settings offers a choice of Control Center icon. Disk-unlock and session-lock screens no longer draw Wiz; kitty's system summary retains the character.
 
