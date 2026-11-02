@@ -1,4 +1,4 @@
-{ lib, stdenvNoCC, librsvg, source }:
+{ lib, stdenvNoCC, source }:
 stdenvNoCC.mkDerivation {
   pname = "cybexos-plymouth";
   # Not the release version: the splash is in every boot's early image, so a
@@ -7,9 +7,8 @@ stdenvNoCC.mkDerivation {
   version = "1";
   src = import ../package-source.nix {
     inherit lib source;
-    paths = [ "desktop/plymouth" "assets/wiz" ];
+    paths = [ "desktop/plymouth" ];
   };
-  nativeBuildInputs = [ librsvg ];
   dontBuild = true;
   installPhase = ''
     runHook preInstall
@@ -18,13 +17,6 @@ stdenvNoCC.mkDerivation {
     cp desktop/plymouth/*.png desktop/plymouth/cybexos.script desktop/plymouth/cybexos.plymouth "$theme/"
     substituteInPlace "$theme/cybexos.plymouth" \
       --replace-fail /usr/share/plymouth/themes/cybexos "$theme"
-    # Wiz on the disk unlock prompt (cybexos.script): his poses at rest, all
-    # in one box (WizRig.STILL_BOX, 136×132), 84 pixels high, so he stands
-    # about 65 pixels tall. The script plugin draws every image at one pixel
-    # per logical pixel, the logo included.
-    for pose in asleep listening sorry happy; do
-      rsvg-convert --height 84 --output "$theme/wiz-$pose.png" "assets/wiz/$pose.svg"
-    done
     # The installation medium's variant: the same pictures and script, which
     # shows the medium's boot progress once the first line flags it.
     installer=$out/share/plymouth/themes/cybexos-installer

@@ -10,6 +10,7 @@ BarIcon BarIcon.qml
 BarPopoutWindow BarPopoutWindow.qml
 BarTooltip BarTooltip.qml
 Cluster Cluster.qml
+ControlIconGlyph ControlIconGlyph.qml
 Divider Divider.qml
 HermesChip HermesChip.qml
 ModuleSlot ModuleSlot.qml

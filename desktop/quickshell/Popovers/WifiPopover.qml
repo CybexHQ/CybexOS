@@ -460,7 +460,7 @@ Surface {
             if (Tailscale.needsLogin)
                 Tailscale.signIn();
             else
-                Popouts.openPanel("tailscale", "right");
+                Popouts.openPanel("tailscale", Popouts.island);
         }
 
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(summary)

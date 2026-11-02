@@ -208,6 +208,7 @@ IPC = '''
                 assistantReply: Assistant.replyOpen,
                 assistantReview: reviewRect ? {x: reviewRect.x, y: reviewRect.y} : null,
                 notes: notes ? notes.text : null, back: !!shell.updateItem("updateBack"),
+                close: !!shell.updateItem("updateClose"),
                 failureText: failure ? failure.text : null,
                 activity: activity ? activity.text : null, elapsed: elapsed ? elapsed.text : null,
                 progress: progress ? progress.Accessible.description : null,
@@ -372,9 +373,12 @@ def main():
             session.status(state='idle')
             session.wait(lambda:session.state().get('page')=='available' and session.state().get('loaded'),'checked again')
 
-            # Control Center's Review closes the drawer and opens the same app.
-            session.call('updates','close')
-            session.wait(lambda:not session.state().get('window'),'closed app')
+            # The window's own close button; Control Center's Review then
+            # closes the drawer and opens the same app.
+            assert session.state()['close'], session.state()
+            session.trigger('updateClose')
+            session.wait(lambda:not session.state().get('window') and not session.state().get('open'),
+                'closed by its close button')
             mouse.move(100, 700)
             session.call('popouts','open','control')
             session.wait(lambda:session.state().get('panel')=='control','control center')
@@ -528,7 +532,7 @@ def main():
             session.wait(lambda:session.state().get('whatsNew')=='1.0.0-beta.21' and session.state().get('components')==3,
                 "What's New")
             state = session.state()
-            assert state['title']['text']=="What's new in Cybex OS 1.0.0-beta.21" and state['back'], state
+            assert state['title']['text']=="What's new in Cybex OS 1.0.0-beta.21" and state['back'] and state['close'], state
             assert state['stance']=='finished' and 'Wiz' in state['notes'] and 'https://example.com/notes' in state['notes'], state
             assert 'never-fetched' not in state['notes'], 'release notes never load images'
             session.wait(lambda:session.state().get('celebrated')=='whats-new 1.0.0-beta.21' and session.pose()==('happy',False),

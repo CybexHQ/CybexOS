@@ -51,14 +51,15 @@ Rectangle {
         const tab = tabs[index].tab;
         // Focus moves before the tab does: activeFocusOnTab follows the
         // current tab, and Qt refuses to clear it on the segment that still
-        // holds focus (see Settings/PillRow).
+        // holds focus (see Settings/PillRow). Another tab of the same drawer
+        // keeps the drawer on its side of the screen.
         if (focusTab) {
             const target = tabRepeater.itemAt(index);
             if (target) target.forceActiveFocus();
         }
         const name = PanelRegistry.nameForTab(tab);
         if (name !== "")
-            Popouts.openPanel(name, "right");
+            Popouts.openPanel(name, Popouts.island);
         // Leaving a tab switched off in settings drops it from the strip and
         // rebuilds the segments, so look the new one up again once it has.
         if (focusTab) {

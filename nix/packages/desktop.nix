@@ -77,13 +77,10 @@ in stdenv.mkDerivation {
     cp desktop/*.desktop $out/share/applications/
     substituteInPlace $out/share/cybexos/defaults/fastfetch.jsonc \
       --replace-fail @CYBEXOS_FASTFETCH@ $out/share/cybexos/fastfetch/cybexos-large.fastfetch.txt
-    # Wiz's poses at rest (assets/wiz): asleep beside the lock screen's field,
-    # in the poses' shared box at twice the 84 pixels it draws there
-    # (desktop/hypr/hyprlock.conf), and idle for fastfetch in kitty, cropped
-    # to him and large enough for fastfetch to scale down to 9 rows at any
-    # font size (desktop/defaults/fish-config.fish).
-    mkdir -p $out/share/cybexos/wiz/lock $out/share/cybexos/wiz/terminal
-    rsvg-convert --height 168 --output $out/share/cybexos/wiz/lock/asleep.png assets/wiz/asleep.svg
+    # Wiz idle for fastfetch in kitty (assets/wiz), cropped to him and large
+    # enough for fastfetch to scale down to 9 rows at any font size
+    # (desktop/defaults/fish-config.fish). The lock screen draws no Wiz.
+    mkdir -p $out/share/cybexos/wiz/terminal
     rsvg-convert --height 640 assets/wiz/idle.svg \
       | magick png:- -trim +repage $out/share/cybexos/wiz/terminal/idle.png
     cp -r ${lazyvimStarter} $out/share/cybexos/defaults/nvim

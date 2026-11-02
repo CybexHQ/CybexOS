@@ -21,8 +21,14 @@ test("the Cybex OS widget owns Control Center through the normal module pipeline
     assert.match(button, /BarChip/);
     assert.match(button, /panelName:\s*"control"/);
     assert.match(button, /tooltip:\s*"Control Center"/);
-    assert.match(button, /BarBrandIcon\s*\{/);
-    assert.match(button, /name:\s*"cybexos"/);
+    // The button's icon is Settings' choice (Common/ControlIconHelpers.js);
+    // by default the Cybex OS mark, drawn from its bundled SVG.
+    const glyph = read("Bar/ControlIconGlyph.qml");
+    assert.match(button, /ControlIconGlyph\s*\{/);
+    assert.match(glyph, /property string value: Settings\.controlIcon/);
+    assert.match(glyph, /BarBrandIcon\s*\{[\s\S]{0,120}?visible: root\.glyph === ""[\s\S]{0,40}?name:\s*"cybexos"/);
+    assert.equal(load("SettingsHelpers.js").defaults().controlIcon, "cybex");
+    assert.equal(load("ControlIconHelpers.js").barGlyph("cybex"), "");
     assert.match(button, /width:\s*Theme\.barIconSize/);
     assert.match(button, /height:\s*Theme\.barIconSize/);
     assert.match(button,

@@ -166,6 +166,22 @@ Item {
         service: root.service
     }
 
+    // Closes the window, as Escape does once What's New is closed. Level
+    // with What's New's Back, above every page, so it is always in reach.
+    // Closing never interrupts an update; the worker owns that.
+    UpdateButton {
+        objectName: "updateClose"
+        z: 2
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: Theme.scaled(12)
+        anchors.rightMargin: Theme.scaled(16)
+        glyph: "x"
+        text: I18n.tr("Close")
+        iconOnly: true
+        onTriggered: root.service.close()
+    }
+
     WhatsNewPage {
         anchors.fill: parent
         visible: root.whatsNew

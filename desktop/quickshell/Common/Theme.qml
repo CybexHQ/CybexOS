@@ -443,6 +443,10 @@ Singleton {
         return choice ? choice.family : fontSans;
     }
     readonly property string fontMono: "JetBrainsMono Nerd Font"
+    // Nerd Font icons as glyphs: the Control Center button's chosen icon and
+    // the operating system's logo (Common/ControlIconHelpers.js). Every
+    // installation has this face, and the terminal prompt draws the same one.
+    readonly property string fontNerdIcons: "JetBrainsMono Nerd Font"
     // Numeric readings — the clock, percentages, meters, resets. The
     // edge-drawer redesign sets these in Geist Mono against Figtree UI copy,
     // so a reading is recognisably an instrument value rather than prose.

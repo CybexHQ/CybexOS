@@ -69,7 +69,8 @@ function settingsHarness() {
         valueSet(key, before, after) { (calls.valueSets = calls.valueSets || []).push([key, before, after]); },
         backUpCorruptFile() { calls.backups++; },
         // Runs once per full application of a loaded file.
-        applyScrollFactor() {}, applyGlassEffect() { calls.applied++; }, applyPointerHiding() {}
+        applyScrollFactor() {}, applyGlassEffect() { calls.applied++; }, applyPointerHiding() {},
+        writePromptIcon() {}
     };
     context.root = context;
     context.defaults = H.defaults();

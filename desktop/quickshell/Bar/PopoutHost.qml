@@ -70,9 +70,10 @@ Item {
     readonly property rect effectiveAnchor: Popouts.anchorRect.width > 0
         ? Popouts.anchorRect : activeIslandRect
 
-    // Right-edge panels keep their screen-edge alignment; all panels share
-    // the same small gap from the menubar and screen edges.
-    readonly property bool rightEdgePanel: PanelRegistry.edge(Popouts.currentName) === "right"
+    // Edge drawers keep their screen-edge alignment, on the side of the bar
+    // section that opened them; all panels share the same small gap from the
+    // menubar and screen edges.
+    readonly property string edgeSide: PanelRegistry.edgeSide(Popouts.currentName, Popouts.island)
     // Centre-anchored panels sit at the output's true centre, period: not on
     // the centre island, whose rect breathes when the clock discloses its
     // quick actions, and not on whichever trigger opened them.
@@ -200,7 +201,8 @@ Item {
         // edge drawer skips all of that: it keeps a small inset from the screen edge no
         // matter which glyph opened its tab.
         const centred = anchor.x + anchor.width / 2 - bodyW / 2;
-        const bodyX = rightEdgePanel
+        const bodyX = edgeSide === "left" ? edgeMargin
+            : edgeSide === "right"
             ? Math.max(edgeMargin, Math.round(host.width - edgeMargin - bodyW))
             : Math.round(clamp(centred, edgeMargin,
                 Math.max(edgeMargin, host.width - edgeMargin - bodyW)));

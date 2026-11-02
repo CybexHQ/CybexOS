@@ -1,7 +1,7 @@
 // Pure settings-schema helpers shared by QML and Node tests.
 // Keep this file free of Qt APIs so persistence stays deterministic.
 
-var VERSION = 31;
+var VERSION = 32;
 
 var BAR_STYLES = ["hug", "floating", "attached"];
 var PALETTE_MODES = ["wallpaper", "fixed"];
@@ -41,6 +41,24 @@ function pointerThemeIn(value) {
     return typeof value === "string" && POINTER_THEME.test(value) ? value : "";
 }
 
+// Schema 32 adds the Control Center button's icon, which the fish prompt
+// shows too: "cybex" (the Cybex OS mark), "os" (the operating system's logo)
+// or "nf:<name>:<code>", a Nerd Font icon and its private-use codepoint.
+// Common/ControlIconHelpers.js reads these; its normalize() must agree.
+var CONTROL_ICON_CUSTOM = /^nf:([a-z0-9]+(?:-[a-z0-9_]+)+):([0-9a-f]{4,5})$/;
+
+function controlIconIn(value, fallback) {
+    if (value === "cybex" || value === "os")
+        return value;
+    var match = typeof value === "string" && value.length <= 80
+        ? CONTROL_ICON_CUSTOM.exec(value) : null;
+    if (!match)
+        return fallback;
+    var code = parseInt(match[2], 16);
+    return (code >= 0xE000 && code <= 0xF8FF) || (code >= 0xF0000 && code <= 0xFFFFD)
+        ? value : fallback;
+}
+
 // Reads in default layout order: left, then center, then right. The order
 // only decides where an id the settings file has never seen is appended, but
 // keeping the two lists in step is what makes that placement predictable.
@@ -55,11 +73,13 @@ function pointerThemeIn(value) {
 // the digitalpals.model-usage Omarchy plugin (see ModelUsage/README.md).
 // Schema 28 adds `fusebox`, the Fusebox server widget, beside Model Usage.
 // Schema 30 adds `assistant`, the button that shows and hides the Cybex OS
-// Assistant, before the notification and status widgets.
+// Assistant, before the notification and status widgets. Schema 32 moves
+// the default `control` to the start of the left column; a saved layout keeps
+// wherever its person put it.
 var MODULE_IDS = [
-    "ws", "media", "indicators", "clock", "weather", "notes", "modelusage", "fusebox", "updates", "gh",
+    "control", "ws", "media", "indicators", "clock", "weather", "notes", "modelusage", "fusebox", "updates", "gh",
     "t3", "hermes", "remote", "tray", "assistant",
-    "notifications", "vol", "wifi", "bt", "batt", "control"
+    "notifications", "vol", "wifi", "bt", "batt"
 ];
 
 var RETIRED_MODULE_IDS = ["bell", "idle", "usage"];
@@ -245,7 +265,7 @@ function defaultMods() {
         return { id: id, on: on, detail: "auto" };
     }
     return {
-        left: [mod("ws", true), mod("media", true)],
+        left: [mod("control", true), mod("ws", true), mod("media", true)],
         center: [mod("indicators", true), mod("clock", true), mod("weather", false),
             mod("notes", true)],
         right: [
@@ -253,7 +273,7 @@ function defaultMods() {
             mod("t3", false),
             mod("hermes", false), mod("remote", false),
             mod("tray", false), mod("assistant", true), mod("notifications", true), mod("vol", true),
-            mod("wifi", true), mod("bt", true), mod("batt", true), mod("control", true)
+            mod("wifi", true), mod("bt", true), mod("batt", true)
         ]
     };
 }
@@ -475,6 +495,10 @@ function defaults() {
         drawerOverview: defaultDrawerOverview(),
         drawerHover: "open",
         drawerWidth: 400,
+        // The Control Center button's icon, and whether the fish prompt
+        // shows it too (off: the prompt keeps the operating system's icon).
+        controlIcon: "cybex",
+        controlIconPrompt: true,
         mods: defaultMods(),
         modOpts: defaultModOpts(),
         // Show the dock in all layouts (Floating always shows it). Pins are desktop
@@ -949,6 +973,8 @@ function repoListIn(value, fallback) {
 // Sanitize a persisted module layout: known ids only, first occurrence wins,
 // ids a newer schema knows about but the file does not are appended at their
 // default column's end so shipping a new module never requires migration.
+// The one exception is the Control Center button, which goes back to the
+// front of its default column, the top left.
 function normalizeMods(raw) {
     var base = defaultMods();
     if (!raw || typeof raw !== "object")
@@ -978,8 +1004,13 @@ function normalizeMods(raw) {
         });
     });
     MODULE_IDS.forEach(function(id) {
-        if (!seen[id])
-            next[defaultCol[id]].push({ id: id, on: defaultOn[id], detail: "auto" });
+        if (seen[id])
+            return;
+        var entry = { id: id, on: defaultOn[id], detail: "auto" };
+        if (id === "control")
+            next[defaultCol[id]].unshift(entry);
+        else
+            next[defaultCol[id]].push(entry);
     });
     return next;
 }
@@ -1376,7 +1407,17 @@ function migrateMods(raw, sourceVersion, context) {
             id: "assistant", on: true, detail: "auto"
         });
     }
-    return normalizeMods(migrated);
+    var next = normalizeMods(migrated);
+    // A layout from before schema 24 had the button at the far right, where
+    // it always lived then; it stays there rather than taking today's
+    // default place at the top left.
+    if (typeof sourceVersion !== "number" || sourceVersion < 24) {
+        ["left", "center", "right"].forEach(function(col) {
+            next[col] = next[col].filter(function(entry) { return entry.id !== "control"; });
+        });
+        next.right.push({ id: "control", on: true, detail: "auto" });
+    }
+    return next;
 }
 
 // Stored legacy values are explicit choices, even when equal to an old
@@ -1507,6 +1548,8 @@ function merge(raw, context) {
         drawerOverview: normalizeDrawerOverview(parsed.drawerOverview),
         drawerHover: enumIn(parsed.drawerHover, DRAWER_HOVER_MODES, d.drawerHover),
         drawerWidth: intIn(parsed.drawerWidth, 320, 480, 10, d.drawerWidth),
+        controlIcon: controlIconIn(parsed.controlIcon, d.controlIcon),
+        controlIconPrompt: boolIn(parsed.controlIconPrompt, d.controlIconPrompt),
         mods: parsed.mods === undefined ? d.mods : migrateMods(parsed.mods, parsed.v, context),
         modOpts: migrateModOpts(parsed.modOpts, parsed.v, parsed),
         dock: boolIn(parsed.dock, d.dock),
@@ -1826,6 +1869,7 @@ var exported = {
     POINTER_SIZE_IDS: POINTER_SIZE_IDS,
     POINTER_IDLE_SECONDS: POINTER_IDLE_SECONDS,
     pointerThemeIn: pointerThemeIn,
+    controlIconIn: controlIconIn,
     IDLE_SCREEN_OFF_MINS: IDLE_SCREEN_OFF_MINS,
     IDLE_SUSPEND_MINS: IDLE_SUSPEND_MINS,
     defaults: defaults,

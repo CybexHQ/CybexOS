@@ -60,6 +60,30 @@ if status is-interactive
             end
     end
 
+    # The Control Center button's icon (Settings -> Bar & Control Center ->
+    # Control Center -> Button icon). The shell writes it to one line of
+    # prompt-icon; "os", or no file, keeps the operating system's icon above.
+    # Read with builtins before every prompt, so a change shows at the next
+    # prompt of every open terminal, a Distrobox's included.
+    set -g __cybexos_os_icon $POSH_OS_ICON
+    if test -n "$XDG_STATE_HOME"
+        set -g __cybexos_prompt_icon $XDG_STATE_HOME/cybexos/prompt-icon
+    else
+        set -g __cybexos_prompt_icon $HOME/.local/state/cybexos/prompt-icon
+    end
+    function __cybexos_prompt_icon --on-event fish_prompt
+        set -l icon
+        if test -r $__cybexos_prompt_icon
+            read icon <$__cybexos_prompt_icon
+        end
+        if test -n "$icon" -a "$icon" != os
+            set -gx POSH_OS_ICON $icon
+        else
+            set -gx POSH_OS_ICON $__cybexos_os_icon
+        end
+    end
+    __cybexos_prompt_icon
+
     if command -q oh-my-posh
         oh-my-posh init fish --config ~/.config/oh-my-posh/EDM115-newline2.omp.json | source
     end

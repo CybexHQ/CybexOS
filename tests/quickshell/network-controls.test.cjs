@@ -114,7 +114,8 @@ test("Tailscale is an overlay with a persistent drill-in, not the physical route
     assert.match(panel, /TailscaleSummary\s*\{\}/);
     assert.match(panel, /Tailscale\.statusText \+ " · open details"/);
     assert.match(panel, /exit node active/);
-    assert.match(panel, /Popouts\.openPanel\("tailscale", "right"\)/);
+    // A drill-in of the same drawer, which stays on its side of the screen.
+    assert.match(panel, /Popouts\.openPanel\("tailscale", Popouts\.island\)/);
 
     // Tailscale augments the view; the hero and diagnostics remain bound to
     // NetworkDetails' selected Ethernet/Wi-Fi interface.

@@ -41,6 +41,7 @@
         updater = pkgs.callPackage ./nix/packages/updater.nix { source = self; };
         installer-ui = pkgs.callPackage ./nix/packages/installer.nix { source = self; };
         plymouth = pkgs.callPackage ./nix/packages/plymouth.nix { source = self; };
+        symbols-font = pkgs.callPackage ./nix/packages/symbols-font.nix { source = self; };
         xps-camera = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).sensor;
         xps-psys = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).psys;
         t3-code = pkgs.callPackage ./nix/packages/t3-code.nix {};

@@ -53,6 +53,24 @@ function popoutAnchorDepth(style, gap, height) {
     return edgeMargin(style, gap) + Math.max(0, Number(height) || 0);
 }
 
+// How far a tooltip must move sideways to keep `margin` from both edges of
+// the bar's window. `left` is where its caller placed it, in window
+// coordinates. A tip wider than the window keeps its left margin.
+function tooltipNudge(left, width, windowWidth, margin) {
+    var gap = Math.max(0, Number(margin) || 0);
+    var start = Number(left) || 0;
+    var span = Math.max(0, Number(width) || 0);
+    var room = Number(windowWidth) || 0;
+    if (room <= 0)
+        return 0;
+    var high = room - gap - span;
+    if (start > high)
+        return Math.max(gap, high) - start;
+    if (start < gap)
+        return gap - start;
+    return 0;
+}
+
 var exported = {
     STYLES: STYLES,
     styleIn: styleIn,
@@ -63,7 +81,8 @@ var exported = {
     exclusiveZone: exclusiveZone,
     barY: barY,
     hideShift: hideShift,
-    popoutAnchorDepth: popoutAnchorDepth
+    popoutAnchorDepth: popoutAnchorDepth,
+    tooltipNudge: tooltipNudge
 };
 
 if (typeof module !== "undefined" && module.exports)

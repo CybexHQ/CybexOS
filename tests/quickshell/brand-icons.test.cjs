@@ -60,9 +60,19 @@ test("the brand registry owns canonical and geometry-matched hover SVGs", () => 
 
 
 test("Quickshell no longer carries a parallel Nerd Font icon path", () => {
-    const sources = codeFiles().map(file => fs.readFileSync(file, "utf8")).join("\n");
-    // The default text face includes Nerd Font glyphs; icons still use Sym/BrandIcon.
+    // The default text face includes Nerd Font glyphs; icons still use
+    // Sym/BrandIcon. The one exception is the Control Center button's chosen
+    // icon, which the fish prompt draws from the same font
+    // (Common/ControlIconHelpers.js); only its files name the icon face.
+    const iconFiles = ["Common/ControlIconHelpers.js", "Bar/ControlIconGlyph.qml",
+        "Settings/ControlIconGroup.qml", "Common/Theme.qml"];
+    const relative = file => path.relative(shellDir, file).split(path.sep).join("/");
+    const sources = codeFiles().filter(file => !iconFiles.includes(relative(file)))
+        .map(file => fs.readFileSync(file, "utf8")).join("\n");
     assert.doesNotMatch(sources, /fontNerd|/);
+    const theme = fs.readFileSync(path.join(shellDir, "Common/Theme.qml"), "utf8");
+    assert.equal((theme.match(/fontNerd/g) || []).length, 1, "Theme only declares the face");
+    assert.doesNotMatch(theme, //);
 });
 
 test("every bundled product mark records pinned provenance and licensing", () => {

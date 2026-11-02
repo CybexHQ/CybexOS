@@ -105,7 +105,7 @@ test("roving keyboard pickers move focus before they commit", () => {
     const tabs = read("Popovers/Drawer/DrawerTabs.qml");
     const activate = tabs.slice(tabs.indexOf("function activateTab("));
     order(activate, "if (target) target.forceActiveFocus();",
-        "Popouts.openPanel(name, \"right\");", "drawer tabs");
+        "Popouts.openPanel(name, Popouts.island);", "drawer tabs");
     const wallpaper = read("Settings/WallpaperGrid.qml");
     order(wallpaper.slice(wallpaper.indexOf("function focusItem(")),
         "item.forceActiveFocus();", "currentIndex = next;", "wallpaper grid");

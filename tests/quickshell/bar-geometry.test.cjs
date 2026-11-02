@@ -72,3 +72,25 @@ test("Hyprland and shell surfaces share the hug corner radius", () => {
             new RegExp(`readonly property int ${alias}:\\s*chipRadius`),
             `Theme.${alias} must use the bar's chip corner`);
 });
+
+test("a bar tooltip stays 8 px inside both edges of the bar's window", () => {
+    // Centred under the last module: 40 px past the right edge comes back.
+    assert.equal(G.tooltipNudge(1880, 120, 1920, 8), -88);
+    // Under the first module, left of the window: moves right.
+    assert.equal(G.tooltipNudge(-45, 120, 1920, 8), 53);
+    assert.equal(G.tooltipNudge(4, 120, 1920, 8), 4);
+    // Already inside, or exactly at the margin: untouched.
+    assert.equal(G.tooltipNudge(600, 120, 1920, 8), 0);
+    assert.equal(G.tooltipNudge(8, 120, 1920, 8), 0);
+    assert.equal(G.tooltipNudge(1792, 120, 1920, 8), 0);
+    // Wider than the window: keeps its left margin. No window yet: no move.
+    assert.equal(G.tooltipNudge(100, 2000, 1920, 8), -92);
+    assert.equal(G.tooltipNudge(1880, 120, 0, 8), 0);
+});
+
+test("every bar tooltip clamps itself, so no caller can place one off screen", () => {
+    const tip = fs.readFileSync(path.join(shellDir, "Bar/BarTooltip.qml"), "utf8");
+    assert.match(tip, /BarGeometry\.tooltipNudge\(left, root\.width, window\.width, edgeMargin\)/);
+    assert.match(tip, /Translate \{ x: root\.nudge \}/);
+    assert.match(tip, /root\.keepOnScreen\(\);\s*root\.ready = root\.activeHover;/);
+});

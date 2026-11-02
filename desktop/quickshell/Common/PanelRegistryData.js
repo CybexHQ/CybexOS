@@ -29,8 +29,10 @@
 //   attached             the surface sits flush against the bar with no gap,
 //                        retaining shared rounded corners (the edge drawer,
 //                        the Day sheet)
-//   edge                 "right" pins the surface to the screen edge instead
-//                        of centring it on its trigger (the edge drawer)
+//   edge                 "right" pins the surface to a screen edge instead
+//                        of centring it on its trigger (the edge drawer):
+//                        the right edge, or the left one when it opens from
+//                        the bar's left section (edgeSide)
 //   tab                  which Control Dashboard tab this name presents. Every
 //                        name that routes into Popovers/Drawer/DrawerPopover.qml
 //                        names one, which is also how the drawer knows what to
@@ -144,6 +146,16 @@ function edge(name) {
     return panel && panel.edge ? panel.edge : "";
 }
 
+// The screen edge an edge drawer pins to: the side of the bar section it
+// opened from, so the Control Center button at the top left opens its drawer
+// on the left. Anything but the left section keeps the right edge; a panel
+// without an edge returns "".
+function edgeSide(name, island) {
+    if (edge(name) === "")
+        return "";
+    return island === "left" ? "left" : "right";
+}
+
 function drawerTab(name) {
     var panel = byName(name);
     return panel && panel.tab ? panel.tab : "";
@@ -195,6 +207,7 @@ var exported = {
     centerAnchored: centerAnchored,
     attached: attached,
     edge: edge,
+    edgeSide: edgeSide,
     drawerTab: drawerTab,
     nameForTab: nameForTab,
     fillsBody: fillsBody,

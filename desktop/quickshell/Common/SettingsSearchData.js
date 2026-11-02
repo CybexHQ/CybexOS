@@ -147,6 +147,8 @@ var ROWS = [
     { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Overview", label: "Overview contents", key: "", terms: "drawer now playing sliders tiles updates cpu ram temperature system stats top processes end task manager" },
     { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Behavior", label: "Open on hover", key: "drawerHover", terms: "drawer hover switch glyph menu" },
     { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Behavior", label: "Width", key: "drawerWidth", terms: "drawer size wide" },
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Button icon", label: "Button icon", key: "controlIcon", terms: "control center logo icon cybexos x nixos snowflake os nerd font glyph menu button top left prompt terminal" },
+    { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Button icon", label: "Use in terminal prompt", key: "controlIconPrompt", terms: "fish prompt terminal shell icon logo oh-my-posh" },
 
     // Notifications
     { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Do Not Disturb", key: "notifDnd", terms: "dnd silence mute focus" },

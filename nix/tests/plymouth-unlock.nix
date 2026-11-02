@@ -2,13 +2,11 @@
 # in a real systemd initrd, asked for a passphrase by systemd-cryptsetup
 # through Plymouth's own password agent, typed on the VM's keyboard. A LUKS
 # volume is formatted on the first boot and unlocked in the initrd of the
-# second. The screenshots show Wiz on the empty field (asleep), while typing
-# (listening), while a wrong passphrase is checked and after it (sorry), and
-# once the volume unlocked (happy). Last, the same theme at double scale,
-# through plymouthd and `plymouth ask-for-password` in the booted system, as
-# nix/tests/lifecycle.nix runs it, with the status systemd sends for a started
-# cryptsetup unit, after which Wiz leaves. Each pose is checked in its
-# screenshot: there, and different from or the same as the others.
+# second, after a wrong passphrase first. The screenshots show the field 40
+# pixels under the logo with nothing drawn between them or beside it (no
+# character stands on the field), bullets appearing as the passphrase is
+# typed, and the same at double scale, through plymouthd and `plymouth
+# ask-for-password` in the booted system, as nix/tests/lifecycle.nix runs it.
 #
 # Only the theme and the installed systems' quiet kernel parameters are taken
 # from the Cybex OS module (nix/modules/default.nix). Plymouth keeps to its
@@ -54,30 +52,34 @@ pkgs.testers.runNixOSTest {
     import time
     from PIL import Image
 
-    PASSPHRASE = "wiz-unlocks-this"
-    # Wiz's box above the field on the 1280x800 display, below the logo
-    # (centred 38% down, 44 high) and his 16-pixel gap: at one and at double
-    # scale. The field and its bullets stay outside.
-    WIZ = (590, 336, 690, 418)
-    WIZ_DOUBLE = (540, 372, 740, 532)
+    PASSPHRASE = "cybex-unlocks-this"
+    # On the 1280x800 display the logo (189x44) is centred 38% down, so it
+    # ends at y 326; the field (286x48) starts 40 pixels lower, at 497..783 x
+    # 366..414. At double scale every logical pixel is two: the logo ends at
+    # y 348 and the field spans 354..926 x 428..524.
+    GAP, FIELD, BELOW = (480, 330, 800, 362), (497, 366, 783, 414), (300, 330, 980, 800)
+    GAP2, FIELD2, BELOW2 = (340, 352, 940, 424), (354, 428, 926, 524), (300, 352, 980, 800)
 
-    def wiz(name, box=WIZ):
+    def crop(name, box):
         return Image.open(machine.out_dir / f"{name}.png").convert("RGB").crop(box).tobytes()
+
+    def lit(a):
+        """Pixels that are not the black background."""
+        return sum(1 for i in range(0, len(a), 3) if max(a[i:i + 3]) > 24)
 
     def changed(a, b):
         """How many pixels of two crops differ."""
         return sum(1 for i in range(0, len(a), 3) if a[i:i + 3] != b[i:i + 3])
 
-    def hat_band(a):
-        """Pixels of his hat's brand red: he is there."""
+    def brand_red(a):
+        """Pixels of the brand red that Wiz's hat band used: none may remain."""
         return sum(1 for i in range(0, len(a), 3)
                    if abs(a[i] - 0xDC) <= 40 and abs(a[i + 1] - 0x1E) <= 40 and abs(a[i + 2] - 0x37) <= 40)
 
-    def same_pose(a, b):
-        assert changed(wiz(a), wiz(b)) < 20, f"{a} and {b} should show the same pose"
-
-    def other_pose(a, b, box=WIZ):
-        assert changed(wiz(a, box), wiz(b, box)) > 100, f"{a} and {b} should show different poses"
+    def plain_field(name, gap=GAP, field=FIELD, below=BELOW):
+        assert lit(crop(name, field)) > 500, f"{name}: the passphrase field is missing"
+        assert lit(crop(name, gap)) == 0, f"{name}: something is drawn between the logo and the field"
+        assert brand_red(crop(name, below)) == 0, f"{name}: a picture is drawn by the field"
 
     machine.start()
     machine.wait_for_unit("multi-user.target")
@@ -91,42 +93,26 @@ pkgs.testers.runNixOSTest {
     machine.start()
     machine.wait_for_console_text("Starting Cryptography Setup for cryptdata")
     time.sleep(5)
-    machine.screenshot("01-asleep")
+    machine.screenshot("01-empty")
     machine.send_chars("not-the-passphrase")
     time.sleep(1)
-    machine.screenshot("02-listening")
+    machine.screenshot("02-typing")
     machine.send_key("ret")
     time.sleep(0.3)
     machine.screenshot("03-checking")
     machine.wait_for_console_text("Passphrase incorrect")
     time.sleep(2)
-    machine.screenshot("04-sorry")
-    machine.send_chars("wiz")
-    time.sleep(1)
-    machine.screenshot("05-listening-again")
-    for _ in "wiz":
-        machine.send_key("backspace")
-    time.sleep(1)
-    machine.screenshot("06-sorry-cleared")
+    machine.screenshot("04-asked-again")
     machine.send_chars(PASSPHRASE)
     machine.send_key("ret")
     machine.wait_for_console_text("Finished Cryptography Setup for cryptdata")
-    # systemd tells Plymouth the unit started just after logging it; he is
-    # happy for two seconds.
-    time.sleep(0.7)
-    machine.screenshot("07-happy")
     machine.wait_for_unit("multi-user.target")
-    for name in ("01-asleep", "02-listening", "04-sorry", "07-happy"):
-        assert hat_band(wiz(name)) > 10, f"{name}: Wiz is missing above the field"
-    other_pose("01-asleep", "02-listening")
-    # He keeps listening while the passphrase is checked, and again later.
-    same_pose("02-listening", "03-checking")
-    same_pose("02-listening", "05-listening-again")
-    other_pose("04-sorry", "01-asleep")
-    other_pose("04-sorry", "02-listening")
-    # Still sorry once the retry's field is empty again.
-    same_pose("04-sorry", "06-sorry-cleared")
-    other_pose("07-happy", "02-listening")
+    for name in ("01-empty", "02-typing", "04-asked-again"):
+        plain_field(name)
+    # While the passphrase is checked the field gives way to the progress bar;
+    # nothing appears above it.
+    assert lit(crop("03-checking", GAP)) == 0, "03-checking: something is drawn under the logo"
+    assert changed(crop("01-empty", FIELD), crop("02-typing", FIELD)) > 100, "typing shows no bullets"
     machine.succeed("test -b /dev/mapper/cryptdata")
     # Script errors fail silently on screen; Plymouth reports them on stderr.
     machine.fail("journalctl -b --no-pager -u plymouth-start.service | grep -i 'parser error'")
@@ -138,25 +124,22 @@ pkgs.testers.runNixOSTest {
     machine.succeed("plymouth --show-splash; chvt 2")
     machine.succeed("systemd-run --unit=cybexos-plymouth-ask --service-type=exec -- $(command -v plymouth) ask-for-password --prompt='Unlock Cybex OS qualification disk' --command=${sink}")
     time.sleep(2)
-    machine.screenshot("09-double-scale-asleep")
+    machine.screenshot("09-double-scale-empty")
     machine.send_chars("double")
     time.sleep(1)
-    machine.screenshot("10-double-scale-listening")
+    machine.screenshot("10-double-scale-typing")
     machine.send_key("ret")
     machine.wait_until_succeeds("grep -q double /run/cybexos-plymouth-answer", timeout=30)
     # What systemd sends when a cryptsetup unit has started.
     machine.succeed("plymouth update --status=systemd-cryptsetup@check.service")
     time.sleep(0.5)
-    machine.screenshot("11-double-scale-happy")
-    # Then he leaves.
-    time.sleep(2.5)
-    machine.screenshot("12-double-scale-gone")
+    machine.screenshot("11-double-scale-unlocked")
     machine.succeed("plymouth quit")
-    for name in ("09-double-scale-asleep", "10-double-scale-listening", "11-double-scale-happy"):
-        assert hat_band(wiz(name, WIZ_DOUBLE)) > 40, f"{name}: Wiz is missing above the field"
-    other_pose("09-double-scale-asleep", "10-double-scale-listening", WIZ_DOUBLE)
-    other_pose("10-double-scale-listening", "11-double-scale-happy", WIZ_DOUBLE)
-    assert hat_band(wiz("12-double-scale-gone", WIZ_DOUBLE)) == 0, "Wiz stayed after the unlock"
+    for name in ("09-double-scale-empty", "10-double-scale-typing"):
+        plain_field(name, GAP2, FIELD2, BELOW2)
+    assert lit(crop("11-double-scale-unlocked", GAP2)) == 0, "something appeared under the logo after the unlock"
+    assert changed(crop("09-double-scale-empty", FIELD2), crop("10-double-scale-typing", FIELD2)) > 100, \
+        "typing shows no bullets at double scale"
     debug_log = machine.succeed("cat /run/cybexos-plymouth.log")
     (machine.out_dir / "plymouth-double-scale.log").write_text(debug_log)
     machine.fail("journalctl --no-pager -u cybexos-plymouth-test | grep -i 'parser error'")

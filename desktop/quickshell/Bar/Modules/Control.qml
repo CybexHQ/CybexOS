@@ -17,11 +17,13 @@ BarModule {
         Accessible.role: Accessible.Button
         Accessible.name: I18n.tr("Control Center")
 
-        BarBrandIcon {
+        // Settings -> Control Center -> Button icon; the fish prompt shows
+        // the same icon.
+        ControlIconGlyph {
+            objectName: "controlIcon"
             anchors.verticalCenter: parent.verticalCenter
             width: Theme.barIconSize
             height: Theme.barIconSize
-            name: "cybexos"
             highlighted: controlButton.held || controlButton.hovered
         }
     }

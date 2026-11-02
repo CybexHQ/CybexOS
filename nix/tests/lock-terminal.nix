@@ -1,6 +1,6 @@
-# Wiz on a signed-in Cybex OS desktop: asleep beside the lock screen's
-# password field, and in kitty, the default terminal, when fastfetch is typed
-# at its fish prompt.
+# A signed-in Cybex OS desktop: the lock screen shows no Wiz beside its
+# password field, and Wiz is in kitty, the default terminal, when fastfetch is
+# typed at its fish prompt.
 #
 # The session locks as it does itself (cybexos-session-lock.service runs
 # `cybexos-runtime exec hyprlock`), first with the lock screen the shell's
@@ -65,12 +65,12 @@ pkgs.testers.runNixOSTest {
     # The first sign-in's welcome guide would cover the terminal.
     time.sleep(5)
     user("cybexos-runtime ipc welcome close")
-    machine.succeed("test -s /run/current-system/sw/share/cybexos/wiz/lock/asleep.png")
+    machine.fail("test -e /run/current-system/sw/share/cybexos/wiz/lock")
     machine.succeed("test -s /run/current-system/sw/share/cybexos/wiz/terminal/idle.png")
 
     # ---- the lock screen ---------------------------------------------------
-    # Right of the field: the field ends at x 790; Wiz's box is centred at
-    # (825, 409) in a 1280x800 output, and his hat band is the brand red.
+    # Right of the field, where Wiz used to sleep: the field ends at x 790 in
+    # a 1280x800 output. Nothing there may be his hat band's brand red.
     WIZ = (790, 360, 875, 460)
     RED = (0xDC, 0x1E, 0x37)
     themed = "/home/tester/.local/state/cybexos/theme/hyprlock.conf"
@@ -84,10 +84,10 @@ pkgs.testers.runNixOSTest {
         machine.screenshot(name)
         rendered = machine.succeed(f"cat /run/user/{uid}/cybexos/hyprlock.conf")
         (out / f"{name}.conf").write_text(rendered)
-        assert "path = /run/current-system/sw/share/cybexos/wiz/lock/asleep.png" in rendered, rendered
+        assert "image {" not in rendered and "wiz" not in rendered.lower(), rendered
         band = pixels(name, WIZ, RED, 40)
         machine.log(f"{name}: {band} hat band pixels right of the field")
-        assert band > 20, f"{name}: Wiz's hat band is missing right of the field ({band} pixels)"
+        assert band == 0, f"{name}: Wiz is still beside the field ({band} pixels)"
         machine.send_chars("qualification-only\n")
         wait(lambda: not locked(), 30)
         time.sleep(1)
@@ -102,6 +102,30 @@ pkgs.testers.runNixOSTest {
     user("hyprctl -i 0 dispatch 'hl.dsp.exec_cmd(\"kitty\")'")
     machine.wait_until_succeeds(f"runuser -u tester -- env {session} hyprctl -i 0 -j clients | grep -q '\"class\": \"kitty\"'", timeout=60)
     time.sleep(5)
+
+    # ---- the prompt icon -------------------------------------------------------
+    # The shell writes the Control Center button's icon for fish, by default
+    # the Cybex OS mark, which only Cybex OS Symbols has; kitty reaches it
+    # through fontconfig. Switched to "os", the next prompt shows NixOS's.
+    icon_file = "/home/tester/.local/state/cybexos/prompt-icon"
+    machine.wait_until_succeeds(f"test -s {icon_file}", timeout=60)
+    assert machine.succeed(f"cat {icon_file}") == "\U001000CB\n", machine.succeed(f"od -c {icon_file}")
+    machine.succeed("fc-list ':charset=1000cb' family | grep -Fx 'Cybex OS Symbols'")
+    PROMPT = (0, 40, 400, 120)
+    machine.send_chars("clear\n")
+    time.sleep(2)
+    machine.screenshot("prompt-cybexos")
+    machine.succeed(f"runuser -u tester -- sh -c 'printf \"os\\n\" > {icon_file}'")
+    machine.send_chars("clear\n")
+    time.sleep(2)
+    machine.screenshot("prompt-os")
+    mark, logo = (Image.open(out / f"{name}.png").convert("RGB").crop(PROMPT).tobytes()
+                  for name in ("prompt-cybexos", "prompt-os"))
+    differ = sum(1 for i in range(0, len(mark), 3) if mark[i:i + 3] != logo[i:i + 3])
+    machine.log(f"prompt icon: {differ} pixels changed between the Cybex OS and NixOS icons")
+    assert differ > 20, f"the prompt did not follow its icon file ({differ} pixels)"
+    machine.send_chars("clear\n")
+    time.sleep(1)
     machine.send_chars("fastfetch\n")
     time.sleep(8)
     machine.screenshot("terminal-kitty")

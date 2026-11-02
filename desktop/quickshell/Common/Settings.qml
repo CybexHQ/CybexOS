@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import "SettingsHelpers.js" as SettingsHelpers
+import "ControlIconHelpers.js" as ControlIconHelpers
 import "ProcHelpers.js" as ProcHelpers
 import "Persistence"
 
@@ -116,6 +117,8 @@ Singleton {
     property var drawerOverview: defaults.drawerOverview
     property string drawerHover: defaults.drawerHover
     property int drawerWidth: defaults.drawerWidth
+    property string controlIcon: defaults.controlIcon
+    property bool controlIconPrompt: defaults.controlIconPrompt
     property var mods: defaults.mods
     property var modOpts: defaults.modOpts
     property bool dock: defaults.dock
@@ -362,7 +365,8 @@ Singleton {
         // The dock moved to Workspaces & dock with its switches (2026-10).
         workspaces: ["dock", "dockAutoHide", "dockPinned"],
         plugins: [],
-        drawer: ["drawerTabs", "drawerOverview", "drawerHover", "drawerWidth"],
+        drawer: ["drawerTabs", "drawerOverview", "drawerHover", "drawerWidth",
+            "controlIcon", "controlIconPrompt"],
         notifications: ["notifDnd", "notifDndUntilMs", "notifQuiet", "notifQuietStart", "notifQuietEnd",
             "notifDuration", "notifPosition", "notifDensity", "notifIcons",
             "notifProgress", "notifBodyLines", "osd", "notifHistoryPersist",
@@ -858,6 +862,7 @@ Singleton {
         applyScrollFactor();
         applyGlassEffect();
         applyPointerHiding();
+        writePromptIcon();
         if (retainPending && !newerSchema) {
             migrationPending = false;
             scheduleSave();
@@ -1104,6 +1109,14 @@ Singleton {
     onDrawerOverviewChanged: scheduleSave()
     onDrawerHoverChanged: scheduleSave()
     onDrawerWidthChanged: scheduleSave()
+    onControlIconChanged: {
+        scheduleSave();
+        writePromptIcon();
+    }
+    onControlIconPromptChanged: {
+        scheduleSave();
+        writePromptIcon();
+    }
     onModsChanged: scheduleSave()
     onModOptsChanged: scheduleSave()
     onDockChanged: scheduleSave()
@@ -1206,6 +1219,51 @@ Singleton {
             if (!running && root.dispatchedPointerHiding !== root.pointerHidingLua())
                 Qt.callLater(root.applyPointerHiding);
         }
+    }
+
+    // The fish prompt shows the Control Center button's icon. It reads this
+    // one-line file before each prompt (desktop/defaults/fish-config.fish):
+    // a glyph, or "os" for the operating system's own icon. Written at load
+    // and on each change; a change made while a write runs follows it.
+    readonly property string promptIconFile: (Quickshell.env("XDG_STATE_HOME")
+        || Quickshell.env("HOME") + "/.local/state") + "/cybexos/prompt-icon"
+    property string writtenPromptIcon: ""
+
+    function promptIconText() {
+        return ControlIconHelpers.promptText(controlIcon, controlIconPrompt);
+    }
+
+    function writePromptIcon() {
+        if (!loaded || promptIconProc.running)
+            return;
+        writtenPromptIcon = promptIconText();
+        promptIconProc.command = ["sh", "-c",
+            'mkdir -p "${1%/*}" && printf "%s\\n" "$2" > "$1.tmp" && mv -f "$1.tmp" "$1"',
+            "cybexos-prompt-icon", promptIconFile, writtenPromptIcon];
+        promptIconProc.running = true;
+    }
+
+    Process {
+        id: promptIconProc
+
+        onExited: exitCode => {
+            if (exitCode !== 0)
+                console.warn("could not write the prompt icon:", exitCode);
+        }
+        onRunningChanged: {
+            if (!running && root.writtenPromptIcon !== root.promptIconText())
+                Qt.callLater(root.writePromptIcon);
+        }
+    }
+
+    // Where a bar module sits: "left", "center" or "right", or "" when the
+    // layout has it switched off or does not hold it.
+    function moduleColumn(id) {
+        for (const col of ["left", "center", "right"]) {
+            if (mods[col].some(entry => entry.id === id && entry.on))
+                return col;
+        }
+        return "";
     }
 
     // The layer namespace is fixed once Quickshell connects the Wayland

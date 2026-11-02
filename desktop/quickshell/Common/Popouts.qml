@@ -40,6 +40,14 @@ Singleton {
         return Screens.focused ? Screens.focused.name : "";
     }
 
+    // The bar section a panel's own module sits in, for callers that do not
+    // say (IPC, keyboard shortcuts, the launcher): the Control Center opens
+    // its drawer by its button wherever the person put it.
+    function moduleIsland(name) {
+        const panel = PanelRegistry.byName(name);
+        return panel && panel.moduleId ? Settings.moduleColumn(panel.moduleId) : "";
+    }
+
     function openPanel(name, isle, anchor, targetScreenName) {
         if (name === PanelRegistry.SETTINGS) {
             Settings.showPanel(undefined, targetScreenName);
@@ -53,7 +61,7 @@ Singleton {
             return;
         }
         const nextHost = resolvedHostName(targetScreenName, open);
-        island = isle ?? defaultIsland[name] ?? "right";
+        island = isle || moduleIsland(name) || defaultIsland[name] || "right";
         // Callers with no module to point at — the IPC handler, or one
         // popover morphing into another — keep the surface where it is
         // rather than making it jump to the section edge.

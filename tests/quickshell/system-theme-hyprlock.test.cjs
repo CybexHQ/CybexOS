@@ -89,7 +89,7 @@ test("the lock screen renders the shell's font and colours over a solid base", (
     assert.equal(lines[0], HEADER);
     assert.equal(lines[2], "$font = JetBrainsMono Nerd Font");
     assert.deepEqual(sections(config).map(s => s.name),
-        ["general", "animations", "background", "label", "label", "input-field", "image", "label"]);
+        ["general", "animations", "background", "label", "label", "input-field", "label"]);
     assert.deepEqual(section(config, "background"), { monitor: "", color: "rgba(1a1917ff)" });
     assert.equal(section(config, "label", 0).color, "rgba(f2f0eaff)");
     assert.equal(section(config, "label", 1).color, "rgba(b3afa4ff)");
@@ -110,19 +110,14 @@ test("the lock screen renders the shell's font and colours over a solid base", (
     assert.doesNotMatch(config, /^shape \{$/m);
 });
 
-test("Wiz sleeps beside the password field, feet level with its bottom edge", () => {
-    for (const tokens of [darkTokens(), withWallpaper(lightTokens(), "")]) {
-        const wiz = section(render(tokens), "image");
-        // nix/packages/desktop.nix renders the pose at twice this size there.
-        assert.equal(wiz.path, "/run/current-system/sw/share/cybexos/wiz/lock/asleep.png");
-        // A still picture, unframed: hyprlock's default is a bordered circle.
-        assert.deepEqual([wiz.size, wiz.rounding, wiz.border_size], ["84", "0", "0"]);
-        assert.deepEqual([wiz.halign, wiz.valign], ["center", "center"]);
-        // The field spans x -150..150 and y -45..9 (up is positive); his box,
-        // 86.5x84, starts left of x 150 by its transparent margin, its bottom
-        // 6.4 below his feet at y -45.
-        assert.equal(wiz.position, "185, -9");
+test("the lock screen shows no picture: Wiz is not on it", () => {
+    for (const tokens of [darkTokens(), withWallpaper(lightTokens(), ""),
+        withWallpaper(darkTokens(), WALLPAPER)]) {
+        const config = render(tokens);
+        assert.doesNotMatch(config, /^image \{$/m);
+        assert.doesNotMatch(config, /wiz/i);
     }
+    assert.doesNotMatch(fs.readFileSync(template, "utf8"), /^image \{$|wiz/im);
 });
 
 test("the lock screen shows the wallpaper blurred under a scrim of the base colour", () => {
@@ -233,7 +228,7 @@ test("the vendor lock screen uses the same plain background and dark controls", 
     const lines = rendered.split("\n");
     assert.equal(lines[0], HEADER);
     assert.match(lines[1], /^# /);
-    // No wallpaper: the only picture is Wiz's.
+    // No wallpaper and no picture.
     assert.equal(section(vendor, "background").path, undefined);
     assert.doesNotMatch(vendor, /blur_passes =|brightness =/);
     assert.equal(vendor, lines.slice(2).join("\n"),
@@ -344,9 +339,6 @@ test("the lock screen's text and field grow with the shell's text size", () => {
     assert.equal(date.position, "0, 128");
     assert.equal(field.size, "450, 81");
     assert.equal(field.position, "0, -27");
-    // Wiz grows with the field and keeps his place beside it.
-    assert.equal(section(large, "image").size, "126");
-    assert.equal(section(large, "image").position, "277, -14");
     // Colours, the wallpaper and the scrim are untouched by size.
     assert.deepEqual(section(large, "background"), section(base, "background"));
     assert.deepEqual(section(large, "shape"), section(base, "shape"));

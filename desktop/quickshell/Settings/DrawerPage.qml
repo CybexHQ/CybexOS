@@ -2,8 +2,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../Common"
 
-// Drawer page (turn-3 settings design): the edge drawer's tab strip — order
-// and visibility — what its Overview tab shows, and how the drawer opens.
+// Drawer page (turn-3 settings design): the Control Center button's icon,
+// the edge drawer's tab strip — order and visibility — what its Overview tab
+// shows, and how the drawer opens.
 // Tab rows reorder by drag or by the same keyboard grammar the Widgets page
 // uses: Space picks up, arrows move, Space drops, Escape cancels.
 SettingsPage {
@@ -80,6 +81,10 @@ SettingsPage {
         anchors.right: parent.right
         anchors.top: parent.top
         spacing: Theme.settingsGroupSpacing
+
+        ControlIconGroup {
+            width: parent.width
+        }
 
         SettingsGroup {
             width: parent.width

@@ -12,6 +12,9 @@ Rectangle {
     // The page's tone (accent, ok, warn, error or neutral). A primary action
     // after a warning or a failure is amber: the next step is the person's.
     property string tone: "accent"
+    // A square button with only its glyph, such as Close; `text` still
+    // names it for assistive technology.
+    property bool iconOnly: false
     signal triggered()
 
     readonly property bool attention: primary && (tone === "warn" || tone === "error")
@@ -21,7 +24,7 @@ Rectangle {
         : attention ? (Theme.dark ? "#1c1c12" : "#ffffff")
         : Theme.textOnAccent
 
-    implicitWidth: content.implicitWidth + Theme.scaled(32)
+    implicitWidth: iconOnly ? implicitHeight : content.implicitWidth + Theme.scaled(32)
     implicitHeight: Theme.scaled(38)
     radius: Theme.chipRadius + 3
     color: !primary ? Theme.hoverFill : attention ? Theme.amber : Theme.accent
@@ -66,6 +69,7 @@ Rectangle {
             color: root.ink
         }
         Text {
+            visible: !root.iconOnly
             anchors.verticalCenter: parent.verticalCenter
             text: root.text
             color: root.ink

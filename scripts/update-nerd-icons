@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Rebuild the Nerd Font icon catalogue for the Control Center button icon.
+
+Settings -> Bar & Control Center -> Control Center -> Button icon searches
+these names; the bar and the fish prompt draw the chosen glyph from
+JetBrainsMono Nerd Font, which every installation has. VERSION must match the
+Nerd Fonts release in the tree's Nixpkgs (nerd-fonts.jetbrains-mono), so each
+codepoint names the glyph that font really has. Only this maintenance command
+needs the network; the shell reads the generated file locally.
+"""
+import hashlib
+import json
+from pathlib import Path
+import urllib.request
+
+VERSION = "3.5.0"
+SHA256 = "0842e1a0f6a2e3d8fa7fd22b5aab4ff93878269c8c2c9155b307f000eaea0f94"
+URL = f"https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v{VERSION}/glyphnames.json"
+OUTPUT = Path(__file__).resolve().parents[1] / "desktop/quickshell/assets/nerd-icons/glyphs.json"
+# Icon sets worth a button. Powerline separators, indent guides and the like
+# are prompt furniture, not icons.
+SETS = ("md", "fa", "fae", "dev", "cod", "oct", "weather", "seti", "linux", "custom")
+
+
+def private_use(code):
+    # A few Font Awesome names map to ordinary symbols (U+2665, U+26A1) that
+    # an emoji font would draw instead; every kept glyph is the Nerd Font's.
+    return 0xE000 <= code <= 0xF8FF or 0xF0000 <= code <= 0xFFFFD
+
+
+def main():
+    data = urllib.request.urlopen(URL, timeout=60).read()
+    if hashlib.sha256(data).hexdigest() != SHA256:
+        raise ValueError("Nerd Fonts glyph list checksum mismatch")
+    names = json.loads(data)
+    if names.get("METADATA", {}).get("version") != VERSION:
+        raise ValueError("Nerd Fonts glyph list is not version " + VERSION)
+    glyphs = {name: entry["code"] for name, entry in sorted(names.items())
+              if name.split("-", 1)[0] in SETS and private_use(int(entry["code"], 16))}
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_text(json.dumps({"version": VERSION, "source": URL, "glyphs": glyphs},
+                                 separators=(",", ":"), sort_keys=False) + "\n")
+    print(f"{len(glyphs)} glyphs -> {OUTPUT}")
+
+
+if __name__ == "__main__":
+    main()

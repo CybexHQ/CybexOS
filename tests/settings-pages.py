@@ -104,6 +104,8 @@ TEST_IPC = '''
         return null;
     }
     function settingsView() { return shell.findNamed(pagesSettings.contentItem, "settingsView"); }
+    // The window's root: its content and the overlay that dialogs open on.
+    function settingsRoot() { return pagesSettings.contentItem.parent || pagesSettings.contentItem; }
     IpcHandler {
         target: "settings-test"
         function state(): string {
@@ -152,6 +154,32 @@ TEST_IPC = '''
                 themes: Pointer.themes.map(theme => [theme.id, theme.source, theme.installed, theme.downloadable]) });
         }
         function pickPointer(id: string): void { Pointer.pick(id); }
+        function controlIcon(): string {
+            // Widget options open in a dialog on the window's overlay.
+            const group = shell.findNamed(shell.settingsRoot(), "controlIconGroup");
+            const picker = group ? shell.findNamed(group, "controlIconPicker") : null;
+            const preview = group ? shell.findNamed(group, "controlIconPreview") : null;
+            const first = picker ? shell.findNamed(picker, "controlIconResult") : null;
+            return JSON.stringify({ group: !!group, value: Settings.controlIcon, prompt: Settings.controlIconPrompt,
+                picker: !!(picker && picker.visible), loaded: group ? group.catalogueLoaded : false,
+                results: group ? group.results.map(result => result.name) : [],
+                first: first ? first.value : "", preview: !!(preview && preview.visible) });
+        }
+        function chooseControlIcon(mode: string): void {
+            const group = shell.findNamed(shell.settingsRoot(), "controlIconGroup");
+            shell.findNamed(group, "controlIconChoice-" + mode).activate();
+        }
+        function pickFirstIcon(): void {
+            const group = shell.findNamed(shell.settingsRoot(), "controlIconGroup");
+            shell.findNamed(shell.findNamed(group, "controlIconPicker"), "controlIconResult").pick();
+        }
+        function popout(): string {
+            return JSON.stringify({ open: Popouts.open, name: Popouts.currentName, island: Popouts.island });
+        }
+        function scrollTo(name: string): void {
+            const item = shell.findNamed(shell.settingsRoot(), name);
+            if (item) item.forceActiveFocus();
+        }
         function highlight(key: string): void { Settings.highlightKey = ""; Settings.highlightKey = key; }
     }'''
 
@@ -472,6 +500,48 @@ def main():
             if state()['sheet']:
                 assert ipc('settings-test', 'pressEscape') == 'true'
 
+            # The Control Center button's icon: the Cybex OS mark by default,
+            # the operating system's logo, or a searched Nerd Font icon. The
+            # fish prompt's one-line file follows each choice.
+            def control_icon():
+                return json.loads(ipc('settings-test', 'controlIcon'))
+
+            prompt_file = home / '.local/state/cybexos/prompt-icon'
+            ipc('settings', 'open', 'drawer')
+            wait(lambda: control_icon()['group'], 'Control Center page with its Button icon group')
+            icon = control_icon()
+            assert icon['value'] == 'cybex' and icon['prompt'] and icon['preview'] and not icon['picker'], icon
+            wait(lambda: prompt_file.exists() and prompt_file.read_text() == '\U001000CB\n',
+                 'the prompt file holds the Cybex OS Symbols glyph')
+            ipc('settings-test', 'scrollTo', 'controlIconGroup')
+            time.sleep(0.6)
+            screenshot('16-control-icon-default.png')
+            ipc('settings-test', 'chooseControlIcon', 'os')
+            wait(lambda: control_icon()['value'] == 'os' and prompt_file.read_text() == 'os\n',
+                 'the operating system choice leaves the prompt its own icon')
+            ipc('settings-test', 'chooseControlIcon', 'custom')
+            wait(lambda: (i := control_icon())['picker'] and i['loaded'] and i['results'], 'the icon search')
+            assert control_icon()['value'] == 'os', 'opening the search changes nothing yet'
+            focus_settings()
+            keys('-d', '20', 'rocket')
+            found = wait(lambda: (i := control_icon())['results'][:1] == ['md-rocket'] and i, 'search for rocket')
+            assert found['first'] == 'nf:md-rocket:f0463', found
+            ipc('settings-test', 'pickFirstIcon')
+            wait(lambda: control_icon()['value'] == 'nf:md-rocket:f0463'
+                 and prompt_file.read_text() == '\U000F0463\n', 'the rocket on the bar and in the prompt')
+            time.sleep(0.6)
+            screenshot('17-control-icon-custom.png')
+            ipc('settings-test', 'setValue', 'controlIconPrompt', 'false')
+            wait(lambda: prompt_file.read_text() == 'os\n', 'the prompt switch off keeps the OS icon')
+            ipc('settings-test', 'setValue', 'controlIconPrompt', 'true')
+            ipc('settings-test', 'chooseControlIcon', 'cybex')
+            wait(lambda: control_icon()['value'] == 'cybex' and not control_icon()['picker']
+                 and prompt_file.read_text() == '\U001000CB\n', 'back to the Cybex OS mark')
+            def saved_icon():
+                saved = json.loads((home / '.config/cybexos/shell.json').read_text())
+                return saved['v'], saved.get('controlIcon', 'cybex'), saved.get('controlIconPrompt', True)
+            wait(lambda: saved_icon() == (32, 'cybex', True), 'the choice saved in schema 32')
+
             # The narrow window: icon rail, compact chip.
             subprocess.run(['swaymsg', '[title="Cybex OS Settings"]', 'resize', 'set', '640', '620'],
                            env=env, check=True, capture_output=True)
@@ -488,6 +558,19 @@ def main():
 
             ipc('settings', 'close')
             wait(lambda: not state()['open'] and not state()['history'], 'closing forgets the trail')
+
+            # The Control Center opens by its button at the top left, also
+            # from IPC and the keyboard, which name no section; its drawer
+            # tabs keep it there.
+            def popout():
+                return json.loads(ipc('settings-test', 'popout'))
+            ipc('popouts', 'toggle', 'control')
+            wait(lambda: popout() == {'open': True, 'name': 'control', 'island': 'left'},
+                 'the Control Center drawer on the left')
+            time.sleep(1)
+            screenshot('18-control-center-left.png')
+            ipc('popouts', 'toggle', 'control')
+            wait(lambda: not popout()['open'], 'the Control Center drawer closed')
             log = (base / 'qs.log').read_text()
             problems = [line for line in log.splitlines() if QML_ERRORS.search(line)]
             assert not problems, '\n'.join(problems[:40])

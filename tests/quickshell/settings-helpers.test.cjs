@@ -4,9 +4,26 @@ const { load } = require("./shell.cjs");
 
 const H = load("SettingsHelpers.js");
 
+// The default layout before schema 32, with the Control Center button at the
+// far right. Older settings files were written against this layout.
+function legacyMods() {
+    const mods = H.defaultMods();
+    const control = mods.left.find(m => m.id === "control");
+    mods.left = mods.left.filter(m => m.id !== "control");
+    mods.right.push(control);
+    return mods;
+}
+
 test("defaults carry the design values", () => {
     const d = H.defaults();
-    assert.equal(H.VERSION, 31);
+    assert.equal(H.VERSION, 32);
+    // The Control Center button leads the left column, with the Cybex OS
+    // mark, which the fish prompt shows too.
+    assert.deepEqual(d.mods.left.map(m => m.id), ["control", "ws", "media"]);
+    assert.ok(d.mods.left[0].on);
+    assert.ok(!d.mods.right.some(m => m.id === "control"));
+    assert.equal(d.controlIcon, "cybex");
+    assert.equal(d.controlIconPrompt, true);
     assert.deepEqual(d.drawerTabs.map(t => t.id),
         ["overview", "sound", "network", "bluetooth", "power", "notifications"]);
     assert.ok(d.drawerTabs.every(t => t.on === true));
@@ -59,13 +76,13 @@ test("defaults carry the design values", () => {
     assert.equal(d.dock, false, "the dock is optional and starts off");
     assert.equal(d.dockAutoHide, false);
     assert.deepEqual(d.dockPinned, []);
-    assert.deepEqual(d.mods.left.map(m => m.id), ["ws", "media"]);
+    assert.deepEqual(d.mods.left.map(m => m.id), ["control", "ws", "media"]);
     assert.deepEqual(d.mods.center.map(m => m.id),
         ["indicators", "clock", "weather", "notes"]);
     assert.equal(d.mods.center.find(m => m.id === "notes").on, true);
     assert.deepEqual(d.mods.right.map(m => m.id),
         ["modelusage", "fusebox", "updates", "gh", "t3", "hermes", "remote", "tray", "assistant",
-         "notifications", "vol", "wifi", "bt", "batt", "control"]);
+         "notifications", "vol", "wifi", "bt", "batt"]);
     assert.equal(d.mods.right.find(m => m.id === "assistant").on, true,
         "the assistant's button hides itself where the feature is not installed");
     assert.equal(d.mods.left[1].on, true, "the media chip hides itself when nothing plays");
@@ -560,7 +577,7 @@ test("schema-5 colors select wallpaper or fixed mode and remain stored", () => {
 });
 
 test("schema-6 migration preserves module order and adds clock-side indicators", () => {
-    const raw = H.defaultMods();
+    const raw = legacyMods();
     raw.left = [raw.left[1], raw.left[0]];
     raw.right = raw.right.filter(mod => mod.id !== "control");
     raw.right = [raw.right.at(-1), ...raw.right.slice(0, -1)];
@@ -598,9 +615,9 @@ test("normalizeMods drops unknown ids and dedupes across columns", () => {
         center: [{ id: "clock", on: false }],
         right: []
     });
-    assert.deepEqual(next.left.map(m => m.id), ["clock", "ws", "media"],
-        "flux dropped, duplicate clock collapsed, absent defaults appended");
-    assert.equal(next.left[0].on, true, "first occurrence of a duplicate wins");
+    assert.deepEqual(next.left.map(m => m.id), ["control", "clock", "ws", "media"],
+        "flux dropped, duplicate clock collapsed, absent defaults appended, the button first");
+    assert.equal(next.left[1].on, true, "first occurrence of a duplicate wins");
     assert.deepEqual(next.center.map(m => m.id), ["indicators", "weather", "notes"]);
     const all = [...next.left, ...next.center, ...next.right].map(m => m.id).sort();
     assert.deepEqual(all, [...H.MODULE_IDS].sort());
@@ -608,13 +625,14 @@ test("normalizeMods drops unknown ids and dedupes across columns", () => {
 
 test("normalizeMods appends ids missing from the file at their default column", () => {
     const next = H.normalizeMods({ left: [{ id: "vol", on: false }], center: [], right: [] });
-    assert.deepEqual(next.left.map(m => m.id), ["vol", "ws", "media"]);
-    assert.equal(next.left[0].on, false);
+    // The Control Center button goes back to the top left, before the rest.
+    assert.deepEqual(next.left.map(m => m.id), ["control", "vol", "ws", "media"]);
+    assert.equal(next.left[1].on, false);
     assert.deepEqual(next.center.map(m => m.id),
         ["indicators", "clock", "weather", "notes"]);
     assert.deepEqual(next.right.map(m => m.id),
         ["modelusage", "fusebox", "updates", "gh", "t3", "hermes", "remote", "tray", "assistant",
-         "notifications", "wifi", "bt", "batt", "control"]);
+         "notifications", "wifi", "bt", "batt"]);
     assert.ok(next.right.some(m => m.id === "bt" && m.on === true),
         "appended module keeps its default enable flag");
 });
@@ -786,7 +804,7 @@ test("schema-11 adds notifications without rewriting a custom layout", () => {
 });
 
 test("schema-11 inserts notifications before the first right-side status widget", () => {
-    const raw = H.defaultMods();
+    const raw = legacyMods();
     raw.right = raw.right.filter(mod => mod.id !== "notifications");
     const byId = Object.fromEntries(raw.right.map(mod => [mod.id, mod]));
     raw.right = [byId.updates, byId.tray, byId.gh, byId.wifi, byId.t3,
@@ -799,7 +817,7 @@ test("schema-11 inserts notifications before the first right-side status widget"
 });
 
 test("schema-11 appends notifications on the right when its status widgets moved", () => {
-    const raw = H.defaultMods();
+    const raw = legacyMods();
     raw.right = raw.right.filter(mod => mod.id !== "notifications");
     const statusIds = ["vol", "wifi", "bt", "batt"];
     const moved = raw.right.filter(mod => statusIds.includes(mod.id));
@@ -941,7 +959,7 @@ test("schema-8 inserts indicators immediately before the existing clock", () => 
 });
 
 test("schema-30 adds the assistant's button before the right side's notification and status widgets", () => {
-    const raw = H.defaultMods();
+    const raw = legacyMods();
     raw.right = raw.right.filter(mod => mod.id !== "assistant");
     const byId = Object.fromEntries(raw.right.map(mod => [mod.id, mod]));
     raw.right = [byId.updates, byId.wifi, byId.tray, byId.notifications, byId.vol];
@@ -952,7 +970,7 @@ test("schema-30 adds the assistant's button before the right side's notification
     assert.deepEqual(migrated.right[1], { id: "assistant", on: true, detail: "auto" });
 
     // A layout that already has it, on or off, keeps it as it is.
-    const placed = H.defaultMods();
+    const placed = legacyMods();
     placed.right = placed.right.filter(mod => mod.id !== "assistant");
     placed.left.push({ id: "assistant", on: false, detail: "compact" });
     const kept = H.merge({ v: 29, mods: placed }).mods;
@@ -1147,8 +1165,8 @@ test("wallpaper paths and module detail policies are validated", () => {
         { id: "media", on: true, detail: "prefer" },
         { id: "clock", on: true, detail: "invalid" }
     ]});
-    assert.equal(mods.left[0].detail, "prefer");
-    assert.equal(mods.left[1].detail, "auto");
+    assert.equal(mods.left.find(m => m.id === "media").detail, "prefer");
+    assert.equal(mods.left.find(m => m.id === "clock").detail, "auto");
 });
 
 test("notification settings are validated, clamped, and snapped", () => {
@@ -1244,7 +1262,7 @@ test("typed quiet-hour times parse, snap to the step, and reject non-times", () 
 
 
 test("schema 24 replaces fixed Control Center without changing other widgets", () => {
-    const raw = H.defaultMods();
+    const raw = legacyMods();
     raw.right = raw.right.filter(m => m.id !== "control");
     raw.left.reverse();
     raw.right.find(m => m.id === "hermes").detail = "compact";
@@ -1263,16 +1281,20 @@ test("Control Center placement and visibility survive reload", () => {
     const C = load("WidgetCatalog.js");
     const settings = H.defaults();
     for (const id of ["control"]) {
-        settings.mods = L.moveWidget(settings.mods, "right", id, "left", 0).mods;
-        settings.mods.left[0].on = false;
+        // Moved from its default top left to the far right, then hidden.
+        settings.mods = L.moveWidget(settings.mods, "left", id, "right",
+            settings.mods.right.length).mods;
+        assert.equal(settings.mods.right.at(-1).id, id);
+        settings.mods.right.at(-1).on = false;
         const restored = H.merge(JSON.parse(H.serialize(settings)));
         assert.deepEqual(restored.mods, settings.mods);
+        assert.ok(!restored.mods.left.some(e => e.id === id), "a moved button stays where it was put");
         const entries = E.catalog(restored.mods, [], C.WIDGETS);
         assert.ok(E.search(entries, C.widgetName(id), "available").some(e => e.key === id));
-        assert.ok(!E.sectionEntries(entries, "left").some(e => e.key === id));
-        settings.mods.left[0].on = true;
+        assert.ok(!E.sectionEntries(entries, "right").some(e => e.key === id));
+        settings.mods.right.at(-1).on = true;
         const added = H.merge(JSON.parse(H.serialize(settings)));
-        assert.ok(E.sectionEntries(E.catalog(added.mods, [], C.WIDGETS), "left").some(e => e.key === id));
+        assert.ok(E.sectionEntries(E.catalog(added.mods, [], C.WIDGETS), "right").some(e => e.key === id));
     }
 });
 
@@ -1305,7 +1327,9 @@ test("schema 25 drops the retired usage widget, drawer tab, options and poll cei
         .map(m => m.id);
     assert.ok(!ids.includes("usage"), "the usage module survived migration");
     assert.deepEqual([...ids].sort(), [...H.MODULE_IDS].sort());
-    assert.deepEqual(merged.mods.left.slice(0, 1), [{ id: "ws", on: true, detail: "auto" }]);
+    // Its layout has no Control Center button, which goes back to the top left.
+    assert.deepEqual(merged.mods.left.slice(0, 2), [{ id: "control", on: true, detail: "auto" },
+        { id: "ws", on: true, detail: "auto" }]);
     assert.deepEqual(merged.mods.right.slice(0, 4), [
         { id: "modelusage", on: true, detail: "auto" },
         { id: "fusebox", on: false, detail: "auto" },

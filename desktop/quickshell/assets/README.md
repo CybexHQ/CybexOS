@@ -13,6 +13,10 @@ The shell chooses icons by semantic role:
 - Small animated primitives may be drawn in QML when an icon-font shape does
   not animate or align correctly.
 
+`nerd-icons/` names the Nerd Font icons the Control Center button can use;
+see [nerd-icons/README.md](nerd-icons/README.md) for the pinned list and its
+regeneration.
+
 `wiz/` holds the assistant character's layers. They are generated: edit
 `Common/WizRig.js` and run `scripts/export-wiz` (docs/assistant.md). Wiz is
 original project artwork under the repository MIT license.

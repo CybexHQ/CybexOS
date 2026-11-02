@@ -118,3 +118,55 @@ test("outside kitty, fastfetch runs as typed", { skip: !hasFish && "fish is not 
         fs.rmSync(tmp, { recursive: true, force: true });
     }
 });
+
+// The Control Center button's icon in the prompt (Common/Settings.qml writes
+// the one-line file; Common/ControlIconHelpers.js decides its contents).
+test("the prompt reads the Control Center icon before every prompt, with builtins", () => {
+    const source = fs.readFileSync(config, "utf8");
+    const start = source.indexOf("function __cybexos_prompt_icon --on-event fish_prompt");
+    assert.ok(start > source.indexOf("if status is-interactive"), "the handler is interactive-only");
+    assert.ok(start < source.indexOf("oh-my-posh init"), "set before the prompt is first drawn");
+    const body = source.slice(start, source.indexOf("\n    end\n", start));
+    assert.match(body, /read icon <\$__cybexos_prompt_icon/);
+    assert.doesNotMatch(body, /\b(cat|head|sh|command)\b/, "no subprocess per prompt");
+    assert.match(source, /set -g __cybexos_prompt_icon \$HOME\/\.local\/state\/cybexos\/prompt-icon\n/);
+    const settings = fs.readFileSync(path.join(repoDir, "desktop/quickshell/Common/Settings.qml"), "utf8");
+    assert.match(settings, /\|\| Quickshell\.env\("HOME"\) \+ "\/\.local\/state"\) \+ "\/cybexos\/prompt-icon"/);
+});
+
+test("a changed prompt icon shows at the next prompt; os or no file keeps the OS icon",
+    { skip: !hasFish && "fish is not installed" }, () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fish-prompt-icon-"));
+    try {
+        const state = path.join(tmp, "state");
+        const file = path.join(state, "cybexos/prompt-icon");
+        const script = [
+            `source ${config}`,
+            "set -g os $POSH_OS_ICON",
+            "function show; emit fish_prompt; test \"$POSH_OS_ICON\" = \"$os\"; and echo OS; or echo \"[$POSH_OS_ICON]\"; end",
+            "show",
+            `mkdir -p ${path.dirname(file)}; printf '%s\\n' \\U001000CB > ${file}; show`,
+            `printf '%s\\n' \\Uf0463 > ${file}; show`,
+            `printf 'os\\n' > ${file}; show`,
+            `rm ${file}; show`,
+        ].join("\n");
+        const result = spawnSync("fish", ["--no-config", "-i", "-c", script], {
+            encoding: "utf8",
+            input: "",
+            env: {
+                ...process.env,
+                HOME: tmp,
+                XDG_STATE_HOME: state,
+                XDG_CONFIG_HOME: path.join(tmp, "config"),
+                XDG_DATA_HOME: path.join(tmp, "data"),
+                XDG_CACHE_HOME: path.join(tmp, "cache"),
+                PATH: `${path.join(tmp, "bin")}:${process.env.PATH}`,
+            },
+        });
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(result.stdout.trim().split("\n").filter(line => /^(OS|\[)/.test(line)),
+            ["OS", "[\u{1000CB}]", "[\u{F0463}]", "OS", "OS"]);
+    } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+    }
+});

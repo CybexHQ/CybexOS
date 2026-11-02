@@ -80,6 +80,7 @@ SettingsTooltip SettingsTooltip.qml
 TextSizePreview TextSizePreview.qml
 ThemeGallery ThemeGallery.qml
 ChoiceRow ChoiceRow.qml
+ControlIconGroup ControlIconGroup.qml
 ActionRow ActionRow.qml
 MuteButton MuteButton.qml
 VolumeRow VolumeRow.qml

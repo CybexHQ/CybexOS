@@ -40,30 +40,13 @@ Space Grotesk and JetBrains Mono. GRUB sizes a list from its theme, so each
 list comes in row variants that the menus choose. The ISOLINUX screen for a
 legacy BIOS start is the same build's 800×600 notice.
 
-### Wiz at the disk unlock, on the lock screen and in the terminal
+### Wiz in the terminal, not on the password screens
 
-Wiz, the assistant's character (docs/assistant.md), appears where the shell
-cannot draw him, as still pictures of his poses: `scripts/export-wiz` writes
-each pose at rest to `assets/wiz/<pose>.svg`, all in one box with his feet at
-the same height, and the packages render them with librsvg at build time.
-He never speaks, and the boot logo stays the Cybex mark.
+Wiz, the assistant's character (docs/assistant.md), appears in the terminal
+as a still picture of a pose: `scripts/export-wiz` writes each pose at rest to
+`assets/wiz/<pose>.svg`, and the desktop package renders the one it needs with
+librsvg at build time. He never speaks, and the boot logo stays the Cybex mark.
 
-- **Disk unlock.** While Plymouth asks for the disk passphrase, Wiz (84 pixels
-  high, about 65 standing) stands centred on the password field, which moves
-  down under the unchanged logo to make room. He is `asleep` while the field
-  is empty, `listening` while there are bullets and while the answer is
-  checked, `sorry` when systemd-cryptsetup asks again (the same prompt right
-  after an answer; it sends no other sign of a wrong passphrase) and `happy`
-  for two seconds when systemd reports the `systemd-cryptsetup@` unit
-  started, which happens only once the disk unlocked. Boots without a prompt,
-  including the installation medium's, never show him. Plymouth's script
-  plugin draws images one pixel per logical pixel and enlarges them at double
-  scale, so he, like the logo, is drawn from a single-density picture (the
-  theme's `logo@2x.png` is not read by the script).
-- **Lock screen.** hyprlock shows pictures, not the shell's animation: Wiz
-  sleeps (`asleep`) right of the password field, his feet level with its
-  bottom edge, in the vendor lock screen and the one the system theme
-  renders, growing with the shell's text size like the field.
 - **Terminal.** Typing a plain `fastfetch` at fish's prompt in kitty shows Wiz
   (`idle`, 9 rows high) through kitty's graphics protocol. The default
   fastfetch config's logo is `$CYBEXOS_FASTFETCH_LOGO`, else the braille
@@ -72,13 +55,33 @@ He never speaks, and the boot logo stays the Cybex mark.
   no arguments and `NO_COLOR` is unset. Where fastfetch cannot draw a picture
   it would print the file as text, so other terminals, tmux, ssh, pipes and
   `command fastfetch` keep the braille logo.
+- **Disk unlock and lock screen.** Neither shows Wiz (removed in November
+  2026). Plymouth's passphrase field sits 40 pixels under the logo, and
+  hyprlock shows the clock, the date and the centred password field.
 
 `checks.x86_64-linux.plymouth-unlock` unlocks a LUKS volume in a real
 systemd initrd through the packaged theme with a wrong and then the right
-passphrase, and shows it at double scale; `checks.x86_64-linux.lock-terminal`
-locks a signed-in desktop with both lock screens and runs fastfetch in kitty.
-Both take screenshots for review; they are VM qualification, not of physical
-displays.
+passphrase, and shows it at double scale, checking that nothing is drawn
+between the logo and the field; `checks.x86_64-linux.lock-terminal` locks a
+signed-in desktop with both lock screens, checks that no picture is beside
+the field, and runs fastfetch in kitty. Both take screenshots for review;
+they are VM qualification, not of physical displays.
+
+### The Control Center button and the prompt icon
+
+The Control Center button starts the bar's left column, in its top-left
+corner before the launcher, and its drawer opens on that side. Settings ->
+Bar & Control Center -> Control Center -> Button icon chooses its icon: the
+Cybex OS mark (the default), the operating system's logo (NixOS), or any Nerd
+Font icon, searched by name in `desktop/quickshell/assets/nerd-icons`
+(regenerate with `scripts/update-nerd-icons` when Nixpkgs moves to a new
+Nerd Fonts release). The fish prompt shows the same icon: the shell writes it
+to `~/.local/state/cybexos/prompt-icon`, which fish reads with builtins before
+each prompt. The Cybex OS mark reaches terminals through Cybex OS Symbols, a
+one-glyph font built from the brand's monochrome symbol at U+1000CB
+(`scripts/build-symbols-font.py`, `nix/packages/symbols-font.nix`). Choosing
+the operating system, or turning off "Use in terminal prompt", leaves the
+prompt its own per-distribution icon, so a Distrobox shows its distribution.
 
 The graphical and terminal installers, timezone map, password dialog and
 brand controls use blue with charcoal text. New desktop preferences, the

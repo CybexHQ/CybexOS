@@ -164,10 +164,16 @@ test("menubar icons keep bright system ink and shared monochrome brands", () => 
     assert.equal((bar.match(/idleColor:\s*Theme\.barIcon/g) || []).length, 1,
         "the launcher keeps the shared resting icon tone");
     const control = read("Bar/Modules/Control.qml");
+    const controlGlyph = read("Bar/ControlIconGlyph.qml");
     assert.match(control,
-        /BarChip\s*\{[\s\S]{0,220}?panelName:\s*"control"[\s\S]{0,700}?name:\s*"cybexos"/,
-        "the Control Center widget must use Cybex OS's bundled vector");
-    assert.match(control, /BarBrandIcon\s*\{[\s\S]{0,180}?name:\s*"cybexos"/);
+        /BarChip\s*\{[\s\S]{0,220}?panelName:\s*"control"[\s\S]{0,700}?ControlIconGlyph\s*\{/,
+        "the Control Center widget draws its chosen icon");
+    // The default Cybex OS mark is the bundled vector; a Nerd Font icon
+    // takes the same resting and hover ink as the bar's other marks.
+    assert.match(controlGlyph, /BarBrandIcon\s*\{[\s\S]{0,180}?name:\s*"cybexos"/);
+    assert.match(controlGlyph, /property color idleColor:\s*Theme\.barIcon/);
+    assert.match(controlGlyph, /property color hoverColor:\s*Theme\.barTextHi/);
+    assert.match(controlGlyph, /color: root\.highlighted \? root\.hoverColor : root\.idleColor/);
     assert.match(control,
         /highlighted:\s*controlButton\.held \|\| controlButton\.hovered/);
     assert.doesNotMatch(updates, /idleColor:|rebootRecommended/,

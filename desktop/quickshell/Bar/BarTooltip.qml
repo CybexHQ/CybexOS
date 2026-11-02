@@ -1,5 +1,6 @@
 import QtQuick
 import "../Common"
+import "../Common/BarGeometry.js" as BarGeometry
 
 // The hover tip under a bar module: the same glass a panel is made of, at
 // panel density, so it reads as a very small popover rather than a system
@@ -19,6 +20,22 @@ Item {
     // read the one answer.
     required property PointerCheck check
     readonly property bool activeHover: check.over
+    // Sideways shift that keeps the tip 8 px inside the bar's window, so a
+    // module at either end of the bar never loses half its label. Callers
+    // place the tip as they like; this only moves it back on screen.
+    readonly property int edgeMargin: 8
+    property real nudge: 0
+
+    function keepOnScreen() {
+        const window = root.Window.window;
+        if (!window || !root.parent) {
+            nudge = 0;
+            return;
+        }
+        const left = root.parent.mapToItem(null, root.x, 0).x;
+        nudge = BarGeometry.tooltipNudge(left, root.width, window.width, edgeMargin);
+    }
+    onWidthChanged: if (ready) keepOnScreen()
 
     width: tip.implicitWidth
     height: tip.implicitHeight
@@ -31,6 +48,7 @@ Item {
     // Rises the last few pixels into place as it fades in — the same
     // vocabulary as a panel arriving, at a tenth of the distance.
     transform: [
+        Translate { x: root.nudge },
         Translate {
             y: root.ready ? 0 : (Settings.position === "bottom" ? 4 : -4)
 
@@ -79,7 +97,10 @@ Item {
     Timer {
         id: delay
         interval: 550
-        onTriggered: root.ready = root.activeHover
+        onTriggered: {
+            root.keepOnScreen();
+            root.ready = root.activeHover;
+        }
     }
 
     Rectangle {
