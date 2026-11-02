@@ -58,6 +58,7 @@ in pkgs.testers.runNixOSTest {
     machine.start()
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("display-manager.service")
+    machine.wait_for_unit("cybexos-lid-guard.service")
     # Fresh connections use Google, with one resolver shared by NM and VPNs.
     # The editable profile must survive restarts and retain an Automatic choice.
     machine.wait_for_unit("cybexos-network-defaults.service")
@@ -258,6 +259,9 @@ in pkgs.testers.runNixOSTest {
     machine.wait_until_succeeds("cybex update request " + update["requestId"] + " | python3 -c 'import json,sys; assert json.load(sys.stdin)[\"state\"] in (\"done\",\"failed\")'", timeout=900)
     prepared = json.loads(machine.succeed("runuser -u tester -- cybex update status"))
     assert prepared["state"] == "ready" and prepared["request"]["state"] == "done", prepared
+    staged = "/var/lib/cybexos/transactions/" + prepared["transaction"] + "/roots/system"
+    machine.succeed("test -e " + staged + "/etc/systemd/system/cybexos-lid-guard.service")
+    assert "cybexos-lid-guard.service" in json.loads(machine.succeed("cat " + staged + "/etc/cybexos/health-services.json"))["units"]
     assert prepared["progress"] is None and prepared["finishedAt"] >= prepared["operationStartedAt"], prepared
     machine.sleep(2)
     assert json.loads(machine.succeed("cybex update status"))["elapsedSeconds"] == prepared["elapsedSeconds"], prepared

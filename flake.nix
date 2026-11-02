@@ -140,6 +140,7 @@
         passwordless-sudo = import ./nix/tests/passwordless-sudo.nix { inherit pkgs module; };
         dictation = import ./nix/tests/dictation.nix { inherit pkgs module; };
         installer-power = import ./nix/tests/installer-power.nix { inherit pkgs; };
+        lid-guard = import ./nix/tests/lid-guard.nix { inherit pkgs; };
         # Settings -> Appearance -> Pointer: a download, Hyprland and the next login.
         pointer = import ./nix/tests/pointer.nix { inherit pkgs module; };
         # Wiz on the disk unlock screen, the lock screen and in kitty.

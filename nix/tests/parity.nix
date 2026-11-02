@@ -65,6 +65,10 @@ let
     firewall = { inherit (c.networking.firewall) enable allowedTCPPorts allowedUDPPorts allowedUDPPortRanges; };
     pam = map (name: c.security.pam.services.${name}.text) [ "login" "sddm" "cybexos-lock" "polkit-1" ];
     managedShell = c.systemd.user.services.quickshell.serviceConfig;
+    lidPolicy = {
+      settings = c.services.logind.settings.Login;
+      service = c.systemd.services.cybexos-lid-guard.serviceConfig;
+    };
     personalInit = c.systemd.user.services.cybexos-personal-init.serviceConfig;
     backup = c.systemd.user.services.cybexos-backup.serviceConfig;
     printing = map toString c.services.printing.drivers;
@@ -345,6 +349,13 @@ assert builtins.all keyWithPassword [ "sudo" "polkit-1" "cybexos-lock" ];
 assert pam.u2f.settings.nouserok == false;
 assert machine.config.security.sudo.wheelNeedsPassword;
 assert machine.config.networking.firewall.enable;
+assert machine.config.services.logind.settings.Login.HandleLidSwitch == "suspend";
+assert machine.config.services.logind.settings.Login.HandleLidSwitchExternalPower == "suspend";
+assert machine.config.services.logind.settings.Login.HandleLidSwitchDocked == "suspend";
+assert builtins.elem "cybexos-lid-guard.service" (health machine.config).units;
+assert builtins.elem "display-manager.service" machine.config.systemd.services.cybexos-lid-guard.before;
+assert installer.services.logind.settings.Login.HandleLidSwitch == "ignore";
+assert !(installer.systemd.services ? cybexos-lid-guard);
 assert machine.config.security.apparmor.enable;
 assert builtins.elem machine.config.system.path machine.config.systemd.user.services.quickshell.path;
 assert machine.config.systemd.user.services.quickshell.serviceConfig.ExecStopPost ==

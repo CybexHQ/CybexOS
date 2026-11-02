@@ -61,6 +61,7 @@ jobs:
       - run: nix build .#checks.x86_64-linux.vm -L
       - run: nix build .#checks.x86_64-linux.boot -L
       - run: nix build .#checks.x86_64-linux.firmware -L
+      - run: nix build .#checks.x86_64-linux.lid-guard -L
   image:
     runs-on: [self-hosted, linux, x64, cybexos-isolated]
     steps:
