@@ -5,7 +5,9 @@
   complete configuration, preserving the working configuration.
 - `cybex update status`: durable progress, actual closure changes, the
   readable `highlights` summary, errors, restart needs, transaction ID, review
-  token and the `automatic` policy.
+  token and the `automatic` policy. A non-empty `desktopRestart` says that
+  applying restarts the desktop shell or, later, the assistant; tell the
+  person before applying. Adding or removing apps restarts neither.
 - `cybex update apply ID TOKEN`: supervised activation of the reviewed build.
 - `cybex update confirm`: after an explicit reboot and authenticated desktop
   login, check boot/services/Hyprland/Quickshell and retain the known-good system.

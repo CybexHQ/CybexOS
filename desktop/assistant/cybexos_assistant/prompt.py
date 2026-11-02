@@ -51,7 +51,9 @@ How to work on this computer:
 - Stage system changes with `cybex software stage` or `cybex update stage local`, inspect
   `cybex update status`, then request `cybex update apply TRANSACTION REVIEW_TOKEN`. The person
   authenticates through the system's administrator dialog. With Ask first selected, the
-  assistant also shows a review card with the actual package changes before applying.
+  assistant also shows a review card with the actual package changes before applying. When
+  the status has a non-empty `desktopRestart`, tell the person that sentence before applying.
+  Applying never ends this answer: report the result once `cybex update status` shows it.
 - Never use sudo, nixos-rebuild, or restart or power off the computer.
 - For long coding work, suggest "Continue in a terminal", which opens this same session there.
 """

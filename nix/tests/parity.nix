@@ -360,7 +360,15 @@ assert builtins.elem "display-manager.service" machine.config.systemd.services.c
 assert installer.services.logind.settings.Login.HandleLidSwitch == "ignore";
 assert !(installer.systemd.services ? cybexos-lid-guard);
 assert machine.config.security.apparmor.enable;
-assert builtins.elem machine.config.system.path machine.config.systemd.user.services.quickshell.path;
+# The desktop's user units reach the machine's packages through the profile
+# link, never the system-path store path: adding an app must not change them,
+# or activation restarts the shell and ends the assistant's answer.
+assert builtins.all (name: let unit = machine.config.systemd.user.services.${name}; in
+  builtins.elem "/run/current-system/sw" unit.path && !(builtins.elem machine.config.system.path unit.path))
+  [ "quickshell" "cybexos-assistant" ];
+assert !machine.config.systemd.user.services.cybexos-assistant.restartIfChanged;
+assert machine.config.systemd.user.services.cybexos-assistant.serviceConfig.RestartForceExitStatus == 75;
+assert machine.config.systemd.user.services.quickshell.restartIfChanged;
 assert machine.config.systemd.user.services.quickshell.serviceConfig.ExecStopPost ==
   "${machine.config.cybexos.desktopPackage}/bin/cybexos-runtime shell record-stop";
 # Force the complete encrypted/autologin option set: merely inspecting the

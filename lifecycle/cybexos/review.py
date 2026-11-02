@@ -143,3 +143,49 @@ def highlights(package_changes, before, after, changes, entry=desktop_entry):
     names, size = closure(changes)
     return {'schema': 1, 'components': rows, 'apps': apps, 'tools': tools,
             'background': len(names - shown), 'sizeChange': size}
+
+
+# The desktop's own user units (nix/modules/desktop.nix). Activation restarts
+# a changed shell; the assistant is never restarted by it and renews itself
+# once idle. Adding or removing an app changes neither unit.
+SESSION_UNITS = (('desktop', 'quickshell.service'), ('assistant', 'cybexos-assistant.service'))
+SESSION_NOTICES = {
+    # Apps the shell started (launcher, dock, app shortcuts) run in its
+    # service and end with it (nix/tests/session-restarts.nix).
+    ('desktop', 'apply'): ('Applying this restarts the desktop shell: the screen goes blank for a moment, '
+                           'and apps opened from the launcher, the dock or app shortcuts close. Save your work first.'),
+    ('assistant', 'apply'): 'Applying this restarts the assistant, ending an answer in progress.',
+    ('assistant', 'idle'): ('The assistant keeps running through this change and restarts into its '
+                            'update once it has been idle for a few minutes, or at the next login.'),
+}
+
+
+def session_unit(read, system, unit):
+    """A user unit's text in a built system, or None when it has none."""
+    try:
+        return read(system + '/etc/systemd/user/' + unit)
+    except Failure:
+        return None
+
+
+def session_restarts(before, after):
+    """Which of the desktop's own services a change restarts, and when.
+
+    `before` and `after` map each unit name to its file in the running and
+    the built system (None when absent). The unit text is exactly what
+    switch-to-configuration compares; a unit only one system has is started
+    or stopped with its feature, not restarted.
+    """
+    rows = []
+    for role, unit in SESSION_UNITS:
+        old, new = before.get(unit), after.get(unit)
+        if old is None or new is None or old == new:
+            continue
+        deferred = any(line.strip() == 'X-RestartIfChanged=false' for line in new.splitlines())
+        rows.append({'id': role, 'unit': unit, 'when': 'idle' if deferred else 'apply'})
+    return rows
+
+
+def session_notice(rows):
+    """The sentence `cybex update status` shows before applying; empty when nothing restarts."""
+    return ' '.join(SESSION_NOTICES[(row['id'], row['when'])] for row in rows)

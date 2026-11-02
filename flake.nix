@@ -136,6 +136,8 @@
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
         firmware = import ./nix/tests/firmware.nix { inherit pkgs module; };
         hyprland-pointer = import ./nix/tests/hyprland-pointer.nix { inherit pkgs module; };
+        # Installing apps leaves the shell and the assistant running; their own changes still reach them.
+        session-restarts = import ./nix/tests/session-restarts.nix { inherit pkgs module; };
         # Settings -> Security -> Sudo without password: Polkit, the helper and real sudo.
         passwordless-sudo = import ./nix/tests/passwordless-sudo.nix { inherit pkgs module; };
         dictation = import ./nix/tests/dictation.nix { inherit pkgs module; };

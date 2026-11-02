@@ -187,7 +187,8 @@ class Engine:
             previous = {'schema': 1, 'startedAt': now, 'phase': '', 'error': '', 'notes': '',
                         'changes': '', 'packageChanges': [], 'highlights': None, 'reviewToken': None, 'inputs': {},
                         'recovery': '', 'retry': '', 'restart': '', 'requestId': None,
-                        'workerUnit': None, 'software': None, 'firmware': None, 'notPrebuilt': None}
+                        'workerUnit': None, 'software': None, 'firmware': None, 'notPrebuilt': None,
+                        'sessionRestarts': [], 'desktopRestart': ''}
         if (values.get('state', previous.get('state')) != previous.get('state')
                 or values.get('phase', previous.get('phase')) != previous.get('phase')):
             previous['phaseStartedAt'] = now
@@ -318,6 +319,13 @@ class Engine:
         except Failure:
             return {}
 
+    def session_restarts(self, previous, system):
+        """The desktop services applying `system` over `previous` restarts (review.session_restarts)."""
+        read = lambda path: self.run('cat', path, sensitive=True)  # noqa: E731
+        units = [unit for _, unit in review.SESSION_UNITS]
+        return review.session_restarts({unit: review.session_unit(read, previous, unit) for unit in units},
+                                       {unit: review.session_unit(read, system, unit) for unit in units})
+
     def root(self, path, name, tx):
         roots = tx / 'roots'
         roots.mkdir(exist_ok=True)
@@ -446,21 +454,24 @@ class Engine:
                     self.run('cat', system + '/etc/cybexos/software.json', sensitive=True))
                 highlights = review.highlights(package_changes, self.components(previous_system),
                                                self.components(system), changes)
+                session = self.session_restarts(previous_system, system)
                 atomic(tx / 'changes.txt', changes.encode())
                 record = {'id': identifier, 'scope': scope, 'system': system, 'previousSystem': previous_system,
                           'baseline': baseline, 'configDigest': config_digest(config), 'createdAt': int(time.time()),
                           'inputs': {name: inputs.identity(new, name) for name in ('nixpkgs', 'cybexos')},
                           'changeKind': kind, 'requestId': request_id, 'software': selections,
                           'packageChanges': package_changes, 'highlights': highlights,
-                          'firmware': device_firmware}
+                          'firmware': device_firmware, 'sessionRestarts': session}
                 record['reviewToken'] = hashlib.sha256((record['configDigest'] + changes + review.identity(package_changes)
-                                                        + review.identity(highlights) + review.identity(device_firmware)).encode()).hexdigest()
+                                                        + review.identity(highlights) + review.identity(device_firmware)
+                                                        + review.identity(session)).encode()).hexdigest()
                 atomic(tx / 'deployment.json', record)
                 self.status(state='ready', phase='Built and checked; review changes before applying',
                             changes=changes, packageChanges=package_changes, highlights=highlights, firmware=device_firmware,
                             reviewToken=record['reviewToken'], inputs=record['inputs'],
                             installedVersion=read(self.release)['version'], availableVersion=candidate['version'] if candidate else read(self.release)['version'],
                             notes=candidate['notes'] if candidate else '', software=selections,
+                            sessionRestarts=session, desktopRestart=review.session_notice(session),
                             restart='Reboot may be required; no reboot is automatic.')
                 # A failed preview must not spend explicit retry permission.
                 for authorization in retry_authorizations:

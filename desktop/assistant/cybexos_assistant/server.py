@@ -17,6 +17,11 @@ Everything a turn changed is recorded in the change log (changes.py), so it
 can be undone from the reply or from Settings later. The desktop tools
 (desktop.py, served to the agents by mcp.py) arrive here as `desktop.call`;
 the ones only the desktop can carry out go to the shell as `desktop.request`.
+
+Activation never restarts this service (nix/modules/desktop.nix), so an update
+the assistant applies cannot end the answer that reports it. When an update
+changes the service's own unit, it restarts itself into the new one once it
+has been idle for a while (`renewable`), and otherwise at the next login.
 """
 
 from __future__ import annotations
@@ -66,6 +71,13 @@ SHELL_TIMEOUT = 30.0
 SHELL_SLOW_TIMEOUT = 180.0
 FLATHUB_TIMEOUT = 900.0
 ROUTINE_TICK = 30.0
+# Renewal after an update changed this service's unit: how often to look, how
+# long nothing must have run first, and the exit status systemd answers with
+# a start of the new unit (RestartForceExitStatus in nix/modules/desktop.nix).
+UNIT = "/etc/systemd/user/cybexos-assistant.service"
+RENEW_TICK = 5.0
+RENEW_QUIET = 120.0
+RENEW_EXIT = 75
 WALLHAVEN = "https://wallhaven.cc/api/v1"
 
 
@@ -121,6 +133,15 @@ class Client:
             self.writer.close()
 
 
+def unit_identity(path):
+    """The store file the user unit resolves to. NixOS links each unit to its
+    own store path, so the identity changes exactly when its text does."""
+    try:
+        return os.path.realpath(path, strict=True)
+    except (OSError, ValueError):
+        return None
+
+
 class Lane:
     """One question in progress at most, its agents and its conversation."""
 
@@ -172,6 +193,12 @@ class Server:
         self.listener = None
         self.scheduler = None
         self.closing = False
+        # The unit this process runs, and when a question last started or ended.
+        self.unit_path = self.env.get("CYBEXOS_ASSISTANT_UNIT") or UNIT
+        self.unit = unit_identity(self.unit_path)
+        self.quiet_since = time.monotonic()
+        self.stopping = None
+        self.renewing = False
         self.methods = {
             "hello": self.hello, "turn.start": self.turn_start, "turn.stop": self.turn_stop,
             "approval.respond": self.approval_respond, "turn.undo": self.turn_undo,
@@ -521,6 +548,7 @@ class Server:
         status = policy.read_json(self.status_path)
         lane.turn = turn
         lane.active = record
+        self.quiet_since = time.monotonic()
         self.history.begin(record, turn)
         lane.task = asyncio.create_task(self._run(lane, turn, record, text, images, model, context, notes,
                                                   plugins, status, requested))
@@ -571,6 +599,7 @@ class Server:
 
     def _settle(self, lane, turn, record, plugins, status):
         """What a finished turn left behind, and what runs next."""
+        self.quiet_since = time.monotonic()
         recorded = []
         if not turn.look_only:
             turn.snapshots.finish()
@@ -973,6 +1002,37 @@ class Server:
                 LOG.exception("routine scheduling failed")
             await asyncio.sleep(ROUTINE_TICK)
 
+    # ---- renewal after an update -------------------------------------------------
+
+    def outdated(self):
+        """An update replaced this service's unit since it started."""
+        current = unit_identity(self.unit_path)
+        return self.unit is not None and current is not None and current != self.unit
+
+    def renewable(self):
+        """A restart now loses nothing the person is using: no question runs
+        or waits, nothing is spoken, the last answer has had time to be read
+        (the main lane's is kept across the restart, see save), and
+        conversations are kept on disk rather than only for this session."""
+        return (not any(lane.busy() for lane in self.lanes.values())
+                and self.queue is None and not self.waiting_routines and not self.desktop_pending
+                and not self.auth_lock.locked() and not self.speaker.speaking
+                and history_module.retention(policy.read_json(self.settings_path)) != "session"
+                and time.monotonic() - self.quiet_since >= RENEW_QUIET)
+
+    async def _renew(self):
+        while not self.closing:
+            await asyncio.sleep(RENEW_TICK)
+            try:
+                if self.outdated() and self.renewable():
+                    LOG.info("the assistant service was updated; restarting into it")
+                    self.renewing = True
+                    if self.stopping is not None:
+                        self.stopping.set()
+                    return
+            except Exception:
+                LOG.exception("renewal check failed")
+
     # ---- desktop tools -----------------------------------------------------------
 
     async def desktop_call(self, params):
@@ -1337,12 +1397,17 @@ class Server:
             task.cancel()
 
     async def serve(self):
+        """Runs until stopped; RENEW_EXIT asks systemd to start the updated unit."""
         await self.start()
-        stop = asyncio.Event()
+        self.stopping = asyncio.Event()
         loop = asyncio.get_running_loop()
         for number in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(number, stop.set)
+            loop.add_signal_handler(number, self.stopping.set)
+        renewal = self._spawn(self._renew()) if self.unit is not None else None
         LOG.info("listening on %s", self.socket_path)
-        await stop.wait()
+        await self.stopping.wait()
+        if renewal is not None:
+            renewal.cancel()
         await self.shutdown()
+        return RENEW_EXIT if self.renewing else 0
 

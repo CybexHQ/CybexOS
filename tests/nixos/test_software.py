@@ -37,6 +37,46 @@ class SoftwareTests(unittest.TestCase):
         self.assertEqual(read(self.working / 'local/software.json')['packages'], [])
         self.assertEqual((self.working / 'flake.lock').read_bytes(), locked)
 
+    def stage_with_units(self, before, after):
+        """Stage an app with the running and built systems' desktop user units."""
+        self.prepare_machine()
+        original = self.engine.run
+        def run(*args, **kwargs):
+            if args[0] == 'cat' and '/etc/systemd/user/' in str(args[1]):
+                units = after if str(args[1]).startswith(lifecycle.NEW_SYSTEM) else before
+                text = units.get(str(args[1]).rsplit('/', 1)[1])
+                if text is None:
+                    raise CommandFailure('cat', 1)
+                return text
+            return original(*args, **kwargs)
+        self.engine.run = run
+        record = self.engine.stage('local', software={'packages':['hello'], 'previous':[]})
+        return record, read(self.engine.status_path)
+
+    def test_status_warns_before_applying_only_when_a_desktop_service_restarts(self):
+        shell = '[Service]\nEnvironment="PATH=/run/current-system/sw/bin"\nExecStart=/nix/store/a-desktop/bin/x\n'
+        assistant = '[Service]\nX-RestartIfChanged=false\nExecStart=/nix/store/a-assistant/bin/y serve\n'
+        units = {'quickshell.service': shell, 'cybexos-assistant.service': assistant}
+        # Adding an app changes neither unit: nothing restarts.
+        record, status = self.stage_with_units(units, dict(units))
+        self.assertEqual((record['sessionRestarts'], status['sessionRestarts'], status['desktopRestart']), ([], [], ''))
+        token = record['reviewToken']
+        # The desktop itself changed: activation restarts the shell.
+        changed = dict(units, **{'quickshell.service': shell.replace('a-desktop', 'b-desktop')})
+        record, status = self.stage_with_units(units, changed)
+        self.assertEqual(status['sessionRestarts'], [{'id': 'desktop', 'unit': 'quickshell.service', 'when': 'apply'}])
+        self.assertIn('restarts the desktop shell', status['desktopRestart'])
+        self.assertNotEqual(record['reviewToken'], token)
+        # The assistant changed: it is never restarted by activation.
+        changed = dict(units, **{'cybexos-assistant.service': assistant.replace('a-assistant', 'b-assistant')})
+        _, status = self.stage_with_units(units, changed)
+        self.assertEqual(status['sessionRestarts'], [{'id': 'assistant', 'unit': 'cybexos-assistant.service', 'when': 'idle'}])
+        self.assertIn('idle', status['desktopRestart'])
+        self.assertNotIn('desktop shell', status['desktopRestart'])
+        # Turning the assistant on or off starts or stops it; it is no restart.
+        _, status = self.stage_with_units({'quickshell.service': shell}, units)
+        self.assertEqual((status['sessionRestarts'], status['desktopRestart']), ([], ''))
+
     def test_stale_choices_unknown_schemas_and_expression_injection_are_rejected(self):
         self.prepare_machine()
         baseline = config_digest(self.working)

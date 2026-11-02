@@ -209,7 +209,9 @@ class GameMode(unittest.TestCase):
         # Shared packaged helpers are immutable executables on the managed PATH.
         package = (ROOT / "nix/packages/desktop.nix").read_text()
         self.assertIn("cp assets/scripts/* $out/bin/", package)
-        self.assertIn("config.system.path", (ROOT / "nix/modules/desktop.nix").read_text())
+        module = (ROOT / "nix/modules/desktop.nix").read_text()
+        self.assertIn('sessionPath = "/run/current-system/sw";', module)
+        self.assertIn("path = [ sessionPath ];", module)
 
 
 if __name__ == "__main__":

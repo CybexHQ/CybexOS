@@ -297,7 +297,38 @@ PAM files for password login, the greeter and the encryption-gated automatic
 login, and the `cybexos-session` script it starts (not that script's
 desktop-environment wrapper, which names each release's packages). Activation
 does not restart the login screen, so only a boot shows that a changed one still
-works. Every other change keeps the trial boot. To keep releases that leave
+works. Every other change keeps the trial boot.
+
+### Desktop services during activation
+
+Adding or removing apps never restarts the desktop. The shell
+(`quickshell.service`) and the assistant (`cybexos-assistant.service`) find
+the machine's packages through `/run/current-system/sw/bin`, which activation
+moves, rather than through the `system-path` store path, which names every
+installed app. Their unit files, the only thing switch-to-configuration
+compares, therefore stay the same, and a new app is on their `PATH` at once.
+
+A change to either service itself still reaches it:
+
+- The shell restarts during activation; the screen goes blank for a moment.
+  Apps the shell started (the launcher, the dock and app shortcuts all start
+  them through Quickshell) run inside `quickshell.service` and close with it.
+- Activation never restarts the assistant (`X-RestartIfChanged=false`), so an
+  update it applies for the person cannot end the answer that reports it.
+  Once its unit has changed, the service restarts itself into the new one
+  after nothing has run for two minutes: no question running or waiting, no
+  waiting routine, nothing being spoken. It exits with status 75, which the
+  unit maps to a restart (`RestartForceExitStatus`). With conversations kept
+  only for the session (`assistantHistory: "session"`) it waits for the next
+  login instead, so the restart never discards them. The last answer is kept
+  across the restart. "Always in this conversation" answers are not, so the
+  next tool use asks again.
+
+Preparing a change compares both units between the running and the built
+system. `cybex update status` reports the result before anything is applied:
+`sessionRestarts` lists `{id, unit, when}` (`when` is `apply` or `idle`), and
+`desktopRestart` is the sentence to show the person, empty when nothing
+restarts. Both are part of the review token. To keep releases that leave
 these alone restart-free, the boot splash and the automatic-login encryption
 check are packages named without the release version, and the session file
 starts `/run/current-system/sw/bin/cybexos-session`;

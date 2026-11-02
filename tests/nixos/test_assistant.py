@@ -1267,6 +1267,78 @@ class ServeTest(unittest.IsolatedAsyncioTestCase):
             harness.cleanup()
 
 
+class RenewalTest(unittest.IsolatedAsyncioTestCase):
+    """After an update changed its unit, the service restarts itself only once
+    nothing is running and the last answer has had time to be read."""
+
+    async def asyncSetUp(self):
+        self.harness = Harness()
+        self.units = self.harness.root / "units"
+        self.units.mkdir()
+        for name in ("old", "new"):
+            (self.units / name).write_text(f"[Service]\nExecStart={name}\n")
+        self.link = self.units / "cybexos-assistant.service"
+        self.link.symlink_to(self.units / "old")
+        self.harness.env["CYBEXOS_ASSISTANT_UNIT"] = str(self.link)
+        for name, value in (("RENEW_TICK", 0.05), ("RENEW_QUIET", 1.0)):
+            patcher = patch(f"cybexos_assistant.server.{name}", value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.server = Server(self.harness.socket, self.harness.state, home=self.harness.home, env=self.harness.env)
+        self.serving = asyncio.create_task(self.server.serve())
+        for _ in range(500):
+            if self.harness.socket.exists():
+                break
+            await asyncio.sleep(0.01)
+        self.client = await Client().open(self.harness.socket)
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        if not self.serving.done():
+            self.server.stopping.set()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(self.serving, 10)
+        self.harness.cleanup()
+
+    def update(self):
+        self.link.unlink()
+        self.link.symlink_to(self.units / "new")
+
+    async def test_an_update_waits_for_the_running_answer_then_restarts_into_the_new_unit(self):
+        await asyncio.sleep(1.3)
+        self.assertFalse(self.serving.done(), "an unchanged unit never restarts")
+        started = await self.client.result("turn.start", {"text": "hang", "agent": "claude"})
+        self.update()
+        await asyncio.sleep(1.3)
+        self.assertFalse(self.serving.done(), "a running answer is never ended")
+        self.assertTrue(self.server.outdated())
+        await self.client.result("turn.stop")
+        await self.client.finished()
+        await asyncio.sleep(0.4)
+        self.assertFalse(self.serving.done(), "the answer stays readable for a while")
+        self.assertEqual(await asyncio.wait_for(self.serving, 5), 75)
+        self.assertFalse(self.harness.socket.exists())
+        # The last answer is kept for the box after the restart.
+        state = json.loads((self.harness.state / "state.json").read_text())
+        self.assertEqual(state["turn"]["id"], started["turn"]["id"])
+        self.assertEqual(state["turn"]["status"], "stopped")
+
+    async def test_session_only_history_keeps_the_service_until_the_next_login(self):
+        path = self.harness.home / ".config/cybexos/shell.json"
+        path.write_text(json.dumps({"assistantHistory": "session"}))
+        self.update()
+        await asyncio.sleep(1.5)
+        self.assertFalse(self.serving.done())
+        self.assertTrue(self.server.outdated() and not self.server.renewable())
+        path.write_text(json.dumps({"assistantHistory": "month"}))
+        self.assertEqual(await asyncio.wait_for(self.serving, 5), 75)
+
+    async def test_stopping_the_service_is_an_ordinary_exit(self):
+        self.update()
+        self.server.stopping.set()
+        self.assertEqual(await asyncio.wait_for(self.serving, 5), 0)
+
+
 class SpeechTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.harness = Harness()

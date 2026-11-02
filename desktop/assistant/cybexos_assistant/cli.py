@@ -137,8 +137,7 @@ def main(argv=None):
         from .server import Server
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
         os.umask(0o077)
-        asyncio.run(Server(path, args.state_dir).serve())
-        return 0
+        return asyncio.run(Server(path, args.state_dir).serve())
     try:
         if args.command == "status":
             return asyncio.run(status(path))

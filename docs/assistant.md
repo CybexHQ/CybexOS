@@ -375,7 +375,11 @@ the shortcut and the service; nothing in `shell.json` is lost.
 - `desktop/assistant/cybexos_assistant/` — the `cybexos-assistant` service, a
   user unit (`cybexos-assistant.service`). It owns the agent processes so a
   Quickshell restart, including one caused by the assistant's own changes,
-  does not end a turn. Only the standard library is used.
+  does not end a turn. Activation never restarts the service itself: after
+  an update changed its unit it restarts into the new one once idle, or at
+  the next login when conversations are kept only for the session
+  ([Updates](updates.md#desktop-services-during-activation)). Only the
+  standard library is used.
   - `server.py` — the socket and the session state.
   - `auth.py` — bounded, output-discarding `claude auth status` and
     `codex login status` checks. No prompt or model request checks sign-in.

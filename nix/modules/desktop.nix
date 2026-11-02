@@ -29,6 +29,9 @@ let cfg = config.cybexos;
       in lib.optional (!(theme.bundled or false) && path.success && path.value != null)
         { name = theme.package; value = builtins.unsafeDiscardStringContext path.value; })
       pointerCatalogue.themes);
+    # The running system's packages for the desktop's user units, through the
+    # profile link that activation moves (see quickshell.service).
+    sessionPath = "/run/current-system/sw";
     pointerDefaultSize = builtins.tryEval (lib.toInt (toString (config.environment.sessionVariables.XCURSOR_SIZE or "24")));
 in {
   config = lib.mkIf cfg.enable {
@@ -144,9 +147,13 @@ in {
       partOf = [ "hyprland-session.target" ];
       wantedBy = [ "hyprland-session.target" ];
       # User units do not inherit a login shell's system-profile PATH. The
-      # Include the machine's selected packages so personal widgets can invoke
-      # locally declared tools as well as the bundled desktop helpers.
-      path = [ config.system.path ];
+      # machine's selected packages are on it, so personal widgets can invoke
+      # locally declared tools as well as the bundled desktop helpers. Through
+      # the stable profile link, not config.system.path: that store path
+      # names every installed app, so adding or removing one would change
+      # this unit and make switch-to-configuration restart the desktop.
+      # The link follows activation, so new apps are found right away.
+      path = [ sessionPath ];
       serviceConfig = {
         ExecStart = "${cfg.desktopPackage}/bin/cybexos-runtime exec quickshell";
         ExecStopPost = "${cfg.desktopPackage}/bin/cybexos-runtime shell record-stop";
@@ -218,11 +225,18 @@ in {
     systemd.user.services.cybexos-assistant = lib.mkIf cfg.features.assistant {
       description = "Cybex OS Assistant agent service";
       partOf = [ "hyprland-session.target" ]; wantedBy = [ "hyprland-session.target" ];
-      path = [ config.system.path ];
+      path = [ sessionPath ];
+      # An update the assistant applies for the person must not end the
+      # answer that reports it. Activation never restarts this service: once
+      # its own unit has changed, the service restarts itself after it has
+      # been idle for a while (server.py: renewal), or at the next login.
+      restartIfChanged = false;
       serviceConfig = {
         ExecStart = "${assistant}/bin/cybexos-assistant serve";
         UMask = "0077";
         Restart = "on-failure"; RestartSec = 2;
+        # The idle self-restart into the new unit (cybexos_assistant.server.RENEW_EXIT).
+        RestartForceExitStatus = 75; SuccessExitStatus = 75;
         TimeoutStopSec = 10;
       };
       environment.PYTHONDONTWRITEBYTECODE = "1";
