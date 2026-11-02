@@ -7,7 +7,7 @@ let
   # and haptics. The XPS 13 DX13260 is 0E53 on Wildcat Lake, 0E54 on Panther Lake.
   xps14or16 = lib.elem xps.sku [ "0DB9" "0DBA" ];
   # Quirks measured on one exact SKU and panel EDID (docs/hardware-compatibility.md).
-  xpsPsrOff = xps.sku == "0DB9" && xps.panel == "30e4c607";
+  xps14LgOled = xps.sku == "0DB9" && xps.panel == "30e4c607";
   camera = pkgs.callPackage ../packages/ipu7.nix { inherit (config.boot.kernelPackages) kernel kernelModuleMakeFlags; };
   lpmd = pkgs.callPackage ../packages/intel-lpmd.nix {};
   micmuteLed = pkgs.writeShellApplication {
@@ -120,7 +120,7 @@ in {
       { assertion = xps.camera -> xps14or16; message = "The processed XPS camera stack is reviewed for the XPS 14/16 (0DB9/0DBA) only."; }
     ];
     boot.kernelParams = lib.optional (xps14or16 && lib.hasPrefix "30e4" xps.panel) "xe.enable_dpcd_backlight=1"
-      ++ lib.optional xpsPsrOff "xe.enable_psr=0"
+      ++ lib.optional xps14LgOled "xe.enable_psr=0"
       # Stock equivalents of Dell's display quirks for the XPS 13, which are
       # not upstream (docs/laptop-support.md). Panther Lake: Panel
       # Replay and PSR2 stutter and corrupt the panel, so keep PSR1 only.
@@ -151,7 +151,7 @@ in {
     # retrain power-cycles the panel for 1.2 s under the display lock, freezing
     # the whole desktop. Xe has no parameter for LOBF, only this debugfs switch;
     # set it before the display manager's first modeset (docs/hardware-compatibility.md).
-    systemd.services.xps-panel-link = lib.mkIf xpsPsrOff {
+    systemd.services.xps-panel-link = lib.mkIf xps14LgOled {
       description = "Keep the XPS panel link on between frames";
       wantedBy = [ "multi-user.target" ];
       before = [ "display-manager.service" ];
@@ -167,6 +167,12 @@ in {
         done
         [ "$found" = 1 ] || { echo "The internal panel's LOBF control is missing." >&2; exit 1; }
       '';
+    };
+    # Trial workaround: display ioctls can exhaust RTKit's 200 ms real-time
+    # CPU budget and kill Hyprland. See the XPS 14 display investigation in
+    # docs/laptop-support.md. Keep personal scheduling preferences overridable.
+    environment.sessionVariables = lib.mkIf xps14LgOled {
+      HYPRLAND_NO_RT = lib.mkDefault "1";
     };
     # PPD owns user-selected profiles. Adaptive thermald supplies the separate
     # firmware/DPTF thermal protection; do not run a competing profile manager.

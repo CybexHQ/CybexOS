@@ -102,12 +102,16 @@ let
       cybexos.hardware.xps = { enable = true; sku = "0DB9"; camera = true; };
     } ];
   }).config;
-  # The LG OLED panel (EDID 30e4c607) on SKU 0DB9: PSR off, and LOBF with it.
-  xpsPanel = (nixpkgs.lib.nixosSystem {
+  # The measured LG OLED panel (EDID 30e4c607) on SKU 0DB9.
+  xpsPanelSystem = nixpkgs.lib.nixosSystem {
     inherit system;
     modules = [ module ./machine.nix {
       cybexos.hardware.xps = { enable = true; sku = "0DB9"; panel = "30e4c607"; };
     } ];
+  };
+  xpsPanel = xpsPanelSystem.config;
+  xpsPanelPreference = (xpsPanelSystem.extendModules {
+    modules = [ { environment.sessionVariables.HYPRLAND_NO_RT = "0"; } ];
   }).config;
   laptop = hardware: (nixpkgs.lib.nixosSystem {
     inherit system;
@@ -116,6 +120,8 @@ let
   # XPS 13 DX13260: Panther Lake (0E54) and Wildcat Lake (0E53).
   xps13 = laptop { xps = { enable = true; sku = "0E54"; panel = "30e4abcd"; }; };
   xps13Wcl = laptop { xps = { enable = true; sku = "0E53"; }; };
+  xps16LgOled = laptop { xps = { enable = true; sku = "0DBA"; panel = "30e4c607"; }; };
+  xpsPanelDisabled = laptop { xps = { sku = "0DB9"; panel = "30e4c607"; }; };
   zbook = laptop { zbookUltraG1a.enable = true; };
   zbookSmartPc = laptop { zbookUltraG1a = { enable = true; smartPc = true; }; };
   secureBoot = (nixpkgs.lib.nixosSystem {
@@ -411,6 +417,12 @@ assert (health xps).reportedUserUnits == [ "xps-speaker-tuning.service" ];
 assert builtins.elem "xe.enable_psr=0" xpsPanel.boot.kernelParams && !(builtins.elem "xe.enable_psr=0" xps.boot.kernelParams);
 assert xpsPanel.systemd.services ? xps-panel-link && !(xps.systemd.services ? xps-panel-link);
 assert builtins.elem "display-manager.service" xpsPanel.systemd.services.xps-panel-link.before;
+# Only the measured XPS 14 OLED defaults out of real-time scheduling, and
+# an ordinary personal definition takes precedence over the vendor default.
+assert xpsPanel.environment.sessionVariables.HYPRLAND_NO_RT == "1";
+assert xpsPanelPreference.environment.sessionVariables.HYPRLAND_NO_RT == "0";
+assert builtins.all (c: !(c.environment.sessionVariables ? HYPRLAND_NO_RT))
+  [ generic installer xps xps13 xps13Wcl xps16LgOled xpsPanelDisabled zbook ];
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.Type == "oneshot";
 assert xps.systemd.services.xps-ipu7-abi.serviceConfig.RemainAfterExit;
 assert builtins.elem "xps-ipu7-abi.service" xps.systemd.services.v4l2-relayd-ipu7.requires;

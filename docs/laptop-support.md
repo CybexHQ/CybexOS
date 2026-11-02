@@ -48,6 +48,11 @@ the x86_64 image.
 | Camera | Processed IPU7 stack, still blocked (below). | Not enabled; not reviewed for this model. |
 | Wi-Fi | Intel BE211 with the stock driver and firmware, plus the wireless regulatory database (all machines). | Intel BE213 (Wildcat Lake), the same. |
 
+The exact XPS 14 `0DB9` / `30e4c607` profile also defaults to
+`HYPRLAND_NO_RT=1` as a trial workaround for display hotplug terminating the
+session. See the [display investigation](#xps-14-display-investigation-2026-11-02)
+for evidence and qualification limits.
+
 ### Why each XPS quirk exists
 
 - **XPS 14/16 speakers and the camera share a GPIO.** The camera's vision
@@ -134,6 +139,69 @@ the x86_64 image.
 - **XPS 16 OLED.** It shares the XPS 14's panel controller, but its PSR
   behaviour has not been measured. Add its EDID to the PSR/LOBF quirk only after
   measuring it.
+
+### XPS 14 display investigation (2026-11-02)
+
+These observations are from one XPS 14 DA14260, SKU `0DB9`, LG OLED EDID
+`30e4c607`, Intel Arc B390 (`xe`), BIOS 1.12.0, Linux 7.3.1, Hyprland
+0.57.0 and Aquamarine 0.15.1. The external monitor was an Apple Studio
+Display XDR at 5120x2880/120 Hz; the internal panel ran at 2880x1800/120 Hz.
+The machine's personal module kept the monitor's redundant second tile off
+the boot console with `video=DP-2:d`; that connector-specific choice remains
+machine-owned.
+
+**Hotplug session termination.** Connecting the monitor ended the session
+with exit status 137 and returned to SDDM. No Hyprland core, GPU reset or
+out-of-memory event was recorded. The subsequent PipeWire core showed its
+X11 connection disappearing. The replacement Hyprland session used
+`SCHED_RR`, priority 1, with `RLIMIT_RTTIME` soft/hard limits of
+150,000/200,000 microseconds. The kernel had
+`CONFIG_POSIX_CPU_TIMERS_TASK_WORK=y`. This matches the mechanism discussed
+in [Hyprland 16648](https://github.com/hyprwm/Hyprland/discussions/16648),
+including a report with the same GPU, panel resolution and compositor
+version; the exact killing syscall was not captured on this laptop.
+
+The profile defaults `HYPRLAND_NO_RT=1` for this exact SKU/panel pair.
+An ordinary personal declaration can override it. The running compositor
+was separately demoted to normal scheduling, with no real-time threads
+remaining. An equivalent personal startup declaration passed the actual
+`cybex update stage local` and supervised activation/desktop health checks.
+Reboot/login confirmation and a hotplug trial after the scheduling change
+were still pending. This branch's source is not a physically qualified
+release. Upstream's proposed broader fix is
+[Hyprland 16737](https://github.com/hyprwm/Hyprland/pull/16737).
+
+**Internal-panel flicker remains unresolved.** The panel was already steady
+after booting without the monitor, before changing scheduling. It remained
+steady after reconnecting the monitor and signing in following the session
+termination, with both panels at 120 Hz and charging from the monitor.
+Earlier unplugging alone had left the flicker present. A read-only comparison
+recovered these measurements from the flickering boot and the steady boot:
+
+| Measurement | Flickering | Steady |
+| --- | --- | --- |
+| Reported maximum brightness | 65,535 | 512 |
+| Full capability block at `0x700` | Identical, starts `06 bf 06 54` | Identical |
+| Backlight-mode byte at `0x721` | `0x02` | `0x82` |
+
+Only bit 7 differed in the captured control block at `0x720`:
+`DP_EDP_PANEL_LUMINANCE_CONTROL_ENABLE` was clear during flicker and set
+while steady. Both boots used `xe.enable_dpcd_backlight=1`, PSR disabled and
+LOBF disabled. The comparison points toward inconsistent brightness
+initialization; causality was not tested by changing that bit. The failing
+boot's initial cached capabilities and selected backlight callbacks were
+not recorded, so later identical live capability reads cannot explain the
+initial selection. See the
+[kernel definitions](https://github.com/gregkh/linux/blob/v7.3.1/include/drm/display/drm_dp.h)
+and the related boot-dependent brightness report,
+[Omarchy 11646](https://github.com/omacom/omarchy/issues/11646).
+
+Linux 7.4-rc1 includes an
+[eDP wake-before-capability-probe change](https://github.com/torvalds/linux/commit/908f1be9c34392d858c5159851421a3b9b954a17)
+absent from 7.3.1. It is a candidate for this class of initialization
+problem, not a verified fix for these measurements. A future failing boot
+needs its initial capability probe and backlight selection captured. The
+earlier external blackouts during closed-lid use also remain unqualified.
 
 ## HP ZBook Ultra G1a
 
