@@ -122,6 +122,12 @@
 
 ## Build and test artifact cleanup
 
+- Always clean up when you complete a task, without waiting to be asked.
+  This covers everything the task created: mockups, review screenshots and
+  previews (in `/data/tmp`, `/tmp` or elsewhere), preview servers, temporary
+  git worktrees and their branches once merged, VMs, leases and builds.
+  A mockup or review artifact kept for the user's review is removed as soon
+  as the work it shows is implemented, committed or abandoned.
 - Clean up disposable artifacts created during your task before final handoff,
   including failed/retried image builds, test ISOs, VM disks, extracted root
   filesystems, temporary logs, and screenshots. This includes outputs outside
