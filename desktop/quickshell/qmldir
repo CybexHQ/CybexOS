@@ -9,6 +9,8 @@ LauncherWindow LauncherWindow.qml
 NotificationToasts NotificationToasts.qml
 NetworkOverlayWindow NetworkOverlayWindow.qml
 OsdWindow OsdWindow.qml
+DictationPill DictationPill.qml
+DictationOffer DictationOffer.qml
 ShortcutsOverlay ShortcutsOverlay.qml
 SettingsWindow SettingsWindow.qml
 PolkitPrompt PolkitPrompt.qml

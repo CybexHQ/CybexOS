@@ -128,12 +128,9 @@ BarModule {
     function tooltipFor(id) {
         switch (id) {
         case "dictation":
-            return Dictation.recording ? "Stop dictation"
+            return Dictation.recording ? "Stop dictation · F9"
                 : Dictation.transcribing ? "Cancel transcription"
-                : "Dictate in " + Settings.modOpts.indicators.dictationPrimaryLanguage
-                    + (Settings.modOpts.indicators.dictationSecondaryLanguage === "off"
-                        ? "" : " · middle click "
-                            + Settings.modOpts.indicators.dictationSecondaryLanguage);
+                : "Dictate · F9";
         case "recording":
             if (Recorder.scrolling && !Recorder.active)
                 return "Finish scrolling screenshot · Enter";
@@ -166,9 +163,7 @@ BarModule {
     function trigger(id, button, mouseButton) {
         switch (id) {
         case "dictation":
-            Dictation.toggle(mouseButton === Qt.MiddleButton
-                ? Settings.modOpts.indicators.dictationSecondaryLanguage
-                : Settings.modOpts.indicators.dictationPrimaryLanguage);
+            Dictation.toggle();
             break;
         case "recording":
             if (Recorder.scrolling && !Recorder.active)

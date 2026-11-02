@@ -1,0 +1,433 @@
+diff --git a/src/config/language.rs b/src/config/language.rs
+index e3aca1d..ef4738a 100644
+--- a/src/config/language.rs
++++ b/src/config/language.rs
+@@ -25,8 +25,17 @@ impl Default for LanguageConfig {
+ 
+ impl LanguageConfig {
+     /// Convert to a vector of language codes
++    ///
++    /// A single string may itself be a comma-separated list: that is what
++    /// `voxtype config set whisper.language en,fr` writes, and the schema
++    /// documents it as constraining auto-detection like an array does.
+     pub fn as_vec(&self) -> Vec<String> {
+         match self {
++            LanguageConfig::Single(s) if s.contains(',') => s
++                .split(',')
++                .map(|p| p.trim().to_string())
++                .filter(|p| !p.is_empty())
++                .collect(),
+             LanguageConfig::Single(s) => vec![s.clone()],
+             LanguageConfig::Multiple(v) => v.clone(),
+         }
+@@ -39,13 +48,13 @@ impl LanguageConfig {
+ 
+     /// Check if multiple languages are configured (constrained auto-detection)
+     pub fn is_multiple(&self) -> bool {
+-        matches!(self, LanguageConfig::Multiple(v) if v.len() > 1)
++        self.as_vec().len() > 1
+     }
+ 
+     /// Get the first/primary language (used for fallback or single-language mode)
+     pub fn primary(&self) -> &str {
+         match self {
+-            LanguageConfig::Single(s) => s,
++            LanguageConfig::Single(s) => s.split(',').next().map(str::trim).unwrap_or("en"),
+             LanguageConfig::Multiple(v) => v.first().map(|s| s.as_str()).unwrap_or("en"),
+         }
+     }
+@@ -72,6 +81,16 @@ mod tests {
+     use crate::config::WhisperConfig;
+     use serde::Deserialize;
+ 
++    #[test]
++    fn a_comma_separated_string_constrains_detection_like_an_array() {
++        let written = LanguageConfig::Single("en, nl".to_string());
++        assert!(written.is_multiple());
++        assert!(!written.is_auto());
++        assert_eq!(written.as_vec(), vec!["en".to_string(), "nl".to_string()]);
++        assert_eq!(written.primary(), "en");
++        assert!(!LanguageConfig::Single("en".to_string()).is_multiple());
++    }
++
+     #[test]
+     fn test_language_config_single() {
+         let toml_str = r#"
+diff --git a/src/config/root.rs b/src/config/root.rs
+index 3525480..b2758b7 100644
+--- a/src/config/root.rs
++++ b/src/config/root.rs
+@@ -407,8 +407,10 @@ impl Config {
+     pub fn active_language(&self) -> Option<&str> {
+         let code = match self.engine {
+             TranscriptionEngine::Whisper => match &self.whisper.language {
++                // A constrained detection set is not one language, whether
++                // written as an array or a comma-separated string.
++                language if language.is_multiple() => return None,
+                 super::language::LanguageConfig::Single(code) => code.as_str(),
+-                // A constrained detection set is not one language.
+                 super::language::LanguageConfig::Multiple(_) => return None,
+             },
+             TranscriptionEngine::Cohere => self.cohere.as_ref().map(|c| c.language.as_str())?,
+diff --git a/src/daemon.rs b/src/daemon.rs
+index f17f7b5..01ad766 100644
+--- a/src/daemon.rs
++++ b/src/daemon.rs
+@@ -853,6 +853,43 @@ fn write_result_sidecar(transcript: &std::path::Path, outcome: &TranscriptOutcom
+     }
+ }
+ 
++/// Path of the live preview for a streamed transcript.
++///
++/// A file-output streaming session types nothing while it runs, so this
++/// sibling carries the running text (committed segments plus the current
++/// partial) for a client that draws its own dictation UI.
++pub fn live_preview_path(transcript: &std::path::Path) -> std::path::PathBuf {
++    let mut live = transcript.as_os_str().to_os_string();
++    live.push(".live");
++    std::path::PathBuf::from(live)
++}
++
++/// Replace the live preview atomically, so a reader never sees half a write.
++fn write_live_preview(transcript: &std::path::Path, text: &str) {
++    let live = live_preview_path(transcript);
++    let staged = temp_sibling(&live);
++    if std::fs::write(&staged, text).is_err() {
++        let _ = std::fs::remove_file(&staged);
++        return;
++    }
++    if std::fs::rename(&staged, &live).is_err() {
++        let _ = std::fs::remove_file(&staged);
++    }
++}
++
++/// Publish a file-output streaming session's running text.
++fn publish_live_preview(state: &State, session: &StreamingSession) {
++    if let State::Streaming {
++        file_output_path: Some(path),
++        ..
++    } = state
++    {
++        let mut text = session.finalized_text().to_string();
++        text.push_str(session.partial());
++        write_live_preview(path, &text);
++    }
++}
++
+ /// Sibling temporary path used to stage an atomic transcript write.
+ ///
+ /// Kept in the same directory as the target so the rename stays within one
+@@ -1868,6 +1905,9 @@ impl Daemon {
+             // text, same as the batch path does before writing (#669).
+             let final_text = self.text_processor.process(&final_text);
+ 
++            let _ = std::fs::remove_file(live_preview_path(&output_path));
++            // Like the batch path, say how the recording ended so a waiting
++            // client (`record stop --wait`) need not fall back to its timeout.
+             match self.deliver_file_output(&output_path, &final_text).await {
+                 FileDelivery::Written => {
+                     let mode_str = match self.config.output.file_mode {
+@@ -1876,9 +1916,27 @@ impl Daemon {
+                     };
+                     tracing::info!("{} streamed transcription to {:?}", mode_str, output_path);
+                     self.play_feedback(SoundEvent::TranscriptionComplete);
++                    let outcome = if final_text.trim().is_empty() {
++                        TranscriptOutcome::empty()
++                    } else {
++                        TranscriptOutcome::ok(final_text.chars().count())
++                    };
++                    write_result_sidecar(&output_path, &outcome);
++                }
++                FileDelivery::FellBack(_) => {
++                    self.play_feedback(SoundEvent::TranscriptionComplete);
++                    write_result_sidecar(
++                        &output_path,
++                        &TranscriptOutcome::error("the transcript was copied to the clipboard instead"),
++                    );
++                }
++                FileDelivery::Lost(_) => {
++                    self.play_feedback(SoundEvent::Error);
++                    write_result_sidecar(
++                        &output_path,
++                        &TranscriptOutcome::error("the transcript could not be written"),
++                    );
+                 }
+-                FileDelivery::FellBack(_) => self.play_feedback(SoundEvent::TranscriptionComplete),
+-                FileDelivery::Lost(_) => self.play_feedback(SoundEvent::Error),
+             }
+ 
+             *state = State::Idle;
+@@ -2096,8 +2154,12 @@ impl Daemon {
+             Ok(mut capture) => match capture.start().await {
+                 Ok(chunk_rx) => {
+                     // Bounded; backed-up streaming backend drops chunks
+-                    // rather than back-pressuring the capture.
+-                    let (streaming_tx, streaming_rx) = tokio::sync::mpsc::channel::<Vec<f32>>(64);
++                    // rather than back-pressuring the capture. Room for
++                    // well over a minute of audio: a sliding-window pass
++                    // that takes seconds (Whisper on a CPU) must not lose
++                    // the words spoken meanwhile, which the final flush
++                    // then transcribes.
++                    let (streaming_tx, streaming_rx) = tokio::sync::mpsc::channel::<Vec<f32>>(8192);
+ 
+                     if let Some(handle) = self.level_emitter_task.take() {
+                         handle.abort();
+@@ -4802,6 +4864,7 @@ impl Daemon {
+                             if let Some(s) = streaming_session.as_mut() {
+                                 if file_output {
+                                     s.observe_partial_delta(&text);
++                                    publish_live_preview(&state, s);
+                                 } else if let Some(chain) = streaming_chain.as_ref() {
+                                     if let Err(e) = s.type_partial_delta(
+                                         chain,
+@@ -4825,6 +4888,7 @@ impl Daemon {
+                                     // in end_streaming — that also catches
+                                     // matches spanning segment boundaries.
+                                     s.commit_segment_silent(&text);
++                                    publish_live_preview(&state, s);
+                                 } else if let Some(chain) = streaming_chain.as_ref() {
+                                     if let Err(e) = s.commit_segment(
+                                         chain,
+@@ -4849,6 +4913,7 @@ impl Daemon {
+                                 if file_output {
+                                     // Raw on purpose — see the Final arm.
+                                     s.replace_and_commit_silent(backspace, &text);
++                                    publish_live_preview(&state, s);
+                                 } else if let Some(chain) = streaming_chain.as_ref() {
+                                     if let Err(e) = s.replace_and_commit(
+                                         chain,
+@@ -4868,6 +4933,19 @@ impl Daemon {
+                                 }
+                             }
+                         }
++                        Some(StreamingEvent::Whole { text }) => {
++                            // Only a session that typed nothing can take it.
++                            if file_output {
++                                if let Some(s) = streaming_session.as_mut() {
++                                    s.replace_whole_silent(&text);
++                                    publish_live_preview(&state, s);
++                                    if let State::Streaming { finalized_text, .. } = &mut state {
++                                        finalized_text.clear();
++                                        finalized_text.push_str(s.finalized_text());
++                                    }
++                                }
++                            }
++                        }
+                         Some(StreamingEvent::Error(err)) => {
+                             tracing::error!("Streaming backend error: {}", err);
+                             send_notification(
+@@ -5570,6 +5648,31 @@ mod tests {
+         assert_eq!(fs::read_to_string(&target).unwrap().trim_end(), "second");
+     }
+ 
++    #[test]
++    fn live_preview_sits_beside_the_transcript() {
++        assert_eq!(
++            live_preview_path(std::path::Path::new("/run/user/1000/x/dictation.txt")),
++            std::path::PathBuf::from("/run/user/1000/x/dictation.txt.live")
++        );
++    }
++
++    #[test]
++    fn live_preview_is_replaced_whole() {
++        let dir = TempDir::new().unwrap();
++        let transcript = dir.path().join("dictation.txt");
++        write_live_preview(&transcript, "hello");
++        write_live_preview(&transcript, "hello world");
++        assert_eq!(
++            fs::read_to_string(live_preview_path(&transcript)).unwrap(),
++            "hello world"
++        );
++        let names: Vec<_> = fs::read_dir(dir.path())
++            .unwrap()
++            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
++            .collect();
++        assert_eq!(names, vec!["dictation.txt.live".to_string()], "no staged file is left");
++    }
++
+     #[test]
+     fn sidecar_sits_beside_the_transcript() {
+         assert_eq!(
+diff --git a/src/output/streaming.rs b/src/output/streaming.rs
+index 1f44999..4ab614c 100644
+--- a/src/output/streaming.rs
++++ b/src/output/streaming.rs
+@@ -143,6 +143,13 @@ impl StreamingSession {
+         self.partial.push_str(new_partial);
+     }
+ 
++    /// File-output sessions: take a backend's whole-recording transcript
++    /// (`StreamingEvent::Whole`) in place of the streamed commits.
++    pub fn replace_whole_silent(&mut self, text: &str) {
++        self.finalized_text = text.to_string();
++        self.partial.clear();
++    }
++
+     /// Current partial buffer.
+     pub fn partial(&self) -> &str {
+         &self.partial
+diff --git a/src/transcribe/sliding_window.rs b/src/transcribe/sliding_window.rs
+index 162e306..e599c6d 100644
+--- a/src/transcribe/sliding_window.rs
++++ b/src/transcribe/sliding_window.rs
+@@ -280,14 +280,20 @@ impl StreamingTranscriber for SlidingWindowStreamingTranscriber {
+             }
+ 
+             loop {
++                // Biased: audio that queued up while a slow tick ran is all
++                // taken in before the next tick. Unbiased, a tick (always
++                // ready after a long inference) won about half the draws, so
++                // a backlog drained one chunk per inference: minutes after
++                // stop on a machine where a pass takes seconds.
+                 let outcome = runtime.block_on(async {
+                     tokio::select! {
++                        biased;
++                        _ = &mut cancel_rx => Outcome::Cancelled,
+                         chunk = samples_rx.recv() => match chunk {
+                             Some(c) => Outcome::Chunk(c),
+                             None => Outcome::Eof,
+                         },
+                         _ = ticker.tick() => Outcome::Tick,
+-                        _ = &mut cancel_rx => Outcome::Cancelled,
+                     }
+                 });
+ 
+@@ -304,6 +310,9 @@ impl StreamingTranscriber for SlidingWindowStreamingTranscriber {
+                             let event = delta_to_event(tail, config.type_partials);
+                             let _ = runtime.block_on(events_tx.send(event));
+                         }
++                        if let Some(text) = session.whole_transcript.take() {
++                            let _ = runtime.block_on(events_tx.send(StreamingEvent::Whole { text }));
++                        }
+                         let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
+                         return Ok(());
+                     }
+@@ -372,6 +381,9 @@ struct Session {
+     /// on a later tick. Empty and unused when `config.revision_mode` is
+     /// false. See the module doc's "Revision mode" section.
+     provisional_words: Vec<String>,
++    /// The final pass over the whole recording, kept by `final_flush` while
++    /// the buffer never slid (it still holds every sample).
++    whole_transcript: Option<String>,
+ }
+ 
+ impl Session {
+@@ -381,6 +393,7 @@ impl Session {
+             config,
+             buffer: Vec::new(),
+             sliding: false,
++            whole_transcript: None,
+             full_text_parts: Vec::new(),
+             prev_whisper: String::new(),
+             last_words: Vec::new(),
+@@ -681,6 +694,9 @@ impl Session {
+             Ok(Some(t)) => t,
+             _ => return None,
+         };
++        if !self.sliding {
++            self.whole_transcript = Some(final_text.trim().to_string());
++        }
+ 
+         if self.config.revision_mode {
+             // Unlike `on_tick`, there is no next tick to wait for: this is
+@@ -1400,6 +1416,69 @@ mod tests {
+         }
+     }
+ 
++    /// Records how often, and on how much audio, it was asked to transcribe.
++    struct SlowTranscriber {
++        calls: std::sync::Mutex<Vec<usize>>,
++    }
++
++    impl Transcriber for SlowTranscriber {
++        fn transcribe(&self, samples: &[f32]) -> Result<String, TranscribeError> {
++            std::thread::sleep(Duration::from_millis(150));
++            self.calls.lock().unwrap().push(samples.len());
++            Ok("alpha beta gamma delta".to_string())
++        }
++    }
++
++    #[tokio::test]
++    async fn a_recording_that_never_slid_ends_with_its_whole_transcript() {
++        let events = run_session(streaming_config()).await;
++        let whole: Vec<&str> = events
++            .iter()
++            .filter_map(|ev| match ev {
++                StreamingEvent::Whole { text } => Some(text.as_str()),
++                _ => None,
++            })
++            .collect();
++        assert_eq!(whole, vec!["alpha beta gamma delta"]);
++        assert!(matches!(events.last(), Some(StreamingEvent::Ended)));
++        assert!(matches!(events[events.len() - 2], StreamingEvent::Whole { .. }));
++    }
++
++    #[test]
++    fn a_slid_buffer_has_no_whole_transcript() {
++        let mut session = Session::new(Arc::new(FakeTranscriber), streaming_config());
++        session.feed(&loud_samples(3.0));
++        session.sliding = true;
++        session.final_flush();
++        assert_eq!(session.whole_transcript, None);
++    }
++
++    #[tokio::test]
++    async fn queued_audio_is_taken_in_before_a_tick_and_flushed_whole() {
++        let slow = Arc::new(SlowTranscriber {
++            calls: Default::default(),
++        });
++        let transcriber: Arc<dyn Transcriber> = slow.clone();
++        let engine = SlidingWindowStreamingTranscriber::new(transcriber, streaming_config());
++        let (tx, rx) = mpsc::channel::<Vec<f32>>(1024);
++        // Three seconds in 10 ms chunks, queued as they would be behind a
++        // slow inference, then the end of the recording.
++        for _ in 0..300 {
++            tx.send(loud_samples(0.01)).await.unwrap();
++        }
++        let mut handle = engine.start_stream(rx).expect("start stream");
++        drop(tx);
++        while let Some(ev) = handle.events.recv().await {
++            if matches!(ev, StreamingEvent::Ended) {
++                break;
++            }
++        }
++        handle.task.await.unwrap().expect("task ok");
++        let calls = slow.calls.lock().unwrap().clone();
++        assert_eq!(calls.last().copied(), Some(48_000), "the flush hears everything: {calls:?}");
++        assert!(calls.len() <= 2, "no tick per queued chunk: {calls:?}");
++    }
++
+     fn loud_samples(secs: f32) -> Vec<f32> {
+         let n = (secs * 16_000.0) as usize;
+         // 0.05 amplitude tone-ish samples — above MIN_SPEECH_RMS.
+diff --git a/src/transcribe/soniox.rs b/src/transcribe/soniox.rs
+index b9f7018..6dc9a36 100644
+--- a/src/transcribe/soniox.rs
++++ b/src/transcribe/soniox.rs
+@@ -1434,6 +1434,7 @@ mod tests {
+                 StreamingEvent::Replace {
+                     backspace, text, ..
+                 } => ("Replace", format!("-{}+{}", backspace, text)),
++                StreamingEvent::Whole { text } => ("Whole", text.clone()),
+                 StreamingEvent::Ended => ("Ended", String::new()),
+                 StreamingEvent::Error(e) => ("Error", e.to_string()),
+             })
+diff --git a/src/transcribe/streaming.rs b/src/transcribe/streaming.rs
+index 2207145..e81ec0c 100644
+--- a/src/transcribe/streaming.rs
++++ b/src/transcribe/streaming.rs
+@@ -84,6 +84,14 @@ pub enum StreamingEvent {
+         segment_id: SegmentId,
+     },
+ 
++    /// The whole recording's transcript, from one pass over all of it,
++    /// sent before `Ended` by a backend that still held every sample when
++    /// the recording ended. It is the authoritative text for a session
++    /// that types nothing as it goes (file output): one pass with full
++    /// context beats the streamed commits, which cannot take back a word.
++    /// A session that typed as it went has nothing to do with it.
++    Whole { text: String },
++
+     /// The backend has finished processing all audio sent so far and is
+     /// closing the stream gracefully (e.g., the daemon dropped the
+     /// samples sender and the backend has flushed).

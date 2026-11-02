@@ -135,6 +135,8 @@ Singleton {
     // A tap on the microphone latches it; a held key or press does not.
     property bool voiceLatched: false
     property bool sendAfterTranscript: false
+    // The recording ended without a stop from here (see onStateChanged).
+    property bool endedByDaemon: false
     property double listenStartedAt: 0
     readonly property string transcriptPath: scratchDir + "/voice.txt"
 
@@ -971,16 +973,16 @@ Singleton {
         if (!voiceAvailable || listening || transcribing || busy)
             return;
         listening = true;
+        endedByDaemon = false;
         voiceLatched = latched === true;
         listenStartedAt = Date.now();
         notice = "";
-        const options = Settings.modOpts.indicators;
         // Removing the previous transcript first is what makes the next read
-        // this recording's words.
+        // this recording's words. The model and languages are dictation's,
+        // in Voxtype's configuration (Dictation applies Settings there).
         Quickshell.execDetached(["sh", "-c",
-            'mkdir -p -m 0700 "$1" && rm -f -- "$2" && exec voxtype --model "$3" --language "$4" record start --file="$2"',
-            "sh", scratchDir, transcriptPath, options.dictationModel,
-            options.dictationPrimaryLanguage]);
+            'mkdir -p -m 0700 "$1" && rm -f -- "$2" "$2.done" "$2.live" && exec voxtype record start --file="$2"',
+            "sh", scratchDir, transcriptPath]);
         Dictation.refresh();
         transcriptTimeout.stop();
     }
@@ -1032,10 +1034,15 @@ Singleton {
                 transcript.reload();
             } else if (root.listening && Dictation.state === "idle"
                     && Date.now() - root.listenStartedAt > 1500) {
-                // The daemon dropped the recording (a device error, or Voxtype
-                // restarting); there is nothing to wait for.
+                // A live recording that Voxtype ended at its length limit goes
+                // straight back to idle with its words on disk; a dropped one
+                // (a device error, or Voxtype restarting) leaves none.
                 root.listening = false;
-                root.notice = I18n.tr("The microphone stopped. Try again.");
+                root.voiceLatched = false;
+                root.transcribing = true;
+                root.sendAfterTranscript = false;
+                root.endedByDaemon = true;
+                transcript.reload();
             }
         }
     }
@@ -1065,8 +1072,10 @@ Singleton {
         transcribing = false;
         transcriptTimeout.stop();
         Quickshell.execDetached(["rm", "-f", "--", transcriptPath]);
+        const dropped = endedByDaemon;
+        endedByDaemon = false;
         if (words === "") {
-            notice = I18n.tr("Nothing was heard.");
+            notice = dropped ? I18n.tr("The microphone stopped. Try again.") : I18n.tr("Nothing was heard.");
             return;
         }
         draft = draft.trim() === "" ? words : draft.trim() + " " + words;

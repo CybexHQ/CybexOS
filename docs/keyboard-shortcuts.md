@@ -19,6 +19,10 @@ tap opens his box to ask something else meanwhile. `Super+Shift+I`
 (**Shell: Ask the assistant about the selection**) opens the box with the
 selected text attached. See [Cybex OS Assistant](assistant.md).
 
+`F9` or `Super+Ctrl+X` (**Dictation: Start or stop dictation**) dictates into
+the focused window: your words appear while you speak and are typed when you
+press it again. See [Dictation](dictation.md).
+
 `Super+Tab` (**Windows: Overview**) opens the window overview: every
 workspace's windows as live thumbnails, with arrow-key, filter and
 drag-to-move controls. See [Window overview, dock and top processes](overview-and-dock.md).

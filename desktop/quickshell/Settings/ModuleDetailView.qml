@@ -493,38 +493,111 @@ SettingsPage {
             }
 
             SettingsGroup {
+                id: dictationGroup
                 visible: Dictation.available
                 width: parent.width
                 title: I18n.tr("Dictation")
 
-                SettingsTextRow {
+                readonly property var languageChoices: SettingsHelpers.DICTATION_LANGUAGES.map(
+                    code => ({value: code, label: I18n.localeName(code)}))
+                readonly property string sizeText: Math.round(Dictation.enhancedSize / 1048576) + " MB"
+                readonly property bool downloading: Dictation.download === "running"
+
+                SelectRow {
                     width: parent.width
-                    label: I18n.tr("Primary language")
-                    value: view.opts.dictationPrimaryLanguage
-                    placeholder: I18n.tr("en, nl, auto, or a comma-separated list")
+                    label: I18n.tr("Language")
+                    model: dictationGroup.languageChoices
+                    current: view.opts.dictationPrimaryLanguage
                     dirty: view.optDirty("dictationPrimaryLanguage")
-                    onCommitted: text => view.setOpt("dictationPrimaryLanguage", text)
+                    onPicked: value => view.setOpt("dictationPrimaryLanguage", value)
                     onResetRequested: view.resetOpt("dictationPrimaryLanguage")
                 }
 
-                SettingsTextRow {
+                SelectRow {
                     width: parent.width
-                    label: I18n.tr("Alternate language")
-                    value: view.opts.dictationSecondaryLanguage
-                    placeholder: I18n.tr("Middle click · use off to disable")
+                    label: I18n.tr("Second language")
+                    model: [{value: "off", label: I18n.tr("None")}].concat(dictationGroup.languageChoices
+                        .filter(choice => choice.value !== view.opts.dictationPrimaryLanguage))
+                    current: view.opts.dictationSecondaryLanguage
                     dirty: view.optDirty("dictationSecondaryLanguage")
-                    onCommitted: text => view.setOpt("dictationSecondaryLanguage", text)
+                    hint: view.opts.dictationSecondaryLanguage === "off" ? ""
+                        : I18n.tr("Dictation recognises which of your two languages you speak.")
+                    onPicked: value => view.setOpt("dictationSecondaryLanguage", value)
                     onResetRequested: view.resetOpt("dictationSecondaryLanguage")
                 }
 
                 PickerRow {
                     width: parent.width
-                    label: I18n.tr("Model")
-                    model: SettingsHelpers.DICTATION_MODEL_CHOICES
+                    label: I18n.tr("Speech model")
+                    model: [
+                        { value: "base", label: I18n.tr("Standard") },
+                        { value: "large-v3-turbo", label: I18n.tr("Enhanced") }
+                    ]
                     current: view.opts.dictationModel
                     dirty: view.optDirty("dictationModel")
-                    onPicked: value => view.setOpt("dictationModel", value)
+                    hint: dictationGroup.downloading
+                        ? I18n.format(I18n.tr("Downloading the enhanced model… %1%"), [Dictation.downloadProgress])
+                        : Dictation.download === "failed"
+                            ? (Dictation.downloadError === "space"
+                                ? I18n.tr("There is not enough free disk space for the enhanced model.")
+                                : Dictation.downloadError === "checksum"
+                                    ? I18n.tr("The downloaded model did not match. Nothing was installed.")
+                                    : I18n.tr("The download did not finish. Check your connection and try again."))
+                        : view.opts.dictationModel === "large-v3-turbo"
+                            ? I18n.format(I18n.tr("Much more accurate, especially for names and other languages. Uses %1 on this computer."), [dictationGroup.sizeText])
+                            : Dictation.enhancedInstalled
+                                ? I18n.tr("Built in and fast. The enhanced model is downloaded and ready.")
+                                : I18n.format(I18n.tr("Built in and fast. The enhanced model is a %1 download."), [dictationGroup.sizeText])
+                    hintTone: Dictation.download === "failed" ? "error" : "info"
+                    onPicked: value => Dictation.useModel(value)
                     onResetRequested: view.resetOpt("dictationModel")
+                }
+
+                ActionRow {
+                    width: parent.width
+                    visible: dictationGroup.downloading || Dictation.enhancedInstalled
+                        || Dictation.download === "failed"
+
+                    SettingsAction {
+                        visible: dictationGroup.downloading
+                        text: I18n.tr("Cancel download")
+                        glyph: "close"
+                        onTriggered: Dictation.cancelDownload()
+                    }
+
+                    SettingsAction {
+                        visible: Dictation.download === "failed"
+                        text: I18n.tr("Try again")
+                        glyph: "download"
+                        onTriggered: Dictation.downloadEnhanced()
+                    }
+
+                    SettingsAction {
+                        visible: Dictation.enhancedInstalled && !dictationGroup.downloading
+                        text: I18n.tr("Remove enhanced model")
+                        danger: true
+                        onTriggered: Dictation.removeEnhanced()
+                    }
+                }
+
+                SwitchRow {
+                    width: parent.width
+                    label: I18n.tr("Live text")
+                    description: I18n.tr("Show your words while you speak. Keeps the speech model loaded, which uses more memory.")
+                    checked: view.opts.dictationLiveText
+                    dirty: view.optDirty("dictationLiveText")
+                    onToggled: value => view.setOpt("dictationLiveText", value)
+                    onResetRequested: view.resetOpt("dictationLiveText")
+                }
+
+                SettingsTextRow {
+                    width: parent.width
+                    label: I18n.tr("Vocabulary")
+                    value: view.opts.dictationVocabulary
+                    placeholder: I18n.tr("Names and terms, separated by commas")
+                    dirty: view.optDirty("dictationVocabulary")
+                    onCommitted: text => view.setOpt("dictationVocabulary", text)
+                    onResetRequested: view.resetOpt("dictationVocabulary")
                 }
             }
 

@@ -100,13 +100,13 @@ bind(mainMod .. " + Y", hl.dsp.exec_cmd(web_app("youtube")), { description = "We
 bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd(web_app("google-photos")),
   { description = "Web apps: Google Photos" }, "webapps.google-photos")
 bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd(web_app("x")), { description = "Web apps: X" }, "webapps.x")
+-- Dictation's model and languages are in Settings (docs/dictation.md); with a
+-- second language set, Whisper recognises which of the two you speak.
 if features.developer_tools then
-  bind(mainMod .. " + CTRL + X", hl.dsp.exec_cmd("voxtype --model base --language en record toggle"),
-    { description = "Dictation: Dictate in English" }, "dictation.dictate-in-english")
-  bind("F9", hl.dsp.exec_cmd("voxtype --model base --language en record toggle"),
-    { description = "Dictation: Dictate in English" }, "dictation.dictate-in-english")
-  bind("SHIFT + F9", hl.dsp.exec_cmd("voxtype --model base --language nl record toggle"),
-    { description = "Dictation: Dictate in Dutch" }, "dictation.dictate-in-dutch")
+  bind(mainMod .. " + CTRL + X", hl.dsp.global("quickshell:dictationToggle"),
+    { description = "Dictation: Start or stop dictation" }, "dictation.toggle")
+  bind("F9", hl.dsp.global("quickshell:dictationToggle"),
+    { description = "Dictation: Start or stop dictation" }, "dictation.toggle")
 end
 
 bind(mainMod .. " + C", function() send_shortcut_once("CTRL", "Insert") end, { description = "Clipboard: Copy" }, "clipboard.copy")
@@ -243,10 +243,9 @@ bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightness-control down 5"),
   { locked = true, repeating = true, description = "Hardware keys: Brightness down" }, "hardware.brightness-down")
 bind("XF86AudioMute", hl.dsp.exec_cmd(volumeMute), { locked = true, description = "Hardware keys: Mute audio" }, "hardware.mute-audio")
 if features.developer_tools then
-  bind("XF86AudioMicMute", hl.dsp.exec_cmd("voxtype --model base --language en record toggle"),
-    { locked = true, description = "Dictation: Dictate in English" }, "dictation.dictate-in-english")
-  bind("SHIFT + XF86AudioMicMute", hl.dsp.exec_cmd("voxtype --model base --language nl record toggle"),
-    { locked = true, description = "Dictation: Dictate in Dutch" }, "dictation.dictate-in-dutch")
+  -- Not on the lock screen: the words would be typed into its password field.
+  bind("XF86AudioMicMute", hl.dsp.global("quickshell:dictationToggle"),
+    { description = "Dictation: Start or stop dictation" }, "dictation.toggle")
 else
   bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
     { locked = true, description = "Hardware keys: Mute microphone" }, "hardware.mute-microphone")

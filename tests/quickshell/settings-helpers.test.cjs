@@ -127,7 +127,7 @@ test("defaults carry the design values", () => {
         idleMode: d.modOpts.indicators.idleDefaultMode,
         idleRemaining: d.modOpts.indicators.idleShowRemaining
     }, {
-        primary: "en", secondary: "nl", model: "base",
+        primary: "en", secondary: "off", model: "base",
         recording: "region", elapsed: true,
         reminderDisplay: "icon", reminderClick: "list", reminderMinutes: 15,
         nightStartup: "remember", dndStartup: "remember", dndMode: "always",
@@ -347,7 +347,7 @@ test("normalizeModOpts clamps, snaps, and validates option values", () => {
     assert.equal(next.indicators.idleDefaultMode, "always");
     assert.equal(next.indicators.idleShowRemaining, false);
     const configuredIndicators = H.normalizeModOpts({ indicators: {
-        enabled: [], dictationPrimaryLanguage: "en,nl", dictationSecondaryLanguage: "de-de",
+        enabled: [], dictationPrimaryLanguage: "nl", dictationSecondaryLanguage: "de",
         dictationModel: "large-v3-turbo", recordingMode: "window",
         recordingShowElapsed: false, reminderDisplay: "count",
         reminderClick: "quick-add", reminderMinutes: 60,
@@ -371,9 +371,23 @@ test("normalizeModOpts clamps, snaps, and validates option values", () => {
         configuredIndicators.idleStartup,
         configuredIndicators.idleDefaultMode,
         configuredIndicators.idleShowRemaining
-    ], ["en,nl", "de-de", "large-v3-turbo", "window", false, "count",
+    ], ["nl", "de", "large-v3-turbo", "window", false, "count",
         "quick-add", 60, "on", "off", "quiet-boundary", "remember",
         "unplugged", true]);
+    // One language each: lists, regional tags and "auto" were free text once.
+    for (const [primary, secondary] of [["en,nl", "de-de"], ["auto", "nl,de"], ["EN", "Nl"]]) {
+        const languages = H.normalizeModOpts({ indicators: {
+            dictationPrimaryLanguage: primary, dictationSecondaryLanguage: secondary } }).indicators;
+        assert.deepEqual([languages.dictationPrimaryLanguage, languages.dictationSecondaryLanguage],
+            ["en", "off"], `${primary} / ${secondary}`);
+    }
+    const vocabulary = H.normalizeModOpts({ indicators: {
+        dictationVocabulary: "Cybex,\n\tHyprland  Wiz", dictationLiveText: "yes", dictationPrompted: 1 } }).indicators;
+    assert.equal(vocabulary.dictationVocabulary, "Cybex, Hyprland Wiz");
+    assert.equal(vocabulary.dictationLiveText, true);
+    assert.equal(vocabulary.dictationPrompted, false);
+    assert.equal(H.normalizeModOpts({ indicators: { dictationVocabulary: "x".repeat(401) } })
+        .indicators.dictationVocabulary, "");
     assert.equal(next.clock.showEvents, true, "non-boolean falls back to default");
     assert.equal(next.clock.daysAhead, 31);
     assert.equal(next.clock.pollMins, 5);

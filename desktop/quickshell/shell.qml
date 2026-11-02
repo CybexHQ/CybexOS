@@ -76,6 +76,41 @@ ShellRoot {
         onPressed: Assistant.askAboutSelection()
     }
 
+    // F9 and Super+Ctrl+X, in-process like the launcher: start or stop a
+    // dictation (docs/dictation.md).
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "dictationToggle"
+        description: I18n.tr("Start or stop dictation")
+        onPressed: Dictation.toggle()
+    }
+
+    // Scripts and tests drive dictation as the shortcut does.
+    IpcHandler {
+        target: "dictation"
+        function toggle(): void { Dictation.toggle(); }
+        function start(): void { Dictation.start(); }
+        function stop(): void { Dictation.stop(); }
+        function cancel(): void { Dictation.cancel(); }
+        // The enhanced-model offer the first typed dictation shows.
+        function offer(): void { Dictation.showOffer(); }
+        function dismissOffer(): void { Dictation.dismissOffer(); }
+        // As Settings sets them: a second language code or "off", the model
+        // ("base", or "large-v3-turbo", which downloads it first) and live text.
+        function language(code: string): void { Dictation.setSecondaryLanguage(code); }
+        function model(value: string): void { Dictation.useModel(value); }
+        function liveText(enabled: bool): void {
+            Settings.setModuleOption("indicators", "dictationLiveText", enabled);
+        }
+        function refreshModel(): void { Dictation.refreshStatus(); }
+        // Settings → Bar & Control Center → Indicators, where dictation's choices are.
+        function settings(): void {
+            Settings.showPanel("bar", Screens.focused ? Screens.focused.name : "");
+            Settings.openWidgetSettings("indicators");
+        }
+        function status(): string { return Dictation.statusJson(); }
+    }
+
     // `cybex assistant show|hide|toggle|ask` and scripts.
     IpcHandler {
         target: "assistant"
@@ -475,6 +510,8 @@ ShellRoot {
     NetworkOverlayWindow {}
     NotificationToasts {}
     OsdWindow {}
+    DictationPill {}
+    DictationOffer {}
     ShortcutsOverlay {}
     PolkitWindow {}
 

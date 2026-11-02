@@ -89,7 +89,20 @@ in {
     };
     desktopPackage = mkOption { type = types.package; default = pkgs.callPackage ../packages/desktop.nix { inherit source; }; };
     updaterPackage = mkOption { type = types.package; default = pkgs.callPackage ../packages/updater.nix { inherit source; }; };
-    dictationPackage = mkOption { type = types.package; default = pkgs.voxtype.override { vulkanSupport = true; }; description = "Nixpkgs Voxtype with Vulkan acceleration and CPU fallback"; };
+    # The patch lets the shell draw the words of a live dictation itself (a
+    # `.live` file beside a `--file` transcript), publishes a streamed
+    # transcript's completion like a batch one, reads `en,nl` as a language
+    # list, and keeps a slow machine's live dictation from losing audio
+    # (docs/dictation.md).
+    # whisper.cpp turns its vector instructions off in any build that sets
+    # SOURCE_DATE_EPOCH, as every Nix build does; on the CPU that halves its
+    # speed. They are turned back on here, so dictation needs an x86-64 CPU
+    # with AVX2, FMA, F16C and BMI2 (Intel 2013, AMD 2015 and later); the
+    # voxtype unit does not start on one without (nix/modules/desktop.nix).
+    dictationPackage = mkOption { type = types.package; default = (pkgs.voxtype.override { vulkanSupport = true; }).overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [ ../packages/voxtype-dictation.patch ];
+      env = (old.env or { }) // { GGML_SSE42 = "ON"; GGML_AVX = "ON"; GGML_AVX2 = "ON"; GGML_FMA = "ON"; GGML_F16C = "ON"; GGML_BMI2 = "ON"; };
+    }); description = "Nixpkgs Voxtype with Vulkan acceleration, an AVX2 CPU path and Cybex OS dictation fixes"; };
   };
   config = lib.mkMerge [ (mkIf (cfg.enable || cfg.installationMedium) {
     nix.settings = {

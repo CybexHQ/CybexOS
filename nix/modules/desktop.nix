@@ -190,8 +190,14 @@ in {
       partOf = [ "hyprland-session.target" ]; wantedBy = [ "hyprland-session.target" ];
       after = [ "cybexos-personal-init.service" "pipewire.service" "pipewire-pulse.service" ];
       requires = [ "cybexos-personal-init.service" ];
+      # The package's CPU path is built for AVX2 (nix/modules/default.nix):
+      # skipped cleanly on an older processor instead of crashing in a loop.
+      # systemd has no name for FMA, which every AVX2 processor has.
+      unitConfig.ConditionCPUFeature = [ "sse4_2" "avx" "avx2" "f16c" "bmi2" ];
       path = with pkgs; [ wtype wl-clipboard libnotify ];
-      serviceConfig = { ExecStart = "${cfg.dictationPackage}/bin/voxtype --on-demand-loading daemon"; Restart = "on-failure"; RestartSec = 5; };
+      # Loading on demand is a config.toml choice: live text needs the model
+      # resident, and Settings turns it off with live text (docs/dictation.md).
+      serviceConfig = { ExecStart = "${cfg.dictationPackage}/bin/voxtype daemon"; Restart = "on-failure"; RestartSec = 5; };
     };
     systemd.user.services.hermes-menubar-bridge = lib.mkIf cfg.features.connectedWidgets {
       description = "Remote Hermes WebUI desktop bridge";

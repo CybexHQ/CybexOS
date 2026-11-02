@@ -48,6 +48,7 @@ quirks still determine whether an individual computer works.
 | --- | --- | --- |
 | Intel processors | x86-64 target; no Intel-only or model-specific CPU restriction in the installer | Requires UEFI; no physical Intel installation matrix. Installed systems enable Intel microcode updates, but the live ISO does not. |
 | AMD processors | Same x86-64 image, including AMD chipset/storage and Radeon drivers | No physical AMD installation matrix. Earlier Minisforum X1 Pro 370 reports describe graphics corruption and later input latency; current-image resolution is unverified. |
+| Dictation (Voxtype) | Needs AVX2, FMA, F16C and BMI2 (Intel Haswell 2013, AMD Excavator 2015 and later): whisper.cpp's CPU path is built for them | On an older processor the voxtype unit does not start and dictation is not offered; the rest of the desktop is unaffected. See [Dictation](dictation.md). |
 | Other CPU architectures | Only `x86_64-linux` is exported by the flake and machine template | ARM/Snapdragon, Apple Silicon, Raspberry Pi, and 32-bit x86 have no supported installer image. |
 | Intel graphics | `i915` and `xe`; Mesa in the installed desktop | New and old GPU generations, external displays and suspend still require physical tests. |
 | AMD graphics | `amdgpu` and `radeon`, with firmware; Mesa in the installed desktop | No current physical Radeon qualification; a loaded KMS driver alone does not prove the Hyprland desktop works. |

@@ -114,8 +114,9 @@ or set up themselves.
   box with what that place knows attached as a chip and the question typed;
   nothing is sent until Enter. They show only while Wiz can answer.
 - **Talk** by holding `Super+I` (or the microphone button) and releasing it to
-  send. The words are transcribed locally by Voxtype; no audio leaves the
-  computer. `Esc` or the cancel button discards a recording.
+  send. The words are transcribed locally by Voxtype, with dictation's
+  speech model and languages ([dictation.md](dictation.md)); no audio leaves
+  the computer. `Esc` or the cancel button discards a recording.
 - **While it works** the character shows what it is doing (see
   [The character](#the-character)) and the box a short line about the
   current step. Clicking the character while it works tucks the box away;

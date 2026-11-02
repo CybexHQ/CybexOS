@@ -191,16 +191,32 @@ function mergeIndicatorOrder(shown, saved) {
     return out;
 }
 
+// Dictation's speech models (docs/dictation.md): the small Whisper model every
+// installation carries, and the larger one a person may download. Older
+// saved choices (tiny, small, medium, large-v3) were never installed, so
+// they fall back to the built-in model.
 var DICTATION_MODEL_CHOICES = [
-    { value: "tiny", label: "Tiny" },
-    { value: "base", label: "Base" },
-    { value: "small", label: "Small" },
-    { value: "medium", label: "Medium" },
-    { value: "large-v3", label: "Large v3" },
-    { value: "large-v3-turbo", label: "Large v3 Turbo" }
+    { value: "base", label: "Standard" },
+    { value: "large-v3-turbo", label: "Enhanced" }
 ];
 var DICTATION_MODELS = DICTATION_MODEL_CHOICES.map(
     function(choice) { return choice.value; });
+
+// Languages offered for dictation: those the shell can name (LocaleNames)
+// that Whisper also transcribes, by their Whisper codes.
+var DICTATION_LANGUAGES = [
+    "en", "ar", "bg", "ca", "cs", "da", "de", "el", "es", "et", "eu", "fi", "fr", "gl",
+    "he", "hi", "hr", "hu", "id", "is", "it", "ja", "ko", "lt", "lv", "nl", "nn", "no",
+    "pl", "pt", "ro", "ru", "sk", "sl", "sr", "sv", "th", "tr", "uk", "vi", "zh"
+];
+
+// The words a person wants recognised, as one line Whisper reads as context.
+function dictationVocabularyIn(value, fallback) {
+    if (typeof value !== "string")
+        return fallback;
+    var line = value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+    return line.length <= 400 ? line : fallback;
+}
 
 // Notes title generation deliberately uses a small, reviewed model catalog.
 // Besides making the settings selectable, this prevents a typo from reaching
@@ -297,8 +313,11 @@ function defaultModOpts() {
             order: INDICATOR_ACTION_IDS.slice(),
             enabled: INDICATOR_ACTION_IDS.slice(),
             dictationPrimaryLanguage: "en",
-            dictationSecondaryLanguage: "nl",
+            dictationSecondaryLanguage: "off",
             dictationModel: "base",
+            dictationLiveText: true,
+            dictationVocabulary: "",
+            dictationPrompted: false,
             recordingMode: "region",
             recordingShowElapsed: true,
             reminderDisplay: "icon",
@@ -640,20 +659,6 @@ function desktopIdsIn(value, fallback) {
         }
     });
     return next;
-}
-
-// Voxtype accepts ISO-like language tags, `auto`, and comma-separated
-// candidates. Keeping this validation deliberately narrower than arbitrary
-// command text makes the value safe to pass as one argv item.
-function dictationLanguageIn(value, fallback, allowOff) {
-    if (typeof value !== "string")
-        return fallback;
-    var normalized = value.trim().toLowerCase();
-    if (allowOff && normalized === "off")
-        return normalized;
-    var tag = "(?:auto|[a-z]{2,3}(?:-[a-z0-9]{2,8})?)";
-    return new RegExp("^" + tag + "(?:," + tag + ")*$").test(normalized)
-        ? normalized : fallback;
 }
 
 function timestampIn(value, fallback) {
@@ -1058,13 +1063,18 @@ var MOD_OPT_CHECKS = {
         enabled: function(v, d) {
             return orderedIdsIn(v, INDICATOR_ACTION_IDS, d, false);
         },
+        // One language each, from the offered list: Voxtype is told both
+        // (docs/dictation.md), so a list or "auto" here has no meaning.
         dictationPrimaryLanguage: function(v, d) {
-            return dictationLanguageIn(v, d, false);
+            return enumIn(v, DICTATION_LANGUAGES, d);
         },
         dictationSecondaryLanguage: function(v, d) {
-            return dictationLanguageIn(v, d, true);
+            return v === "off" ? v : enumIn(v, DICTATION_LANGUAGES, d);
         },
         dictationModel: function(v, d) { return enumIn(v, DICTATION_MODELS, d); },
+        dictationLiveText: boolIn,
+        dictationVocabulary: dictationVocabularyIn,
+        dictationPrompted: boolIn,
         recordingMode: function(v, d) {
             return enumIn(v, ["region", "window", "screen"], d);
         },
@@ -1872,6 +1882,8 @@ var exported = {
     availableIndicatorIds: availableIndicatorIds,
     mergeIndicatorOrder: mergeIndicatorOrder,
     DICTATION_MODEL_CHOICES: DICTATION_MODEL_CHOICES,
+    DICTATION_LANGUAGES: DICTATION_LANGUAGES,
+    dictationVocabularyIn: dictationVocabularyIn,
     NOTE_CODEX_MODEL_CHOICES: NOTE_CODEX_MODEL_CHOICES,
     NOTE_CLAUDE_MODEL_CHOICES: NOTE_CLAUDE_MODEL_CHOICES,
     NOTE_CODEX_EFFORT_CHOICES: NOTE_CODEX_EFFORT_CHOICES,

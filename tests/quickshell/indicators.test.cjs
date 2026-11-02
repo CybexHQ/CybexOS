@@ -154,10 +154,12 @@ test("recording and dictation expose their complete live state", () => {
     assert.match(indicators, /Dictation\.transcribing/);
     assert.match(indicators, /"progress_activity"/);
     assert.match(indicators, /RotationAnimation on rotation/);
-    assert.match(indicators,
-        /dictationSecondaryLanguage[\s\S]*dictationPrimaryLanguage/);
-    assert.match(read("Common/Dictation.qml"),
-        /Settings\.modOpts\.indicators\.dictationModel/);
+    // One dictation for both languages: Whisper tells them apart.
+    assert.match(indicators, /Dictation\.toggle\(\);/);
+    assert.doesNotMatch(indicators, /dictationSecondaryLanguage/);
+    const dictation = read("Common/Dictation.qml");
+    assert.match(dictation, /readonly property var options: Settings\.modOpts\.indicators/);
+    assert.match(dictation, /options\.dictationModel/);
     assert.match(read("Common/Recorder.qml"),
         /Settings\.modOpts\.indicators\.recordingMode/);
 
@@ -188,7 +190,8 @@ test("indicator settings cover ordering, display, actions, and feature defaults"
     const detail = read("Settings/ModuleDetailView.qml");
     for (const key of [
         "order", "enabled", "dictationPrimaryLanguage", "dictationSecondaryLanguage",
-        "dictationModel", "recordingMode", "recordingShowElapsed",
+        "dictationModel", "dictationLiveText", "dictationVocabulary",
+        "recordingMode", "recordingShowElapsed",
         "reminderDisplay", "reminderClick", "reminderMinutes",
         "nightLightStartup", "dndStartup", "dndDefaultMode",
         "idleStartup", "idleDefaultMode", "idleShowRemaining"
@@ -198,7 +201,10 @@ test("indicator settings cover ordering, display, actions, and feature defaults"
     assert.match(detail, /value:\s*"active", label:\s*"Active only"/);
     assert.match(detail, /function beginIndicatorDrag/);
     assert.match(detail, /function commitIndicatorDrag/);
-    assert.match(detail, /SettingsHelpers\.DICTATION_MODEL_CHOICES/);
+    // Picking the enhanced model downloads it first; the languages come
+    // from the list Whisper and the shell can both name.
+    assert.match(detail, /onPicked: value => Dictation\.useModel\(value\)/);
+    assert.match(detail, /SettingsHelpers\.DICTATION_LANGUAGES/);
     assert.match(detail, /Restarting only the menubar resumes its current state/);
     assert.match(indicators, /Settings\.modOpts\.indicators\.reminderDisplay/);
     assert.match(indicators, /Settings\.modOpts\.indicators\.idleShowRemaining/);

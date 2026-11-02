@@ -1,10 +1,16 @@
 state_file = "auto"
 
+# Settings → Bar & Control Center → Indicators → Dictation owns whisper.model,
+# whisper.language, whisper.streaming, whisper.on_demand_loading,
+# whisper.initial_prompt and streaming.revision_mode, and keeps them in line
+# with what it shows (docs/dictation.md). Everything else here is yours.
+
 [hotkey]
 enabled = false
 
 # Quickshell already exposes recording/transcription state in the managed
-# menubar; do not probe for Voxtype's separate optional OSD frontend.
+# menubar and draws the live words itself; do not probe for Voxtype's
+# separate optional OSD frontend.
 [osd]
 enabled = false
 
@@ -15,12 +21,23 @@ max_duration_secs = 60
 
 [whisper]
 model = "base"
-language = "auto"
+language = "en"
 translate = false
-# Load the model when a recording starts and release it when idle, instead of
-# keeping it resident on the GPU for the whole session. The first dictation
-# after an idle period pays a short load delay.
-on_demand_loading = true
+# Live text: the shell's recordings stream, re-reading the words as you speak.
+# Voxtype streams only with the model loaded, so it stays resident.
+streaming = true
+on_demand_loading = false
+
+[streaming]
+# The shell's recordings go to a file, so a revised guess only edits text in
+# memory; nothing is typed until the dictation ends.
+revision_mode = true
+
+# Silence (or a recording with no speech) produces nothing instead of
+# Whisper's invented "Thank you." The energy detector needs no model.
+[vad]
+enabled = true
+backend = "energy"
 
 [output]
 mode = "type"
