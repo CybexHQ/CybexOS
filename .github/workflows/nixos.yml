@@ -30,6 +30,7 @@ jobs:
       - run: nix develop -c tests/qml-lint
       - run: nix develop -c python3 -B tests/user-plugins.py
       - run: nix develop -c python3 -B tests/assistant-overlay.py
+      - run: nix develop -c python3 -B tests/media-player.py
       - run: nix develop -c python3 -B tests/nixos-native
   product:
     runs-on: [self-hosted, linux, x64, cybexos-isolated]

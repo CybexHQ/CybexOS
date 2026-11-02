@@ -178,10 +178,13 @@ test("menubar icons keep bright system ink and shared monochrome brands", () => 
         /highlighted:\s*controlButton\.held \|\| controlButton\.hovered/);
     assert.doesNotMatch(updates, /idleColor:|rebootRecommended/,
         "the available-update icon uses the shared system ink");
-    assert.match(media, /name:\s*root\.playing[\s\S]{0,180}?color:\s*mediaChip\.fg/);
-    assert.match(media, /highlighted:\s*mediaChip\.held \|\| mediaChip\.hovered/);
-    assert.match(media, /tintAmount:\s*mediaChip\.held \|\| mediaChip\.hovered \? 1 : 0/);
-    assert.match(media, /layer\.enabled:\s*visible && tintAmount > 0\.001/,
+    // Without a cover the chip shows the player's mark in the shared ink.
+    const mediaArt = read("Common/MediaArt.qml");
+    assert.match(media, /markColor:\s*mediaChip\.fg/);
+    assert.match(media, /markHighlighted:\s*mediaChip\.held \|\| mediaChip\.hovered/);
+    assert.match(mediaArt, /highlighted:\s*root\.markHighlighted/);
+    assert.match(mediaArt, /tintAmount:\s*root\.markHighlighted \? 1 : 0/);
+    assert.match(mediaArt, /layer\.enabled:\s*visible && tintAmount > 0\.001/,
         "the player icon must not hold an offscreen layer at rest");
     assert.match(tray, /Theme\.barTextHi : Theme\.barIcon/);
     assert.match(tray, /tintAmount:\s*itemHover\.over \? 1 : 0/);

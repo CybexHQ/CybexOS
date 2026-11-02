@@ -1,230 +1,313 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Effects
-import Quickshell.Services.Mpris
+import QtQuick.Shapes
 import ".."
 import "../../Common"
+import "../../Common/StatusHelpers.js" as StatusHelpers
 
-// Now-playing chip: the player's app icon, the track, and a transport that
-// unfolds under the pointer.
+// Now-playing chip: the cover, the track, and a play/pause button ringed by
+// the track's progress.
 //
-// The controls are not a second chip beside the title — they grow out of the
-// same pill, from zero width, which is why the chip's width springs. Hidden,
-// they take no space and no clicks; the fold is the whole affordance.
+// The chip keeps one width while it is used. Nothing unfolds under the
+// pointer, so the modules beside it never move; skipping lives on a middle
+// click, the media keys and the panel. Paused reads at rest: the title dims
+// and the cover loses its colour. The wheel sets this player's own volume.
 BarModule {
     id: root
 
     moduleId: "media"
-    detailSaving: trackTitle.implicitWidth > 0
-        ? Math.min(trackTitle.implicitWidth, Settings.modOpts.media.maxWidth) + 9 : 0
+    detailSaving: titleClip.naturalWidth > 0 ? titleClip.naturalWidth + mediaChip.spacing : 0
 
     readonly property var player: Media.player
-    readonly property bool playing: player !== null
-        && player.playbackState === MprisPlaybackState.Playing
+    readonly property bool playing: Media.playing
+    readonly property var others: Media.others
+    readonly property var label: StatusHelpers.chipText(Settings.modOpts.media.titleFormat,
+        player ? player.trackTitle : "", player ? player.trackArtist : "")
+    readonly property string trackKey: player
+        ? StatusHelpers.playerKey(player) + "\n" + player.trackTitle + "\n" + player.trackArtist : ""
 
-    // A borderless round button inside the chip. It swallows the click so the
-    // chip underneath does not also open the media panel.
-    component TransportButton: Item {
-        id: button
+    function escaped(value) {
+        return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
 
-        // Taken rather than reached for: an inline component has its own
-        // scope, and the bar's pointer state has to arrive through it.
-        required property Bar host
-        property string glyph
-        property color tone: Theme.barTextMid
-        property color hoverTone: Theme.barTextHi
-        signal triggered
-
-        // A MouseArea on a layer surface can miss its exit, and a tint bound
-        // to that stale state has nothing left to clear it.
-        readonly property bool hovered: buttonPointer.over
-
-        width: 24
-        height: 24
-        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-        opacity: enabled ? 1 : 0.35
-        scale: buttonMouse.pressed ? 0.84 : 1
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: Theme.pressDuration
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: Theme.springCurve
-            }
-        }
-
-        Sym {
-            anchors.centerIn: parent
-            name: button.glyph
-            size: Theme.iconMedium
-            color: button.hovered ? button.hoverTone : button.tone
-        }
-
-        PointerCheck {
-            id: buttonPointer
-            host: button.host
-            target: button
-            hovered: buttonMouse.containsMouse
-        }
-
-        MouseArea {
-            id: buttonMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: button.enabled
-            cursorShape: Qt.PointingHandCursor
-            onClicked: button.triggered()
+    // The wheel steps this player's volume, not the output's; the OSD says
+    // whose it is. A handler rather than another MouseArea, as in Volume.qml.
+    WheelHandler {
+        target: null
+        // Virtual pointers (remote desktop, wlr-virtual-pointer) report no
+        // device type, and the default filter would drop their wheel.
+        acceptedDevices: PointerDevice.AllDevices
+        onWheel: event => {
+            const delta = event.angleDelta.y !== 0
+                ? event.angleDelta.y : event.pixelDelta.y * 8;
+            if (delta === 0 || !Media.volumeAvailable)
+                return;
+            Media.stepVolume(delta > 0 ? 0.05 : -0.05);
+            Osd.showPlayer();
         }
     }
 
     BarChip {
         id: mediaChip
 
-        readonly property bool showControls: hovered || held
-
         host: root.host
         panelName: "media"
         isle: root.isle
         anchorItem: root.groupAnchor ?? mediaChip
-        leftPadding: 5
-        rightPadding: showControls ? 5 : 12
-        spacing: 9
+        leftPadding: 4
+        rightPadding: 3
+        spacing: 8
+        contentTakesInput: true
+        middleClickable: true
         tooltip: root.player
             ? root.player.trackTitle + (root.player.trackArtist !== ""
                 ? " · " + root.player.trackArtist : "")
+                + (root.player.identity ? " — " + root.player.identity : "")
             : "Media"
         tooltipAlign: -1
+        onMiddleClicked: {
+            if (root.player && root.player.canGoNext)
+                root.player.next();
+        }
 
-        // The player's app icon rests directly on the shared menubar slab.
-        // A symbol remains underneath while the image loads and for players
-        // that do not expose a usable desktop entry.
+        // ---- cover --------------------------------------------------------
+        // A second player shows as a cover tucked behind the first.
         Item {
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.others.length > 0 ? 25 : 20
+            height: 20
+
+            MediaArt {
+                visible: root.others.length > 0
+                x: 5
+                width: 20
+                height: 20
+                scale: 0.8
+                transformOrigin: Item.Right
+                opacity: 0.7
+                radius: 5
+                // A card even without a cover, so the stack always reads.
+                tile: true
+                player: root.others.find(other => other.trackArtUrl !== "") ?? root.others[0] ?? null
+                markColor: Theme.barTextLow
+            }
+
+            MediaArt {
+                width: 20
+                height: 20
+                radius: 5
+                tile: false
+                player: root.player
+                dimmed: !root.playing
+                markColor: mediaChip.fg
+                markHighlighted: mediaChip.held || mediaChip.hovered
+            }
+        }
+
+        // ---- title --------------------------------------------------------
+        // One line in the configured order, the title brighter than the
+        // artist. A title too long for the chip ends in an ellipsis at rest
+        // and drifts through its full length while the pointer is on it.
+        Item {
+            id: titleClip
+
+            readonly property real naturalWidth: Math.min(fullTitle.implicitWidth,
+                Settings.modOpts.media.maxWidth)
+            readonly property real overflow: Math.max(0, fullTitle.implicitWidth - width)
+            readonly property bool drifting: (mediaChip.hovered || mediaChip.held)
+                && overflow > 0 && !Theme.reducedMotion
+
+            visible: !root.compact && naturalWidth > 0
+            anchors.verticalCenter: parent.verticalCenter
+            width: naturalWidth
+            height: fullTitle.implicitHeight
+            clip: true
+
+            Text {
+                id: fullTitle
+
+                readonly property color mainColor: !root.playing ? Theme.barTextLow
+                    : mediaChip.held || mediaChip.hovered ? Theme.barTextHi : Theme.barTextMid
+                readonly property color sideColor: root.playing ? Theme.barTextDim : Theme.barTextFaint
+                readonly property string first: root.escaped(root.label.first)
+                readonly property string second: root.escaped(root.label.second)
+
+                width: titleClip.drifting ? implicitWidth : titleClip.width
+                textFormat: Text.StyledText
+                text: root.label.second === "" ? first
+                    : root.label.titleFirst
+                        ? first + "<font color=\"" + sideColor + "\"> · " + second + "</font>"
+                        : "<font color=\"" + sideColor + "\">" + first + " · </font>" + second
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.bar
+                font.weight: Theme.weightSemibold
+                color: mainColor
+                elide: titleClip.drifting ? Text.ElideNone : Text.ElideRight
+                maximumLineCount: 1
+
+                Behavior on color {
+                    ColorAnimation { duration: Theme.chipFadeDuration }
+                }
+
+                transform: Translate {
+                    id: slide
+                }
+            }
+
+            SequentialAnimation {
+                running: titleClip.drifting
+                loops: Animation.Infinite
+                onRunningChanged: {
+                    if (!running)
+                        fullTitle.x = 0;
+                }
+
+                PauseAnimation { duration: 700 }
+                NumberAnimation {
+                    target: fullTitle
+                    property: "x"
+                    to: -titleClip.overflow
+                    duration: Math.max(800, titleClip.overflow * 28)
+                    easing.type: Easing.InOutSine
+                }
+                PauseAnimation { duration: 1100 }
+                NumberAnimation {
+                    target: fullTitle
+                    property: "x"
+                    to: 0
+                    duration: Math.max(800, titleClip.overflow * 28)
+                    easing.type: Easing.InOutSine
+                }
+            }
+
+            // A new track rises into place instead of replacing the old one.
+            ParallelAnimation {
+                id: slideIn
+
+                NumberAnimation {
+                    target: slide
+                    property: "y"
+                    from: 10
+                    to: 0
+                    duration: 320
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.springCurve
+                }
+                NumberAnimation {
+                    target: fullTitle
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: 220
+                }
+            }
+        }
+
+        // ---- play / pause ---------------------------------------------------
+        // Always there, so the chip never changes width. The ring around it is
+        // the track's progress; it is grey while paused, and absent when the
+        // player reports no length.
+        Item {
+            id: playButton
+
+            readonly property bool hovered: playPointer.over
+
             anchors.verticalCenter: parent.verticalCenter
             width: 24
             height: 24
+            scale: playMouse.pressed ? 0.86 : 1
+            Accessible.role: Accessible.Button
+            Accessible.name: root.playing ? I18n.tr("Pause") : I18n.tr("Play")
+            Accessible.onPressAction: playMouse.toggle()
 
-            BrandIcon {
-                id: playerBrand
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                name: Media.brandIcon
-                highlighted: mediaChip.held || mediaChip.hovered
-                visible: available && status === Image.Ready
-            }
-
-            Image {
-                id: playerIcon
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                source: Media.iconSource
-                sourceSize: Qt.size(36, 36)
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                visible: !playerBrand.visible && status === Image.Ready
-                // The tint animates here rather than inside the effect so the
-                // offscreen layer exists only while it is non-zero, as in
-                // BrandIcon; at rest the icon takes the plain image path.
-                property real tintAmount: mediaChip.held || mediaChip.hovered ? 1 : 0
-                Behavior on tintAmount {
-                    NumberAnimation { duration: Theme.chipFadeDuration }
-                }
-                layer.enabled: visible && tintAmount > 0.001
-                layer.effect: MultiEffect {
-                    colorization: playerIcon.tintAmount
-                    colorizationColor: mediaChip.hoverColor
-                }
-            }
-
-            Sym {
-                anchors.centerIn: parent
-                visible: !playerBrand.visible && !playerIcon.visible
-                name: root.playing ? "graphic_eq" : "music_note"
-                size: Theme.iconSmall + 1
-                color: mediaChip.fg
-            }
-        }
-
-        Text {
-            id: trackTitle
-            visible: !root.compact
-            anchors.verticalCenter: parent.verticalCenter
-            text: {
-                if (!root.player)
-                    return "";
-                const format = Settings.modOpts.media.titleFormat;
-                const artist = root.player.trackArtist;
-                const title = root.player.trackTitle;
-                if (format === "title" || !artist)
-                    return title;
-                return format === "artist-title"
-                    ? artist + " · " + title : title + " · " + artist;
-            }
-            font.family: Theme.fontMenu
-            font.pixelSize: Theme.typography.bar
-            font.weight: Theme.weightSemibold
-            color: mediaChip.held || mediaChip.hovered ? Theme.barTextHi : Theme.barTextMid
-            elide: Text.ElideRight
-            width: Math.min(implicitWidth, Settings.modOpts.media.maxWidth)
-
-            Behavior on color {
-                ColorAnimation { duration: Theme.chipFadeDuration }
-            }
-        }
-
-        // The transport. Clipped to a width that springs from zero, so the
-        // buttons slide out of the chip rather than popping into it.
-        Item {
-            anchors.verticalCenter: parent.verticalCenter
-            width: mediaChip.showControls ? controls.implicitWidth : 0
-            height: 24
-            clip: true
-            opacity: mediaChip.showControls ? 1 : 0
-
-            Behavior on width {
+            Behavior on scale {
                 NumberAnimation {
-                    duration: Theme.expandDuration
+                    duration: Theme.pressDuration
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Theme.springCurve
                 }
             }
 
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.chipFadeDuration }
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: playButton.hovered ? Theme.barChipHover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation { duration: Theme.chipFadeDuration }
+                }
             }
 
-            Row {
-                id: controls
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+                Accessible.ignored: true
 
-                TransportButton {
-                    host: root.host
-                    glyph: "skip_previous"
-                    tone: Theme.barTextMid
-                    enabled: root.player !== null && root.player.canGoPrevious
-                    onTriggered: root.player.previous()
+                ShapePath {
+                    strokeColor: Qt.rgba(Theme.barTextHi.r, Theme.barTextHi.g, Theme.barTextHi.b, 0.16)
+                    strokeWidth: 2
+                    fillColor: "transparent"
+
+                    PathAngleArc {
+                        centerX: 12
+                        centerY: 12
+                        radiusX: 10
+                        radiusY: 10
+                        startAngle: 0
+                        sweepAngle: 360
+                    }
                 }
 
-                TransportButton {
-                    host: root.host
-                    glyph: root.playing ? "pause" : "play_arrow"
-                    tone: Theme.barTextHi
-                    hoverTone: Theme.barAccent
-                    enabled: root.player !== null && root.player.canTogglePlaying
-                    onTriggered: root.player.togglePlaying()
+                ShapePath {
+                    strokeColor: Media.length <= 0 ? "transparent"
+                        : root.playing ? Theme.barAccent : Theme.barTextFaint
+                    strokeWidth: 2
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+
+                    PathAngleArc {
+                        centerX: 12
+                        centerY: 12
+                        radiusX: 10
+                        radiusY: 10
+                        startAngle: -90
+                        sweepAngle: 360 * Media.progress
+                    }
+                }
+            }
+
+            PlayGlyph {
+                anchors.centerIn: parent
+                playing: root.playing
+                size: 11
+                color: playButton.hovered ? Theme.barAccent : Theme.barTextHi
+            }
+
+            PointerCheck {
+                id: playPointer
+                host: root.host
+                target: playButton
+                hovered: playMouse.containsMouse
+            }
+
+            MouseArea {
+                id: playMouse
+
+                function toggle() {
+                    if (root.player && root.player.canTogglePlaying)
+                        root.player.togglePlaying();
                 }
 
-                TransportButton {
-                    host: root.host
-                    glyph: "skip_next"
-                    tone: Theme.barTextMid
-                    enabled: root.player !== null && root.player.canGoNext
-                    onTriggered: root.player.next()
-                }
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: toggle()
             }
         }
+    }
+
+    onTrackKeyChanged: {
+        if (!Theme.reducedMotion && trackKey !== "")
+            slideIn.restart();
     }
 }

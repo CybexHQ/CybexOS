@@ -89,6 +89,8 @@ AnimatedText AnimatedText.qml
 HSlider HSlider.qml
 Sym Sym.qml
 BrandIcon BrandIcon.qml
+MediaArt MediaArt.qml
+PlayGlyph PlayGlyph.qml
 NotifActions NotifActions.qml
 NotifButton NotifButton.qml
 NotifSnoozes NotifSnoozes.qml

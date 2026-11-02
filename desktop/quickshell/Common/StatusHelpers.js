@@ -206,6 +206,118 @@ function activePlayer(players) {
     return paused !== undefined ? paused : players[0];
 }
 
+// ---- the shell's player ----------------------------------------------------
+
+// A stable name for a player across list rebuilds. The bus name is unique per
+// running player; the identity only stands in for test fixtures without one.
+function playerKey(player) {
+    if (!player)
+        return "";
+    return textValue(player.dbusName) || textValue(player.identity);
+}
+
+// playerctld re-publishes whichever player it last saw, so listing it beside
+// that player would show the same track twice.
+function isProxyPlayer(player) {
+    return textValue(player && player.dbusName).toLowerCase().indexOf("playerctld") !== -1
+        || textValue(player && player.desktopEntry).toLowerCase() === "playerctld";
+}
+
+function listedPlayers(players) {
+    return (players || []).filter(function (player) {
+        return player && !isProxyPlayer(player);
+    });
+}
+
+// The keys of the players that are playing now, in list order.
+function playingKeys(players) {
+    return listedPlayers(players).filter(function (player) {
+        return player.isPlaying;
+    }).map(playerKey);
+}
+
+// A player picked in the media panel stays the shell's player until another
+// one starts playing. Players that were already playing when it was picked
+// do not take over again; only a newly started one does.
+function nextPinnedKey(pinnedKey, previousPlaying, currentPlaying) {
+    if (!pinnedKey)
+        return "";
+    var before = previousPlaying || [];
+    var started = (currentPlaying || []).some(function (key) {
+        return key !== pinnedKey && before.indexOf(key) === -1;
+    });
+    return started ? "" : pinnedKey;
+}
+
+// The pinned player while it exists. Otherwise the player already shown
+// stays while it plays, so starting a second one from the panel's list does
+// not swap the two under the pointer; after that, the automatic choice.
+function selectedPlayer(players, pinnedKey, currentKey) {
+    var listed = listedPlayers(players);
+    function byKey(key) {
+        return key ? listed.find(function (player) {
+            return playerKey(player) === key;
+        }) : undefined;
+    }
+    var pinned = byKey(pinnedKey);
+    if (pinned !== undefined)
+        return pinned;
+    var current = byKey(currentKey);
+    if (current !== undefined && current.isPlaying)
+        return current;
+    return activePlayer(listed);
+}
+
+// Every other player that has something to show, playing ones first.
+function otherPlayers(players, current) {
+    var others = listedPlayers(players).filter(function (player) {
+        return player !== current && textValue(player.trackTitle) !== "";
+    });
+    return others.filter(function (player) { return player.isPlaying; })
+        .concat(others.filter(function (player) { return !player.isPlaying; }));
+}
+
+// The chip's text in the configured order. The title is always the brighter
+// half, so the caller needs to know which half it is.
+function chipText(format, title, artist) {
+    title = textValue(title);
+    artist = textValue(artist);
+    if (format === "title" || artist === "")
+        return { first: title, second: "", titleFirst: true };
+    if (format === "artist-title")
+        return { first: artist, second: title, titleFirst: false };
+    return { first: title, second: artist, titleFirst: true };
+}
+
+// The window that belongs to a player, from the dock's window list
+// ({ address, appId, entryId }). A YouTube web app only matches its own
+// window, never just any window of the browser it runs in.
+function playerWindow(player, windows) {
+    if (!player)
+        return "";
+    var list = windows || [];
+    function match(predicate) {
+        var found = list.find(function (win) {
+            return win && predicate(textValue(win.appId).toLowerCase(),
+                textValue(win.entryId).toLowerCase());
+        });
+        return found !== undefined ? textValue(found.address) : "";
+    }
+    if (playerBrand(player) === "youtube")
+        return match(function (appId, entryId) {
+            return appId.indexOf("youtube") !== -1 || entryId.indexOf("youtube") !== -1;
+        });
+    var names = playerIconCandidates(player).map(function (name) {
+        return name.toLowerCase();
+    });
+    return match(function (appId, entryId) {
+        return names.some(function (name) {
+            return name === appId || name === entryId
+                || (entryId !== "" && name + ".desktop" === entryId);
+        });
+    });
+}
+
 var exported = {
     normalizePercent: normalizePercent,
     batteryPercent: batteryPercent,
@@ -219,7 +331,16 @@ var exported = {
     playerBrand: playerBrand,
     playerIconCandidates: playerIconCandidates,
     playerGlyph: playerGlyph,
-    activePlayer: activePlayer
+    activePlayer: activePlayer,
+    playerKey: playerKey,
+    isProxyPlayer: isProxyPlayer,
+    listedPlayers: listedPlayers,
+    playingKeys: playingKeys,
+    nextPinnedKey: nextPinnedKey,
+    selectedPlayer: selectedPlayer,
+    otherPlayers: otherPlayers,
+    chipText: chipText,
+    playerWindow: playerWindow
 };
 
 if (typeof module !== "undefined" && module.exports)

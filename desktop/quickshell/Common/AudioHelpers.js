@@ -336,6 +336,36 @@ function streamLabel(node, players, streams) {
         || "Application";
 }
 
+// Chromium, VLC and mpv name their MPRIS bus `….instance<pid>`.
+function playerProcessId(player) {
+    var match = /\.instance(\d+)$/.exec(text(player && player.dbusName));
+    return match ? match[1] : "";
+}
+
+// The playback streams that carry one player's sound, so the media panel can
+// set that player's volume. The process id is exact when the player publishes
+// one and a stream shares it; otherwise a stream belongs to the player whose
+// name the audio panel would give it.
+function streamsForPlayer(player, streams, players) {
+    var list = values(streams);
+    if (!player || list.length === 0)
+        return [];
+    var pid = playerProcessId(player);
+    if (pid !== "") {
+        var byProcess = list.filter(function(stream) {
+            return text(nodeProps(stream)["application.process.id"]) === pid;
+        });
+        if (byProcess.length > 0)
+            return byProcess;
+    }
+    var label = streamLabelKey(mprisPlayerLabel(player));
+    if (!label)
+        return [];
+    return list.filter(function(stream) {
+        return streamLabelKey(streamLabel(stream, players, list)) === label;
+    });
+}
+
 function sortPlaybackStreams(streams, players) {
     var list = values(streams);
     return list.sort(function(a, b) {
@@ -436,6 +466,8 @@ var exported = {
     matchingMprisStreamLabel: matchingMprisStreamLabel,
     unmatchedMprisStreamLabel: unmatchedMprisStreamLabel,
     streamLabel: streamLabel,
+    playerProcessId: playerProcessId,
+    streamsForPlayer: streamsForPlayer,
     sortPlaybackStreams: sortPlaybackStreams,
     listSnapshot: listSnapshot,
     sameNodeList: sameNodeList,

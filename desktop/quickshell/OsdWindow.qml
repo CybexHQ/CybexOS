@@ -49,9 +49,12 @@ PanelWindow {
 
     readonly property var audio: Osd.sink && Osd.sink.audio ? Osd.sink.audio : null
     readonly property bool volumeKind: Osd.kind === "volume"
-    readonly property bool muted: volumeKind && audio !== null && audio.muted
+    readonly property bool playerKind: Osd.kind === "player"
+    readonly property bool muted: (volumeKind && audio !== null && audio.muted)
+        || (playerKind && Media.muted)
     readonly property real value: volumeKind
         ? (audio ? audio.volume : 0)
+        : playerKind ? Media.volume
         : Math.max(0, SysInfo.brightness) / 100
 
     // Smooth the level, then snap the meter to whole blocks below so the
@@ -105,11 +108,25 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Theme.iconMedium
                 horizontalAlignment: Text.AlignHCenter
-                name: root.volumeKind
+                name: root.playerKind ? (root.muted ? "volume_off" : "music_note")
+                    : root.volumeKind
                     ? (root.muted || root.value === 0 ? "volume_off" : root.value < 0.5 ? "volume_down" : "volume_up")
                     : "light_mode"
                 size: Theme.iconMedium
                 color: root.muted ? Theme.redText : Theme.textHi
+            }
+
+            // Whose volume this is: the output's is unnamed, a player's is not.
+            Text {
+                visible: root.playerKind
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, Theme.scaled(140))
+                text: Media.player ? Media.player.identity : ""
+                elide: Text.ElideRight
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.primary
+                font.weight: Theme.weightSemibold
+                color: Theme.textMid
             }
 
             BlockMeter {
@@ -130,7 +147,7 @@ PanelWindow {
                     visible: !root.muted
                     anchors.right: unit.left
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.volumeKind
+                    text: root.volumeKind || root.playerKind
                         ? Math.round(root.value * 100)
                         : (SysInfo.brightness >= 0 ? SysInfo.brightness : "--")
                     font.family: Theme.fontMono
@@ -168,7 +185,10 @@ PanelWindow {
             anchors.fill: parent
             onWheel: wheel => {
                 const steps = wheel.angleDelta.y / 120;
-                if (root.volumeKind) {
+                if (root.playerKind) {
+                    Media.stepVolume(steps * 0.05);
+                    Osd.showPlayer();
+                } else if (root.volumeKind) {
                     if (root.audio)
                         root.audio.volume = Format.clamp01(root.audio.volume + steps * 0.05);
                 } else if (SysInfo.brightness < 0) {

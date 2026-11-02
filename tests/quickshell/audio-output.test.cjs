@@ -355,3 +355,29 @@ test("the input routing helper updates the default and existing recorders", () =
     assert.match(route, /pactl list short source-outputs/);
     assert.match(route, /pactl move-source-output "\$output" "\$target"/);
 });
+
+test("a player's own streams: by process id when it publishes one, else by name", () => {
+    const stream = (id, props) => ({ id, isStream: true, isSink: true, properties: props, audio: {} });
+    const brave = stream(1, { "application.name": "Brave", "application.process.id": "4242" });
+    const braveOther = stream(2, { "application.name": "Brave", "application.process.id": "77" });
+    const spotify = stream(3, { "application.name": "spotify" });
+    const generic = stream(4, { "application.name": "audio-src" });
+    const streams = [brave, braveOther, spotify, generic];
+    const chromium = { identity: "Brave", dbusName: "org.mpris.MediaPlayer2.chromium.instance4242",
+        isPlaying: true, canPlay: true };
+    const spotifyPlayer = { identity: "Spotify", dbusName: "org.mpris.MediaPlayer2.spotify",
+        isPlaying: false, canPlay: true };
+
+    assert.equal(H.playerProcessId(chromium), "4242");
+    assert.equal(H.playerProcessId(spotifyPlayer), "");
+    assert.deepEqual(H.streamsForPlayer(chromium, streams, [chromium, spotifyPlayer]), [brave]);
+    assert.deepEqual(H.streamsForPlayer(spotifyPlayer, streams, [chromium, spotifyPlayer]), [spotify]);
+    // No stream with the process id: the name decides.
+    const elsewhere = { ...chromium, dbusName: "org.mpris.MediaPlayer2.chromium.instance9" };
+    assert.deepEqual(H.streamsForPlayer(elsewhere, streams, [elsewhere]), [brave, braveOther]);
+    // A lone generic stream is the only playing player's.
+    const mpv = { identity: "mpv", dbusName: "org.mpris.MediaPlayer2.mpv", isPlaying: true, canPlay: true };
+    assert.deepEqual(H.streamsForPlayer(mpv, [generic], [mpv]), [generic]);
+    assert.deepEqual(H.streamsForPlayer(null, streams, []), []);
+    assert.deepEqual(H.streamsForPlayer(mpv, [], [mpv]), []);
+});

@@ -9,7 +9,9 @@ import Quickshell
 Singleton {
     id: root
 
-    property string kind: "volume" // "volume" | "brightness"
+    // "volume" | "brightness" | "player": one app's own volume, from the
+    // media chip's wheel.
+    property string kind: "volume"
     readonly property bool active: linger.running
 
     // A local handle rather than reading Audio.sink at each site: the
@@ -50,6 +52,15 @@ Singleton {
     // only double it underneath while one of them is on screen.
     readonly property bool suppressed: Popouts.open
         && (Popouts.currentName === "audio" || Popouts.currentName === "control")
+
+    // The media panel carries the player's own slider, as the audio panel
+    // does the output's.
+    function showPlayer() {
+        if (Popouts.open && Popouts.currentName === "media")
+            return;
+        kind = "player";
+        linger.restart();
+    }
 
     function show(k) {
         if (!settled || suppressed)

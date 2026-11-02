@@ -115,13 +115,17 @@ test("Bluetooth and media panels announce state and expose one focusable action 
     assert.match(bluetooth, /Accessible\.role:\s*Accessible\.AlertMessage/);
 
     const media = read("Popovers/MediaPopover.qml");
-    assert.match(media, /function focusInitial\(\)/);
+    assert.match(media, /function focusInitial\(\)[\s\S]*playButton\.forceActiveFocus/);
     assert.match(media,
-        /component TransportButton:[\s\S]*activeFocusOnTab:\s*available[\s\S]*Accessible\.checked:\s*toggle && active/);
-    assert.match(media, /Qt\.Key_(?:Right|Down)[\s\S]*nextItemInFocusChain\(true\)/);
+        /component TransportButton:[\s\S]*activeFocusOnTab:\s*shown && available[\s\S]*Accessible\.checked:\s*toggle && active/);
+    // Arrows act on playback wherever focus is: seek, skip with Shift, volume.
+    assert.match(media, /Keys\.onPressed:[\s\S]*Qt\.Key_Right[\s\S]*Qt\.ShiftModifier[\s\S]*Media\.seekBy[\s\S]*Media\.stepVolume/);
+    // The other players are a list of focusable rows, not a cycling switch.
     assert.match(media,
-        /Accessible\.name:\s*"Choose media player"[\s\S]*root\.selectSource\(-1\)/);
+        /id:\s*otherRow[\s\S]*activeFocusOnTab:\s*true[\s\S]*Accessible\.onPressAction:\s*Media\.pin\(otherRow\.modelData\)/);
     assert.match(media, /Accessible\.role:\s*Accessible\.AlertMessage/);
+    const chip = read("Bar/Modules/Media.qml");
+    assert.match(chip, /id:\s*playButton[\s\S]*Accessible\.role:\s*Accessible\.Button[\s\S]*Accessible\.onPressAction/);
 });
 
 test("reduced-motion mode stops infinite activity loops instead of busy-looping at zero duration", () => {

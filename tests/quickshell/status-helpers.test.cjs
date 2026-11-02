@@ -156,6 +156,79 @@ test("the active player is playing, else paused, else the first known", () => {
     assert.equal(H.activePlayer(undefined), null);
 });
 
+test("a picked player stays the shell's player until another one starts playing", () => {
+    const spotify = player("Spotify", "spotify", { dbusName: "org.mpris.MediaPlayer2.spotify",
+        isPlaying: true, playbackState: H.PLAYBACK_STATE.Playing, trackTitle: "Glass Harbour" });
+    const brave = player("Brave", "brave-browser", { dbusName: "org.mpris.MediaPlayer2.chromium.instance42",
+        playbackState: H.PLAYBACK_STATE.Paused, trackTitle: "Lo-fi beats" });
+    const mpv = player("mpv", "mpv", { dbusName: "org.mpris.MediaPlayer2.mpv", trackTitle: "" });
+    const proxy = player("Spotify", "", { dbusName: "org.mpris.MediaPlayer2.playerctld",
+        isPlaying: true, playbackState: H.PLAYBACK_STATE.Playing, trackTitle: "Glass Harbour" });
+    const all = [proxy, spotify, brave, mpv];
+
+    // playerctld mirrors another player and is never listed.
+    assert.deepEqual(H.listedPlayers(all), [spotify, brave, mpv]);
+    assert.equal(H.selectedPlayer(all, ""), spotify);
+    assert.deepEqual(H.playingKeys(all), ["org.mpris.MediaPlayer2.spotify"]);
+
+    // Picking the paused browser wins over the playing Spotify.
+    const pinned = H.playerKey(brave);
+    assert.equal(H.selectedPlayer(all, pinned), brave);
+    // Spotify was already playing when the browser was picked: the pin holds.
+    assert.equal(H.nextPinnedKey(pinned, ["org.mpris.MediaPlayer2.spotify"],
+        ["org.mpris.MediaPlayer2.spotify"]), pinned);
+    // The pinned player starting is not "another one".
+    assert.equal(H.nextPinnedKey(pinned, [], [pinned]), pinned);
+    // A newly started player takes over.
+    assert.equal(H.nextPinnedKey(pinned, [pinned], [pinned, "org.mpris.MediaPlayer2.mpv"]), "");
+    assert.equal(H.nextPinnedKey("", [], ["org.mpris.MediaPlayer2.mpv"]), "");
+    // A pin on a player that has quit falls back to the automatic choice.
+    assert.equal(H.selectedPlayer([spotify], pinned), spotify);
+
+    // Without a pin, the player shown keeps its place while it plays, even
+    // when another one starts (from the panel's list) ahead of it.
+    const video = player("mpv", "mpv", { dbusName: "mpv", isPlaying: true, trackTitle: "Lecture" });
+    assert.equal(H.selectedPlayer([video, spotify], "", H.playerKey(spotify)), spotify);
+    assert.equal(H.selectedPlayer([video, spotify], "", ""), video);
+    const stopped = { ...spotify, isPlaying: false, playbackState: H.PLAYBACK_STATE.Paused };
+    assert.equal(H.selectedPlayer([video, stopped], "", H.playerKey(stopped)), video,
+        "a paused current player gives way to one that plays");
+
+    // The others: everything else with a track, playing first.
+    const radio = player("Radio", "radio", { dbusName: "radio", isPlaying: true, trackTitle: "News" });
+    assert.deepEqual(H.otherPlayers([proxy, spotify, brave, mpv, radio], spotify), [radio, brave]);
+    assert.deepEqual(H.otherPlayers([], null), []);
+});
+
+test("the chip's text keeps the configured order and marks which half is the title", () => {
+    assert.deepEqual(H.chipText("title-artist", "Salt Road", "Hollis Fern"),
+        { first: "Salt Road", second: "Hollis Fern", titleFirst: true });
+    assert.deepEqual(H.chipText("artist-title", "Salt Road", "Hollis Fern"),
+        { first: "Hollis Fern", second: "Salt Road", titleFirst: false });
+    assert.deepEqual(H.chipText("title", "Salt Road", "Hollis Fern"),
+        { first: "Salt Road", second: "", titleFirst: true });
+    assert.deepEqual(H.chipText("artist-title", "Salt Road", ""),
+        { first: "Salt Road", second: "", titleFirst: true });
+    assert.deepEqual(H.chipText("title-artist", undefined, null),
+        { first: "", second: "", titleFirst: true });
+});
+
+test("a player's window comes from the dock's list, and a web app only matches its own", () => {
+    const windows = [
+        { address: "a1", appId: "brave-browser", entryId: "brave-browser" },
+        { address: "b2", appId: "brave-www.youtube.com__-Default", entryId: "brave-youtube.desktop" },
+        { address: "c3", appId: "Spotify", entryId: "com.spotify.Client" },
+    ];
+    assert.equal(H.playerWindow(player("Spotify", "spotify"), windows), "c3");
+    assert.equal(H.playerWindow(player("Brave", "brave-browser"), windows), "a1");
+    const youtube = player("Brave", "brave-browser", { metadata: { "xesam:url": "https://www.youtube.com/watch?v=x" } });
+    assert.equal(H.playerWindow(youtube, windows), "b2");
+    assert.equal(H.playerWindow(youtube, windows.slice(0, 1)), "",
+        "a YouTube player never falls back to an unrelated browser window");
+    assert.equal(H.playerWindow(player("mpv", "mpv"), windows), "");
+    assert.equal(H.playerWindow(null, windows), "");
+});
+
 // ---- enum mirrors --------------------------------------------------------
 //
 // The two enums above are mirrored numerically so the helpers stay free of Qt

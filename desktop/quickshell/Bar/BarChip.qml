@@ -70,6 +70,12 @@ Rectangle {
     property string tooltip: ""
     property int tooltipAlign: 0
     property var preparePanel: null
+    // Opt-ins for a chip with a control of its own inside (the media chip's
+    // play button): the content then sits above the chip's click target,
+    // which still takes every click the control does not; and a middle click
+    // is reported instead of falling through to the bar.
+    property bool contentTakesInput: false
+    property bool middleClickable: false
 
     // The shared bar-wide hit test drives the background, module colours and
     // tooltip together. It remains correct when a child MouseArea misses an
@@ -78,6 +84,7 @@ Rectangle {
     readonly property color fg: held || hovered ? hoverColor : idleColor
 
     signal clicked()
+    signal middleClicked()
     signal entered()
     signal exited()
 
@@ -100,9 +107,8 @@ Rectangle {
         ColorAnimation { duration: Theme.chipFadeDuration }
     }
 
-    // The media chip unfolds its transport under the pointer and the T3 chip
-    // swaps between a count and a word; both change width in place, and both
-    // should glide rather than jump.
+    // The T3 chip swaps between a count and a word, changing width in place;
+    // that should glide rather than jump.
     Behavior on implicitWidth {
         NumberAnimation {
             duration: Theme.expandDuration
@@ -124,6 +130,7 @@ Rectangle {
 
     Row {
         id: content
+        z: root.contentTakesInput ? 1 : 0
         anchors.verticalCenter: parent.verticalCenter
         x: root.leftPadding
         spacing: root.spacing
@@ -133,6 +140,7 @@ Rectangle {
         id: mouse
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: root.middleClickable ? Qt.LeftButton | Qt.MiddleButton : Qt.LeftButton
         cursorShape: Qt.PointingHandCursor
         onEntered: {
             if (root.preparePanel)
@@ -150,7 +158,11 @@ Rectangle {
                 root.host.hoverPopout(root.panelName, root.isle, root.anchorItem);
         }
         onExited: root.exited()
-        onClicked: {
+        onClicked: mouse => {
+            if (mouse.button === Qt.MiddleButton) {
+                root.middleClicked();
+                return;
+            }
             if (root.preparePanel)
                 root.preparePanel();
             if (root.ownsPanel)
