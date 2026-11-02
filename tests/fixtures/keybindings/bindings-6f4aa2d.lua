@@ -50,6 +50,8 @@ bind(mainMod .. " + SPACE", hl.dsp.global("quickshell:launcherToggle"), { descri
 if features.assistant then
   bind(mainMod .. " + I", hl.dsp.global("quickshell:assistantTalk"),
     { description = "Shell: Assistant" })
+  bind(mainMod .. " + SHIFT + I", hl.dsp.global("quickshell:assistantSelection"),
+    { description = "Shell: Ask the assistant about the selection" })
 end
 bind(mainMod .. " + CTRL + SHIFT + A", hl.dsp.exec_cmd("cybex agent --window"),
   { description = "Apps: AI agent" })

@@ -20,6 +20,17 @@ Rectangle {
         : applying ? "" : (approval.command || approval.diff || "")
 
     implicitHeight: column.implicitHeight + Theme.scaled(20)
+
+    // The service names its facts in English; these are the ones it sends.
+    function factLabel(label) {
+        switch (label) {
+        case "App": return I18n.tr("App");
+        case "From": return I18n.tr("From");
+        case "For": return I18n.tr("For");
+        case "Window": return I18n.tr("Window");
+        default: return label;
+        }
+    }
     radius: Theme.scaled(12)
     color: Theme.cardFill
     border.width: 1
@@ -39,7 +50,7 @@ Rectangle {
             Sym {
                 id: kindGlyph
                 anchors.verticalCenter: parent.verticalCenter
-                name: AssistantHelpers.APPROVAL_GLYPHS[root.kind] || "security"
+                name: root.approval.glyph || AssistantHelpers.APPROVAL_GLYPHS[root.kind] || "security"
                 size: Theme.iconMedium
                 color: root.applying ? Theme.accentText : Theme.amber
             }
@@ -68,6 +79,32 @@ Rectangle {
             color: Theme.textMid
             font.family: root.kind === "edit" ? Theme.fontMono : Theme.fontMenu
             font.pixelSize: Theme.typography.metadata
+        }
+
+        // A desktop tool's facts: the app, where it comes from, who gets it.
+        Grid {
+            width: parent.width
+            visible: (root.approval.facts || []).length > 0
+            columns: 2
+            columnSpacing: Theme.scaled(10)
+            rowSpacing: Theme.scaled(3)
+
+            Repeater {
+                model: (root.approval.facts || []).length * 2
+
+                delegate: Text {
+                    required property int index
+                    readonly property var fact: root.approval.facts[Math.floor(index / 2)]
+                    readonly property bool isLabel: index % 2 === 0
+                    width: isLabel ? Theme.scaled(64) : column.width - Theme.scaled(74)
+                    text: isLabel ? root.factLabel(fact.label) : fact.value
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    color: isLabel ? Theme.textFaint : Theme.textHi
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.metadata
+                }
+            }
         }
 
         // The command or the change, as the agent wrote it.

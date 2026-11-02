@@ -131,6 +131,13 @@ Singleton {
     property bool assistantSpeak: defaults.assistantSpeak
     property bool assistantScreenContext: defaults.assistantScreenContext
     property string assistantHistory: defaults.assistantHistory
+    property string assistantNotify: defaults.assistantNotify
+    property string assistantHover: defaults.assistantHover
+    property bool assistantFade: defaults.assistantFade
+    property bool assistantWindowContext: defaults.assistantWindowContext
+    property bool assistantExpanded: defaults.assistantExpanded
+    property int assistantExpandedWidth: defaults.assistantExpandedWidth
+    property string assistantTuck: defaults.assistantTuck
     property bool assistantShown: defaults.assistantShown
     property string assistantScreen: defaults.assistantScreen
     property int assistantX: defaults.assistantX
@@ -382,8 +389,9 @@ Singleton {
         // Where the character stands and whether it is out are runtime
         // state, reset with the page as idle inhibition is with Power.
         assistant: ["assistantAgent", "assistantApprovalPolicy", "assistantClaudeModel", "assistantCodexModel",
-            "assistantSpeak", "assistantScreenContext", "assistantHistory", "assistantShown", "assistantScreen",
-            "assistantX", "assistantY"],
+            "assistantSpeak", "assistantScreenContext", "assistantHistory", "assistantNotify", "assistantHover",
+            "assistantFade", "assistantWindowContext", "assistantExpanded", "assistantExpandedWidth",
+            "assistantTuck", "assistantShown", "assistantScreen", "assistantX", "assistantY"],
         backup: [],
         keyboard: [],
         home: []

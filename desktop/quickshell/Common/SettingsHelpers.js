@@ -243,6 +243,13 @@ var ASSISTANT_AGENTS = ["auto", "claude", "codex"];
 var ASSISTANT_CLAUDE_MODELS = ["default"].concat(NOTE_CLAUDE_MODELS);
 var ASSISTANT_CODEX_MODELS = ["default"].concat(NOTE_CODEX_MODELS);
 var ASSISTANT_HISTORY = ["month", "forever", "session"];
+// When Wiz says a question finished or needs an answer (notifications):
+// only while the box is closed, always, or never.
+var ASSISTANT_NOTIFY = ["closed", "always", "never"];
+// What resting the pointer on Wiz does: a status line, the box, or nothing.
+var ASSISTANT_HOVER = ["status", "open", "nothing"];
+// The screen edge Wiz is tucked behind; "" when he stands free.
+var ASSISTANT_TUCK = ["", "left", "right"];
 
 // Group kinds that rest on a visible pill fill rather than transparent
 // furniture. Cluster.qml reads this so the decision lives beside the map.
@@ -518,6 +525,20 @@ function defaults() {
         // How long Wiz keeps conversations (cybexos_assistant/history.py):
         // "month" (30 days), "forever", or "session" (never saved to disk).
         assistantHistory: "month",
+        // A notification for a question that finished or needs an answer
+        // while the box was not on screen (ASSISTANT_NOTIFY).
+        assistantNotify: "closed",
+        // Resting the pointer on Wiz shows his status; a click opens the box.
+        assistantHover: "status",
+        // He fades and lets clicks through while the pointer works under him.
+        assistantFade: true,
+        // The focused window's app and title go with a new question, as a
+        // chip the person can remove.
+        assistantWindowContext: true,
+        // The wide view for long answers, and its width.
+        assistantExpanded: false,
+        assistantExpandedWidth: 560,
+        assistantTuck: "",
         // Where the character was left. Runtime state, persisted so a shell
         // reload or a new session finds it there; -1 is the default corner.
         assistantShown: false,
@@ -1565,6 +1586,13 @@ function merge(raw, context) {
         assistantSpeak: boolIn(parsed.assistantSpeak, d.assistantSpeak),
         assistantScreenContext: boolIn(parsed.assistantScreenContext, d.assistantScreenContext),
         assistantHistory: enumIn(parsed.assistantHistory, ASSISTANT_HISTORY, d.assistantHistory),
+        assistantNotify: enumIn(parsed.assistantNotify, ASSISTANT_NOTIFY, d.assistantNotify),
+        assistantHover: enumIn(parsed.assistantHover, ASSISTANT_HOVER, d.assistantHover),
+        assistantFade: boolIn(parsed.assistantFade, d.assistantFade),
+        assistantWindowContext: boolIn(parsed.assistantWindowContext, d.assistantWindowContext),
+        assistantExpanded: boolIn(parsed.assistantExpanded, d.assistantExpanded),
+        assistantExpandedWidth: intIn(parsed.assistantExpandedWidth, 420, 1200, 1, d.assistantExpandedWidth),
+        assistantTuck: enumIn(parsed.assistantTuck, ASSISTANT_TUCK, d.assistantTuck),
         assistantShown: boolIn(parsed.assistantShown, d.assistantShown),
         assistantScreen: textIn(parsed.assistantScreen, 64, d.assistantScreen),
         assistantX: intIn(parsed.assistantX, -1, 32768, 1, d.assistantX),

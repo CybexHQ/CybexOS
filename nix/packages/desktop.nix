@@ -83,6 +83,13 @@ in stdenv.mkDerivation {
     mkdir -p $out/share/cybexos/wiz/terminal
     rsvg-convert --height 640 assets/wiz/idle.svg \
       | magick png:- -trim +repage $out/share/cybexos/wiz/terminal/idle.png
+    # The assistant's notifications show Wiz in the pose of their news
+    # (docs/assistant.md): finished, waiting for an answer, a routine's
+    # finding, a failure.
+    mkdir -p $out/share/cybexos/wiz/notify
+    for pose in finished needs-input thinking sorry; do
+      rsvg-convert --height 128 --output $out/share/cybexos/wiz/notify/$pose.png assets/wiz/$pose.svg
+    done
     cp -r ${lazyvimStarter} $out/share/cybexos/defaults/nvim
     cp assets/EDM115-newline2.omp.json $out/share/cybexos/defaults/prompt.json
     cp -r agent-skills/cybexos $out/share/cybexos/skills/

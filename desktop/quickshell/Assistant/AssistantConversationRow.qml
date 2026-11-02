@@ -66,10 +66,20 @@ Rectangle {
         anchors.topMargin: Theme.scaled(8)
         width: Theme.iconSmall
         height: Theme.iconSmall
+        visible: !root.row.routine
         name: AssistantHelpers.AGENT_ICONS[root.row.agent] || ""
         colorized: true
         tint: Theme.textLow
         normalizeTintSource: true
+    }
+
+    // A routine's run carries the calendar instead of the agent's mark.
+    Sym {
+        anchors.centerIn: mark
+        visible: !!root.row.routine
+        name: "event"
+        size: Theme.iconSmall
+        color: Theme.accentText
     }
 
     Column {

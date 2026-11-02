@@ -24,6 +24,7 @@ def build_parser():
     ask.add_argument("--agent", choices=("auto", "claude", "codex"), default="auto")
     ask.add_argument("--socket", default=None)
     ask.add_argument("text", nargs="+")
+    commands.add_parser("mcp", help="the desktop tools as an MCP server (the agents start this)")
     for verb in ("show", "hide", "toggle"):
         commands.add_parser(verb, help=f"{verb} the character")
     return parser
@@ -102,6 +103,9 @@ async def ask(path, agent, text):
     try:
         await connection.call("hello", {"client": "cybexos-assistant ask", "protocol": 1})
         started = await connection.call("turn.start", {"text": text, "agent": agent}, follow)
+        if not started.get("turn"):
+            print("Wiz is busy; your question waits until he is free.", file=sys.stderr)
+            return 0
         current["id"] = started["turn"]["id"]
         while current["done"] is None:
             follow(await connection.receive())
@@ -125,6 +129,9 @@ def main(argv=None):
         except OSError as error:
             print(f"cybexos-assistant: {error}", file=sys.stderr)
             return 127
+    if args.command == "mcp":
+        from .mcp import main as mcp_main
+        return mcp_main()
     path = args.socket or default_socket()
     if args.command == "serve":
         from .server import Server

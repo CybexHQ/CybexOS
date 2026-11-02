@@ -14,7 +14,7 @@ import itertools
 import json
 import shlex
 
-from . import policy, steps
+from . import desktop, policy, steps
 from .protocol import LOG, encode, iter_lines, parse_json, stop_process
 from .turn import classify
 
@@ -35,8 +35,11 @@ class CodexAgent:
     label = "Codex"
 
     def __init__(self, executable, home, instructions, status_path=None, conversation_id=None,
-                 on_conversation=None, env=None):
+                 on_conversation=None, env=None, mcp=None, look_only=False):
         self.executable = executable
+        # (argv, env) of the Cybex OS desktop tool server (mcp.py), or None.
+        self.mcp = mcp
+        self.look_only = look_only
         self.home = str(home)
         self.instructions = instructions
         self.status_path = status_path
@@ -121,7 +124,8 @@ class CodexAgent:
         if self.process is not None and self.process.returncode is None:
             return
         self.process = await asyncio.create_subprocess_exec(
-            self.executable, "app-server", cwd=self.home, env=self.env, stdin=asyncio.subprocess.PIPE,
+            self.executable, "app-server", *mcp_overrides(self.mcp), cwd=self.home, env=self.env,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)
         self.loaded = None
         self.stderr.clear()
@@ -158,7 +162,7 @@ class CodexAgent:
         self._record(identifier)
         self.loaded = identifier
 
-    async def run(self, turn, text, image=None, model=None):
+    async def run(self, turn, text, images=None, model=None):
         self._cancel_idle()
         loop = asyncio.get_running_loop()
         try:
@@ -169,8 +173,8 @@ class CodexAgent:
             self.final_text = self.last_message = None
             self.turn_error, self.turn_kind = "", ""
             items = [{"type": "text", "text": text, "text_elements": []}]
-            if image:
-                items.append({"type": "localImage", "path": image})
+            for path in images or []:
+                items.append({"type": "localImage", "path": path})
             params = {"threadId": self.conversation_id, "input": items}
             if model:
                 params["model"] = model
@@ -302,6 +306,9 @@ class CodexAgent:
             if kind == "fileChange":
                 self.items[item.get("id")] = item
             turn.set_step(steps.codex_item(item))
+            # The service records its own desktop tools as it runs them.
+            if not (kind == "mcpToolCall" and item.get("server") == desktop.SERVER):
+                turn.add_step(steps.codex_record(item))
         elif method == "item/agentMessage/delta":
             if self.message_item in (None, params.get("itemId")):
                 turn.delta(params.get("delta", ""))
@@ -378,7 +385,12 @@ class CodexAgent:
             elif method == "item/tool/requestUserInput":
                 await self._reply(identifier, {"answers": {}})
             elif method == "mcpServer/elicitation/request":
-                await self._reply(identifier, {"action": "decline", "content": None, "_meta": None})
+                # Codex may ask before calling a tool of the Cybex OS server;
+                # the service decides on every call itself (desktop.py).
+                if params.get("serverName") == desktop.SERVER:
+                    await self._reply(identifier, {"action": "accept", "content": {}, "_meta": None})
+                else:
+                    await self._reply(identifier, {"action": "decline", "content": None, "_meta": None})
             elif method == "item/tool/call":
                 await self._reply(identifier, {"contentItems": [], "success": False})
             else:
@@ -415,6 +427,24 @@ class CodexAgent:
         card = {"kind": "other", "title": "Allow more access", "detail": "\n".join(detail)[:1500]}
         key = ("permissions", json.dumps(requested, sort_keys=True))
         return await self._authorize(turn, policy.ask(card, key=key))
+
+
+def toml_string(value):
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def mcp_overrides(mcp):
+    """`-c` overrides that add the Cybex OS desktop tools to this app-server."""
+    if not mcp:
+        return []
+    argv, env = mcp
+    key = f"mcp_servers.{desktop.SERVER}"
+    table = "{" + ", ".join(f"{name} = {toml_string(value)}" for name, value in sorted(env.items())) + "}"
+    return ["-c", f"{key}.command={toml_string(argv[0])}",
+            "-c", f"{key}.args=[{', '.join(toml_string(arg) for arg in argv[1:])}]",
+            "-c", f"{key}.env={table}",
+            "-c", f"{key}.tool_timeout_sec=900",
+            "-c", f'{key}.default_tools_approval_mode="approve"']
 
 
 def review_decision(answer):

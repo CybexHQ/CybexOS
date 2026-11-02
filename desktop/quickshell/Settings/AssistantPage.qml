@@ -3,8 +3,10 @@ import QtQuick
 import Quickshell
 import "../Common"
 import "../Common/AssistantHelpers.js" as AssistantHelpers
+import "../Common/SettingsSearchData.js" as SettingsSearchData
 
-// Assistant: who answers, what it may see and hear, and how it looks
+// Assistant: who answers, what it may see and hear, how it behaves on the
+// desktop, everything it changed and the routines it runs
 // (docs/assistant.md). The agents keep their own sign-in and settings; this
 // page chooses the agent and the assistant's tool permissions. Screen context
 // and spoken replies are off until switched on here.
@@ -14,6 +16,140 @@ SettingsPage {
 
     readonly property bool claudeInstalled: !!(Assistant.agents.claude && Assistant.agents.claude.available)
     readonly property bool codexInstalled: !!(Assistant.agents.codex && Assistant.agents.codex.available)
+
+    // ---- the change log ------------------------------------------------------
+    property var changes: []
+    property bool allChanges: false
+    readonly property var changeGroups: AssistantHelpers.groupChanges(
+        allChanges ? changes : changes.slice(0, 12), Assistant.now)
+
+    function reloadChanges() {
+        if (!Assistant.connected)
+            return;
+        Assistant.loadChanges(rows => {
+            if (rows !== null)
+                page.changes = rows;
+        });
+    }
+
+    onVisibleChanged: {
+        if (visible)
+            reloadChanges();
+    }
+    Component.onCompleted: reloadChanges()
+
+    Connections {
+        target: Assistant
+
+        function onChangesRevisionChanged() {
+            page.reloadChanges();
+        }
+
+        function onConnectedChanged() {
+            page.reloadChanges();
+        }
+    }
+
+    function groupLabel(group) {
+        switch (group) {
+        case "today": return I18n.tr("Today");
+        case "yesterday": return I18n.tr("Yesterday");
+        case "week": return I18n.tr("Earlier this week");
+        default: return I18n.tr("Older");
+        }
+    }
+
+    function changeValue(row) {
+        const time = Qt.formatTime(new Date(row.at), Settings.clock24 ? "HH:mm" : "h:mm AP");
+        const what = row.kind === "setting" ? row.before + " → " + row.after
+            : row.detail === "created" ? I18n.tr("created")
+            : row.detail === "installed" ? I18n.tr("installed")
+            : row.detail === "removed" || row.detail === "deleted" ? I18n.tr("removed")
+            : row.kind === "system" ? I18n.tr("system change")
+            : I18n.tr("changed");
+        const state = row.status === "undone" ? I18n.tr("undone")
+            : row.status === "blocked" ? I18n.tr("changed again later, undo that first")
+            : row.status === "changed" ? I18n.tr("changed since")
+            : "";
+        return [what, time, state].filter(part => part !== "").join(" · ");
+    }
+
+    function undoLabel(row) {
+        switch (row.action) {
+        case "delete": return I18n.tr("Delete");
+        case "remove": return I18n.tr("Remove");
+        default: return I18n.tr("Undo");
+        }
+    }
+
+    // ---- the routine being written ------------------------------------------------
+    property bool editing: false
+    property string editId: ""
+    property string editQuestion: ""
+    property string editKind: "weekly"
+    property int editWeekday: 0
+    property int editDay: 1
+    property string editTime: "09:00"
+    property bool editAttention: true
+    property string editError: ""
+
+    function newRoutine() {
+        editId = "";
+        editQuestion = "";
+        editKind = "weekly";
+        editWeekday = 0;
+        editDay = 1;
+        editTime = "09:00";
+        editAttention = true;
+        editError = "";
+        editing = true;
+    }
+
+    function editRoutine(routine) {
+        editId = routine.id;
+        editQuestion = routine.question;
+        editKind = routine.schedule.kind;
+        editWeekday = routine.schedule.weekday || 0;
+        editDay = routine.schedule.day || 1;
+        editTime = routine.schedule.time || "09:00";
+        editAttention = routine.notify !== "always";
+        editError = "";
+        editing = true;
+    }
+
+    function saveRoutine() {
+        const schedule = { kind: editKind };
+        if (editKind !== "update")
+            schedule.time = editTime.trim();
+        if (editKind === "weekly")
+            schedule.weekday = editWeekday;
+        if (editKind === "monthly")
+            schedule.day = editDay;
+        const fields = { question: editQuestion.trim(), schedule: schedule,
+            notify: editAttention ? "attention" : "always" };
+        const done = (routine, error) => {
+            if (error) {
+                page.editError = error.message;
+                return;
+            }
+            page.editing = false;
+        };
+        if (editId === "")
+            Assistant.createRoutine(fields, done);
+        else
+            Assistant.updateRoutine(editId, Object.assign({ title: fields.question }, fields), done);
+    }
+
+    function routineDetail(routine) {
+        const last = routine.last;
+        const lastText = !last ? I18n.tr("not run yet")
+            : last.status === "failed" ? I18n.tr("last run failed")
+            : last.attention ? I18n.tr("last run found something")
+            : I18n.tr("last run: all well");
+        return [Assistant.routineLabel(routine),
+            routine.notify === "always" ? I18n.tr("always tells you") : I18n.tr("tells you when something needs attention"),
+            routine.enabled ? lastText : I18n.tr("paused")].join(" · ");
+    }
 
     function installedLabel(installed) {
         return !Assistant.connected ? "" : installed ? I18n.tr("installed") : I18n.tr("not installed");
@@ -51,7 +187,7 @@ SettingsPage {
             }
             SettingsHint {
                 width: parent.width
-                text: I18n.tr("Hover the character or tap Super+I to type. Hold Super+I to talk, and release to send.")
+                text: I18n.tr("Click the character or tap Super+I to type. Hold Super+I to talk, and release to send. Super+Shift+I asks about the selected text.")
             }
             // The read-only `cybex doctor` report, and the assistant asked
             // about it (docs/system-check.md).
@@ -182,6 +318,282 @@ SettingsPage {
                     onTriggered: {
                         Assistant.openHistory();
                         Assistant.confirmingClear = true;
+                    }
+                }
+            }
+        }
+
+        SettingsGroup {
+            width: parent.width
+            title: I18n.tr("Behaviour")
+
+            PickerRow {
+                width: parent.width
+                label: I18n.tr("When the pointer rests on Wiz")
+                settingKey: "assistantHover"
+                model: [
+                    { value: "status", label: I18n.tr("Show status") },
+                    { value: "open", label: I18n.tr("Open the box") },
+                    { value: "nothing", label: I18n.tr("Nothing") }
+                ]
+            }
+            PickerRow {
+                width: parent.width
+                label: I18n.tr("Notify when Wiz finishes")
+                settingKey: "assistantNotify"
+                model: [
+                    { value: "closed", label: I18n.tr("When the box is closed") },
+                    { value: "always", label: I18n.tr("Always") },
+                    { value: "never", label: I18n.tr("Never") }
+                ]
+            }
+            SettingsHint {
+                width: parent.width
+                text: I18n.tr("Questions that take longer than 20 seconds, and every question waiting for your answer.")
+            }
+            SwitchRow {
+                width: parent.width
+                label: I18n.tr("Fade while working under Wiz")
+                settingKey: "assistantFade"
+                description: I18n.tr("When the pointer sweeps over him, he fades and clicks go to the window underneath. Resting on him brings him back.")
+            }
+            SwitchRow {
+                width: parent.width
+                label: I18n.tr("Include the focused window")
+                settingKey: "assistantWindowContext"
+                description: I18n.tr("A new question carries the app and title of the window you were using, as a chip you can remove.")
+            }
+            SwitchRow {
+                width: parent.width
+                label: I18n.tr("Wide view for answers")
+                settingKey: "assistantExpanded"
+                description: I18n.tr("Opens answers beside Wiz with room for tables and code. Expand and its edge change this too.")
+            }
+        }
+
+        SettingsGroup {
+            width: parent.width
+            title: I18n.tr("Changes Wiz made")
+            property string searchAnchor: "assistant-changes"
+
+            SettingsHint {
+                width: parent.width
+                text: page.changes.length === 0 ? I18n.tr("Nothing yet. Every preference, file, widget, app and routine Wiz changes is listed here and can be undone.")
+                    : I18n.tr("Undo restores what was there before. A change that something later changed again waits for that to be undone first.")
+            }
+
+            Repeater {
+                model: page.changeGroups
+
+                delegate: SettingsSubsection {
+                    id: day
+                    required property var modelData
+                    width: parent.width
+                    title: page.groupLabel(day.modelData.group)
+
+                    Repeater {
+                        model: day.modelData.rows
+
+                        delegate: ValueRow {
+                            id: changeRowItem
+                            required property var modelData
+                            readonly property var row: AssistantHelpers.changeRow(modelData, SettingsSearchData.ROWS)
+                            width: parent.width
+                            label: row.label
+                            labelMono: row.kind === "file"
+                            value: page.changeValue(row)
+                            valueColor: row.status === "blocked" || row.status === "changed" ? Theme.amber
+                                : row.status === "undone" ? Theme.textFaint : Theme.textMid
+
+                            SettingsAction {
+                                visible: changeRowItem.row.undoable
+                                text: page.undoLabel(changeRowItem.row)
+                                onTriggered: Assistant.undoChanges([changeRowItem.row.id])
+                            }
+                            SettingsAction {
+                                visible: changeRowItem.row.kind === "system"
+                                text: I18n.tr("Software Update…")
+                                onTriggered: Updates.show()
+                            }
+                            SettingsAction {
+                                visible: changeRowItem.row.conversation !== ""
+                                    && Assistant.conversations.some(entry => entry.id === changeRowItem.row.conversation)
+                                compact: true
+                                glyph: "history"
+                                text: I18n.tr("Open the conversation")
+                                onTriggered: Assistant.openConversation(changeRowItem.row.conversation)
+                            }
+                        }
+                    }
+                }
+            }
+
+            ValueRow {
+                width: parent.width
+                visible: page.changes.length > 12
+                label: I18n.format("%1 changes this month", [page.changes.length])
+                SettingsAction {
+                    text: page.allChanges ? I18n.tr("Show fewer") : I18n.tr("Show all")
+                    onTriggered: page.allChanges = !page.allChanges
+                }
+            }
+        }
+
+        SettingsGroup {
+            width: parent.width
+            title: I18n.tr("Routines")
+            property string searchAnchor: "assistant-routines"
+
+            SettingsHint {
+                width: parent.width
+                text: I18n.tr("Questions Wiz asks on a schedule while you're logged in. A routine only looks and reports; fixes wait for you in its conversation. Ask Wiz for one (“every Monday morning, check this computer”) or add one here.")
+            }
+
+            Repeater {
+                model: Assistant.routines
+
+                delegate: ValueRow {
+                    id: routineRow
+                    required property var modelData
+                    width: parent.width
+                    label: modelData.title
+                    value: page.routineDetail(modelData)
+                    valueColor: modelData.last && modelData.last.attention ? Theme.amber : Theme.textMid
+
+                    SettingsAction {
+                        compact: true
+                        glyph: "play_arrow"
+                        text: I18n.tr("Run now")
+                        enabled: Assistant.connected
+                        onTriggered: Assistant.runRoutine(routineRow.modelData.id)
+                    }
+                    SettingsAction {
+                        text: routineRow.modelData.enabled ? I18n.tr("Pause") : I18n.tr("Resume")
+                        onTriggered: Assistant.updateRoutine(routineRow.modelData.id,
+                            { enabled: !routineRow.modelData.enabled })
+                    }
+                    SettingsAction {
+                        text: I18n.tr("Edit")
+                        onTriggered: page.editRoutine(routineRow.modelData)
+                    }
+                    SettingsAction {
+                        compact: true
+                        glyph: "delete"
+                        danger: true
+                        text: I18n.tr("Remove")
+                        onTriggered: Assistant.deleteRoutine(routineRow.modelData.id)
+                    }
+                }
+            }
+
+            ValueRow {
+                width: parent.width
+                visible: !page.editing
+                label: Assistant.routines.length === 0 ? I18n.tr("No routines yet") : ""
+                SettingsAction {
+                    glyph: "add"
+                    text: I18n.tr("New routine")
+                    enabled: Assistant.connected
+                    onTriggered: page.newRoutine()
+                }
+            }
+
+            // The routine being written or changed.
+            SettingsSubsection {
+                width: parent.width
+                visible: page.editing
+                title: page.editId === "" ? I18n.tr("New routine") : I18n.tr("Edit routine")
+
+                SettingsTextRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    label: I18n.tr("Question")
+                    value: page.editQuestion
+                    placeholder: I18n.tr("Check this computer and tell me if anything needs attention")
+                    onCommitted: text => page.editQuestion = text
+                }
+                SelectRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    label: I18n.tr("When")
+                    current: page.editKind
+                    model: [
+                        { value: "daily", label: I18n.tr("Every day") },
+                        { value: "weekly", label: I18n.tr("Every week") },
+                        { value: "monthly", label: I18n.tr("Every month") },
+                        { value: "update", label: I18n.tr("After each kept update") }
+                    ]
+                    onPicked: value => page.editKind = value
+                }
+                SelectRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    visible: page.editKind === "weekly"
+                    label: I18n.tr("Day")
+                    current: page.editWeekday
+                    model: [
+                        { value: 0, label: I18n.tr("Monday") }, { value: 1, label: I18n.tr("Tuesday") },
+                        { value: 2, label: I18n.tr("Wednesday") }, { value: 3, label: I18n.tr("Thursday") },
+                        { value: 4, label: I18n.tr("Friday") }, { value: 5, label: I18n.tr("Saturday") },
+                        { value: 6, label: I18n.tr("Sunday") }
+                    ]
+                    onPicked: value => page.editWeekday = value
+                }
+                SelectRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    visible: page.editKind === "monthly"
+                    label: I18n.tr("Day of the month")
+                    current: page.editDay
+                    model: Array.from({ length: 28 }, (_, index) => ({ value: index + 1, label: String(index + 1) }))
+                    onPicked: value => page.editDay = value
+                }
+                SettingsTextRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    visible: page.editKind !== "update"
+                    label: I18n.tr("Time")
+                    value: page.editTime
+                    placeholder: "09:00"
+                    fieldWidth: Theme.scaled(90, Theme.typeScale)
+                    onCommitted: text => page.editTime = text
+                }
+                SwitchRow {
+                    width: parent.width
+                    // A draft: Save or Cancel below, nothing to reset.
+                    dirty: false
+                    resetKeys: []
+                    label: I18n.tr("Tell me only when something needs attention")
+                    checked: page.editAttention
+                    onToggled: value => page.editAttention = value
+                }
+                SettingsHint {
+                    width: parent.width
+                    visible: page.editError !== ""
+                    tone: "warning"
+                    text: page.editError
+                }
+                ValueRow {
+                    width: parent.width
+                    SettingsAction {
+                        text: I18n.tr("Cancel")
+                        onTriggered: page.editing = false
+                    }
+                    SettingsAction {
+                        primary: true
+                        text: page.editId === "" ? I18n.tr("Add routine") : I18n.tr("Save")
+                        enabled: page.editQuestion.trim() !== ""
+                        onTriggered: page.saveRoutine()
                     }
                 }
             }

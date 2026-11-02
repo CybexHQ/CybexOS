@@ -12,15 +12,18 @@ import base64
 import collections
 import contextlib
 import itertools
+import json
 import os
 
-from . import policy, steps
+from . import desktop, policy, steps
 from .protocol import LOG, encode, iter_lines, parse_json, stop_process
 from .turn import classify
 
 
 IDLE_SECONDS = 15 * 60
 STOP_GRACE = 5.0
+# A look-only question (a side question, a routine) cannot edit files at all.
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 
 
 class ClaudeAgent:
@@ -28,8 +31,11 @@ class ClaudeAgent:
     label = "Claude Code"
 
     def __init__(self, executable, home, instructions, status_path=None, conversation_id=None,
-                 on_conversation=None, env=None):
+                 on_conversation=None, env=None, mcp=None, look_only=False):
         self.executable = executable
+        # (argv, env) of the Cybex OS desktop tool server (mcp.py), or None.
+        self.mcp = mcp
+        self.look_only = look_only
         self.home = str(home)
         self.instructions = instructions
         self.status_path = status_path
@@ -86,12 +92,22 @@ class ClaudeAgent:
                    "--append-system-prompt", self.instructions]
         if model:
             command += ["--model", model]
+        if self.mcp:
+            argv, server_env = self.mcp
+            command += ["--mcp-config", json.dumps({"mcpServers": {desktop.SERVER: {
+                "type": "stdio", "command": argv[0], "args": argv[1:], "env": server_env}}})]
+        # Both options take several values; the next option ends each list.
+        if self.look_only:
+            command += ["--disallowedTools", *EDIT_TOOLS]
         self.resumed = bool(self.conversation_id)
         if self.conversation_id:
             command += ["--resume", self.conversation_id]
         self.received = 0
+        env = dict(self.env if self.env is not None else os.environ)
+        # An app install through the desktop tools can take minutes.
+        env.setdefault("MCP_TOOL_TIMEOUT", "900000")
         self.process = await asyncio.create_subprocess_exec(
-            *command, cwd=self.home, env=self.env, stdin=asyncio.subprocess.PIPE,
+            *command, cwd=self.home, env=env, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)
         self.model = model
         self.stderr.clear()
@@ -111,8 +127,8 @@ class ClaudeAgent:
         if self.result is not None and not self.result.done():
             self.result.set_result({"status": status, "text": text, "error": error, "kind": kind})
 
-    async def run(self, turn, text, image=None, model=None):
-        outcome = await self._attempt(turn, text, image, model)
+    async def run(self, turn, text, images=None, model=None):
+        outcome = await self._attempt(turn, text, images, model)
         if outcome["kind"] == "crashed" and self.resume_failed and not turn.stopping:
             # A session Claude Code no longer has (deleted, or from another
             # machine's home) must not fail every later question too.
@@ -120,17 +136,16 @@ class ClaudeAgent:
             self.resume_failed = False
             self.conversation_id = None
             self.on_conversation(self.name, None)
-            outcome = await self._attempt(turn, text, image, model)
+            outcome = await self._attempt(turn, text, images, model)
         return outcome
 
-    async def _attempt(self, turn, text, image, model):
+    async def _attempt(self, turn, text, images, model):
         self._cancel_idle()
         await self._start(model or None)
         loop = asyncio.get_running_loop()
         self.turn, self.result = turn, loop.create_future()
         content = [{"type": "text", "text": text}]
-        if image:
-            data, media = image
+        for data, media in images or []:
             content.append({"type": "image", "source": {"type": "base64", "media_type": media,
                                                         "data": base64.b64encode(data).decode("ascii")}})
         try:
@@ -256,6 +271,9 @@ class ClaudeAgent:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     name, tool_input = block.get("name", ""), block.get("input") or {}
                     turn.set_step(steps.claude_tool(name, tool_input))
+                    # The service records its own desktop tools as it runs them.
+                    if not desktop.ours(name):
+                        turn.add_step(steps.claude_record(name, tool_input))
                     # Best effort for edits the person's own rules allow without a prompt.
                     path = tool_input.get(policy.EDIT_TOOLS.get(name, "")) if isinstance(tool_input, dict) else None
                     if isinstance(path, str) and path and not policy.vendor(policy.expand(path, self.home)):
@@ -297,4 +315,5 @@ class ClaudeAgent:
 
 def media_type(path):
     extension = os.path.splitext(str(path))[1].lower()
-    return "image/jpeg" if extension in (".jpg", ".jpeg") else "image/png"
+    return {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+            ".gif": "image/gif"}.get(extension, "image/png")

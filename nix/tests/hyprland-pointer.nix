@@ -98,10 +98,12 @@ in pkgs.testers.runNixOSTest {
     }) ];
     # The character's place before the first sign-in, right of the probe
     # window and below the bar, as tests/assistant-overlay.py seeds it.
+    # Hovering opens the box here (Settings → Assistant can choose that;
+    # the default shows a status line), which is what these drags start from.
     systemd.tmpfiles.rules = [
       "d /home/tester/.config 0700 tester users -"
       "d /home/tester/.config/cybexos 0700 tester users -"
-      ''f /home/tester/.config/cybexos/shell.json 0600 tester users - {"v":30,"assistantShown":true,"assistantX":880,"assistantY":240}''
+      ''f /home/tester/.config/cybexos/shell.json 0600 tester users - {"v":30,"assistantShown":true,"assistantX":880,"assistantY":240,"assistantHover":"open"}''
     ];
     virtualisation = {
       memorySize = 8192;
@@ -269,7 +271,7 @@ in pkgs.testers.runNixOSTest {
 
     # The system check the guide runs, in this session, and Ready's report of it.
     IDS = ["graphics", "drivers", "firmware-files", "services", "audio", "secure-boot", "firmware-updates",
-           "storage", "battery", "time", "desktop"]
+           "storage", "battery", "time", "desktop", "laptop"]
     report = json.loads(user("cybex doctor --json"))
     (out / "doctor.json").write_text(json.dumps(report, indent=2) + "\n")
     assert [check["id"] for check in report["checks"]] == IDS, report

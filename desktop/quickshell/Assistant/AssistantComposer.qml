@@ -1,10 +1,8 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell
 import Quickshell.Services.Pipewire
 import "../Common"
 import "../Common/AssistantHelpers.js" as AssistantHelpers
-import "../Common/T3CodeHelpers.js" as T3CodeHelpers
 
 // Where a question is typed or spoken. Enter sends, Shift+Enter breaks the
 // line and Esc closes (a recording is cancelled first). While listening, the
@@ -28,12 +26,42 @@ AssistantSurface {
     readonly property var recent: Assistant.conversations.slice(0, Math.max(0, Math.min(
         AssistantHelpers.RECENT_LIMIT, Math.floor((root.room - root.baseHeight) / root.recentRowHeight))))
     property bool menuOpen: false
-    onVisibleChanged: menuOpen = false
+    // The agent and model menu under the chip.
+    property bool modelMenuOpen: false
+    onVisibleChanged: {
+        menuOpen = false;
+        modelMenuOpen = false;
+    }
 
     readonly property bool listening: Assistant.listening
     // The microphone's level, which the character's ring follows too.
     readonly property real level: listening ? peaks.peak : 0
     readonly property bool transcribing: Assistant.transcribing
+    // The one suggestion that fits the moment, first, with why it is there.
+    readonly property var situational: {
+        const moment = Assistant.situation;
+        if (!moment)
+            return null;
+        switch (moment.kind) {
+        case "update-failed":
+            return { text: I18n.tr("Why did the update fail?"), update: true, glyph: "warning",
+                warn: true, reason: I18n.format("Software Update failed %1", [root.ago(moment.at)]) };
+        case "kept":
+            return { text: I18n.format("What's new in %1?", [moment.version]), glyph: "auto_awesome",
+                reason: I18n.format("Cybex OS %1 was kept %2", [moment.version, root.ago(moment.at)]) };
+        case "repeated":
+            return { text: I18n.format("Why does “%1” keep happening?", [moment.summary]), glyph: "notifications",
+                reason: I18n.format("%1 times in the last hour", [moment.count]) };
+        }
+        return null;
+    }
+
+    function ago(at) {
+        const minutes = Math.max(0, Math.floor((Assistant.now - at) / 60000));
+        return minutes < 1 ? I18n.tr("just now") : minutes === 1 ? I18n.tr("a minute ago")
+            : I18n.format("%1 minutes ago", [minutes]);
+    }
+
     readonly property var suggestions: {
         const list = [
             { text: I18n.tr("Check this computer"), check: true },
@@ -43,7 +71,8 @@ AssistantSurface {
         ];
         if (Settings.assistantScreenContext)
             list.push({ text: I18n.tr("Explain what is on my screen"), screen: true });
-        return list;
+        // Only three fixed ones after the moment's own.
+        return root.situational ? [root.situational].concat(list.slice(0, 3)) : list;
     }
 
     function focusInput() {
@@ -60,6 +89,8 @@ AssistantSurface {
     function backOut() {
         if (Assistant.listening || Assistant.transcribing)
             Assistant.cancelListening();
+        else if (root.modelMenuOpen)
+            root.modelMenuOpen = false;
         else if (root.menuOpen)
             root.menuOpen = false;
         else
@@ -133,6 +164,15 @@ AssistantSurface {
                 controlHeight: Theme.scaled(26)
                 color: "transparent"
                 onTriggered: Assistant.openHistory()
+            }
+
+            AssistantButton {
+                visible: root.continuing
+                glyph: Settings.assistantExpanded ? "close_fullscreen" : "open_in_full"
+                accessibleName: Settings.assistantExpanded ? I18n.tr("Back to the small box") : I18n.tr("Expand")
+                controlHeight: Theme.scaled(26)
+                color: "transparent"
+                onTriggered: Assistant.toggleExpanded()
             }
 
             AssistantButton {
@@ -263,28 +303,22 @@ AssistantSurface {
                         }
                     }
 
-                    TextEdit {
+                    AssistantMarkdown {
                         width: parent.width
-                        readOnly: true
-                        selectByMouse: true
                         visible: text !== ""
-                        textFormat: exchange.failed ? TextEdit.PlainText : TextEdit.MarkdownText
+                        plain: exchange.failed || exchange.active
                         text: exchange.failed ? (exchange.modelData.error || I18n.tr("Something went wrong."))
                             : exchange.active ? I18n.tr("Wiz is still working on this.")
                             : exchange.modelData.status === "stopped" && (exchange.modelData.text || "") === ""
                                 ? I18n.tr("Stopped.")
-                            : T3CodeHelpers.styleMarkdownLinks(exchange.modelData.text || "",
-                                Theme.accentText.toString())
-                        wrapMode: TextEdit.Wrap
+                            : exchange.modelData.text || ""
                         color: exchange.failed ? Theme.redText : exchange.active ? Theme.textLow : Theme.textHi
-                        selectionColor: Theme.accentSoft
-                        selectedTextColor: Theme.textHi
-                        font.family: Theme.fontMenu
-                        font.pixelSize: Theme.typography.control
-                        onLinkActivated: link => {
-                            if (/^(https?|mailto):/i.test(link))
-                                Quickshell.execDetached(["xdg-open", link]);
-                        }
+                    }
+
+                    AssistantSteps {
+                        width: parent.width
+                        steps: exchange.modelData.steps || []
+                        folded: true
                     }
 
                     Text {
@@ -360,6 +394,72 @@ AssistantSurface {
             controlHeight: Theme.scaled(26)
             color: "transparent"
             onTriggered: Assistant.detachScreen()
+        }
+    }
+
+    // ---- what goes with the question ----------------------------------------------
+    Flow {
+        id: attachmentFlow
+        width: parent.width
+        spacing: Theme.scaled(5)
+        visible: Assistant.attachments.length > 0 && !Assistant.setupRequired && !root.listening
+
+        Repeater {
+            model: Assistant.attachments
+
+            delegate: Rectangle {
+                id: attachmentChip
+                required property var modelData
+                height: Theme.scaled(26)
+                width: Math.min(attachmentFlow.width, chipRow.implicitWidth + Theme.scaled(8))
+                radius: Theme.scaled(7)
+                color: Theme.chip
+                border.width: 1
+                border.color: Theme.hairline
+                Accessible.role: Accessible.StaticText
+                Accessible.name: attachmentChip.modelData.label
+
+                Row {
+                    id: chipRow
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.scaled(8)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.scaled(5)
+
+                    Sym {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: AssistantHelpers.attachmentGlyph(attachmentChip.modelData.kind)
+                        size: Theme.iconSmall
+                        color: Theme.textMid
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, attachmentFlow.width - Theme.scaled(110))
+                        text: attachmentChip.modelData.label
+                        elide: Text.ElideMiddle
+                        textFormat: Text.PlainText
+                        color: Theme.textHi
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: (attachmentChip.modelData.detail || "") !== ""
+                        text: attachmentChip.modelData.detail || ""
+                        color: Theme.textFaint
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                    }
+                    AssistantButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        glyph: "close"
+                        accessibleName: I18n.format("Remove %1", [attachmentChip.modelData.label])
+                        controlHeight: Theme.scaled(18)
+                        color: "transparent"
+                        onTriggered: Assistant.removeAttachment(attachmentChip.modelData.id)
+                    }
+                }
+            }
         }
     }
 
@@ -441,6 +541,9 @@ AssistantSurface {
                             else
                                 Assistant.send();
                             event.accepted = true;
+                        } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+                            // A picture on the clipboard is attached; text pastes as usual.
+                            Assistant.pasteImage();
                         }
                     }
 
@@ -538,7 +641,7 @@ AssistantSurface {
 
             AssistantButton {
                 visible: Settings.assistantScreenContext && !root.listening && !root.transcribing
-                glyph: "monitor"
+                glyph: "photo"
                 accessibleName: Assistant.screenAttached ? I18n.tr("Remove the screenshot")
                     : I18n.tr("Attach the screen")
                 color: Assistant.screenAttached ? Theme.chipHover : "transparent"
@@ -589,20 +692,39 @@ AssistantSurface {
             delegate: Rectangle {
                 id: chip
                 required property var modelData
-                width: chipText.implicitWidth + Theme.scaled(18)
+                readonly property bool moment: !!chip.modelData.reason
+                width: Math.min(suggestionFlow.width, chipContent.implicitWidth + Theme.scaled(18))
                 height: Theme.scaled(26)
                 radius: height / 2
                 color: chipMouse.containsMouse ? Theme.chipHover : Theme.chip
+                border.width: moment ? 1 : 0
+                border.color: chip.modelData.warn ? Theme.amber : Theme.accentText
                 Accessible.role: Accessible.Button
                 Accessible.name: chip.modelData.text
+                Accessible.description: chip.modelData.reason || ""
 
-                Text {
-                    id: chipText
+                Row {
+                    id: chipContent
                     anchors.centerIn: parent
-                    text: chip.modelData.text
-                    color: Theme.textMid
-                    font.family: Theme.fontMenu
-                    font.pixelSize: Theme.typography.metadata
+                    spacing: Theme.scaled(4)
+
+                    Sym {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: chip.moment
+                        name: chip.modelData.glyph || ""
+                        size: Theme.iconSmall
+                        color: chip.modelData.warn ? Theme.amber : Theme.accentText
+                    }
+                    Text {
+                        id: chipText
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, suggestionFlow.width - Theme.scaled(40))
+                        text: chip.modelData.text
+                        elide: Text.ElideRight
+                        color: chip.moment ? Theme.textHi : Theme.textMid
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                    }
                 }
 
                 MouseArea {
@@ -611,8 +733,12 @@ AssistantSurface {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                        if (chip.moment)
+                            Assistant.useSituation();
                         if (chip.modelData.check)
                             Assistant.checkSystem();
+                        else if (chip.modelData.update)
+                            Assistant.askAboutUpdate();
                         else if (chip.modelData.screen)
                             Assistant.askAboutScreen(chip.modelData.text);
                         else
@@ -620,6 +746,26 @@ AssistantSurface {
                     }
                 }
             }
+        }
+    }
+
+    // Why the first suggestion is there.
+    Row {
+        visible: suggestionFlow.visible && root.situational !== null
+        spacing: Theme.scaled(5)
+
+        Sym {
+            anchors.verticalCenter: parent.verticalCenter
+            name: "schedule"
+            size: Theme.iconSmall
+            color: Theme.textFaint
+        }
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.situational ? root.situational.reason : ""
+            color: Theme.textFaint
+            font.family: Theme.fontMenu
+            font.pixelSize: Theme.typography.metadata
         }
     }
 
@@ -695,11 +841,10 @@ AssistantSurface {
             width: agentRow.implicitWidth + Theme.scaled(14)
             height: Theme.scaled(22)
             radius: height / 2
-            color: agentMouse.containsMouse && !root.continuing ? Theme.chipHover : Theme.chip
-            Accessible.role: root.continuing ? Accessible.StaticText : Accessible.Button
-            Accessible.name: root.continuing
-                ? I18n.format("Continues with %1", [Assistant.askAgentLabel])
-                : I18n.format("Answered by %1. Change the agent.", [Assistant.agentLabel])
+            color: agentMouse.containsMouse || root.modelMenuOpen ? Theme.chipHover : Theme.chip
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.format("Answered by %1 · %2. Change the agent or model.",
+                [Assistant.askAgentLabel, Assistant.askModelLabel])
 
             Row {
                 id: agentRow
@@ -722,11 +867,17 @@ AssistantSurface {
                         && Assistant.agents[Assistant.askAgent].available)
                     text: !installed && Assistant.connected
                         ? I18n.format("%1 is not installed", [Assistant.askAgentLabel])
-                        : root.continuing ? I18n.format("Continues with %1", [Assistant.askAgentLabel])
-                        : Assistant.agentLabel
+                        : Assistant.askAgentLabel + " · " + Assistant.askModelLabel
                     color: installed || !Assistant.connected ? Theme.textMid : Theme.redText
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.metadata
+                }
+
+                Sym {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: root.modelMenuOpen ? "expand_less" : "expand_more"
+                    size: Theme.iconSmall
+                    color: Theme.textLow
                 }
             }
 
@@ -734,14 +885,12 @@ AssistantSurface {
                 id: agentMouse
                 anchors.fill: parent
                 hoverEnabled: true
-                enabled: !root.continuing
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     if (!AssistantHelpers.anyAgent(Assistant.agents))
                         Settings.showPanel("assistant", Assistant.screenName);
                     else
-                        Settings.set("assistantAgent",
-                            AssistantHelpers.nextAgent(Assistant.agent, Assistant.agents));
+                        root.modelMenuOpen = !root.modelMenuOpen;
                 }
             }
         }
@@ -765,6 +914,124 @@ AssistantSurface {
             color: Assistant.notice !== "" ? Theme.textMid : Theme.textFaint
             font.family: Theme.fontMenu
             font.pixelSize: Theme.typography.metadata
+        }
+    }
+
+    // ---- agent and model, for this conversation ---------------------------------------
+    Rectangle {
+        id: modelMenu
+        width: parent.width
+        visible: root.modelMenuOpen && !Assistant.setupRequired
+        height: visible ? menuColumn.implicitHeight + Theme.scaled(10) : 0
+        radius: Theme.scaled(10)
+        color: Theme.cardFill
+        border.width: 1
+        border.color: Theme.hairline
+
+        Column {
+            id: menuColumn
+            x: Theme.scaled(5)
+            y: Theme.scaled(5)
+            width: parent.width - Theme.scaled(10)
+            spacing: Theme.scaled(1)
+
+            Text {
+                leftPadding: Theme.scaled(6)
+                topPadding: Theme.scaled(2)
+                text: I18n.tr("Agent").toUpperCase()
+                color: Theme.textFaint
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+                font.weight: Theme.weightSemibold
+                font.letterSpacing: 0.6
+            }
+
+            Repeater {
+                model: AssistantHelpers.AGENT_IDS
+
+                delegate: AssistantMenuRow {
+                    required property string modelData
+                    readonly property var status: Assistant.agents[modelData] || {}
+                    width: menuColumn.width
+                    glyphBrand: AssistantHelpers.AGENT_ICONS[modelData]
+                    label: AssistantHelpers.AGENT_LABELS[modelData]
+                    // A conversation continues with the agent it started with.
+                    enabled: !root.continuing && status.available === true
+                    checked: Assistant.askAgent === modelData
+                    detail: root.continuing && Assistant.askAgent !== modelData
+                        ? I18n.format("Started with %1", [Assistant.askAgentLabel])
+                        : status.available !== true ? I18n.tr("Not installed")
+                        : status.auth !== "ready" ? I18n.tr("Sign in…") : ""
+                    onChosen: {
+                        if (status.auth !== "ready") {
+                            root.modelMenuOpen = false;
+                            Assistant.signIn(modelData);
+                            return;
+                        }
+                        Assistant.agentOverride = modelData === Assistant.agent ? "" : modelData;
+                        Assistant.modelOverride = "";
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.hairline
+            }
+
+            Text {
+                leftPadding: Theme.scaled(6)
+                topPadding: Theme.scaled(2)
+                text: I18n.tr("Model").toUpperCase()
+                color: Theme.textFaint
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+                font.weight: Theme.weightSemibold
+                font.letterSpacing: 0.6
+            }
+
+            Repeater {
+                model: AssistantHelpers.modelChoices(Assistant.askAgent)
+
+                delegate: AssistantMenuRow {
+                    required property var modelData
+                    width: menuColumn.width
+                    label: modelData.value === "default" ? I18n.tr("Default") : modelData.label
+                    detail: modelData.value === "default"
+                        ? I18n.format("%1's own", [Assistant.askAgentLabel]) : ""
+                    checked: (Assistant.askModel === "" ? "default" : Assistant.askModel) === modelData.value
+                    onChosen: {
+                        Assistant.modelOverride = modelData.value;
+                        root.modelMenuOpen = false;
+                    }
+                }
+            }
+
+            Text {
+                width: parent.width
+                leftPadding: Theme.scaled(6)
+                rightPadding: Theme.scaled(6)
+                bottomPadding: Theme.scaled(3)
+                text: I18n.tr("Only for this conversation. Your default stays in Settings.")
+                wrapMode: Text.WordWrap
+                color: Theme.textFaint
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+            }
+        }
+    }
+
+    // Dropped files and images go with the question.
+    DropArea {
+        parent: root
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onDropped: drop => {
+            if (drop.hasUrls) {
+                Assistant.attachUrls(drop.urls);
+                drop.accept();
+            }
         }
     }
 

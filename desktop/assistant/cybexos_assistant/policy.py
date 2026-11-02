@@ -81,8 +81,13 @@ MAX_CHANGES = 16000
 class Decision:
     """allow, deny or ask; ask carries the card the person sees."""
 
-    def __init__(self, action, message="", card=None, step="", paths=(), key=None):
+    def __init__(self, action, message="", card=None, step="", paths=(), key=None, always=False,
+                 changes=False):
         self.action = action
+        # Asks even under Always allow (a desktop tool that could lose work).
+        self.always = always
+        # Allowed, but changes something (a desktop tool): not for a look-only question.
+        self.changes = changes
         self.message = message
         self.card = card
         self.step = step
@@ -436,6 +441,10 @@ def decide_tool(name, tool_input, home, status_path=None):
         path = tool_input.get(EDIT_TOOLS[name])
         decision = decide_edit([path] if isinstance(path, str) else [], home, edit_preview(name, tool_input))
         return decision
+    if name.startswith("mcp__cybexos__"):
+        # Cybex OS's own desktop tools: the service decides on every call
+        # itself, asking the person when it should (server.desktop_call).
+        return allow()
     if name.startswith("mcp__"):
         parts = name.split("__")
         server, tool = (parts[1], "__".join(parts[2:])) if len(parts) > 2 else ("", name)

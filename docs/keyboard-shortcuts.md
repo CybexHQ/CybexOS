@@ -14,8 +14,10 @@ same description show as alternatives, and numbered bindings such as
 `Switch to workspace 1` to `10` are shown as one row.
 
 `Super+I` (**Shell: Assistant**) talks to the Cybex OS Assistant: tap it to
-type a question, or hold it, speak, and release to send. See
-[Cybex OS Assistant](assistant.md).
+type a question, or hold it, speak, and release to send. While Wiz works, a
+tap opens his box to ask something else meanwhile. `Super+Shift+I`
+(**Shell: Ask the assistant about the selection**) opens the box with the
+selected text attached. See [Cybex OS Assistant](assistant.md).
 
 `Super+Tab` (**Windows: Overview**) opens the window overview: every
 workspace's windows as live thumbnails, with arrow-key, filter and

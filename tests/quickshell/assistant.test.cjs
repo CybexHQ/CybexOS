@@ -175,7 +175,7 @@ test("the shell is a client: the service owns turns and the shell reconciles wit
     assert.match(assistant, /readonly property string socketPath: runtimeDir \+ "\/assistant\.sock"/);
     assert.match(assistant, /Socket \{\s*id: socket\s*path: root\.socketPath\s*parser: SplitParser/);
     assert.match(assistant, /onConnectionStateChanged: \{\s*root\.helloed = false;/);
-    assert.match(assistant, /case "turn\.updated":\s*adopt\(params\.turn\);/);
+    assert.match(assistant, /case "turn\.updated":\s*if \(params\.lane === "side"\)\s*adoptSide\(params\.turn\);\s*else\s*adopt\(params\.turn\);/);
     assert.match(assistant, /case "turn\.delta":/);
     assert.doesNotMatch(assistant, /Process \{[^}]*"claude"|"codex", "app-server"/,
         "the shell never runs an agent itself");
@@ -193,7 +193,9 @@ test("the overlay takes input only on the character and the box, and the keyboar
     const window = read("AssistantWindow.qml");
     assert.match(window, /WlrLayershell\.namespace: "qs-assistant"/);
     assert.match(window, /WlrLayershell\.layer: WlrLayer\.Overlay/);
-    assert.match(window, /mask: Region \{\s*item: character\s*Region \{\s*item: dockMask\s*\}\s*Region \{\s*item: pressMask/);
+    assert.match(window, /mask: Region \{\s*item: characterMask\s*Region \{\s*item: dockMask\s*\}\s*Region \{\s*item: pressMask/);
+    // Faded, he takes no input at all, so clicks reach the window under him.
+    assert.match(window, /id: characterMask[\s\S]*?width: root\.faded \? 0 : character\.width/);
     // A held button on the character takes the whole output until it comes
     // up, and a drag never changes the keyboard mode under it.
     assert.match(window, /id: pressMask\s*width: root\.pressing \? stage\.width : 0\s*height: root\.pressing \? stage\.height : 0/);
@@ -214,7 +216,7 @@ test("the overlay takes input only on the character and the box, and the keyboar
 test("shown, the character flies in from the top-right corner, never across from the left", () => {
     const window = read("AssistantWindow.qml");
     // Until the surface has its size he waits just past the top-right corner.
-    assert.match(window, /bubbleX: dragging \? dragX : entered \? resting\.x : root\.width/);
+    assert.match(window, /bubbleX: dragging \? dragX : !entered \? root\.width\s*: tuck !== "" \? AssistantHelpers\.tuckedX\(tuck, root\.size, root\.width\) : resting\.x/);
     assert.match(window, /bubbleY: dragging \? dragY : entered \? resting\.y : -root\.size/);
     // Nothing animates before then, so a zero width cannot start a sweep.
     for (const axis of ["x", "y"])
@@ -311,14 +313,14 @@ test("a click opens a new conversation unless the last one still needs the perso
     assert.match(assistant, /function toggleComposer\(\) \{[\s\S]*?else\s*openFresh\(true\);\s*\}/);
     assert.match(assistant, /function ask\(text\) \{[\s\S]*?startNew\(\);/);
     const window = read("AssistantWindow.qml");
-    assert.match(window, /hoverDwell[\s\S]*?Assistant\.openComposer\(false\)/);
+    assert.match(window, /id: rest[\s\S]*?Settings\.assistantHover === "open"[\s\S]*?Assistant\.openComposer\(false\)/);
     assert.doesNotMatch(window, /Assistant\.(?:startNew|openFresh)\(/, "hovering never resets the conversation");
     // The question names the conversation it continues; "" starts a new one.
     assert.match(assistant, /conversation: continued,/);
     assert.match(assistant, /case "conversations\.updated":\s*adoptConversations\(params\.conversations \|\| \[\]\);/);
     // History is a box view, closed by a click elsewhere, with the keyboard for its search.
     assert.match(window, /readonly property bool showHistory: Assistant\.historyOpen/);
-    assert.match(window, /showComposer \|\| showHistory \|\| \(showWorking && Assistant\.waiting\)/);
+    assert.match(window, /showComposer \|\| showHistory \|\| showWorking\)/);
     assert.match(window, /Assistant\.focusLost\(\);/);
     // Clearing asks first; deleting one offers Undo.
     const history = read("Assistant/AssistantHistory.qml");

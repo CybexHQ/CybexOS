@@ -579,6 +579,18 @@ Item {
                     else root.service.prepare();
                 }
             }
+            // Something went wrong: Wiz can be asked about it, with what
+            // Software Update knows attached (docs/assistant.md).
+            UpdateButton {
+                objectName: "updateAskWiz"
+                visible: root.page === "problem" && Assistant.canAsk
+                glyph: "auto_awesome"
+                text: I18n.tr("Ask Wiz about this")
+                onTriggered: {
+                    root.service.close();
+                    Assistant.askAboutUpdate();
+                }
+            }
             UpdateButton {
                 objectName: "updatePrimary"
                 visible: root.kept !== null

@@ -1,15 +1,14 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell
 import "../Common"
 import "../Common/AssistantHelpers.js" as AssistantHelpers
-import "../Common/T3CodeHelpers.js" as T3CodeHelpers
 
 // The answer, under the question it answers. It stays until closed. What the
 // turn left behind gets its own row: a staged system change to review and
-// apply, a new widget to add to the bar, and Undo for preferences or files it
-// changed. `room` is the height the box may use on this side of the
-// character; a long reply scrolls inside it.
+// apply, a new widget to add to the bar, a routine it created, and what it
+// changed, each with its own Undo (AssistantChanges). "What Wiz did" lists
+// its steps. `room` is the height the box may use on this side of the
+// character; a long reply scrolls inside it, and Expand opens the wide view.
 AssistantSurface {
     id: root
 
@@ -17,7 +16,11 @@ AssistantSurface {
     readonly property var turn: Assistant.turn
     readonly property bool failed: turn !== null && turn.status === "failed"
     readonly property var plugins: turn && turn.plugins ? turn.plugins : []
-    readonly property bool canUndo: turn !== null && turn.undo !== undefined && turn.undo.length > 0
+    readonly property var changes: turn && turn.changes ? turn.changes.filter(change => change.kind !== "system") : []
+    readonly property var steps: turn && turn.steps ? turn.steps : []
+    readonly property var routinesMade: turn && turn.routines ? turn.routines : []
+    // The answer is longer than the box shows: Expand says so in words.
+    readonly property bool overflowing: bodyFlick.contentHeight > bodyFlick.height + 1
     // The build this turn staged, while the updater still holds it.
     readonly property bool staged: turn !== null && !!turn.staged
         && Updates.deployment.transaction === turn.staged
@@ -61,7 +64,7 @@ AssistantSurface {
 
         Text {
             id: duration
-            anchors.right: close.left
+            anchors.right: expand.left
             anchors.rightMargin: Theme.scaled(4)
             anchors.verticalCenter: parent.verticalCenter
             visible: root.turn !== null && root.turn.finishedAt > 0
@@ -70,6 +73,19 @@ AssistantSurface {
             font.family: Theme.fontNumeric
             font.pixelSize: Theme.typography.metadata
             font.features: Theme.tabularNumberFeatures
+        }
+
+        AssistantButton {
+            id: expand
+            anchors.right: close.left
+            anchors.rightMargin: Theme.scaled(2)
+            anchors.verticalCenter: parent.verticalCenter
+            glyph: Settings.assistantExpanded ? "close_fullscreen" : "open_in_full"
+            label: !Settings.assistantExpanded && root.overflowing ? I18n.tr("Expand") : ""
+            accessibleName: Settings.assistantExpanded ? I18n.tr("Back to the small box") : I18n.tr("Expand")
+            controlHeight: Theme.scaled(24)
+            color: !Settings.assistantExpanded && root.overflowing ? Theme.chip : "transparent"
+            onTriggered: Assistant.toggleExpanded()
         }
 
         AssistantButton {
@@ -96,31 +112,13 @@ AssistantSurface {
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentHeight > height
 
-        TextEdit {
+        AssistantMarkdown {
             id: body
             width: bodyFlick.width
-            readOnly: true
-            selectByMouse: true
-            textFormat: root.failed ? TextEdit.PlainText : TextEdit.MarkdownText
-            text: root.failed
-                ? (root.turn.error || I18n.tr("Something went wrong."))
-                : T3CodeHelpers.styleMarkdownLinks(root.turn ? root.turn.text || "" : "",
-                    Theme.accentText.toString())
-            wrapMode: TextEdit.Wrap
+            plain: root.failed
+            text: root.failed ? (root.turn.error || I18n.tr("Something went wrong."))
+                : root.turn ? root.turn.text || "" : ""
             color: root.failed ? Theme.redText : Theme.textHi
-            selectionColor: Theme.accentSoft
-            selectedTextColor: Theme.textHi
-            font.family: Theme.fontMenu
-            font.pixelSize: Theme.typography.control
-            // The agent wrote these links; only web and mail ones open.
-            onLinkActivated: link => {
-                if (/^(https?|mailto):/i.test(link))
-                    Quickshell.execDetached(["xdg-open", link]);
-            }
-
-            HoverHandler {
-                cursorShape: body.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
-            }
         }
     }
 
@@ -215,6 +213,94 @@ AssistantSurface {
             }
         }
 
+        // Routines this answer created: when they run, and their settings.
+        Repeater {
+            model: root.routinesMade
+
+            delegate: Rectangle {
+                id: routineCard
+                required property var modelData
+                width: extras.width
+                height: routineColumn.implicitHeight + Theme.scaled(16)
+                radius: Theme.scaled(10)
+                color: Theme.cardFill
+
+                Column {
+                    id: routineColumn
+                    x: Theme.scaled(10)
+                    y: Theme.scaled(8)
+                    width: parent.width - Theme.scaled(20)
+                    spacing: Theme.scaled(3)
+
+                    Row {
+                        spacing: Theme.scaled(6)
+
+                        Sym {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "event"
+                            size: Theme.iconSmall
+                            color: Theme.accentText
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: I18n.tr("Routine created")
+                            color: Theme.textHi
+                            font.family: Theme.fontMenu
+                            font.pixelSize: Theme.typography.secondary
+                            font.weight: Theme.weightSemibold
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: routineCard.modelData.title
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                        color: Theme.textMid
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                    }
+                    Text {
+                        width: parent.width
+                        text: Assistant.routineLabel(routineCard.modelData) + " · "
+                            + (routineCard.modelData.notify === "always" ? I18n.tr("always tells you")
+                                : I18n.tr("tells you only when something needs attention"))
+                        wrapMode: Text.WordWrap
+                        color: Theme.textLow
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                    }
+                    Row {
+                        topPadding: Theme.scaled(4)
+                        spacing: Theme.scaled(4)
+
+                        AssistantButton {
+                            label: I18n.tr("Edit")
+                            controlHeight: Theme.scaled(26)
+                            onTriggered: Assistant.showRoutines()
+                        }
+                        AssistantButton {
+                            label: I18n.tr("Run now")
+                            glyph: "play_arrow"
+                            controlHeight: Theme.scaled(26)
+                            onTriggered: Assistant.runRoutine(routineCard.modelData.id)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Everything the answer changed, each with its own Undo.
+        AssistantChanges {
+            width: parent.width
+            changes: root.changes
+        }
+
+        AssistantSteps {
+            width: parent.width
+            steps: root.steps
+            folded: AssistantHelpers.stepsFolded(root.turn ? root.turn.text : "", root.steps)
+        }
+
         // Widgets the turn created. They stay off until added.
         Repeater {
             model: root.plugins
@@ -291,13 +377,6 @@ AssistantSurface {
         id: actions
         width: parent.width
         spacing: Theme.scaled(4)
-
-        AssistantButton {
-            visible: root.canUndo
-            label: I18n.tr("Undo")
-            glyph: "undo"
-            onTriggered: Assistant.undo()
-        }
 
         AssistantButton {
             visible: Assistant.speechAvailable && !root.failed && root.turn !== null && (root.turn.text || "") !== ""

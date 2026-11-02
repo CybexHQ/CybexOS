@@ -68,6 +68,14 @@ ShellRoot {
         onReleased: Assistant.shortcutReleased()
     }
 
+    // Super+Shift+I: the box, with the selected text attached.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "assistantSelection"
+        description: I18n.tr("Ask the Cybex OS Assistant about the selected text")
+        onPressed: Assistant.askAboutSelection()
+    }
+
     // `cybex assistant show|hide|toggle|ask` and scripts.
     IpcHandler {
         target: "assistant"
@@ -109,6 +117,16 @@ ShellRoot {
             Assistant.checkSystem();
         }
 
+        // The box with the selected text attached (Super+Shift+I).
+        function selection(): void {
+            Assistant.askAboutSelection();
+        }
+
+        // Back out from behind a screen edge.
+        function untuck(): void {
+            Assistant.untuck();
+        }
+
         // Read-only state for diagnostics.
         function status(): string {
             return JSON.stringify({available: Assistant.available, shown: Assistant.shown,
@@ -121,7 +139,12 @@ ShellRoot {
                 composing: Assistant.composing, listening: Assistant.listening,
                 historyOpen: Assistant.historyOpen, continuing: Assistant.continuing,
                 conversations: Assistant.conversations.length,
-                turnConversation: Assistant.turn ? Assistant.turn.conversation || "" : ""});
+                turnConversation: Assistant.turn ? Assistant.turn.conversation || "" : "",
+                side: Assistant.side ? Assistant.side.status : "", queued: Assistant.queue !== null,
+                attachments: Assistant.attachments.map(item => item.kind), tuck: Settings.assistantTuck,
+                expanded: Settings.assistantExpanded, attention: Assistant.attentionConversation,
+                statusShown: Assistant.statusShown,
+                routines: Assistant.routines.length});
         }
     }
 

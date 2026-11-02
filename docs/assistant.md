@@ -8,7 +8,9 @@ questions. The work is done by the coding agent the person already uses:
 Claude Code or Codex. Cybex OS never stores their credentials.
 
 The assistant is summoned, never proactive. It does not watch the screen,
-listen or speak unless asked to for one question.
+listen or speak unless asked to for one question. Its notifications, its
+situational suggestion and its routines all follow something the person did
+or set up themselves.
 
 ## Using it
 
@@ -37,9 +39,37 @@ listen or speak unless asked to for one question.
   what it found and proposes fixes. Nothing changes until you agree; system
   changes are staged for review as below. The report goes to your AI provider
   as part of the question, like anything else the agent reads.
-- **Ask** by hovering the character, or tap `Super+I`, then type and press
-  Enter. Hovering opens the box without taking the keyboard; clicking it or
-  the shortcut does.
+- **Ask** by clicking the character or tapping `Super+I`, then type and press
+  Enter. Resting the pointer on him for half a second shows a one-line status
+  under him: a reply ready, what he is working on, a question waiting for
+  you, a routine's finding, or "Ask me anything". A pointer passing over him
+  does nothing. Settings → Assistant → **When the pointer rests on Wiz**
+  chooses Show status (default), Open the box (the box opens without taking
+  the keyboard, as before) or Nothing.
+- **Context besides the screenshot.** What goes with a question shows as
+  removable chips above the field, and goes with that one question only:
+  - the focused window's app and title, added when a new box opens
+    (Settings → **Include the focused window**, on by default);
+  - selected text: `Super+Shift+I` opens the box with the primary
+    selection attached;
+  - files and images dropped on Wiz (a ring shows where) or on the box, and
+    images pasted with `Ctrl+V`. Images go to the agent as images; other
+    files as text, up to 256 KB, and the service refuses anything that is
+    neither. Dropped and pasted images are copied to the scratch folder and
+    deleted with the answer, like screenshots.
+- **Agent and model.** The chip under the field says who answers ("Claude
+  Code · Opus") and opens a small menu to choose the agent and model for this
+  conversation only; Settings keeps the default. A continued conversation
+  keeps its agent (it greys the other: "Started with …"), so only its model
+  can change. An agent that is not signed in offers **Sign in…**.
+- **A suggestion that fits the moment.** The new box's first suggestion can
+  follow what just happened: an update that failed ("Why did the update
+  fail?", with what Software Update knows attached), a Cybex OS update that
+  was kept ("What's new in 1.0.10?"), or a warning repeated three times in an
+  hour in the notifications ("Why does "Wi-Fi disconnected" keep
+  happening?"). A grey line says why it is there. It lasts an hour, until it
+  is used, or until Wiz is asked something else; there is never more than
+  one.
 - **Each box is a conversation.** Clicking the character, tapping `Super+I`,
   Ask Wiz in the launcher and `cybex assistant ask` start a new conversation
   once the box has closed (a click elsewhere, `Esc`, the close button or the
@@ -78,18 +108,61 @@ listen or speak unless asked to for one question.
   and game mode off. Nothing about the screen is sent; if the box already
   holds a screenshot, the question waits there with it for you to send or
   detach.
+- **Ask Wiz where things go wrong.** A failure notification (critical, or one
+  that reads as an error) carries an **Ask Wiz** action, and Software
+  Update's problem page an **Ask Wiz about this** button. Either opens the
+  box with what that place knows attached as a chip and the question typed;
+  nothing is sent until Enter. They show only while Wiz can answer.
 - **Talk** by holding `Super+I` (or the microphone button) and releasing it to
   send. The words are transcribed locally by Voxtype; no audio leaves the
   computer. `Esc` or the cancel button discards a recording.
 - **While it works** the character shows what it is doing (see
   [The character](#the-character)) and the box a short line about the
   current step. Clicking the character while it works tucks the box away;
-  a blue dot appears when the reply is ready.
+  a blue dot appears when the reply is ready. `Super+I` brings the box back
+  with its **Ask something else…** field.
+- **A second question meanwhile** is answered alongside, in its own
+  conversation, with permission only to look: read, search, the web, and
+  read-only commands and desktop tools. If it needs to change something, it
+  says what it would change and waits as **Up next**; Wiz asks it again,
+  with changes allowed, as soon as the current question is done. **Run now**
+  stops the current question first (after asking); × removes the waiting
+  one. At most one question runs alongside and one waits; a question that
+  continues the running conversation waits too.
+- **A notification** says when a question that took longer than 20 seconds
+  has finished, or when a question needs your answer, while the box was not
+  in view on the screen you are using (hidden, tucked, another display, game
+  mode). Its buttons are the reply's own (Add to bar, Review change…, Open);
+  Open brings Wiz out with that conversation. Settings → **Notify when Wiz
+  finishes**: When the box is closed (default), Always, Never. Focus and
+  game mode keep it in the notification centre, as any notification.
 - **Replies** stay under the character until closed. Copy, Reply (continue the
-  conversation), Speak, Undo (when it changed preferences or files), and
-  Continue in a terminal (opens the same Claude Code or Codex session in
-  Kitty, for longer coding work) appear under a reply. Undo belongs to the
-  latest answer only, so an older one can never overwrite later edits.
+  conversation), Speak, and Continue in a terminal (opens the same Claude
+  Code or Codex session in Kitty, for longer coding work) appear under a
+  reply. Each code block has its own **Copy** button.
+- **What changed** is listed under the answer, one row each with its own
+  Undo: a preference with its old and new value ("Menubar opacity 100% →
+  80%"), a file, a widget, an app installed for this account, a routine.
+  **Undo all** undoes every row that still can. A row that cannot be undone
+  any more says why: it was changed again by a later answer (undo that one
+  first), or changed since by something else, which is left as it is.
+- **What Wiz did** lists the steps the agent took, in plain words with the
+  file or command in grey; Cybex OS's own desktop tools carry the accent. It
+  is folded after a short answer and open after a long one.
+- **The wide view.** A reply too long for the box offers **Expand**, which
+  opens it beside Wiz on the side of the screen with more room (about 560 ×
+  640 at 1×; drag its inner edge to resize it). The agent is told the reply
+  has room, so headings and tables are fine there. The choice stays until
+  Collapse, and also applies to a conversation being read and to History.
+- **Keeping out of the way.** Dragged near a corner or the middle of a side,
+  he lands there (the spots show while dragging); anywhere else he stays
+  exactly where he is dropped. Pushed past the left or right edge, he tucks
+  away with only his hat brim and one eye showing; his pips still show,
+  resting on him shows his status, and a click or `Super+I` brings him out.
+  A pointer that sweeps across him without stopping makes him fade to a
+  ghost and lets its clicks through to the window underneath, until it moves
+  away or rests on him for half a second (Settings → **Fade while working
+  under Wiz**, on by default).
 - **From a terminal**, `cybex assistant ask "…"` asks the same assistant and
   prints the reply. With **Ask first** selected, approval cards appear on screen.
   `cybex assistant status` prints the service's state as JSON.
@@ -133,6 +206,62 @@ automatically, so ownership checks still run on subsequent requests.
 New widgets are created disabled. When a reply created one, **Add to bar**
 enables it with `cybex plugin enable`.
 
+## Desktop tools
+
+Both agents get Cybex OS's own tool server, `cybexos`
+(`desktop/assistant/cybexos_assistant/mcp.py`, started by the agent as
+`cybexos-assistant mcp` for the assistant's own processes only). Its tools
+apply live, check values, and record every change for Undo:
+
+| Tool | What it does | Without asking |
+| --- | --- | --- |
+| `desktop_status`, `settings_search`, `settings_get`, `wallpaper_search`, `software_search`, `doctor_run`, `routine_list` | Look: windows, workspaces, displays, theme; settings with their values; Wallhaven; Flathub; the system check; routines | Yes, also alongside and in routines |
+| `settings_set`, `wallpaper_set` | Change a preference (checked exactly as the Settings window checks it; the assistant's own settings are refused) or the wallpaper (a Wallhaven image is downloaded into the wallpaper folder) | Yes; listed under Changed |
+| `routine_create`, `routine_delete` | Create or remove a routine | Yes; listed under Changed |
+| `app_open`, `window_focus`, `window_move`, `workspace_switch` | Open an app, focus or move a window, show a workspace | Yes |
+| `window_close` | Close a window | **Always asks**, even under Always allow: the app may have unsaved work |
+| `flatpak_install`, `flatpak_remove` | Install or remove a Flathub app for this account (`cybex software flathub`), waiting until it is done | Asks under Ask first; listed under Changed, and Undo removes or reinstalls it |
+
+The service decides on every call itself (`server.desktop_call`); the
+agents' own permission prompt for these tools is always answered yes. Tools
+that only the desktop can carry out (preferences, the wallpaper, windows,
+apps) go to the shell as `desktop.request` and are answered by
+`Common/AssistantTools.qml`. The shell and terminal stay available for
+everything else, under the policy table above.
+
+## Changes and Undo
+
+Everything Wiz changes is recorded in a change log
+(`desktop/assistant/cybexos_assistant/changes.py`). A preference changed
+in `shell.json` becomes one entry per key, by its value rather than its
+bytes, so the shell rewriting the file does not stop Undo; a widget is one
+entry for its folder; other files one entry each, with the earlier version
+kept on disk (0600) so Undo survives a restart of the service. Apps, routines
+and staged system changes (which Software Update owns and undoes) are entries
+too. Settings → Assistant → **Changes Wiz made** lists them by day, links each
+to its conversation, and offers Undo, Remove or Delete while it can still be
+undone. The log follows **Keep conversations**: 30 days, forever, or nothing
+saved; clearing the history clears it too.
+
+## Routines
+
+A routine is a question Wiz asks on a schedule: every day, every week on a
+day, every month on a day (1–28) at a time, or after each kept Cybex OS
+update. Create one by asking ("every Monday morning, check this computer"),
+which the agent does with `routine_create` and the reply shows as a
+**Routine created** card, or in Settings → Assistant → **Routines**, where
+each can also be run now, paused, edited or removed.
+
+A routine runs only while the person is logged in, when Wiz is free; one
+missed while the computer was off runs once at the next chance. It only
+looks: its question may not change anything, and fixes wait for the person
+in its conversation, which History marks with a calendar. Its reply starts
+with a verdict line the service reads and removes. With a finding, or always
+when the routine says so, a notification follows and Wiz shows the amber pip
+until the conversation is opened; with nothing to report, only History has
+the run. Routines are kept in `routines.json` beside the conversations, whatever
+**Keep conversations** says.
+
 ## Settings
 
 Settings → Assistant, stored in `~/.config/cybexos/shell.json`:
@@ -145,7 +274,13 @@ Settings → Assistant, stored in `~/.config/cybexos/shell.json`:
 | `assistantCodexModel` | `default`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` | `default` |
 | `assistantSpeak` | spoken replies | `false` |
 | `assistantScreenContext` | offer the screen button | `false` |
-| `assistantHistory` | keep conversations: `month` (30 days), `forever`, `session` (until you log out; nothing saved) | `month` |
+| `assistantHistory` | keep conversations and the change log: `month` (30 days), `forever`, `session` (until you log out; nothing saved) | `month` |
+| `assistantNotify` | notify when a question finishes or waits: `closed` (while the box is not in view), `always`, `never` | `closed` |
+| `assistantHover` | resting the pointer on Wiz: `status`, `open` (the box), `nothing` | `status` |
+| `assistantFade` | fade and let clicks through while the pointer sweeps over him | `true` |
+| `assistantWindowContext` | a new question carries the focused window's app and title | `true` |
+| `assistantExpanded`, `assistantExpandedWidth` | the wide view, and its width (420–1200) | `false`, `560` |
+| `assistantTuck` | the screen edge he is tucked behind: `""`, `left`, `right` | `""` |
 | `assistantShown` | the character is on screen | `false` |
 | `assistantScreen`, `assistantX`, `assistantY` | where it was left | primary display, top right |
 
@@ -258,19 +393,29 @@ the shortcut and the service; nothing in `shell.json` is lost.
   - `speech.py` — speech-dispatcher's SSIP socket, one sentence per message
     so the reply can follow along.
   - `prompt.py` — the instructions appended to the agent's own system
-    prompt.
+    prompt, and the per-question notes (attachments, looking only, a
+    routine, the wide view).
+  - `changes.py` — the change log behind Undo.
+  - `routines.py` — routines and their schedules.
+  - `desktop.py` — the desktop tools: schemas, kinds and step labels.
+  - `mcp.py` — the tools as an MCP server, which forwards each call to the
+    service as `desktop.call`.
 - `desktop/quickshell/Common/Assistant.qml` — the shell's client: connection,
-  turn state, voice, screen capture and placement.
+  turn state, voice, screen capture, attachments, notifications and
+  placement. `Common/AssistantTools.qml` carries out the desktop tools only
+  the shell can.
 - `desktop/quickshell/AssistantWindow.qml` and `Assistant/` — the overlay
   surface, the character, the composer, the working pill and the reply card.
 - `desktop/quickshell/Bar/Modules/Assistant.qml` — the menubar button.
 
 State lives in `~/.local/state/cybexos/assistant/`: `state.json` keeps the
 last answer for the box (only while its conversation exists and
-conversations are saved), and `conversations/<id>.json` (directory `0700`,
+conversations are saved), `conversations/<id>.json` (directory `0700`,
 files `0600`, `history.py`) holds one conversation each: its agent, the
-agent's session id, its title (the first question) and every question with
-its answer, status and times. Screenshots and approval cards are never
+agent's session id, its title (the first question, or the routine's), the
+routine that started it, and every question with its answer, status, times
+and steps. `changes/` holds the change log and the earlier versions of files
+it can restore, and `routines.json` the routines. Screenshots and approval cards are never
 stored; screenshots live in `$XDG_RUNTIME_DIR/cybexos/assistant/` only for
 the question that used them. The service applies `assistantHistory` when it
 starts and whenever it lists conversations: with `month` it forgets
@@ -291,10 +436,16 @@ Requests:
 | `hello` | `{client, protocol: 1}` | `{protocol, agents, turn, conversations, speech}` |
 | `auth.status` | `{}` | `{agents}` — refresh installation/sign-in status |
 | `auth.login` | `{agent: "claude" \| "codex"}` | `{argv, cwd}` — the agent's own login command, which the shell runs in the background |
-| `turn.start` | `{text, agent, model?, conversation?, screenshot?, context?}` | `{turn}`; error `-32001` while a turn runs, `-32002` for a conversation no longer in the history. Without `conversation` the question starts a new one; with it, it continues that conversation with its own agent |
-| `turn.stop` | `{}` | `{stopped}` |
+| `turn.start` | `{text, agent, model?, conversation?, screenshot?, attachments?, context?}` | `{turn}` (its `lane` says whether it runs in the main lane or alongside), or `{queued}` when it waits; error `-32001` once one question already waits, `-32002` for a conversation no longer in the history. Without `conversation` the question starts a new one; with it, it continues that conversation with its own agent |
+| `turn.stop` | `{lane?}` | `{stopped}`; `lane` is `main` (default) or `side` |
+| `queue.remove`, `queue.run` | `{}` | `{ok}` — drop the waiting question, or stop the main one so it starts now |
+| `change.list` | `{}` | `{changes: [entry]}`, newest first, each with `status` (`applied`, `undone`, `blocked` with `blockedBy`, `changed`, `system`) and `undoable` |
+| `change.undo` | `{id}` or `{ids}` | `{restored: [id], skipped: [{id, reason}]}` |
+| `routine.list`, `routine.create`, `routine.update`, `routine.delete`, `routine.run` | a routine's `{question, title?, schedule, notify?, enabled?}` or `{id}` | `{routines}`, `{routine}`, `{ok}`, or `{started, waiting}` |
+| `desktop.call` | `{tool, arguments, lane}` | `{isError, text}` — from mcp.py |
+| `desktop.respond` | `{id, ok, result?, error?}` | `{ok}` — the shell's answer to `desktop.request` |
 | `approval.respond` | `{id, decision: "allow" \| "always" \| "deny"}` | `{ok}` |
-| `turn.undo` | `{id}` | `{restored: [path], skipped: [path]}` |
+| `turn.undo` | `{id}` | `{restored: [path], skipped: [path]}` — every change of that answer that can still be undone |
 | `conversation.list` | `{query?}` | `{conversations: [summary]}`, newest first; `query` matches titles, questions and answers without case |
 | `conversation.open` | `{id}` | `{conversation}`: the summary with `turns` (`id, prompt, text, status, error, errorKind, startedAt, finishedAt`) and `resumable` |
 | `conversation.delete` | `{id}` | `{ok}`; stops its running question first |
@@ -321,13 +472,18 @@ the same for every turn.
 
 Notifications:
 
-- `turn.updated {turn}` — a complete snapshot after any change except text;
-  `null` after the history was cleared.
+- `turn.updated {turn, lane}` — a complete snapshot after any change except
+  text; `null` after the history was cleared.
 - `conversations.updated {conversations}` — the summaries after a question
   starts or finishes, or a conversation is deleted, restored, cleared or
   pruned.
 - `agents.updated {agents}` — refreshed installation/sign-in status.
-- `turn.delta {id, text}` — reply text appended while streaming.
+- `turn.delta {id, text, lane}` — reply text appended while streaming.
+- `queue.updated {queue}`, `changes.updated {count}`, `routines.updated {routines}`.
+- `routine.finished {routine, conversation, attention, notify, summary}`.
+- `desktop.request {id, tool, arguments}` — to the shell only.
+- `notice {text}` — something the box should say (a waiting question that
+  could not start).
 - `speech.progress {id, index}`, `speech.done {id, status}`.
 
 A turn snapshot:
@@ -349,6 +505,14 @@ A turn snapshot:
   "startedAt": 1761223000000,
   "finishedAt": 0,
   "undo": ["~/.config/cybexos/shell.json"],
+  "changes": [{"id": "ch-…", "kind": "setting", "key": "barOpacity", "before": 1, "after": 0.8,
+               "status": "applied", "undoable": true}],
+  "steps": [{"label": "Changed a preference", "detail": "barOpacity", "tool": true}],
+  "routines": [],
+  "lane": "main",
+  "lookOnly": false,
+  "needsChange": false,
+  "routine": null,
   "plugins": [{"id": "personal.cputemp", "name": "CPU temperature"}],
   "staged": "8f3a2c…",
   "screenshot": false,

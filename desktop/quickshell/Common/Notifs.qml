@@ -10,6 +10,7 @@ import "NotifHelpers.js" as Helpers
 import "NotifHolds.js" as Holds
 import "SettingsHelpers.js" as SettingsHelpers
 import "Format.js" as Format
+import "AssistantHelpers.js" as AssistantHelpers
 
 Singleton {
     id: root
@@ -255,6 +256,15 @@ Singleton {
             unsnooze(current.sourceKey);
             return;
         }
+        if (action.kind === "ask-wiz") {
+            const summary = current.displaySummary || current.summary || "";
+            Assistant.askWith(I18n.format("Why did this happen: “%1”?", [summary]), { kind: "text",
+                label: I18n.format("Notification · %1", [current.displayAppName || current.appName || ""]),
+                text: [current.displayAppName || current.appName || "", summary,
+                    current.displayBody || current.body || ""].filter(line => line !== "").join("\n") });
+            hideToast(current, false);
+            return;
+        }
         if (!current.live || !current.notif
                 || Helpers.actionList(current.actions).indexOf(action) < 0)
             return;
@@ -270,6 +280,12 @@ Singleton {
         if (!entry)
             return [];
         let result = entry.live ? Helpers.secondaryActions(entry.actions) : [];
+        // Something went wrong: Wiz can be asked about it (docs/assistant.md).
+        // (A singleton the notification tests do not load.)
+        if (typeof Assistant !== "undefined" && Assistant.canAsk && entry.appName !== "Wiz"
+                && AssistantHelpers.looksLikeFailure(entry.summary,
+                entry.body, entry.urgency === NotificationUrgency.Critical))
+            result.unshift({ kind: "ask-wiz", text: I18n.tr("Ask Wiz") });
         if (!entry.restored) {
             for (const code of (entry.codes || []).slice(0, 2))
                 result.push({ kind: "copy-code", text: I18n.tr("Copy verification code"), value: code });

@@ -92,6 +92,8 @@ while True:
     text = content[0]["text"]
     if text.endswith("echo me"):
         finish(text)
+    elif "routine report" in text:
+        finish("ATTENTION: yes\nThe SSD firmware update is waiting.")
     elif "bash" in text:
         answer = ask("r1", "Bash", {"command": "rm -rf ~/x"})
         say("allowed" if answer["behavior"] == "allow" else "denied")
@@ -421,12 +423,13 @@ class Client:
             await asyncio.sleep(0.01)
         raise AssertionError("timed out; notifications: " + json.dumps(self.notifications[-5:])[:2000])
 
-    async def turn(self, predicate, timeout=8.0):
-        message = await self.until(lambda m: m["method"] == "turn.updated" and predicate(m["params"]["turn"]), timeout)
+    async def turn(self, predicate, timeout=8.0, lane="main"):
+        message = await self.until(lambda m: m["method"] == "turn.updated" and m["params"].get("lane", "main") == lane
+                                   and m["params"]["turn"] is not None and predicate(m["params"]["turn"]), timeout)
         return message["params"]["turn"]
 
-    async def finished(self, timeout=8.0):
-        return await self.turn(lambda turn: turn["status"] in ("completed", "stopped", "failed"), timeout)
+    async def finished(self, timeout=8.0, lane="main"):
+        return await self.turn(lambda turn: turn["status"] in ("completed", "stopped", "failed"), timeout, lane)
 
     async def close(self):
         if self.writer is not None:
@@ -838,8 +841,11 @@ class ClaudeTest(ServiceTest):
         waiting = await self.client.turn(lambda turn: turn["approvals"])
         card = waiting["approvals"][0]
         self.assertEqual((waiting["status"], card["kind"], card["command"]), ("waiting", "command", "rm -rf ~/x"))
-        busy = await self.client.call("turn.start", {"text": "again", "agent": "claude"})
-        self.assertEqual(busy["error"]["code"], -32001)
+        # Asked meanwhile, a question runs alongside and may only look.
+        side = (await self.client.result("turn.start", {"text": "again echo me", "agent": "claude"}))["turn"]
+        self.assertEqual((side["lane"], side["lookOnly"]), ("side", True))
+        aside = await self.client.finished(lane="side")
+        self.assertEqual((aside["status"], aside["id"]), ("completed", side["id"]))
         await self.client.result("approval.respond", {"id": card["id"], "decision": "allow"})
         done = await self.client.finished()
         self.assertEqual((done["status"], done["text"], done["approvals"]), ("completed", "allowed", []))
@@ -866,7 +872,7 @@ class ClaudeTest(ServiceTest):
         self.assertIn("transparent", shell.read_text())
         undone = await self.client.result("turn.undo", {"id": turn["id"]})
         self.assertEqual(undone, {"restored": ["~/.config/cybexos/shell.json"], "skipped": []})
-        self.assertEqual(shell.read_text(), '{"bar": "solid"}\n')
+        self.assertEqual(json.loads(shell.read_text()), {"bar": "solid"})
         self.assertEqual((await self.client.turn(lambda turn: not turn["undo"]))["undo"], [])
         again = await self.client.call("turn.undo", {"id": turn["id"]})
         self.assertEqual(again["error"]["code"], -32002)
@@ -875,7 +881,10 @@ class ClaudeTest(ServiceTest):
         await self.ask("make a plugin")
         done = await self.client.finished()
         self.assertEqual(done["plugins"], [{"id": "personal.cputemp", "name": "CPU temperature"}])
-        self.assertEqual(done["undo"], ["~/.local/share/cybexos/plugins/personal.cputemp/manifest.json"])
+        self.assertEqual(done["undo"], ["~/.local/share/cybexos/plugins/personal.cputemp"])
+        [change] = done["changes"]
+        self.assertEqual((change["kind"], change["plugin"], change["op"], change["status"]),
+                         ("plugin", "personal.cputemp", "created", "applied"))
 
     async def test_staged_change_and_apply_card(self):
         self.approval_policy("ask")
@@ -1016,7 +1025,11 @@ class CodexTest(ServiceTest):
         done = await self.client.finished()
         self.assertEqual((done["status"], done["text"], done["agent"]), ("completed", "Hi there", "codex"))
         entries = self.harness.entries()
-        self.assertEqual(entries[0]["argv"], ["app-server"])
+        argv = entries[0]["argv"]
+        self.assertEqual(argv[0], "app-server")
+        overrides = [argv[index + 1] for index, value in enumerate(argv) if value == "-c"]
+        self.assertIn('mcp_servers.cybexos.args=["-m", "cybexos_assistant", "mcp"]', overrides)
+        self.assertIn('mcp_servers.cybexos.default_tools_approval_mode="approve"', overrides)
         methods = [entry.get("method") for entry in entries[1:]]
         self.assertEqual(methods[:4], ["initialize", "initialized", "thread/start", "turn/start"])
         self.assertFalse(any(entry.get("jsonrpc") for entry in entries[1:]))

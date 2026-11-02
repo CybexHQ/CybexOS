@@ -216,6 +216,11 @@ class Session:
         shell_entry.write_text(shell_entry.read_text().replace('target: "assistant"',
             'target: "assistant"\n        function signIn(agent: string): void { Assistant.signIn(agent); }'
             '\n        function draft(): string { return Assistant.draft; }'
+            '\n        function setting(key: string, value: string): void { Settings.set(key, JSON.parse(value)); }'
+            '\n        function close(): void { Assistant.closeBox(); }'
+            '\n        function tool(name: string, args: string): string { let out = null;'
+            ' AssistantTools.handle(name, JSON.parse(args), r => out = {ok: true, result: r},'
+            ' e => out = {ok: false, error: String(e)}); return JSON.stringify(out); }'
             '\n        function dnd(on: bool): void { Notifs.setDnd(on); }'
             '\n        function notifications(): string {'
             ' return JSON.stringify({count: Notifs.count, dnd: Notifs.dnd}); }'
@@ -457,6 +462,19 @@ def main():
             opened = session.home / 'terminal-argv.json'
             assert not opened.exists(), f'the sign-in opened a terminal: {opened.read_text()}'
 
+            # Resting the pointer on Wiz shows his status, and opens nothing.
+            session.ipc('close')
+            state = session.wait(lambda: (lambda s: s if not s.get('composing') else None)(session.shell_state()),
+                                 'the box to close')
+            session.pointer.move(state['x'] + state['size'] / 2, state['y'] + state['size'] / 2)
+            session.wait(lambda: session.shell_state().get('statusShown'), 'the status line')
+            assert not session.shell_state().get('composing'), session.shell_state()
+            session.pointer.move(20, 880)
+            session.wait(lambda: not session.shell_state().get('statusShown'), 'the status line to go')
+            # The rest of the dragging runs with hovering opening the box, as
+            # Settings → Assistant can choose.
+            session.ipc('setting', 'assistantHover', '"open"')
+
             # Send real compositor pointer events. Repeated movement must cover
             # the full distance despite the character's scale/rotation/mask.
             # The last drag starts with the box open from hovering: the drag
@@ -466,6 +484,9 @@ def main():
                 before = session.shell_state()
                 size = before['size']
                 if dwell:
+                    # A new rest: away from him first, then back.
+                    session.pointer.move(20, 880)
+                    time.sleep(0.3)
                     session.pointer.move(before['x'] + size / 2, before['y'] + size / 2)
                     session.wait(lambda: session.shell_state().get('composing'), 'the box opened by hovering')
                 held = []
@@ -482,6 +503,38 @@ def main():
                 assert held == ['carried'], held
                 session.wait(lambda: session.shell_state().get('pose') not in (None, 'carried'), 'Wiz to land')
 
+            session.ipc('setting', 'assistantHover', '"status"')
+            # Dropped near the left edge's middle, he lands in that spot;
+            # pushed past the right edge he tucks away, and a click (here
+            # Super+I's compose) brings him out again.
+            before = session.shell_state()
+            session.drag(before['x'] + before['size'] / 2, before['y'] + before['size'] / 2,
+                         60 - before['x'], 450 - before['y'] - before['size'] / 2)
+            landed = session.wait(lambda: (lambda s: s if s.get('x') == 24 else None)(session.shell_state()),
+                                  'the snap to the left side')
+            session.drag(landed['x'] + landed['size'] / 2, landed['y'] + landed['size'] / 2,
+                         1439 - landed['x'] - landed['size'] / 2, 0)
+            session.wait(lambda: session.shell_state().get('tuck') == 'right', 'the tuck behind the right edge')
+            session.ipc('compose')
+            session.wait(lambda: (lambda s: s.get('tuck') == '' and s.get('composing'))(session.shell_state()),
+                         'Wiz back out with the box')
+            session.press('-k', 'Escape')
+            session.wait(lambda: not session.shell_state().get('composing'), 'the box to close')
+
+            # The shell's own desktop tools: values are checked as Settings
+            # checks them, and the assistant's own settings are refused.
+            set_clock = json.loads(session.ipc('tool', 'settings_set', json.dumps({'key': 'clock24', 'value': False})))
+            assert set_clock['ok'] and set_clock['result']['after'] is False, set_clock
+            session.wait(lambda: json.loads(session.preferences.read_text()).get('clock24') is False,
+                         'the preference written')
+            refused = json.loads(session.ipc('tool', 'settings_set', json.dumps(
+                {'key': 'assistantApprovalPolicy', 'value': 'always'})))
+            assert not refused['ok'], refused
+            wrong = json.loads(session.ipc('tool', 'settings_set', json.dumps({'key': 'clock24', 'value': 'soon'})))
+            assert not wrong['ok'] and 'does not accept' in wrong['error'], wrong
+            found = json.loads(session.ipc('tool', 'settings_search', json.dumps({'query': 'clock'})))
+            assert any(row['key'] == 'clock24' for row in found['result']['results']), found
+
             # Signed in, the launcher's question is asked straight away, with
             # nothing of the screen.
             session.ask_from_launcher('connect my printer')
@@ -496,8 +549,19 @@ def main():
             turn = session.finished("Make the menubar transparent")
             assert turn["status"] == "completed" and turn["text"].startswith("The menubar"), turn
             assert turn["undo"] == ["~/.config/cybexos/shell.json"], turn
+            [change] = turn["changes"]
+            assert (change["kind"], change["key"], change["hadBefore"], change["after"], change["undoable"]) == \
+                ("setting", "glassEnabled", False, True, True), change
+            # The fake reports the Read it did before asking to edit.
+            assert turn["steps"] == [{"label": "Read a file", "detail": "shell.json", "tool": False}], turn["steps"]
             assert json.loads(session.preferences.read_text())["glassEnabled"] is True
             session.wait(lambda: session.shell_state().get("turn") == "completed", "the shell's reply")
+            # The reply with what changed and its steps, in the wide view too.
+            session.screenshot("assistant-changes.png")
+            session.ipc('setting', 'assistantExpanded', 'true')
+            time.sleep(0.4)
+            session.screenshot("assistant-wide.png")
+            session.ipc('setting', 'assistantExpanded', 'false')
             undone = session.call("turn.undo", {"id": turn["id"]})["result"]
             assert undone == {"restored": ["~/.config/cybexos/shell.json"], "skipped": []}, undone
             assert "glassEnabled" not in json.loads(session.preferences.read_text())
@@ -623,7 +687,7 @@ def main():
             output = session.log()
             errors = [line for line in output.splitlines() if QML_ERRORS.search(line)]
             assert not errors, "\n".join(errors)
-            print("Assistant onboarding/draft preservation, Ask Wiz from the launcher (signed out and in), repeated pointer dragging, default automatic approvals, Ask first, Undo, widget hand-off, Wiz's poses (carried while dragged), hiding, conversation history (new by default, open and continue, delete, restore, clear) and the empty notification centre passed")
+            print("Assistant onboarding/draft preservation, Ask Wiz from the launcher (signed out and in), the status line on rest, repeated pointer dragging, snapping and tucking, the shell's desktop tools, default automatic approvals, Ask first, what changed with Undo and the steps, the wide view, widget hand-off, Wiz's poses (carried while dragged), hiding, conversation history (new by default, open and continue, delete, restore, clear) and the empty notification centre passed")
         finally:
             session.stop()
 

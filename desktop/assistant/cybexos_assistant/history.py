@@ -51,11 +51,23 @@ def _turn(entry):
     if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not TURN.fullmatch(entry["id"]):
         return None
     status = entry.get("status") if entry.get("status") in STATUSES else "failed"
+    steps = [step for step in entry.get("steps") or [] if isinstance(step, dict)
+             and isinstance(step.get("label"), str)][:60] if isinstance(entry.get("steps"), list) else []
     return {
         "id": entry["id"], "prompt": str(entry.get("prompt") or ""), "text": str(entry.get("text") or ""),
         "status": status, "error": str(entry.get("error") or ""), "errorKind": str(entry.get("errorKind") or ""),
         "startedAt": int(entry.get("startedAt") or 0), "finishedAt": int(entry.get("finishedAt") or 0),
+        "steps": [{"label": step["label"][:80], "detail": str(step.get("detail") or "")[:80],
+                   "tool": bool(step.get("tool"))} for step in steps],
     }
+
+
+def _routine(value):
+    """The routine a conversation was started by: {id, title}, or None."""
+    if not isinstance(value, dict) or not isinstance(value.get("id"), str) \
+            or not re.fullmatch(r"r-[0-9a-f]{12}", value["id"]):
+        return None
+    return {"id": value["id"], "title": collapse(value.get("title") or "", 80)}
 
 
 def _record(document):
@@ -76,6 +88,7 @@ def _record(document):
         "title": collapse(document.get("title") or turns[0]["prompt"], MAX_TITLE),
         "createdAt": int(document.get("createdAt") or turns[0]["startedAt"] or 0),
         "updatedAt": int(document.get("updatedAt") or turns[-1]["startedAt"] or 0),
+        "routine": _routine(document.get("routine")),
         "turns": turns,
     }
 
@@ -160,11 +173,11 @@ class History:
 
     # ---- changes -----------------------------------------------------------
 
-    def create(self, agent):
+    def create(self, agent, routine=None):
         identifier = "c-" + secrets.token_hex(8)
         stamp = now_ms()
         record = {"id": identifier, "agent": agent, "session": None, "title": "", "createdAt": stamp,
-                  "updatedAt": stamp, "turns": []}
+                  "updatedAt": stamp, "routine": _routine(routine), "turns": []}
         self.records[identifier] = record
         return record
 
@@ -174,7 +187,7 @@ class History:
     def begin(self, record, turn):
         """A question asked in `record`; written before the agent starts."""
         if not record["turns"]:
-            record["title"] = collapse(turn.prompt, MAX_TITLE)
+            record["title"] = collapse((record.get("routine") or {}).get("title") or turn.prompt, MAX_TITLE)
         record["turns"].append(self.entry(turn))
         record["updatedAt"] = turn.started_at
         self.write(record)
@@ -225,7 +238,7 @@ class History:
     def entry(turn):
         return {"id": turn.id, "prompt": turn.prompt, "text": turn.text, "status": turn.status,
                 "error": turn.error, "errorKind": turn.error_kind, "startedAt": turn.started_at,
-                "finishedAt": turn.finished_at}
+                "finishedAt": turn.finished_at, "steps": list(getattr(turn, "steps", []))}
 
     @staticmethod
     def matches(record, query):
@@ -248,9 +261,12 @@ class History:
                 preview = live.get("step") or preview
         return {"id": record["id"], "agent": record["agent"], "title": record["title"],
                 "preview": collapse(preview, MAX_PREVIEW), "status": status, "turns": len(record["turns"]),
-                "createdAt": record["createdAt"], "updatedAt": record["updatedAt"]}
+                "createdAt": record["createdAt"], "updatedAt": record["updatedAt"],
+                "routine": record.get("routine")}
 
     def summaries(self, query="", live=None):
+        """`live` is the running turns' snapshots (one, or a list)."""
+        lives = [live] if isinstance(live, dict) else [item for item in live or [] if item]
+        running = {item.get("conversation"): item for item in lives}
         rows = sorted(self.records.values(), key=lambda record: record["updatedAt"], reverse=True)
-        return [self.summary(record, live if live and live.get("conversation") == record["id"] else None)
-                for record in rows if self.matches(record, query)]
+        return [self.summary(record, running.get(record["id"])) for record in rows if self.matches(record, query)]

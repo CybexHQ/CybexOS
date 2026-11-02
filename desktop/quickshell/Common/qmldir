@@ -68,6 +68,7 @@ singleton Recorder Recorder.qml
 singleton GameMode GameMode.qml
 singleton Dictation Dictation.qml
 singleton Assistant Assistant.qml
+singleton AssistantTools AssistantTools.qml
 singleton Reminders Reminders.qml
 singleton Recovery Recovery.qml
 singleton Backup Backup.qml
