@@ -6,7 +6,7 @@ const H = load("SettingsHelpers.js");
 
 test("defaults carry the design values", () => {
     const d = H.defaults();
-    assert.equal(H.VERSION, 33);
+    assert.equal(H.VERSION, 34);
     // The Control Center button ends the right column, with the Cybex OS
     // mark, which the fish prompt shows too.
     assert.equal(d.mods.right.at(-1).id, "control");
@@ -1297,29 +1297,84 @@ test("Control Center placement and visibility survive reload", () => {
     }
 });
 
-test("schema 33 returns the Control Center button from the top left to the far right", () => {
-    // Schema 32's default layout started the left column with the button.
-    const raw = H.defaultMods();
-    const control = raw.right.pop();
-    raw.left.unshift({ ...control, detail: "compact" });
-    const back = H.merge({ v: 32, mods: raw }).mods;
-    assert.deepEqual(back.left.map(m => m.id), ["ws", "media"]);
-    assert.deepEqual(back.right.at(-1), { id: "control", on: true, detail: "compact" });
-    assert.deepEqual(back, { ...H.defaultMods(), right: [...H.defaultMods().right.slice(0, -1),
-        { id: "control", on: true, detail: "compact" }] });
+test("schema 34 returns the Control Center button to the far right from anywhere", () => {
+    const withControl = (col, index, entry) => {
+        const raw = H.defaultMods();
+        raw.right.pop();
+        raw[col].splice(index, 0, entry);
+        return raw;
+    };
+    const expected = entry => ({ ...H.defaultMods(), right: [...H.defaultMods().right.slice(0, -1), entry] });
+    // Schema 32's default led the left column with it.
+    const lead = withControl("left", 0, { id: "control", on: true, detail: "compact" });
+    assert.deepEqual(H.merge({ v: 32, mods: lead }).mods, expected({ id: "control", on: true, detail: "compact" }));
+    // Schema 33 left it after the music player when an older writer had
+    // kept a dragged copy there; hidden, it comes back hidden.
+    const afterMedia = withControl("left", 2, { id: "control", on: false, detail: "auto" });
+    assert.deepEqual(H.merge({ v: 33, mods: afterMedia }).mods, expected({ id: "control", on: false, detail: "auto" }));
+    const centred = withControl("center", 1, { id: "control", on: true, detail: "auto" });
+    assert.deepEqual(H.merge({ v: 33, mods: centred }).mods, expected({ id: "control", on: true, detail: "auto" }));
+    // A copy in two columns resolves to one at the far right.
+    const twice = withControl("left", 2, { id: "control", on: true, detail: "auto" });
+    twice.right.push({ id: "control", on: true, detail: "auto" });
+    assert.deepEqual(H.merge({ v: 33, mods: twice }).mods, expected({ id: "control", on: true, detail: "auto" }));
+    // A schema-34 layout keeps the button where its person put it.
+    assert.deepEqual(H.merge({ v: 34, mods: afterMedia }).mods.left.map(m => m.id), ["ws", "media", "control"]);
+});
 
-    // Hidden there, it comes back hidden.
-    raw.left[0].on = false;
-    assert.equal(H.merge({ v: 32, mods: raw }).mods.right.at(-1).on, false);
+test("schema 34 ignores the layout leftovers an older reset kept", () => {
+    // Before schema 34, Reset kept every entry outside its default column.
+    const leftover = { v: 33, mods: { left: [{ id: "control", on: true, detail: "auto" }] } };
+    assert.equal(H.staleModsLeftover(leftover), true);
+    assert.deepEqual(H.merge(leftover).mods, H.defaultMods());
+    assert.deepEqual(H.overrideKeys(leftover), []);
+    // The next save drops it.
+    const saved = JSON.parse(H.serializeDocument(H.merge(leftover), leftover, []));
+    assert.equal(saved.mods, undefined);
+    // A whole layout is a choice, even when old.
+    const full = H.defaultMods();
+    full.left.push(full.right.pop());
+    assert.equal(H.staleModsLeftover({ v: 33, mods: full }), false);
+    assert.deepEqual(H.overrideKeys({ v: 33, mods: full }), ["mods"]);
+    // A newer schema's widget is not a leftover of ours.
+    assert.equal(H.staleModsLeftover({ v: 34, mods: leftover.mods }), false);
+});
 
-    // Anywhere else in a schema-32 layout, and in a current layout, it stays.
-    const moved = H.defaultMods();
-    moved.right.pop();
-    moved.left.splice(1, 0, { id: "control", on: true, detail: "auto" });
-    assert.deepEqual(H.merge({ v: 32, mods: moved }).mods.left.map(m => m.id), ["ws", "control", "media"]);
-    const placed = H.defaultMods();
-    placed.left.unshift(placed.right.pop());
-    assert.equal(H.merge({ v: 33, mods: placed }).mods.left[0].id, "control");
+test("resetting a layout removes widgets placed outside their default column", () => {
+    const file = { v: 34, mods: H.defaultMods() };
+    file.mods.left.push(file.mods.right.pop());
+    file.mods.right.unshift(file.mods.center.splice(2, 1)[0]);
+    file.mods.left.push({ id: "future", on: true, detail: "auto" });
+    const settings = H.merge(file);
+    settings.mods = H.defaultMods();
+    const saved = JSON.parse(H.serializeDocument(settings, file, []));
+    // Only the widget this schema does not know survives, for its own schema.
+    assert.deepEqual(saved.mods, { left: [{ id: "future", on: true, detail: "auto" }] });
+    assert.deepEqual(H.merge(saved).mods, H.defaultMods());
+});
+
+test("a widget dragged to another column stays there after the save reloads", () => {
+    const L = load("LayoutHelpers.js");
+    const file = { v: 34, mods: H.defaultMods() };
+    file.mods.left.push({ id: "control", on: true, detail: "auto", future: 1 });
+    file.mods.right.pop();
+    file.mods.center.push({ id: "future", on: true, detail: "auto" });
+    for (const [from, id, to, index] of [["left", "control", "right", 99], ["center", "weather", "right", 0],
+        ["right", "batt", "left", 0]]) {
+        const settings = H.merge(file);
+        settings.mods = L.moveWidget(settings.mods, from, id, to, index).mods;
+        const saved = JSON.parse(H.serializeDocument(settings, file, ["mods"]));
+        const ids = col => saved.mods[col].map(m => m.id);
+        assert.equal(["left", "center", "right"].filter(col => ids(col).includes(id)).length, 1,
+            id + " is stored in one column");
+        assert.deepEqual(H.merge(saved).mods, settings.mods);
+        assert.ok(ids("center").includes("future"), "a newer schema's widget stays put");
+    }
+    // A moved entry keeps fields a newer schema added.
+    const settings = H.merge(file);
+    settings.mods = L.moveWidget(settings.mods, "left", "control", "right", 99).mods;
+    const saved = JSON.parse(H.serializeDocument(settings, file, ["mods"]));
+    assert.equal(saved.mods.right.at(-1).future, 1);
 });
 
 test("schema 25 drops the retired usage widget, drawer tab, options and poll ceiling", () => {

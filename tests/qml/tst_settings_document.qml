@@ -101,6 +101,28 @@ Item {
             compare(Helpers.overrideKeys(reset), []);
         }
 
+        // Resetting a layout whose Control Center button sat after the music
+        // player once left the button behind in the file, and the reload that
+        // follows every save put it back on the left.
+        function test_layout_reset_survives_the_post_save_reload() {
+            const mods = Helpers.defaultMods();
+            mods.left.push(mods.right.pop());
+            document.source = { v: Helpers.VERSION, mods: mods };
+            document.baseline = JSON.stringify(document.source);
+            document.explicitKeys = ["mods"];
+            document.values = Helpers.merge(document.source);
+            compare(document.values.mods.left.map(m => m.id), ["ws", "media", "control"]);
+            const reset = Helpers.clone(document.values);
+            reset.mods = Helpers.defaultMods();
+            document.values = reset;
+            document.explicitKeys = [];
+            verify(document.begin());
+            verify(!("mods" in JSON.parse(document.submitted)));
+            const result = document.complete(document.submitted);
+            compare(result.values.mods, Helpers.defaultMods());
+            compare(document.explicitKeys, []);
+        }
+
         function test_event_loop_edit_survives_delayed_completion_and_reload() {
             document.source = { v: Helpers.VERSION, unit: "c" };
             document.explicitKeys = ["unit"];

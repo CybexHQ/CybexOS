@@ -1,7 +1,7 @@
 // Pure settings-schema helpers shared by QML and Node tests.
 // Keep this file free of Qt APIs so persistence stays deterministic.
 
-var VERSION = 33;
+var VERSION = 34;
 
 var BAR_STYLES = ["hug", "floating", "attached"];
 var PALETTE_MODES = ["wallpaper", "fixed"];
@@ -74,8 +74,11 @@ function controlIconIn(value, fallback) {
 // Schema 28 adds `fusebox`, the Fusebox server widget, beside Model Usage.
 // Schema 30 adds `assistant`, the button that shows and hides the Cybex OS
 // Assistant, before the notification and status widgets. Schema 32 moved
-// the default `control` to the start of the left column; schema 33 puts it
-// back at the far right (migrateMods).
+// the default `control` to the start of the left column; schema 33 put it
+// back at the far right when it still led the left column. Schema 34 returns
+// it to the far right from wherever an older file holds it, and drops the
+// layout leftovers older writers kept after a reset (migrateMods,
+// staleModsLeftover).
 var MODULE_IDS = [
     "ws", "media", "indicators", "clock", "weather", "notes", "modelusage", "fusebox", "updates", "gh",
     "t3", "hermes", "remote", "tray", "assistant",
@@ -1431,14 +1434,37 @@ function migrateMods(raw, sourceVersion, context) {
             id: "assistant", on: true, detail: "auto"
         });
     }
-    // Schema 32 put the Control Center button first in the left column, before
-    // the launcher; schema 33 returns it to the far right. A schema-32 layout
-    // that still starts with it goes back there, keeping its visibility and
-    // detail; anywhere else it stays where its person put it.
-    if (sourceVersion === 32 && migrated.left.length > 0
-            && migrated.left[0] && migrated.left[0].id === "control")
-        migrated.right.push(migrated.left.shift());
-    return normalizeMods(migrated);
+    // The Control Center button belongs at the far right. Schema 32 put it
+    // first in the left column; schema 33 only moved it back from there, and
+    // until schema 34 a widget dragged to another column left a copy behind
+    // that won on reload (preserveUnknownMods), so older files can hold it
+    // anywhere. It goes to the end of the right column once, keeping its
+    // visibility and detail; a later move is the person's own.
+    var next = normalizeMods(migrated);
+    if (typeof sourceVersion !== "number" || sourceVersion < 34) {
+        var control = null;
+        ["left", "center", "right"].forEach(function(col) {
+            next[col] = next[col].filter(function(entry) {
+                if (entry.id !== "control")
+                    return true;
+                control = entry;
+                return false;
+            });
+        });
+        next.right.push(control || { id: "control", on: true, detail: "auto" });
+    }
+    return next;
+}
+
+// Before schema 34 the writer compared a layout entry only with its default
+// column, so resetting a layout left behind every widget placed outside its
+// default column, and the next load rebuilt a layout around those leftovers.
+// A file of that age whose layout holds nothing else never chose a layout.
+function staleModsLeftover(raw) {
+    if (!raw || typeof raw !== "object" || raw.mods === undefined
+            || (typeof raw.v === "number" && raw.v >= 34))
+        return false;
+    return JSON.stringify(unknownFields(raw.mods, defaultMods())) === JSON.stringify(raw.mods);
 }
 
 // Stored legacy values are explicit choices, even when equal to an old
@@ -1571,7 +1597,8 @@ function merge(raw, context) {
         drawerWidth: intIn(parsed.drawerWidth, 320, 480, 10, d.drawerWidth),
         controlIcon: controlIconIn(parsed.controlIcon, d.controlIcon),
         controlIconPrompt: boolIn(parsed.controlIconPrompt, d.controlIconPrompt),
-        mods: parsed.mods === undefined ? d.mods : migrateMods(parsed.mods, parsed.v, context),
+        mods: parsed.mods === undefined || staleModsLeftover(parsed)
+            ? d.mods : migrateMods(parsed.mods, parsed.v, context),
         modOpts: migrateModOpts(parsed.modOpts, parsed.v, parsed),
         dock: boolIn(parsed.dock, d.dock),
         dockAutoHide: boolIn(parsed.dockAutoHide, d.dockAutoHide),
@@ -1718,9 +1745,62 @@ function serialize(settings) {
 function overrideKeys(raw) {
     var known = defaults();
     return Object.keys(raw || {}).filter(function(key) {
+        if (key === "mods" && staleModsLeftover(raw))
+            return false;
         return Object.prototype.hasOwnProperty.call(known, key)
-            && JSON.stringify(unknownFields(raw[key], known[key])) !== JSON.stringify(raw[key]);
+            && JSON.stringify(unknownFields(raw[key], schemaFor(key, known))) !== JSON.stringify(raw[key]);
     });
+}
+
+// What a stored value is checked against for fields this schema understands.
+// A layout entry is understood in any column, not just its default one:
+// every built-in widget may be placed in any section.
+function schemaFor(key, known) {
+    if (key !== "mods")
+        return known[key];
+    var entries = MODULE_IDS.map(function(id) {
+        return { id: id, on: true, detail: "auto" };
+    });
+    return { left: entries, center: entries, right: entries };
+}
+
+// A layout entry moved to another column is no longer where the file had it.
+// Only entries the new layout does not place at all (a newer schema's
+// widgets) stay behind in their old column; a moved entry carries its
+// unknown fields along.
+function preserveUnknownMods(original, replacement) {
+    if (!original || typeof original !== "object" || !replacement || typeof replacement !== "object")
+        return preserveUnknown(original, replacement);
+    var columns = ["left", "center", "right"];
+    var stored = {};
+    var placedIn = {};
+    columns.forEach(function(col) {
+        listIn(original[col]).forEach(function(entry) {
+            if (entry && typeof entry.id === "string" && !stored[entry.id])
+                stored[entry.id] = entry;
+        });
+        listIn(replacement[col]).forEach(function(entry) {
+            if (entry && typeof entry.id === "string")
+                placedIn[entry.id] = col;
+        });
+    });
+    var base = clone(original);
+    columns.forEach(function(col) {
+        var kept = listIn(original[col]).filter(function(entry) {
+            return !entry || typeof entry.id !== "string" || placedIn[entry.id] === undefined;
+        });
+        listIn(replacement[col]).forEach(function(entry) {
+            if (entry && stored[entry.id])
+                kept.push(stored[entry.id]);
+        });
+        if (original[col] !== undefined || replacement[col] !== undefined)
+            base[col] = clone(kept);
+    });
+    return preserveUnknown(base, replacement);
+}
+
+function listIn(value) {
+    return (Array.isArray(value) || value instanceof Array) ? value : [];
 }
 
 function unknownFields(original, schema) {
@@ -1825,9 +1905,10 @@ function serializeDocument(settings, original, explicitKeys) {
     out.v = VERSION;
     Object.keys(defaults()).forEach(function(key) {
         if (explicitKeys.indexOf(key) !== -1)
-            out[key] = preserveUnknown(out[key], settings[key]);
+            out[key] = key === "mods" ? preserveUnknownMods(out[key], settings[key])
+                : preserveUnknown(out[key], settings[key]);
         else {
-            var extra = unknownFields(out[key], defaults()[key]);
+            var extra = unknownFields(out[key], schemaFor(key, defaults()));
             if (extra === undefined)
                 delete out[key];
             else
@@ -1950,6 +2031,8 @@ var exported = {
     overrideKeys: overrideKeys,
     preserveUnknown: preserveUnknown,
     unknownFields: unknownFields,
+    preserveUnknownMods: preserveUnknownMods,
+    staleModsLeftover: staleModsLeftover,
     serializeDocument: serializeDocument,
     rebaseDocuments: rebaseDocuments,
     parse: parse
