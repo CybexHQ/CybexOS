@@ -87,7 +87,8 @@ local named_fresh = model.assign(document(), { named_monitor }, { untouched_name
 for _, number in ipairs(named_fresh[named_monitor.name].slots) do check(number ~= 1, "positive named ID was allocated as a slot") end
 -- A small compositor model includes the visible-workspace swap trap.
 local world = { monitors = {}, workspaces = {}, windows = {}, rules = {}, listeners = {}, timers = {}, swaps = 0,
-  native_scrolling = true, general_layout = "master", layout_writes = 0, plugin_loaded = false, plugin_declarations = 0, plugin_buttons = 0 }
+  native_scrolling = true, general_layout = "master", layout_writes = 0, plugin_loaded = false, plugin_declarations = 0, plugin_buttons = 0,
+  hyprland_version = os.getenv("CYBEXOS_FIXTURE_HYPRLAND_VERSION") or "0.56.2", config_errors = {} }
 local function monitor_named(name) for _, mon in ipairs(world.monitors) do if mon.name == name then return mon end end end
 local function workspace(id) for _, ws in ipairs(world.workspaces) do if ws.id == tonumber(id) then return ws end end end
 local function create(id, mon)
@@ -117,7 +118,7 @@ local function move_workspace(ws, mon)
   ws.monitor = mon
   for _, win in ipairs(world.windows) do if win.workspace == ws then win.monitor = mon end end
 end
-hl = { dsp = { window = {}, workspace = {} }, plugin = {},
+hl = { dsp = { window = {}, workspace = {} }, plugin = {}, version = function() return world.hyprland_version end,
   get_loaded_plugins = function() return world.plugin_loaded and { { name = world.plugin_name or "hyprbars" } } or {} end }
 function hl.plugin.load(path)
   assert(path == "/etc/cybexos/titlebars.so", "unexpected plugin path")
@@ -248,7 +249,14 @@ end end
 function hl.dsp.window.fullscreen_state(spec) return function() spec.window.fullscreen = spec.internal end end
 local function add_monitor(mon, active)
   world.monitors[#world.monitors + 1] = mon
-  function mon:set_workspace(spec) self.active_workspace = assert(workspace(spec.workspace)) end
+  -- Hyprland 0.57 takes the selector itself, 0.56 a { workspace = ... } table.
+  -- Like native, the other shape records a config error and changes nothing.
+  function mon:set_workspace(spec)
+    local selector = world.hyprland_version >= "0.57" and spec or type(spec) == "table" and spec.workspace or nil
+    local target = (type(selector) == "string" or type(selector) == "number") and workspace(selector)
+    if not target then world.config_errors[#world.config_errors + 1] = "HLMonitor.set_workspace: bad argument"; return end
+    self.active_workspace = target
+  end
   mon.active_workspace = create(active, mon)
   if not world.focused then world.focused = mon end
 end
@@ -359,6 +367,21 @@ check(snapshot_row(ws, 1).layout == "unmanaged" and not snapshot_row(ws, 1).layo
 ws.cycle_layout(1)
 check(snapshot_row(ws, 1).layout == "dwindle", "cycling custom native layout did nothing")
 ws.set_layout(1, "default")
+-- A bar click on an occupied workspace of the same display (Shared mode):
+-- focus_id shows it under either set_workspace API, or through the
+-- dispatchers when the version is unknown, without a config error.
+local occupied = window("0x30", create(3, internal))
+local pinned_version = world.hyprland_version
+for _, version in ipairs({ "0.56.2", "0.57.0", "unknown" }) do
+  world.hyprland_version, world.focused, internal.active_workspace = version, internal, workspace(1)
+  ws.focus_id(3)
+  check(internal.active_workspace.id == 3 and world.focused == internal and #world.config_errors == 0,
+    "a bar click did not show an existing workspace under Hyprland " .. version)
+end
+world.hyprland_version, internal.active_workspace = pinned_version, workspace(1)
+for i, win in ipairs(world.windows) do if win == occupied then table.remove(world.windows, i); break end end
+for i, row in ipairs(world.workspaces) do if row.id == 3 then table.remove(world.workspaces, i); break end end
+count_windows(); ws.refresh()
 local registered_gesture
 hl.gesture = function(spec) registered_gesture = spec end
 _G.__cybexos_gestures = { active = { { name = "workspace", fingers = 3, direction = "horizontal" } } }
@@ -865,4 +888,5 @@ local json = require("displays")
 check(json.decode(string.rep(" ", data.MAX_BYTES + 1)) == nil, "oversized input accepted")
 check(json.decode('{"x":NaN}') == nil and json.decode('{"x":1} trailing') == nil, "strict JSON accepted executable extensions")
 check(not ws.snapshot.capabilities.titlebars, "missing optional titlebar plugin was reported as working")
+check(#world.config_errors == 0, "a monitor call used the wrong Hyprland API shape: " .. table.concat(world.config_errors, "; "))
 print("Hyprland workspace/mode behavioral fixtures passed (" .. assertions .. " assertions)")

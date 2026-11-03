@@ -392,13 +392,25 @@ local function sync_policy()
     end
   end
 end
+-- Hyprland 0.57 takes HLMonitor:set_workspace's selector itself; 0.56 took a
+-- { workspace = selector } table. Neither raises for the other's shape: it
+-- records a config error and leaves the display as it was, so the shape comes
+-- from the running compositor. An unknown version uses the dispatchers below.
+local function set_workspace_argument(selector)
+  local version = type(hl.version) == "function" and hl.version() or ""
+  local major, minor = tostring(version):match("^(%d+)%.(%d+)")
+  if not major then return nil end
+  if tonumber(major) > 0 or tonumber(minor) >= 57 then return selector end
+  return { workspace = selector }
+end
 local function show(monitor, workspace_id)
   local workspace = get_workspace(workspace_id)
   if workspace and monitor_name(workspace.monitor) ~= monitor.name then
     hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(workspace_id), monitor = monitor.name }))
     workspace = get_workspace(workspace_id)
   end
-  if workspace and monitor.set_workspace then monitor:set_workspace({ workspace = tostring(workspace_id) })
+  local argument = workspace and monitor.set_workspace and set_workspace_argument(tostring(workspace_id))
+  if argument then monitor:set_workspace(argument)
   else
     hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
     hl.dispatch(hl.dsp.focus({ workspace = tostring(workspace_id) }))
