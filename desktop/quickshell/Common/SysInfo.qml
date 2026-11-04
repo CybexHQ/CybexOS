@@ -114,6 +114,9 @@ Singleton {
                 expectedStop = false;
                 root.idleInhibitPending = false;
                 root.idleInhibitLifecycle = "stopped";
+                // A quick off/on can arrive while SIGTERM is in flight.
+                if (root.idleInhibited)
+                    root.syncIdleInhibit();
                 return;
             }
             root.idleInhibitPending = false;
@@ -184,11 +187,13 @@ Singleton {
             idleInhibitLifecycle = idleInhibitProc.running ? "stopping" : "stopped";
             if (idleInhibitProc.running) {
                 idleInhibitProc.expectedStop = true;
-                idleInhibitProc.running = false;
             } else {
                 idleInhibitEffective = false;
                 idleInhibitPending = false;
             }
+            // Before Quickshell's post-reload hook, running is still false
+            // even when a start has been queued. Cancel that request too.
+            idleInhibitProc.running = false;
         }
     }
 
@@ -294,7 +299,9 @@ Singleton {
         if (startupApplied)
             syncNightLight();
     }
-    onIdleInhibitModeChanged: {
+    // A mode's change signal can precede the idleInhibited binding update.
+    // Synchronize from the value the process actually follows, once updated.
+    onIdleInhibitedChanged: {
         if (startupApplied)
             syncIdleInhibit();
     }

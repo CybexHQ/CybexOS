@@ -55,3 +55,37 @@ VM passed in 203 seconds, including real local updater staging, candidate
 service/health checks and interrupted-worker recovery. This exercised staging,
 not applying an update or an ISO installation. No workstation configuration
 was changed and no physical laptop suspend/resume was performed.
+
+## Stay awake and idle timers
+
+The menubar's Stay awake control holds a systemd idle inhibitor through
+`Common/SysInfo.qml`. Its Off state must release both an existing inhibitor
+and a process start queued before Quickshell's post-reload hook. Process
+synchronization follows the derived `idleInhibited` property's change signal;
+the mode's earlier signal can still observe the previous derived value. A
+request reenabled while the previous process is stopping resumes after exit.
+
+On 2026-11-04, a real Quickshell regression reproduced an inhibitor surviving
+an Off startup policy and an expired remembered request. External preference
+changes could also leave the process running with Stay awake off. The fix
+cancels queued starts and observes the updated enabled state. It preserves
+timed requests across shell reloads and keeps the existing battery-only idle
+suspend and external-display lid policies.
+
+`python3 -B -m unittest discover -s tests/nixos -p test_idle_inhibit.py -v`
+loads the production singleton in a private, windowless Quickshell. It checks
+Off startup, remembered requests, expired timers, preference changes,
+unplugging and rapid off/on requests. Settings, battery state, the inhibitor
+command and service restarts are fixtures: no live desktop or real logind
+inhibitor is changed. This tests QML/process behavior, not physical sleep.
+
+Validation on 2026-11-04: the six real-engine idle regressions, 1,030 Python
+source tests, the lifecycle integration scripts, 25 system-settings tests,
+99 focused JavaScript tests and linting of 506 QML files passed. The desktop
+package and ISO/source parity check built successfully. The actual staged
+updater was exercised in disposable lifecycle VMs but did not reach Ready:
+the offline fixture lacked bootstrap and ShellCheck outputs; carrying those
+cached outputs allowed the prebuilt check to pass, then further missing
+Nixpkgs build inputs failed to download (including libssh2 security patches).
+The experimental fixture changes were discarded. No update was applied to
+the workstation and no physical suspend/resume was tested.
