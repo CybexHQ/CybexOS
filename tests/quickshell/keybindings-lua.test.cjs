@@ -32,14 +32,24 @@ test('defaults preserve the baseline with the reviewed dictation changes, includ
         const old = run(`dofile(${JSON.stringify(baseline)})\nprint(json.encode(registered()))`, features).output[0];
         // Keep the historical fixture intact. Dictation now delegates language
         // selection to Settings and routes all three keys through Quickshell,
-        // with no binding allowed on the lock screen (8f3239cd).
+        // with no binding allowed on the lock screen (8f3239cd), and
+        // Super+Ctrl+Shift+X opens its history beside Super+Ctrl+X.
         const expected = old.flatMap(row => {
             if (row.options.description === 'Dictation: Dictate in Dutch') return [];
-            if (row.options.description === 'Dictation: Dictate in English') return [{
-                ...row,
-                dispatcher: {name: 'global', args: ['quickshell:dictationToggle']},
-                options: {description: 'Dictation: Start or stop dictation'}
-            }];
+            if (row.options.description === 'Dictation: Dictate in English') {
+                const toggle = {
+                    ...row,
+                    dispatcher: {name: 'global', args: ['quickshell:dictationToggle']},
+                    options: {description: 'Dictation: Start or stop dictation'}
+                };
+                if (row.keys !== 'SUPER + CTRL + X') return [toggle];
+                return [toggle, {
+                    ...row,
+                    keys: 'SUPER + CTRL + SHIFT + X',
+                    dispatcher: {name: 'global', args: ['quickshell:dictationHistory']},
+                    options: {description: 'Dictation: Show dictation history'}
+                }];
+            }
             return [row];
         });
         const current = run(`require('bindings')\nrequire('keybinding_preferences')\nprint(json.encode(registered()))`, features);

@@ -85,6 +85,14 @@ ShellRoot {
         onPressed: Dictation.toggle()
     }
 
+    // Super+Ctrl+Shift+X: the dictation history.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "dictationHistory"
+        description: I18n.tr("Show dictation history")
+        onPressed: Dictation.toggleHistory()
+    }
+
     // Scripts and tests drive dictation as the shortcut does.
     IpcHandler {
         target: "dictation"
@@ -103,10 +111,19 @@ ShellRoot {
             Settings.setModuleOption("indicators", "dictationLiveText", enabled);
         }
         function refreshModel(): void { Dictation.refreshStatus(); }
-        // Settings → Bar & Control Center → Indicators, where dictation's choices are.
-        function settings(): void {
-            Settings.showPanel("bar", Screens.focused ? Screens.focused.name : "");
-            Settings.openWidgetSettings("indicators");
+        // Settings → Assistant → Dictation, where dictation's choices are.
+        function settings(): void { Dictation.openSettings(); }
+        // The dictation history, and a dictation's way back out of it.
+        function history(): void { Dictation.toggleHistory(); }
+        function closeHistory(): void { Dictation.closeHistory(); }
+        // As Settings → Assistant → Dictation sets them.
+        function tidy(mode: string): void {
+            Settings.setModuleOption("indicators", "dictationTidy", mode);
+        }
+        function addCorrection(heard: string, write: string): void { Dictation.addCorrection(heard, write); }
+        function removeCorrection(heard: string): void { Dictation.removeCorrection(heard); }
+        function keepRecordings(enabled: bool): void {
+            Settings.setModuleOption("indicators", "dictationKeepAudio", enabled);
         }
         function status(): string { return Dictation.statusJson(); }
     }
@@ -512,6 +529,7 @@ ShellRoot {
     OsdWindow {}
     DictationPill {}
     DictationOffer {}
+    DictationHistory {}
     ShortcutsOverlay {}
     PolkitWindow {}
 

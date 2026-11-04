@@ -981,7 +981,7 @@ Singleton {
         // this recording's words. The model and languages are dictation's,
         // in Voxtype's configuration (Dictation applies Settings there).
         Quickshell.execDetached(["sh", "-c",
-            'mkdir -p -m 0700 "$1" && rm -f -- "$2" "$2.done" "$2.live" && exec voxtype record start --file="$2"',
+            'mkdir -p -m 0700 "$1" && rm -f -- "$2" "$2.done" "$2.live" "$2.wav" && exec voxtype record start --file="$2"',
             "sh", scratchDir, transcriptPath]);
         Dictation.refresh();
         transcriptTimeout.stop();
@@ -1071,7 +1071,7 @@ Singleton {
             return;
         transcribing = false;
         transcriptTimeout.stop();
-        Quickshell.execDetached(["rm", "-f", "--", transcriptPath]);
+        Quickshell.execDetached(["rm", "-f", "--", transcriptPath, transcriptPath + ".wav"]);
         const dropped = endedByDaemon;
         endedByDaemon = false;
         if (words === "") {

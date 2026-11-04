@@ -130,7 +130,7 @@ BarModule {
         case "dictation":
             return Dictation.recording ? "Stop dictation · F9"
                 : Dictation.transcribing ? "Cancel transcription"
-                : "Dictate · F9";
+                : "Dictate · F9 · middle click history";
         case "recording":
             if (Recorder.scrolling && !Recorder.active)
                 return "Finish scrolling screenshot · Enter";
@@ -163,7 +163,10 @@ BarModule {
     function trigger(id, button, mouseButton) {
         switch (id) {
         case "dictation":
-            Dictation.toggle();
+            if (mouseButton === Qt.MiddleButton)
+                Dictation.toggleHistory();
+            else
+                Dictation.toggle();
             break;
         case "recording":
             if (Recorder.scrolling && !Recorder.active)

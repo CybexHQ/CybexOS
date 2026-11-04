@@ -6,16 +6,28 @@ import "Common"
 // The words of a dictation while you speak (docs/dictation.md): a pill where
 // the volume OSD sits, on the overlay layer, never taking the keyboard, so
 // the window you are dictating into keeps its focus. The words are typed
-// into that window only when you stop; until then they are Whisper's best
-// guess and may still change.
+// into that window only when you stop; until then they are the model's best
+// guess and may still change. With tidy-up on, the tidied words replace them
+// before they are typed, and the pill says how it went, with the original
+// words a click away.
 PanelWindow {
     id: root
 
     readonly property string phase: Dictation.phase
-    readonly property bool shown: phase !== "" && phase !== "done"
+    readonly property var result: Dictation.lastResult
+    // A finished dictation shows only when there is something to say: it was
+    // tidied (the original is a click away) or polishing did not answer.
+    readonly property bool doneNote: phase === "done" && (result.tidied === true || result.polishFailed === true)
+    readonly property bool shown: phase !== "" && (phase !== "done" || doneNote)
     readonly property bool listening: phase === "starting" || phase === "listening"
-    readonly property bool working: phase === "finishing" || phase === "typing"
+    readonly property bool tidying: phase === "tidying"
+    readonly property bool working: phase === "finishing" || phase === "typing" || tidying
     readonly property bool problem: phase === "failed" || phase === "empty"
+    // The one action a finished pill offers.
+    readonly property string action: phase === "done" && result.tidied === true ? I18n.tr("Copy original")
+        : phase === "failed" && result.id ? I18n.tr("Open history") : ""
+    readonly property string agentName: Settings.modOpts.indicators.dictationPolishAgent === "codex"
+        ? "Codex" : "Claude"
 
     visible: shown || pill.opacity > 0.001
     screen: Screens.focused
@@ -63,20 +75,29 @@ PanelWindow {
         return "…" + (space > 0 && space < 30 ? cut.slice(space + 1) : cut);
     }
 
-    readonly property string words: tail(Dictation.liveText)
+    readonly property string words: tail(Dictation.shownText)
     readonly property string statusText: {
         switch (phase) {
         case "starting": return I18n.tr("Starting…");
         case "listening": return I18n.tr("Listening…");
         case "finishing": return I18n.tr("Finishing…");
+        case "tidying":
+            return Dictation.tidyMode === "polish"
+                ? I18n.format(I18n.tr("Polishing with %1… Click to type it as said"), [agentName])
+                : I18n.tr("Tidying…");
         case "typing": return I18n.tr("Typing…");
+        case "done":
+            return result.polishFailed === true
+                ? I18n.format(I18n.tr("Typed with basic tidy-up: %1 did not answer"), [agentName])
+                : I18n.format(I18n.tr("Typed %1 words · tidied"), [result.words || 0]);
         case "copied": return I18n.tr("Copied to the clipboard. Paste with Ctrl+V.");
         case "empty": return I18n.tr("No speech heard");
         case "failed":
             switch (Dictation.failure) {
             case "microphone": return I18n.tr("The microphone did not start");
             case "timeout": return I18n.tr("Dictation took too long to finish");
-            case "typing": return I18n.tr("Your words could not be typed");
+            case "typing": return result.id ? I18n.tr("Your words could not be typed. They are in history.")
+                : I18n.tr("Your words could not be typed");
             default: return I18n.tr("Dictation failed");
             }
         default: return "";
@@ -99,7 +120,7 @@ PanelWindow {
         border.width: 1
         border.color: root.problem ? Theme.redBorder : Theme.popBorder
         Accessible.role: Accessible.StatusBar
-        Accessible.name: root.showWords ? root.words : root.statusText
+        Accessible.name: root.showWords ? root.words + ". " + root.statusText : root.statusText
 
         Behavior on opacity {
             NumberAnimation {
@@ -148,12 +169,15 @@ PanelWindow {
                 Sym {
                     anchors.centerIn: parent
                     name: root.listening ? "mic"
+                        : root.tidying ? "sparkles"
                         : root.working ? "loader-2"
+                        : root.phase === "done" ? "check"
                         : root.phase === "copied" ? "content_paste"
                         : root.phase === "empty" ? "mic_off"
                         : "error"
                     size: Theme.iconMedium
-                    color: root.listening || root.problem ? Theme.redText : Theme.textHi
+                    color: root.listening || root.problem ? Theme.redText
+                        : root.tidying ? Theme.accentText : Theme.textHi
                 }
             }
 
@@ -184,15 +208,56 @@ PanelWindow {
                     font.pixelSize: root.showWords ? Theme.typography.metadata : Theme.typography.primary
                     color: root.problem ? Theme.redText : root.showWords ? Theme.textLow : Theme.textHi
                 }
+
+                // Copy original, or Open history for words that were not typed.
+                Rectangle {
+                    id: actionButton
+                    visible: root.action !== ""
+                    width: actionLabel.implicitWidth + Theme.scaled(16)
+                    height: actionLabel.implicitHeight + Theme.scaled(6)
+                    radius: Theme.scaled(8)
+                    color: actionMouse.containsMouse ? Theme.hoverFillStrong : Theme.hoverFill
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.action
+
+                    Text {
+                        id: actionLabel
+                        anchors.centerIn: parent
+                        text: root.action
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                        color: Theme.accentText
+                    }
+
+                    MouseArea {
+                        id: actionMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (root.phase === "done")
+                                Dictation.copyOriginal();
+                            else
+                                Dictation.openHistory();
+                        }
+                    }
+                }
             }
         }
 
-        // A click stops a dictation that is listening.
+        // A click stops a dictation that is listening; while tidy-up runs it
+        // types the words as they were said instead.
         MouseArea {
             anchors.fill: parent
-            enabled: root.listening
+            z: -1
+            enabled: root.listening || (root.tidying && !Dictation.originalRequested)
             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: Dictation.stop()
+            onClicked: {
+                if (root.listening)
+                    Dictation.stop();
+                else
+                    Dictation.typeOriginal();
+            }
         }
     }
 }

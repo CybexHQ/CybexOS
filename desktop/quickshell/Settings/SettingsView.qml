@@ -595,7 +595,7 @@ PopoutPanel {
                 case "power": return powerPage;
                 case "security": return securityPage;
                 case "accounts": return accountsPage;
-                case "assistant": return assistantPage;
+                case "assistant": return tab === "dictation" ? dictationPage : assistantPage;
                 case "applications": return applicationsPage;
                 case "region": return regionPage;
                 case "backup": return tab === "storage" ? storagePage : tab === "recovery" ? recoveryPage : backupPage;
@@ -637,6 +637,7 @@ PopoutPanel {
         Component { id: workspacesPage; WorkspacesPage {} }
         Component { id: notificationsPage; NotificationsPage {} }
         Component { id: assistantPage; AssistantPage {} }
+        Component { id: dictationPage; DictationPage {} }
         Component { id: pluginsPage; PluginsPage {} }
         Component { id: networkPage; NetworkPage {} }
         Component { id: soundPage; SoundPage {} }

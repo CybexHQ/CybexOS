@@ -188,9 +188,19 @@ test("active clock-side actions light only their glyph", () => {
 
 test("indicator settings cover ordering, display, actions, and feature defaults", () => {
     const detail = read("Settings/ModuleDetailView.qml");
+    // Dictation's options are the indicator's, set on their own page
+    // (Assistant → Dictation), which the Indicators page links to.
+    const dictationPage = read("Settings/DictationPage.qml");
     for (const key of [
-        "order", "enabled", "dictationPrimaryLanguage", "dictationSecondaryLanguage",
-        "dictationModel", "dictationLiveText", "dictationVocabulary",
+        "dictationPrimaryLanguage", "dictationSecondaryLanguage", "dictationModel",
+        "dictationLiveText", "dictationVocabulary", "dictationCorrections", "dictationTidy",
+        "dictationPolishAgent", "dictationTidyCode", "dictationHistory", "dictationKeepAudio"
+    ])
+        assert.match(dictationPage, new RegExp(`(?:page\\.opts\\.|page\\.(?:set|reset|dirty)(?:Opt)?\\(\")${key}`),
+            `${key} must be reachable from the Dictation settings page`);
+    assert.match(detail, /onTriggered: Settings\.showPanel\("dictation"\)/);
+    for (const key of [
+        "order", "enabled",
         "recordingMode", "recordingShowElapsed",
         "reminderDisplay", "reminderClick", "reminderMinutes",
         "nightLightStartup", "dndStartup", "dndDefaultMode",
@@ -201,10 +211,10 @@ test("indicator settings cover ordering, display, actions, and feature defaults"
     assert.match(detail, /value:\s*"active", label:\s*"Active only"/);
     assert.match(detail, /function beginIndicatorDrag/);
     assert.match(detail, /function commitIndicatorDrag/);
-    // Picking the enhanced model downloads it first; the languages come
-    // from the list Whisper and the shell can both name.
-    assert.match(detail, /onPicked: value => Dictation\.useModel\(value\)/);
-    assert.match(detail, /SettingsHelpers\.DICTATION_LANGUAGES/);
+    // Picking a model not yet downloaded downloads it first; the languages
+    // come from the list Whisper and the shell can both name.
+    assert.match(dictationPage, /onChosen: Dictation\.useModel\(modelData\.value\)/);
+    assert.match(dictationPage, /SettingsHelpers\.DICTATION_LANGUAGES/);
     assert.match(detail, /Restarting only the menubar resumes its current state/);
     assert.match(indicators, /Settings\.modOpts\.indicators\.reminderDisplay/);
     assert.match(indicators, /Settings\.modOpts\.indicators\.idleShowRemaining/);

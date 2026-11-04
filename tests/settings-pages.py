@@ -359,7 +359,7 @@ def main():
             for page, tab in (('appearance', None), ('wallpaper', None), ('bar', None), ('workspaces', None),
                               ('notifications', None), ('plugins', None), ('displays', None), ('sound', None),
                               ('network', None), ('touchpad', None), ('keyboard', 'layouts'), ('power', None),
-                              ('security', None), ('accounts', None), ('assistant', None), ('applications', None),
+                              ('security', None), ('accounts', None), ('assistant', 'wiz'), ('applications', None),
                               ('region', None), ('backup', 'backups')):
                 show(page, tab)
             show('keyboard', 'layouts')
@@ -372,6 +372,14 @@ def main():
             ipc('settings-test', 'showTab', 'backup', 'storage')
             wait(lambda: state().get('tab') == 'storage', 'Disk space tab')
             screenshot('03-backup-disk.png')
+
+            # Assistant holds Wiz and Dictation; the old dictation link opens its tab.
+            show('assistant', 'wiz')
+            ipc('settings-test', 'showTab', 'assistant', 'dictation')
+            wait(lambda: state().get('tab') == 'dictation', 'Assistant › Dictation tab')
+            screenshot('assistant-dictation.png')
+            show('dictation', 'dictation')
+            assert state()['page'] == 'assistant', state()
 
             # Legacy ids land on the merged pages and their tabs.
             show('shortcuts', 'shortcuts')
@@ -540,7 +548,7 @@ def main():
             def saved_icon():
                 saved = json.loads((home / '.config/cybexos/shell.json').read_text())
                 return saved['v'], saved.get('controlIcon', 'cybex'), saved.get('controlIconPrompt', True)
-            wait(lambda: saved_icon() == (33, 'cybex', True), 'the choice saved in schema 33')
+            wait(lambda: saved_icon() == (34, 'cybex', True), 'the choice saved in schema 34')
 
             # The narrow window: icon rail, compact chip.
             subprocess.run(['swaymsg', '[title="Cybex OS Settings"]', 'resize', 'set', '640', '620'],

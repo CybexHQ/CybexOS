@@ -150,7 +150,7 @@ test("Backup & storage is a System page with three tabs that search reaches", ()
     assert.match(read("Common/qmldir"), /^singleton Backup Backup\.qml$/m);
     // The old Storage & cleanup id opens Disk space.
     assert.match(settings, /storage: "backup"/);
-    assert.match(settings, /legacyTabs: \(\{ shortcuts: "shortcuts", storage: "storage" \}\)/);
+    assert.match(settings, /legacyTabs: \(\{ shortcuts: "shortcuts", storage: "storage", dictation: "dictation" \}\)/);
     const rows = load("SettingsSearchData.js").ROWS.filter(row => row.page === "backup");
     assert.deepEqual(rows.map(row => row.label), ["Review cleanup", "Automatic weekly cleanup",
         "Back up personal files", "Automatic backups", "Restore files", "Recovery key", "Recovery points",

@@ -1,9 +1,11 @@
 state_file = "auto"
 
-# Settings → Bar & Control Center → Indicators → Dictation owns whisper.model,
+# Settings → Assistant → Dictation owns engine, whisper.model,
 # whisper.language, whisper.streaming, whisper.on_demand_loading,
-# whisper.initial_prompt and streaming.revision_mode, and keeps them in line
-# with what it shows (docs/dictation.md). Everything else here is yours.
+# whisper.initial_prompt, streaming.revision_mode and, once Parakeet is
+# downloaded, parakeet.model, parakeet.streaming and
+# parakeet.on_demand_loading, and keeps them in line with what it shows
+# (docs/dictation.md). Everything else here is yours.
 
 [hotkey]
 enabled = false

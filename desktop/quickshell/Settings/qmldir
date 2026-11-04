@@ -62,6 +62,7 @@ ChipToggleRow ChipToggleRow.qml
 WeatherLocationPicker WeatherLocationPicker.qml
 
 SoundPage SoundPage.qml
+DictationPage DictationPage.qml
 DisplaysPage DisplaysPage.qml
 DisplayArrangement DisplayArrangement.qml
 NetworkPage NetworkPage.qml

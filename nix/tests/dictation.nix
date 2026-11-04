@@ -8,6 +8,11 @@
 # second language, and the enhanced model as a finished download leaves it
 # (there is no network; tests/nixos/test_dictation_helper.py covers the
 # download): English and Dutch, told apart by Whisper, with live text off.
+# Every typed dictation lands in the history, which opens from its shortcut;
+# a correction rewrites a word, Polish without an agent falls back to basic
+# tidy-up, and a kept recording sits beside its entry. Last, Parakeet (Fast &
+# accurate), streaming through the sliding window with live words, in English
+# and Dutch without being told which.
 #
 # The microphone is a PipeWire null sink's monitor fed with espeak-ng speech,
 # and recognition runs on the VM's CPU (AVX2; a pass takes seconds): this
@@ -27,6 +32,17 @@ let
     url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q8_0.bin";
     sha256 = "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1";
   };
+  # Parakeet v3 as the download leaves it: its files in one directory.
+  parakeetFile = name: sha256: pkgs.fetchurl {
+    inherit name sha256;
+    url = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/${name}";
+  };
+  parakeet = pkgs.linkFarm "parakeet-tdt-0.6b-v3-int8" [
+    { name = "encoder-model.int8.onnx"; path = parakeetFile "encoder-model.int8.onnx" "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09"; }
+    { name = "decoder_joint-model.int8.onnx"; path = parakeetFile "decoder_joint-model.int8.onnx" "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70"; }
+    { name = "vocab.txt"; path = parakeetFile "vocab.txt" "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"; }
+    { name = "config.json"; path = parakeetFile "config.json" "666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466"; }
+  ];
   # A terminal program that records every byte it receives: what wtype typed.
   probe = pkgs.writeText "cybexos-dictation-probe.py" ''
     import os, sys, tty
@@ -119,7 +135,7 @@ in pkgs.testers.runNixOSTest {
             machine.screenshot(f"{label}-live")
         time.sleep(1)
         machine.send_key("f9")
-        wait(lambda: dictation()["phase"] not in ("finishing", "typing"), 180, f"{label}: finished")
+        wait(lambda: dictation()["phase"] not in ("finishing", "tidying", "typing"), 180, f"{label}: finished")
         status = dictation()
         assert status["phase"] in ("", "done") and status["failure"] == "", f"{label}: {status}"
         result = typed()[len(before):]
@@ -155,14 +171,56 @@ in pkgs.testers.runNixOSTest {
     english = dictate("${speech}/english.wav", "base-english")
     assert "morning" in english and "test" in english, english
 
-    # The first dictation that typed words offers the enhanced model, once.
+    # It is in the history, as typed, with the app it went to.
+    def history():
+        return json.loads(machine.succeed("cat /home/tester/.local/state/cybexos/dictation/history.json"))["entries"]
+    entry = history()[0]
+    assert entry["status"] == "typed" and entry["text"].lower() in english, entry
+    assert machine.succeed("stat -c %a /home/tester/.local/state/cybexos/dictation/history.json").strip() == "600"
+
+    # The first dictation that typed words offers the model that suits its
+    # languages (Parakeet for English), once.
     wait(lambda: dictation()["offerShown"], 15, "the offer")
+    assert dictation()["recommendedModel"] == "parakeet", dictation()
     machine.screenshot("offer")
     machine.succeed("grep -q '\"dictationPrompted\": *true' /home/tester/.config/cybexos/shell.json")
     layers = json.loads(user("hyprctl -i 0 -j layers"))
     names = {layer.get("namespace") for monitor in layers.values()
              for level in monitor.get("levels", {}).values() for layer in level}
     assert "qs-dictation-offer" in names, names
+
+    ipc("dismissOffer")
+
+    # The history opens from its shortcut, takes the keyboard, and closes on Escape.
+    machine.send_key("meta_l-ctrl-shift-x")
+    wait(lambda: dictation()["historyOpen"] and dictation()["historyCount"] >= 1, 15, "the history")
+    time.sleep(1)
+    machine.screenshot("history")
+    layers = json.loads(user("hyprctl -i 0 -j layers"))
+    names = {layer.get("namespace") for monitor in layers.values()
+             for level in monitor.get("levels", {}).values() for layer in level}
+    assert "qs-dictation-history" in names, names
+    machine.send_key("esc")
+    wait(lambda: not dictation()["historyOpen"], 15, "the history closed")
+    machine.wait_until_succeeds(f"runuser -u tester -- env {session} hyprctl -i 0 -j activewindow | grep -q cxo-typed", timeout=30)
+
+    # A correction rewrites a word, live and typed; a kept recording sits
+    # beside its entry; Polish without an agent types basic tidy-up.
+    ipc("addCorrection test trial")
+    ipc("keepRecordings true")
+    ipc("tidy polish")
+    wait(lambda: "trial" in machine.succeed("cat /home/tester/.config/cybexos/shell.json"), 15, "the correction saved")
+    corrected = dictate("${speech}/english.wav", "corrected-english")
+    assert "trial" in corrected and not re.search(r"\btest\b", corrected), corrected
+    result = dictation()["lastResult"]
+    assert result["polishFailed"] and result["tidy"] == "basic", result
+    entry = history()[0]
+    assert entry["audio"] is True, entry
+    machine.succeed(f"test -s /home/tester/.local/state/cybexos/dictation/recordings/{entry['id']}.wav")
+    machine.succeed(f"test ! -e /run/user/{uid}/cybexos-dictation/transcript.txt.wav")
+    ipc("tidy basic")
+    ipc("keepRecordings false")
+    ipc("removeCorrection test")
 
     # Live text off: the model loads on demand and the words come at the end.
     pid = voxtype_pid()
@@ -213,10 +271,27 @@ in pkgs.testers.runNixOSTest {
     assert "goedemorgen" in dutch and "vandaag" in dutch, dutch
     ipc("liveText true")
 
+    # Parakeet, as a finished download leaves it, chosen: Voxtype gets its
+    # section, then the engine, and streams it through the sliding window.
+    user("ln -sfn ${parakeet} /home/tester/.local/share/voxtype/models/parakeet-tdt-0.6b-v3-int8")
+    ipc("refreshModel")
+    wait(lambda: dictation()["parakeetInstalled"], 15, "the Parakeet model")
+    pid = voxtype_pid()
+    ipc("model parakeet")
+    wait(lambda: 'engine = "parakeet"' in config() and 'model = "parakeet-tdt-0.6b-v3-int8"' in config(), 30, "Parakeet in config.toml")
+    wait_ready(pid)
+    wait(lambda: dictation()["applied"].get("model") == "parakeet", 30, "Parakeet applied")
+    english = dictate("${speech}/english.wav", "parakeet-english")
+    assert "morning" in english and "weather" in english, english
+    # Dutch, which it recognises by itself. Its last words vary on this
+    # synthetic voice through PipeWire ("van haar" for "vandaag").
+    dutch = dictate("${speech}/dutch.wav", "parakeet-dutch")
+    assert "goedemorgen" in dutch and "mooi" in dutch, dutch
+
     # Back to the built-in model.
     pid = voxtype_pid()
     ipc("model base")
-    wait(lambda: 'model = "base"' in config(), 30, "the built-in model again")
+    wait(lambda: 'model = "base"' in config() and 'engine = "whisper"' in config(), 30, "the built-in model again")
     wait_ready(pid)
 
     # Nothing in the shell's journal went wrong.

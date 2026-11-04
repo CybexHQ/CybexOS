@@ -105,6 +105,8 @@ bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd(web_app("x")), { description = "
 if features.developer_tools then
   bind(mainMod .. " + CTRL + X", hl.dsp.global("quickshell:dictationToggle"),
     { description = "Dictation: Start or stop dictation" }, "dictation.toggle")
+  bind(mainMod .. " + CTRL + SHIFT + X", hl.dsp.global("quickshell:dictationHistory"),
+    { description = "Dictation: Show dictation history" }, "dictation.history")
   bind("F9", hl.dsp.global("quickshell:dictationToggle"),
     { description = "Dictation: Start or stop dictation" }, "dictation.toggle")
 end

@@ -545,7 +545,8 @@ test("the rail is Home and three labeled groups of six, and the palette searches
     // The index is hand-maintained; hold it against the schema and the tabs
     // so a renamed key, page or tab cannot leave a row jumping nowhere.
     const schemaKeys = Object.keys(load("SettingsHelpers.js").defaults());
-    const tabs = { keyboard: ["layouts", "shortcuts"], backup: ["backups", "recovery", "storage"] };
+    const tabs = { keyboard: ["layouts", "shortcuts"], backup: ["backups", "recovery", "storage"],
+        assistant: ["wiz", "dictation"] };
     const { ROWS, ACTIONS } = load("SettingsSearchData.js");
     assert.ok(ROWS.length >= 30, "the search index must cover the workspace");
     for (const row of ROWS.concat(ACTIONS.filter(entry => entry.page))) {

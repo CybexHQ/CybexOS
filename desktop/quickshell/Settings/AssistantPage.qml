@@ -623,7 +623,7 @@ SettingsPage {
                 value: Assistant.voiceAvailable ? I18n.tr("Voxtype, on this computer") : I18n.tr("Voxtype is not running")
                 SettingsAction {
                     text: I18n.tr("Dictation settings")
-                    onTriggered: Settings.openWidgetSettings("indicators")
+                    onTriggered: Settings.setTab("assistant", "dictation")
                 }
             }
         }

@@ -246,7 +246,11 @@ Singleton {
         { id: "accounts", group: "System", label: I18n.tr("Online accounts"), glyph: "account_circle",
             description: I18n.tr("Connected accounts and calendar access"), system: true },
         { id: "assistant", group: "System", label: I18n.tr("Assistant"), glyph: "assistant",
-            description: I18n.tr("Agent, sign-in, voice, screen context and character") },
+            description: I18n.tr("Agent, sign-in, voice, screen context, character and dictation"),
+            tabs: [
+                { id: "wiz", label: I18n.tr("Wiz"), description: I18n.tr("Agent, sign-in, voice, screen context and character") },
+                { id: "dictation", label: I18n.tr("Dictation"), description: I18n.tr("Speech model, words, tidy-up and history") }
+            ] },
         { id: "applications", group: "System", label: I18n.tr("Applications"), glyph: "apps",
             description: I18n.tr("Default applications and installed software") },
         { id: "region", group: "System", label: I18n.tr("Region & language"), glyph: "language",
@@ -267,9 +271,9 @@ Singleton {
     // A key that names a row lands on the page that now holds it (keyPages).
     readonly property var legacyPages: ({
         modules: "bar", widgets: "bar", system: "power", drawer: "bar",
-        shortcuts: "keyboard", storage: "backup", about: "home"
+        shortcuts: "keyboard", storage: "backup", about: "home", dictation: "assistant"
     })
-    readonly property var legacyTabs: ({ shortcuts: "shortcuts", storage: "storage" })
+    readonly property var legacyTabs: ({ shortcuts: "shortcuts", storage: "storage", dictation: "dictation" })
     readonly property var keyPages: ({
         clock24: "region", unit: "region",
         scrollFactor: "touchpad",

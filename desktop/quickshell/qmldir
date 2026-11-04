@@ -11,6 +11,7 @@ NetworkOverlayWindow NetworkOverlayWindow.qml
 OsdWindow OsdWindow.qml
 DictationPill DictationPill.qml
 DictationOffer DictationOffer.qml
+DictationHistory DictationHistory.qml
 ShortcutsOverlay ShortcutsOverlay.qml
 SettingsWindow SettingsWindow.qml
 PolkitPrompt PolkitPrompt.qml

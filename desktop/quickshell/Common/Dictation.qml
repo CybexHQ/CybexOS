@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "SettingsHelpers.js" as SettingsHelpers
 
 // Dictation through Voxtype (docs/dictation.md). Voxtype writes its state for
 // every control path, including the assistant's push-to-talk; watching it
@@ -10,8 +11,10 @@ import Quickshell.Io
 // The shell's own dictations record to a file instead of letting Voxtype type
 // as it goes: the words appear in the dictation pill while you speak (from
 // the `.live` file the Cybex OS patch writes) and are typed once, finished,
-// when you stop. Settings owns the speech model, languages, live text and
-// vocabulary; changes are written to Voxtype's config.toml here.
+// when you stop, after corrections and tidy-up (scripts/dictation.py
+// deliver), which also keeps them in the dictation history. Settings owns the
+// speech model, languages, live text and vocabulary; changes are written to
+// Voxtype's config.toml here.
 Singleton {
     id: root
 
@@ -39,25 +42,70 @@ Singleton {
     readonly property bool busy: recording || transcribing
 
     // This shell's own dictation: "" (none), "starting", "listening",
-    // "finishing", "typing", then briefly "done", "copied", "empty" or
-    // "failed" for the pill to say how it ended.
+    // "finishing", "tidying", "typing", then briefly "done", "copied",
+    // "empty" or "failed" for the pill to say how it ended.
     property string phase: ""
     readonly property bool sessionActive: phase === "starting" || phase === "listening"
-        || phase === "finishing" || phase === "typing"
+        || phase === "finishing" || phase === "tidying" || phase === "typing"
     property string liveText: ""
+    // The live words with the person's corrections, as they will be typed.
+    readonly property string shownText: SettingsHelpers.applyDictationCorrections(liveText,
+        options.dictationCorrections || [])
+    // How tidy-up runs for this dictation ("basic" or "polish"), and whether
+    // the original words were asked for instead.
+    property string tidyMode: ""
+    property bool originalRequested: false
+    // How the last dictation ended: {status, text, original, tidied, tidy,
+    // polishFailed, words, app, id} from scripts/dictation.py deliver.
+    property var lastResult: ({})
     // Why a dictation failed: microphone, timeout, typing or transcription.
     property string failure: ""
     property bool sawRecording: false
     // A stop pressed before Voxtype began recording is sent once it has.
     property bool pendingStop: false
 
-    // The enhanced model (scripts/dictation.py) and its download.
+    // The downloadable models (scripts/dictation.py) and their download:
+    // "enhanced" is Whisper turbo (Settings: Accurate), "parakeet" Parakeet
+    // v3 (Fast & accurate).
     property bool enhancedInstalled: false
+    property bool parakeetInstalled: false
     property bool statusKnown: false
     readonly property real enhancedSize: 874188075
+    readonly property real parakeetSize: 670480039
     property string download: ""          // "", "running", "failed"
+    property string downloadModel: ""     // "enhanced" or "parakeet"
     property int downloadProgress: 0
     property string downloadError: ""
+    // Parakeet knows 25 European languages; for others, Whisper.
+    readonly property bool parakeetFits: SettingsHelpers.parakeetSupports(
+        options.dictationPrimaryLanguage, options.dictationSecondaryLanguage)
+    // What the first-use offer and Settings recommend for these languages.
+    readonly property string recommendedModel: parakeetFits ? "parakeet" : "large-v3-turbo"
+    readonly property bool recommendedInstalled: recommendedModel === "parakeet" ? parakeetInstalled : enhancedInstalled
+    readonly property real recommendedSize: recommendedModel === "parakeet" ? parakeetSize : enhancedSize
+    // The model Voxtype is given: a choice the languages no longer fit, or
+    // whose download is gone, falls back to one that works.
+    readonly property string effectiveModel: {
+        const chosen = options.dictationModel;
+        if (chosen === "parakeet" && parakeetInstalled && parakeetFits)
+            return "parakeet";
+        if (chosen === "large-v3-turbo" && enhancedInstalled)
+            return "large-v3-turbo";
+        if (chosen === "parakeet" && enhancedInstalled)
+            return "large-v3-turbo";
+        return "base";
+    }
+
+    // ---- history -------------------------------------------------------------------------
+    property bool historyOpen: false
+    property var historyEntries: []
+    property var suggestions: []
+    property int weekWords: 0
+    property bool historyLoaded: false
+    // Suggestions the person has not answered and has no correction for yet.
+    readonly property var openSuggestions: suggestions.filter(item =>
+        !(options.dictationCorrections || []).some(rule =>
+            String(rule.heard).toLowerCase() === String(item.heard).toLowerCase()))
     // Shown once, after the first dictation that typed words.
     property bool offerShown: false
     property string applyError: ""
@@ -70,6 +118,8 @@ Singleton {
             stop();
         else if (phase === "finishing" || (transcribing && !sessionActive))
             cancel();
+        else if (phase === "tidying")
+            typeOriginal();
         else if (!busy)
             start();
     }
@@ -83,13 +133,16 @@ Singleton {
         offerShown = false;
         phase = "starting";
         liveText = "";
+        tidyMode = "";
+        originalRequested = false;
+        lastResult = ({});
         failure = "";
         sawRecording = false;
         pendingStop = false;
         // Removing the last session's files first is what makes the next
         // reads this recording's words.
         Quickshell.execDetached(["sh", "-c",
-            'mkdir -p -m 0700 "$1" && rm -f -- "$2" "$2.done" "$2.live" && exec voxtype record start --file="$2"',
+            'mkdir -p -m 0700 "$1" && rm -f -- "$2" "$2.done" "$2.live" "$2.wav" "$2.original" && exec voxtype record start --file="$2"',
             "sh", sessionDir, transcriptPath]);
         settle.restart();
         startGuard.restart();
@@ -119,6 +172,25 @@ Singleton {
 
     function refresh() {
         stateView.reload();
+    }
+
+    // While tidy-up runs: type the words as heard instead. The helper reads
+    // this before typing; once typing has begun it no longer applies.
+    function typeOriginal() {
+        if (phase !== "tidying" || originalRequested)
+            return;
+        originalRequested = true;
+        Quickshell.execDetached(["touch", transcriptPath + ".original"]);
+    }
+
+    // After a tidied dictation: the words as heard, for the clipboard.
+    function copyOriginal() {
+        const text = String(lastResult.original || "");
+        if (text !== "")
+            Quickshell.execDetached(["wl-copy", "--", text]);
+        endHold.stop();
+        phase = "";
+        liveText = "";
     }
 
     function run(command) {
@@ -157,7 +229,9 @@ Singleton {
         if (outcome.status === "ok") {
             phase = "typing";
             livePoll.stop();
-            typeProc.running = true;
+            deliverProc.command = ["python3", root.script, "deliver", root.transcriptPath,
+                "--options", JSON.stringify(deliveryOptions())];
+            deliverProc.running = true;
         } else if (outcome.status === "empty") {
             finish("empty");
         } else {
@@ -166,19 +240,46 @@ Singleton {
         }
     }
 
+    // What the helper needs to finish a dictation, from Settings.
+    function deliveryOptions() {
+        return {
+            corrections: options.dictationCorrections || [],
+            tidy: options.dictationTidy,
+            agent: options.dictationPolishAgent,
+            skipCode: !options.dictationTidyCode,
+            history: options.dictationHistory,
+            keepAudio: options.dictationKeepAudio,
+            languages: languages
+        };
+    }
+
     // ---- model ---------------------------------------------------------------------
     function refreshStatus() {
         if (!statusProc.running)
             statusProc.running = true;
     }
 
-    function downloadEnhanced() {
+    function downloadModelNamed(name) {
         if (downloadProc.running)
             return;
+        downloadModel = name;
         download = "running";
         downloadProgress = 0;
         downloadError = "";
+        downloadProc.command = ["python3", root.script, "download", name];
         downloadProc.running = true;
+    }
+
+    function downloadEnhanced() {
+        downloadModelNamed("enhanced");
+    }
+
+    // The model the first-use offer recommends for the languages chosen.
+    function downloadRecommended() {
+        if (recommendedInstalled)
+            Settings.setModuleOption("indicators", "dictationModel", recommendedModel);
+        else
+            downloadModelNamed(recommendedModel === "parakeet" ? "parakeet" : "enhanced");
     }
 
     function cancelDownload() {
@@ -190,14 +291,25 @@ Singleton {
 
     // Back to the built-in model first, so the daemon never points at a
     // missing file; it keeps the deleted model only until it restarts.
-    function removeEnhanced() {
-        Settings.setModuleOption("indicators", "dictationModel", "base");
+    function removeModel(name) {
+        const setting = name === "parakeet" ? "parakeet" : "large-v3-turbo";
+        if (options.dictationModel === setting)
+            Settings.setModuleOption("indicators", "dictationModel", "base");
+        removeProc.command = ["python3", root.script, "remove", name];
         removeProc.running = true;
+    }
+
+    function removeEnhanced() {
+        removeModel("enhanced");
     }
 
     function useModel(value) {
         if (value === "large-v3-turbo" && !enhancedInstalled) {
-            downloadEnhanced();
+            downloadModelNamed("enhanced");
+            return;
+        }
+        if (value === "parakeet" && !parakeetInstalled) {
+            downloadModelNamed("parakeet");
             return;
         }
         Settings.setModuleOption("indicators", "dictationModel", value);
@@ -222,18 +334,134 @@ Singleton {
         const secondary = options.dictationSecondaryLanguage;
         return secondary === "off" || secondary === primary ? primary : primary + "," + secondary;
     }
-    readonly property string applyKey: JSON.stringify([options.dictationModel, languages,
+    readonly property string applyKey: JSON.stringify([effectiveModel, languages,
         options.dictationLiveText, options.dictationVocabulary])
     onApplyKeyChanged: applyTimer.restart()
 
+    // ---- vocabulary and corrections ---------------------------------------------------
+    function addTerm(term) {
+        const terms = SettingsHelpers.dictationTerms(options.dictationVocabulary);
+        terms.push(String(term || ""));
+        Settings.setModuleOption("indicators", "dictationVocabulary", SettingsHelpers.dictationTermsLine(terms));
+    }
+
+    function removeTerm(term) {
+        const terms = SettingsHelpers.dictationTerms(options.dictationVocabulary).filter(item => item !== term);
+        Settings.setModuleOption("indicators", "dictationVocabulary", SettingsHelpers.dictationTermsLine(terms));
+    }
+
+    function addCorrection(heard, write) {
+        const rules = (options.dictationCorrections || []).filter(rule =>
+            String(rule.heard).toLowerCase() !== String(heard).trim().toLowerCase());
+        rules.push({heard: String(heard).trim(), write: String(write).trim()});
+        Settings.setModuleOption("indicators", "dictationCorrections", SettingsHelpers.dictationCorrectionsIn(rules, []));
+    }
+
+    function removeCorrection(heard) {
+        Settings.setModuleOption("indicators", "dictationCorrections",
+            (options.dictationCorrections || []).filter(rule => rule.heard !== heard));
+    }
+
+    // A suggestion from history edits: taken as a correction, or declined;
+    // either way it is not suggested again.
+    function acceptSuggestion(item) {
+        addCorrection(item.heard, item.write);
+        historyCommand(["forget", item.heard, item.write]);
+    }
+
+    function declineSuggestion(item) {
+        historyCommand(["forget", item.heard, item.write]);
+    }
+
+    // ---- history ------------------------------------------------------------------------
+    function openHistory() {
+        if (!available)
+            return;
+        offerShown = false;
+        historyOpen = true;
+        refreshHistory();
+    }
+
+    function closeHistory() {
+        historyOpen = false;
+    }
+
+    function toggleHistory() {
+        if (historyOpen)
+            closeHistory();
+        else
+            openHistory();
+    }
+
+    function refreshHistory() {
+        historyCommand(["list"]);
+    }
+
+    // Commands run one at a time, in order; each refreshes the list after.
+    property var historyQueue: []
+    function historyCommand(args) {
+        historyQueue = historyQueue.concat([args]);
+        runHistoryQueue();
+    }
+
+    function runHistoryQueue() {
+        if (historyProc.running || historyQueue.length === 0)
+            return;
+        const next = historyQueue[0];
+        historyQueue = historyQueue.slice(1);
+        historyProc.action = next[0];
+        historyProc.command = ["python3", root.script, "history"].concat(next)
+            .concat(["--retention", options.dictationHistory]);
+        historyProc.running = true;
+    }
+
+    // Typing again goes to the window under the history, once it has closed.
+    function typeEntry(id) {
+        closeHistory();
+        historyCommand(["type", id]);
+    }
+
+    function copyEntry(id) {
+        historyCommand(["copy", id]);
+    }
+
+    function deleteEntry(id) {
+        historyCommand(["delete", id]);
+    }
+
+    function editEntry(id, text) {
+        historyCommand(["edit", id, text]);
+    }
+
+    function playEntry(id) {
+        historyCommand(["play", id]);
+    }
+
+    function retranscribeEntry(id) {
+        historyCommand(["retranscribe", id]);
+    }
+
+    function clearHistory() {
+        historyCommand(["clear"]);
+    }
+
+    // Settings → Assistant → Dictation.
+    function openSettings() {
+        Settings.showPanel("dictation", Screens.focused ? Screens.focused.name : "");
+    }
+
     function statusJson() {
         return JSON.stringify({available: available, state: state, phase: phase,
-            liveText: liveText, failure: failure, enhancedInstalled: enhancedInstalled,
-            download: download, downloadProgress: downloadProgress,
+            liveText: liveText, shownText: shownText, failure: failure,
+            enhancedInstalled: enhancedInstalled, parakeetInstalled: parakeetInstalled,
+            download: download, downloadModel: downloadModel, downloadProgress: downloadProgress,
             downloadError: downloadError, offerShown: offerShown, applyError: applyError,
             applied: applied, applying: applyProc.running || applyTimer.running,
-            model: options.dictationModel, languages: languages, cpuSupported: cpuSupported,
-            liveTextEnabled: options.dictationLiveText});
+            model: options.dictationModel, effectiveModel: effectiveModel,
+            recommendedModel: recommendedModel, languages: languages, cpuSupported: cpuSupported,
+            liveTextEnabled: options.dictationLiveText, tidy: options.dictationTidy,
+            tidyMode: tidyMode, lastResult: lastResult, historyOpen: historyOpen,
+            historyCount: historyEntries.length, suggestions: openSuggestions});
     }
 
     Component.onCompleted: refreshStatus()
@@ -383,9 +611,12 @@ Singleton {
         }
     }
 
+    // A tidied dictation stays a little longer, for Copy original; a failed
+    // one for Open history.
     Timer {
         id: endHold
-        interval: 1800
+        interval: root.phase === "failed" && root.lastResult.id
+            || root.phase === "done" && root.lastResult.tidied ? 3500 : 1800
         onTriggered: {
             if (!root.sessionActive) {
                 root.phase = "";
@@ -394,16 +625,38 @@ Singleton {
         }
     }
 
+    // Corrections, tidy-up, typing and history (scripts/dictation.py deliver).
     Process {
-        id: typeProc
-        command: ["python3", root.script, "type", root.transcriptPath]
+        id: deliverProc
+        stdout: SplitParser {
+            onRead: line => {
+                let event = {};
+                try {
+                    event = JSON.parse(line);
+                } catch (error) {
+                    return;
+                }
+                if (event.event === "tidying") {
+                    root.tidyMode = event.mode || "basic";
+                    root.phase = "tidying";
+                } else if (event.event === "typing") {
+                    root.phase = "typing";
+                    if (typeof event.text === "string" && event.text !== "")
+                        root.liveText = event.text;
+                } else if (event.event === "result") {
+                    root.lastResult = event;
+                }
+            }
+        }
         onExited: code => {
+            if (root.historyOpen || root.historyLoaded)
+                root.refreshHistory();
             if (code === 0 || code === 2) {
                 root.finish(code === 0 ? "done" : "copied");
                 // The first dictation that typed words is the moment to
                 // offer better recognition, once (docs/dictation.md).
                 if (!root.options.dictationPrompted && root.statusKnown
-                        && root.options.dictationModel === "base" && !root.enhancedInstalled)
+                        && root.options.dictationModel === "base" && !root.recommendedInstalled)
                     root.showOffer();
             } else if (code === 3) {
                 root.finish("empty");
@@ -411,6 +664,34 @@ Singleton {
                 root.failure = "typing";
                 root.finish("failed");
             }
+        }
+    }
+
+    Process {
+        id: historyProc
+        property string action: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let result = {};
+                try {
+                    result = JSON.parse(text);
+                } catch (error) {
+                    return;
+                }
+                if (historyProc.action === "list") {
+                    root.historyEntries = result.entries || [];
+                    root.suggestions = result.suggestions || [];
+                    root.weekWords = result.weekWords || 0;
+                    root.historyLoaded = true;
+                } else if (result.suggestions) {
+                    root.suggestions = result.suggestions;
+                }
+            }
+        }
+        onExited: {
+            if (action !== "list" && !root.historyQueue.some(args => args[0] === "list"))
+                root.historyQueue = root.historyQueue.concat([["list"]]);
+            root.runHistoryQueue();
         }
     }
 
@@ -423,6 +704,8 @@ Singleton {
                 try {
                     const status = JSON.parse(text);
                     root.enhancedInstalled = status.installed === true;
+                    root.parakeetInstalled = !!(status.models && status.models.parakeet
+                        && status.models.parakeet.installed === true);
                     root.cpuSupported = status.cpu !== false;
                     root.statusKnown = true;
                 } catch (error) {
@@ -434,7 +717,6 @@ Singleton {
 
     Process {
         id: downloadProc
-        command: ["python3", root.script, "download"]
         property string result: ""
         stdout: SplitParser {
             onRead: line => {
@@ -455,8 +737,12 @@ Singleton {
             }
             if (result === "done") {
                 root.download = "";
-                root.enhancedInstalled = true;
-                Settings.setModuleOption("indicators", "dictationModel", "large-v3-turbo");
+                if (root.downloadModel === "parakeet")
+                    root.parakeetInstalled = true;
+                else
+                    root.enhancedInstalled = true;
+                Settings.setModuleOption("indicators", "dictationModel",
+                    root.downloadModel === "parakeet" ? "parakeet" : "large-v3-turbo");
             } else if (root.download === "running") {
                 root.download = "failed";
                 root.downloadError = result.indexOf("failed ") === 0 ? result.slice(7) : "network";
@@ -467,7 +753,6 @@ Singleton {
 
     Process {
         id: removeProc
-        command: ["python3", root.script, "remove"]
         onExited: root.refreshStatus()
     }
 
@@ -482,7 +767,8 @@ Singleton {
                 return;
             }
             applyProc.command = ["python3", root.script, "apply",
-                "--model", root.options.dictationModel === "large-v3-turbo" ? "enhanced" : "base",
+                "--model", root.effectiveModel === "parakeet" ? "parakeet"
+                    : root.effectiveModel === "large-v3-turbo" ? "enhanced" : "base",
                 "--languages", root.languages,
                 "--live", root.options.dictationLiveText ? "1" : "0",
                 "--vocabulary", root.options.dictationVocabulary];

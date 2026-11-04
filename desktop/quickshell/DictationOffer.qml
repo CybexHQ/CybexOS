@@ -8,10 +8,11 @@ import "Popovers"
 import "Settings" as SettingsUi
 
 // After the first dictation that typed words (docs/dictation.md): offer the
-// enhanced speech model and ask about a second language. It appears where the
+// speech model that suits the languages (Parakeet for 25 European ones,
+// Whisper turbo for the rest) and ask about a second language. It appears where the
 // dictation pill was, once the words are typed, and takes the keyboard only
 // when clicked, so the window you dictated into keeps its focus. Settings →
-// Indicators → Dictation holds the same choices afterwards.
+// Assistant → Dictation holds the same choices afterwards.
 PanelWindow {
     id: root
 
@@ -52,8 +53,8 @@ PanelWindow {
     readonly property string secondary: Settings.modOpts.indicators.dictationSecondaryLanguage
     readonly property bool downloading: Dictation.download === "running"
     readonly property bool failed: Dictation.download === "failed"
-    readonly property bool ready: Dictation.enhancedInstalled
-    readonly property string sizeText: Math.round(Dictation.enhancedSize / 1048576) + " MB"
+    readonly property bool ready: Dictation.recommendedInstalled
+    readonly property string sizeText: Math.round(Dictation.recommendedSize / 1048576) + " MB"
 
     // No second language, the system's own language when it is another one,
     // then a few common ones; every other language is in Settings.
@@ -82,8 +83,8 @@ PanelWindow {
     Connections {
         target: Dictation
 
-        function onEnhancedInstalledChanged() {
-            if (Dictation.enhancedInstalled && root.shown)
+        function onRecommendedInstalledChanged() {
+            if (Dictation.recommendedInstalled && root.shown)
                 readyClose.restart();
         }
     }
@@ -135,7 +136,7 @@ PanelWindow {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.ready ? I18n.tr("Enhanced dictation is ready")
+                    text: root.ready ? I18n.tr("The new speech model is ready")
                         : I18n.tr("Make dictation more accurate")
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.title
@@ -148,8 +149,10 @@ PanelWindow {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: root.ready
-                    ? I18n.tr("Your next dictation uses the enhanced speech model.")
-                    : I18n.tr("Dictation uses the small speech model built into Cybex OS. The enhanced model recognises names, technical words and other languages much better. It runs on this computer: nothing you say leaves it.")
+                    ? I18n.tr("Your next dictation uses it.")
+                    : Dictation.recommendedModel === "parakeet"
+                        ? I18n.tr("Dictation uses the small speech model built into Cybex OS. A larger one recognises names, technical words and your languages much better, and is fast even without a graphics card. It runs on this computer: nothing you say leaves it.")
+                        : I18n.tr("Dictation uses the small speech model built into Cybex OS. A larger one recognises names, technical words and other languages much better. It runs on this computer: nothing you say leaves it.")
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textMid
@@ -236,7 +239,7 @@ PanelWindow {
                 }
 
                 Text {
-                    text: I18n.format(I18n.tr("Downloading the enhanced model… %1%"), [Dictation.downloadProgress])
+                    text: I18n.format(I18n.tr("Downloading the speech model… %1%"), [Dictation.downloadProgress])
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.metadata
                     color: Theme.textLow
@@ -248,7 +251,7 @@ PanelWindow {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: Dictation.downloadError === "space"
-                    ? I18n.tr("There is not enough free disk space for the enhanced model.")
+                    ? I18n.tr("There is not enough free disk space for the speech model.")
                     : Dictation.downloadError === "checksum"
                         ? I18n.tr("The downloaded model did not match. Nothing was installed.")
                         : I18n.tr("The download did not finish. Check your connection and try again.")
@@ -297,7 +300,7 @@ PanelWindow {
                             if (root.ready)
                                 Dictation.dismissOffer();
                             else
-                                Dictation.downloadEnhanced();
+                                Dictation.downloadRecommended();
                         }
                     }
                 }
