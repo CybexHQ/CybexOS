@@ -33,7 +33,7 @@ in {
       codex
     ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave-origin.nix {}) spotify chatgptLinux claude-code ]
       ++ lib.optionals cfg.features.assistant [ assistant ]
-      ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools opencode balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
+      ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
       ++ lib.optionals cfg.features.podman [ distrobox podman-compose ]
       ++ lib.optionals cfg.features.steam [ mangohud protonup-qt ]
       ++ lib.optionals cfg.features.connectedWidgets [ gnome-calendar gnome-online-accounts-gtk ];

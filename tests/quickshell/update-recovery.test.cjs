@@ -72,6 +72,29 @@ test("failed discovery, zero updates and completed history create no update badg
     assert.equal(H.indicator(true, "awaiting-boot"), false);
 });
 
+test("a package hold survives reload and suppresses only its exact update candidate", () => {
+    const held = {state: "failed", notPrebuilt: ["opencode-2.2.5"], inputs: {
+        nixpkgs: {rev: "nixpkgs-revision"}, cybexos: {rev: "cybexos-revision"}}};
+    const sources = {upstream: {state: "available", available: "nixpkgs-revision"}, cybexos: {state: "current"}};
+    const reloaded = JSON.parse(JSON.stringify(held));
+    assert.deepEqual(H.waitingPackages(reloaded), ["opencode-2.2.5"]);
+    assert.equal(H.holdTarget(reloaded, sources), "same");
+    assert.equal(H.indicator(true, held.state, H.holdTarget(held, sources)), false);
+    for (const [name, source] of [["upstream", {state: "available", available: "new-nixpkgs"}],
+        ["cybexos", {state: "available", revision: "new-cybexos"}], ["firmware", {state: "available"}]]) {
+        const changed = H.holdTarget(held, {...sources, [name]: source});
+        assert.equal(changed, "changed", name);
+        assert.equal(H.indicator(true, held.state, changed), true, name);
+    }
+    assert.equal(H.holdTarget({...held, inputs: {}}, sources), "unknown");
+    assert.equal(H.holdTarget(held, {}), "unknown");
+    assert.equal(H.indicator(true, held.state, "unknown"), true, "unknown revisions never hide an update");
+    for (const notPrebuilt of [null, [], "opencode", [null], [""]])
+        assert.deepEqual(H.waitingPackages({...held, notPrebuilt}), []);
+    for (const state of ["ready", "activating", "interrupted", "recovery-failed"])
+        assert.deepEqual(H.waitingPackages({...held, state}), []);
+});
+
 test("a failed recovery blocks preparation and offers explicit restoration", () => {
     const capabilities = H.capabilities({ state: "recovery-failed", transaction: "failed" }, false, true, "upstream");
     assert.equal(H.active("recovery-failed"), false);
@@ -166,6 +189,18 @@ test("queued requests show their action before the worker reports a phase", () =
     assert.equal(page({ state: "ready", request: { state: "failed", action: "apply" } }), "ready");
 });
 
+test("prebuilt refusals wait without masking an active worker or a changed candidate", () => {
+    const held = {state: "failed", waitingForPackages: true, holdTarget: "same", hasUpdates: true};
+    assert.equal(page(held), "waiting");
+    assert.equal(page({...held, sourcesLoaded: false, holdTarget: "unknown"}), "waiting");
+    assert.equal(page({...held, holdTarget: "changed"}), "available");
+    assert.equal(page({...held, request: {state: "queued", action: "stage"}}), "preparing");
+    assert.equal(page({...held, state: "activating"}), "installing");
+    assert.equal(page({...held, state: "recovering"}), "recovering");
+    assert.equal(H.capabilities({state: "failed"}, false, true, "upstream").prepare, true,
+        "an explicit check remains available while waiting");
+});
+
 test("a trial boot is confirmed automatically unless that failed or is switched off", () => {
     assert.equal(page({ state: "awaiting-login" }), "finishing");
     assert.equal(page({ state: "awaiting-login", automatic: { prepare: true, confirm: false } }), "confirm");
@@ -188,6 +223,9 @@ test("background preparation is requested for each new target, never over a pers
     assert.equal(H.autoPrepare(true, { prepare: false }, "idle", false), false);
     assert.equal(H.autoPrepare(false, { prepare: true }, "idle", false), false);
     assert.equal(H.autoPrepare(true, { prepare: true }, "idle", true), false);
+    assert.equal(H.autoPrepare(true, { prepare: true }, "failed", false, true), true,
+        "a package hold can request the bounded background check without being dismissed");
+    assert.equal(H.autoPrepare(true, { prepare: true }, "failed", true, true), false);
     for (const state of ["ready", "stale", "failed", "rolled-back", "awaiting-boot", "building"])
         assert.equal(H.autoPrepare(true, { prepare: true }, state, false), false, state);
 });
@@ -274,6 +312,7 @@ test("Wiz shows each status page in the pose language every surface shares", () 
     for (const page of ["preparing", "installing", "recovering"])
         assert.equal(pose(page), "working", page);
     assert.equal(pose("restart"), "needs-input", "restart and shut down are the person's move");
+    assert.equal(pose("waiting"), "needs-input", "an unavailable package waits rather than signalling failure");
     assert.equal(pose("finishing"), "thinking");
     assert.equal(pose("confirm"), "listening", "Does everything work? asks");
     assert.equal(pose("confirm", "check", true), "needs-input", "a failed confirmation waits for a decision");
@@ -284,7 +323,7 @@ test("Wiz shows each status page in the pose language every surface shares", () 
     assert.equal(pose("unavailable"), "asleep");
     const states = load("WizRig.js").STATES;
     for (const page of ["checking", "current", "available", "preparing", "installing", "restart", "finishing",
-        "confirm", "recovering", "problem", "unavailable", "whats-new", "ready"]) {
+        "confirm", "recovering", "problem", "unavailable", "whats-new", "ready", "waiting"]) {
         const value = H.statusPose(page, "check", false, false);
         assert.ok(states.includes(value.pose), page + ": " + value.pose);
         assert.equal(value.unread, page === "available", page);

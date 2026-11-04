@@ -65,7 +65,9 @@ Singleton {
     readonly property string runState: runActive ? "running" : deployment.state === "done" ? "done"
         : ["failed", "interrupted", "rolled-back", "recovery-failed"].includes(deployment.state) ? "failed" : "idle"
     readonly property bool hasUpdates: sourcesLoaded && [sources.upstream, sources.cybexos, sources.firmware || {}].some(source => source.state === "available")
-    readonly property bool showIndicator: !Helpers.firmwareRestart(deployment) && Helpers.indicator(hasUpdates, deployment.state)
+    readonly property var waitingPackages: Helpers.waitingPackages(deployment)
+    readonly property string holdTarget: Helpers.holdTarget(deployment, sourcesLoaded ? sources : null)
+    readonly property bool showIndicator: !Helpers.firmwareRestart(deployment) && Helpers.indicator(hasUpdates, deployment.state, holdTarget)
     readonly property string selectedScope: sourcesLoaded ? Helpers.scope(sources, selectedSources) : ""
     readonly property var actions: Helpers.capabilities(deployment, runActive || !statusLoaded || statusError !== "", available, selectedScope)
     readonly property bool ready: deployment.state === "ready"
@@ -80,10 +82,13 @@ Singleton {
     readonly property bool choosingAutomatic: chooser.busy
     // This request's refusal, or the latest worker request's durable failure.
     readonly property string requestFailure: requestError
-        || ((deployment.request || {}).state === "failed" ? deployment.request.error || "" : "")
+        || ((deployment.request || {}).state === "failed"
+            && !(waitingPackages.length > 0 && deployment.request.action === "stage"
+                && deployment.request.id === deployment.requestId) ? deployment.request.error || "" : "")
     readonly property string page: Helpers.page({statusLoaded: statusLoaded, statusError: statusError,
         sourcesLoaded: sourcesLoaded, hasUpdates: hasUpdates, error: error, state: deployment.state,
         request: deployment.request, requestAction: requestAction, automatic: automatic,
+        waitingForPackages: waitingPackages.length > 0, holdTarget: holdTarget,
         firmwareRestart: Helpers.firmwareRestart(deployment)})
     readonly property string problem: Helpers.problem({statusLoaded: statusLoaded, state: deployment.state})
     readonly property var review: Helpers.summary(deployment)
@@ -107,6 +112,7 @@ Singleton {
         : rebootRecommended ? rebootRecommendation
         : deployment.state === "recovery-failed" ? "Recovery needs attention"
         : deployment.state === "stale" ? "The configuration changed. Prepare again."
+        : page === "waiting" ? "Waiting for NixOS packages"
         : ["failed", "interrupted"].includes(deployment.state) ? "The update did not finish"
         : hasUpdates ? "System updates available"
         : busy ? "Checking for system updates…"
@@ -202,7 +208,8 @@ Singleton {
     }
     function maybePrepare() {
         if (!preparationAllowed || !statusLoaded || !sourcesLoaded || Helpers.firmwareRestart(deployment)
-                || !Helpers.autoPrepare(hasUpdates, automatic, deployment.state, runActive)) return;
+                || !Helpers.autoPrepare(hasUpdates, automatic, deployment.state, runActive,
+                    waitingPackages.length > 0 && deployment.changeKind === "update")) return;
         const target = Helpers.targetKey(sources, installedIdentity);
         if (target === preparedTarget) return;
         preparedTarget = target;

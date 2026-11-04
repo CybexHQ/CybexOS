@@ -202,6 +202,7 @@ IPC = '''
                 title: title ? {text: title.text, color: title.color.toString(), expected: Theme.textHi.toString(),
                     dark: Theme.dark} : null,
                 primary: primary ? {label: primary.text, enabled: primary.enabled, amber: primary.attention} : null,
+                body: view ? view.current.body : null,
                 wiz: wiz ? {pose: wiz.pose, unread: wiz.unread} : null,
                 stance: view ? view.wiz.pose : null, celebrated: view ? view.celebrated : null,
                 whatsNew: Updates.whatsNew ? Updates.whatsNew.version : null, announced: Updates.announced,
@@ -422,6 +423,38 @@ def main():
             session.wait(lambda:session.state().get('window'),'open app restored after shell restart')
             session.call('updates','open')
             session.wait(lambda:'worker rejected' in (session.state().get('failureText') or ''),'durable failure in the app')
+
+            # A prebuilt refusal is a durable wait, with no duplicate update
+            # indicator or red request error. A changed revision is still new.
+            held = {'state':'failed', 'transaction':'a'*32, 'changeKind':'update', 'scope':'upstream',
+                'requestId':'d'*32, 'notPrebuilt':['opencode-2.2.5'],
+                'inputs':{'nixpkgs':{'rev':'new-revision'}},
+                'request':{'id':'d'*32, 'action':'stage', 'state':'failed', 'error':'Package not prebuilt'}}
+            session.fixture(reject=False)
+            session.status(**held, automatic={'prepare':True, 'confirm':True})
+            session.wait(lambda:session.state().get('page')=='waiting' and session.state().get('title',{}).get('text')=='Waiting for NixOS packages',
+                'clear package wait')
+            state = session.state()
+            assert not state['indicator'] and not state['failureText'], state
+            assert 'opencode-2.2.5' in state['body'] and 'automatically' in state['body'], state
+            assert state['primary']['label']=='Check Again' and state['primary']['enabled'], state
+            assert session.pose()==('needs-input',False), state
+            shot('software-update-waiting.png')
+            session.start_shell('qs-waiting-reloaded.log')
+            session.wait(lambda:session.state().get('window') and session.state().get('page')=='waiting'
+                and not session.state().get('indicator'), 'package wait after shell restart')
+            session.fixture(sources={**sources, 'upstream':{'state':'available','available':'newer-revision'}})
+            session.call('update-test','refresh')
+            session.wait(lambda:session.state().get('page')=='available' and session.state().get('indicator'),
+                'new revision after package hold')
+            assert not session.state()['failureText'], session.state()
+            session.trigger('updatePrimary')
+            session.wait(lambda:session.state().get('page')=='ready','explicit check after package hold')
+            assert session.calls()[-1]==['stage','upstream'], session.calls()
+            # Reset the scripted request history for the remaining install-once assertions.
+            (session.runtime/'calls.jsonl').write_text('')
+            session.fixture(sources=sources)
+            session.call('update-test','refresh')
 
             # Real QML presents concurrent compilation truthfully and retains
             # progress/log access after closing and reopening the window.
@@ -673,7 +706,8 @@ def main():
                     errors=[line for line in log.read_text(errors='replace').splitlines() if welcome.ERRORS.search(line)]
                     assert not errors, '\n'.join(errors)
             print('PASS: menubar and Control Center open the app, authorization cancellation, durable worker errors, '
-                  'shell restart, readable review, install once, reopening after the activation restart, restart, '
+                  'shell restart, durable package waits without duplicate indicators, newer-candidate discovery, '
+                  'readable review, install once, reopening after the activation restart, restart, '
                   'automatic and manual confirmation, Wiz\'s pose on every status page, a kept release with Wiz '
                   'celebrating and What\'s New, one toast whose action opens What\'s New and is never repeated, '
                   'NixOS packages alone just up to date, '

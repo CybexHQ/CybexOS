@@ -171,6 +171,37 @@ class Automation(unittest.TestCase):
         (self.config / 'local/personal.nix').write_text('{ }')
         self.assertEqual(self.prepare()['scope'], 'upstream')
 
+    def held(self, **values):
+        atomic(self.engine.status_path, {'state': 'failed', 'changeKind': 'update',
+            'notPrebuilt': ['opencode-2.2.5'], 'finishedAt': 1000.0,
+            'baseline': config_digest(self.working), 'inputs': {
+                'nixpkgs': {'rev': '2' * 40}, 'cybexos': {'rev': 'c' * 40}}, **values})
+
+    def test_a_manual_package_hold_retries_after_a_day_without_dismissal(self):
+        self.held()
+        for now in (1001.0, 1000.0 + automatic.RETRY_SECONDS - 1):
+            self.assertEqual(self.prepare(now=now), {'skipped': 'waiting'})
+        self.assertEqual(self.prepare(now=1000.0 + automatic.RETRY_SECONDS)['scope'], 'upstream')
+
+    def test_a_new_source_or_configuration_retries_a_package_hold_promptly(self):
+        self.held()
+        newer = self.discovery()
+        newer['upstream']['available'] = '3' * 40
+        accepted = self.prepare(newer, now=1001.0)
+        self.assertEqual(accepted['scope'], 'upstream')
+        self.finish(accepted)
+        self.held()
+        (self.config / 'local/personal.nix').write_text('# a personal change\n{}')
+        self.assertEqual(self.prepare(now=1002.0)['scope'], 'upstream')
+
+    def test_package_holds_do_not_retry_personal_software_or_bypass_policy(self):
+        self.held(changeKind='software', scope='local')
+        self.assertEqual(self.prepare(), {'skipped': 'failed'})
+        self.held()
+        self.assertEqual(self.prepare(metered=True), {'skipped': 'metered'})
+        automatic.choose(self.engine.state, 'prepare', False)
+        self.assertEqual(self.prepare(), {'skipped': 'disabled'})
+
     def test_confirmation_is_requested_only_for_a_trial_boot(self):
         confirm = lambda: automatic.confirm(self.engine, self.enqueue, self.status)
         atomic(self.engine.status_path, {'state': 'awaiting-boot'})

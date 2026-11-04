@@ -1,8 +1,7 @@
-# Cybex OS 1.0.16
+# Cybex OS 1.0.17
 
-- Updates are held back again when NixOS has not built a package yet. Nix 2.34, in current nixos-unstable, describes some packages in a new format, and the prebuilt-package check misread them as configuration files. Such a package could therefore reach a build on your computer. opencode 2.2.5 did: its upstream dependency checksum is wrong, so the whole update failed with "hash mismatch in fixed-output derivation". The update now stops before building and reports "Waiting for NixOS to finish building this change" with the package names. Your installed system was never changed by the failed update.
-- If an update failed this way: stage Cybex OS only (`cybex update stage cybexos`) to keep your current Nixpkgs, or prepare the full update again once NixOS has built the fixed opencode.
+- OpenCode is no longer bundled with the default developer tools. Its broken Nixpkgs 2.2.5 dependency download was blocking system updates. Personal package declarations remain untouched, and NixOS package updates remain enabled.
+- When NixOS has not supplied a prebuilt package, Software Update now shows **Waiting for NixOS packages**, names the packages and offers **Check Again**. That explanation survives restarting the desktop. The same held candidate no longer produces a new-update indicator; changed sources and firmware remain discoverable.
+- With automatic preparation enabled, package holds are checked again for a new source or personal configuration, or after a day, even when the first attempt was manual. Other failures and personal software changes still require attention.
 
-Validation covers source regressions (`python3 -m unittest discover tests/nixos`, including new cases for Nix 2.34's derivation format), the prebuilt-package check, the updater's prebuilt guard run with Nix 2.34.9 against an update to nixos-unstable 1d060086 (it now reports `opencode-2.2.5`; before the fix it reported nothing), and the actual local staged-updater lifecycle in an isolated NixOS VM.
-
-This is a source release with no new ISO attached. Existing testing ISOs keep their original source and do not contain this change. Fresh ISO installation, applying the release through a published channel and physical hardware qualification have not been run for this release revision.
+This is a source update with no new ISO. Installation, boot and physical hardware qualification are separate from source, build and isolated updater/UI checks.

@@ -13,6 +13,7 @@ import subprocess
 import time
 
 from .common import Failure, atomic, read
+from . import prebuilt
 
 POLICY = 'update-automatic.json'
 LAST_RUN = 'update-automatic-run.json'
@@ -75,19 +76,28 @@ def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=me
     last = read(state / LAST_RUN, {}) or {}
     own_failure = (current.get('state') in ('failed', 'interrupted') and last.get('requestId')
                    and current.get('requestId') == last.get('requestId'))
+    held = bool(prebuilt.waiting_packages(current)) and current.get('changeKind') == 'update'
     # Anything else in progress, awaiting review/restart or needing attention
     # belongs to the person. Their own failures are dismissed in the app.
-    if current.get('state', 'idle') not in ('idle', 'done') and not own_failure:
+    if current.get('state', 'idle') not in ('idle', 'done') and not own_failure and not held:
         return {'skipped': current.get('state')}
     if (current.get('request') or {}).get('state') in ('queued', 'running', 'unknown'):
         return {'skipped': 'request'}
     if is_metered():
         return {'skipped': 'metered'}
     discovery = (discover or engine.check)()
-    scope, identity = target(config_digest(engine.working), discovery)
+    configuration = config_digest(engine.working)
+    scope, identity = target(configuration, discovery)
     if not scope:
         return {'skipped': 'current'}
-    if last.get('target') == identity and not (own_failure and now() - last.get('at', 0) >= RETRY_SECONDS):
+    # An unavailable package is safe to check again without dismissing the
+    # result. Retry changed sources/configuration promptly, the same candidate
+    # at most daily, including a hold first encountered by a manual request.
+    if held and prebuilt.hold_target(current, discovery) != 'changed':
+        changed_config = current.get('baseline') and current['baseline'] != configuration
+        if not changed_config and now() - current.get('finishedAt', now()) < RETRY_SECONDS:
+            return {'skipped': 'waiting'}
+    if last.get('target') == identity and not ((own_failure or held) and now() - last.get('at', 0) >= RETRY_SECONDS):
         return {'skipped': 'prepared'}
     accepted = enqueue(state, 'stage', [scope])
     atomic(state / LAST_RUN, {'target': identity, 'scope': scope, 'requestId': accepted['requestId'],

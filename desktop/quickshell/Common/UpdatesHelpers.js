@@ -66,8 +66,37 @@ function overviewVisible(hasUpdates, deployment, error) {
         || error !== "";
 }
 
-function indicator(hasUpdates, state) {
-    return hasUpdates && !["activating", "firmware", "awaiting-boot", "awaiting-login", "recovering", "recovery-failed"].includes(state);
+function indicator(hasUpdates, state, holdTarget) {
+    return hasUpdates && holdTarget !== "same"
+        && !["activating", "firmware", "awaiting-boot", "awaiting-login", "recovering", "recovery-failed"].includes(state);
+}
+
+// The worker retains a prebuilt refusal as failed for its command result.
+// Present this specific, safe outcome as waiting, including after a restart.
+function waitingPackages(deployment) {
+    const value = deployment || {};
+    const names = value.notPrebuilt;
+    return value.state === "failed" && (Array.isArray(names) || names instanceof Array) && names.length > 0
+        && names.every(name => typeof name === "string" && name.trim() !== "") ? names : [];
+}
+
+// Same rules as lifecycle/cybexos/prebuilt.py: unknown identities never hide
+// a notification, and a new source or firmware candidate remains discoverable.
+function holdTarget(deployment, sources) {
+    if (!waitingPackages(deployment).length) return "";
+    const available = sources || {};
+    if ((available.firmware || {}).state === "available") return "changed";
+    const selected = deployment.inputs || {};
+    let known = false, unknown = false;
+    for (const [source, name, field] of [["upstream", "nixpkgs", "available"], ["cybexos", "cybexos", "revision"]]) {
+        const candidate = available[source] || {};
+        if (candidate.state !== "available") continue;
+        const attempted = (selected[name] || {}).rev, revision = candidate[field];
+        if (!attempted || !revision) unknown = true;
+        else if (attempted !== revision) return "changed";
+        else known = true;
+    }
+    return known && !unknown ? "same" : "unknown";
 }
 
 function firmwareRestart(deployment) {
@@ -120,6 +149,8 @@ function page(m) {
         return "restart";
     if (state === "awaiting-login")
         return confirmFailed(state, request) || !(m.automatic || {}).confirm ? "confirm" : "finishing";
+    if (m.waitingForPackages)
+        return m.holdTarget === "changed" && m.hasUpdates ? "available" : "waiting";
     if (["failed", "interrupted", "stale", "rolled-back", "recovery-failed"].includes(state))
         return "problem";
     if (m.hasUpdates)
@@ -166,6 +197,7 @@ function statusPose(page, problem, confirmFailed, kept) {
     case "recovering":
         return still("working");
     case "restart":
+    case "waiting":
         return still("needs-input");
     case "confirm":
         return still(confirmFailed ? "needs-input" : "listening");
@@ -320,8 +352,9 @@ function targetKey(sources, installedIdentity) {
         ((sources || {}).firmware || {}).devices || []]);
 }
 
-function autoPrepare(hasUpdates, automatic, state, busy) {
-    return hasUpdates && !!(automatic || {}).prepare && ["idle", "done"].includes(state || "idle") && !busy;
+function autoPrepare(hasUpdates, automatic, state, busy, waitingForPackages) {
+    return hasUpdates && !!(automatic || {}).prepare && !busy
+        && (["idle", "done"].includes(state || "idle") || (state === "failed" && waitingForPackages === true));
 }
 
 // Optional worker telemetry. Old workers and malformed counters retain a
@@ -368,7 +401,7 @@ function downloadSize(bytes) {
 
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, scope, scopeLabel, capabilities, firmwareRestart,
-    overviewVisible, indicator, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
+    overviewVisible, indicator, waitingPackages, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease,
     summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize
 };

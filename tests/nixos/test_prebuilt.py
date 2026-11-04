@@ -151,6 +151,8 @@ class EngineGuard(unittest.TestCase):
         self.assertEqual((status['state'], status['notPrebuilt']), ('failed', ['hello-2.12']))
         self.assertIn("NixOS hasn't finished building 1 package", status['error'])
         self.assertIn('Nothing was changed', status['error'])
+        self.assertEqual(status['inputs']['nixpkgs']['rev'], lifecycle.REV_NEW)
+        self.assertEqual(status['baseline'], self.sentinel)
         self.assertEqual(lifecycle.config_digest(self.config), self.sentinel)
         builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
         self.assertEqual(builds, [], 'the full build never starts')
@@ -166,6 +168,31 @@ class EngineGuard(unittest.TestCase):
         self.plan([])
         self.engine.stage('local')
         self.assertEqual(read(self.engine.status_path)['state'], 'ready')
+
+
+class Waiting(unittest.TestCase):
+    def setUp(self):
+        self.status = {'state': 'failed', 'notPrebuilt': ['opencode-2.2.5'], 'inputs': {
+            'nixpkgs': {'rev': 'nixpkgs-revision'}, 'cybexos': {'rev': 'cybexos-revision'}}}
+        self.sources = {'upstream': {'state': 'available', 'available': 'nixpkgs-revision'},
+                        'cybexos': {'state': 'current'}}
+
+    def test_only_a_typed_prebuilt_refusal_is_waiting(self):
+        self.assertEqual(prebuilt.waiting_packages(self.status), ['opencode-2.2.5'])
+        for names in (None, [], 'opencode', [None], ['']):
+            self.assertEqual(prebuilt.waiting_packages(self.status | {'notPrebuilt': names}), [])
+        for state in ('ready', 'activating', 'interrupted', 'recovery-failed'):
+            self.assertEqual(prebuilt.waiting_packages(self.status | {'state': state}), [])
+
+    def test_a_hold_matches_exact_sources_and_never_hides_new_ones(self):
+        self.assertEqual(prebuilt.hold_target(self.status, self.sources), 'same')
+        for name, source in (('upstream', {'state': 'available', 'available': 'new-nixpkgs'}),
+                             ('cybexos', {'state': 'available', 'revision': 'new-cybexos'}),
+                             ('firmware', {'state': 'available'})):
+            self.assertEqual(prebuilt.hold_target(self.status, self.sources | {name: source}), 'changed')
+        self.assertEqual(prebuilt.hold_target(self.status | {'inputs': {}}, self.sources), 'unknown')
+        self.assertEqual(prebuilt.hold_target(self.status, {}), 'unknown')
+        self.assertEqual(prebuilt.hold_target(self.status | {'notPrebuilt': []}, self.sources), '')
 
 
 class PackagesOnly(unittest.TestCase):

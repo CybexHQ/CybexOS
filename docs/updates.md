@@ -277,10 +277,19 @@ system against this computer's store and caches
 (`lifecycle/cybexos/prebuilt.py`). If anything beyond the expected builds below
 would compile, it stops before building: the status is `failed`, its phase
 "Waiting for NixOS to finish building this change", `notPrebuilt` names the
-packages, and nothing changes. NixOS builds nixos-unstable continuously, so a
-later revision normally passes; background preparation tries again for the
-next revision or after a day. Personal configuration previews (`local`) are
-not checked.
+packages, and nothing changes. Software Update presents this result as
+**Waiting for NixOS packages**, lists the packages and keeps **Check Again**
+available. It retains that explanation after a restart, and does not show a
+new-update indicator for the exact candidate already held back. A different
+Nixpkgs revision, Cybex OS release or available firmware still gets an indicator.
+Unknown candidate identities never suppress an indicator.
+
+NixOS builds nixos-unstable continuously, so a later revision normally passes.
+With automatic preparation enabled, background preparation retries a package
+hold for a changed source or personal configuration, or after a day, including
+holds first encountered manually. Other manual failures and personal Software
+changes still need the person's attention. Personal configuration previews
+(`local`) are not checked.
 
 Two kinds of change become the default generation once activation and its
 health checks pass, without a trial boot or restart:

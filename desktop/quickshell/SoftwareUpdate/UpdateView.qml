@@ -97,6 +97,13 @@ Item {
         case "available":
             return { tone: "accent", busy: false, title: I18n.tr("Updates are available"),
                 body: availableBody() };
+        case "waiting":
+            return { tone: "warn", busy: false, title: I18n.tr("Waiting for NixOS packages"),
+                body: I18n.tr("Some packages for this update aren't available from NixOS yet. Your current system is unchanged.")
+                    + "\n" + I18n.format("Waiting for: %1", [service.waitingPackages.join(", ")])
+                    + "\n" + (service.automatic.prepare
+                        ? I18n.tr("Update checks remain enabled. Cybex OS will check again automatically.")
+                        : I18n.tr("Check again later. You don't need to restart or change your update sources.")) };
         case "preparing":
             return { tone: "accent", busy: true, title: I18n.tr("Getting the update ready"),
                 body: I18n.tr("Downloading packages, building components when needed, and checking compatibility. Nothing changes until you choose Install.") };
@@ -510,7 +517,7 @@ Item {
                 onTriggered: root.chooseSources = !root.chooseSources
             }
             UpdateButton {
-                visible: root.page === "problem" || (root.page === "confirm" && root.service.error !== "")
+                visible: ["problem", "waiting"].includes(root.page) || (root.page === "confirm" && root.service.error !== "")
                 text: root.problemDetails ? I18n.tr("Hide Details") : I18n.tr("Show Details")
                 onTriggered: root.problemDetails = !root.problemDetails
             }
@@ -548,7 +555,7 @@ Item {
             }
             UpdateButton {
                 objectName: "updatePrimary"
-                visible: ["available", "restart", "confirm"].includes(root.page)
+                visible: ["available", "waiting", "restart", "confirm"].includes(root.page)
                     || (root.page === "problem" && ["failed", "interrupted", "stale", "rolled-back", "recovery-failed", "status"].includes(root.problem))
                 primary: true
                 tone: root.current.tone
@@ -561,6 +568,7 @@ Item {
                     : root.service.actions.prepare)
                 text: root.service.requestPending && !root.service.runActive ? I18n.tr("Waiting for authorization…")
                     : root.page === "available" ? I18n.tr("Prepare Update")
+                    : root.page === "waiting" ? I18n.tr("Check Again")
                     : root.page === "restart" ? (root.firmware.needsShutdown ? I18n.tr("Shut Down Now") : I18n.tr("Restart Now"))
                     : root.page === "confirm" ? I18n.tr("Keep This Version")
                     : root.problem === "rolled-back" ? I18n.tr("OK")

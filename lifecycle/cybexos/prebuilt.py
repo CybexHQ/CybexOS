@@ -16,6 +16,43 @@ SIZE = re.compile(r'\(([0-9.]+) (B|KiB|MiB|GiB|TiB) download')
 UNITS = {'B': 1, 'KiB': 1024, 'MiB': 1024 ** 2, 'GiB': 1024 ** 3, 'TiB': 1024 ** 4}
 
 
+def waiting_packages(status):
+    """A durable prebuilt refusal, distinct from a build or activation failure."""
+    names = status.get('notPrebuilt')
+    if (status.get('state') != 'failed' or not isinstance(names, list) or not names
+            or any(not isinstance(item, str) or not item.strip() for item in names)):
+        return []
+    return names
+
+
+def hold_target(status, sources):
+    """Whether discovery names the held candidate, a changed one, or is unknown.
+
+    Only exact source identities can suppress a notification or permit an
+    early automatic retry. Older status records without identities remain
+    waiting, without guessing which revisions they checked.
+    """
+    if not waiting_packages(status):
+        return ''
+    if (sources.get('firmware') or {}).get('state') == 'available':
+        return 'changed'
+    selected = status.get('inputs') or {}
+    known, unknown = False, False
+    for source, name, field in (('upstream', 'nixpkgs', 'available'), ('cybexos', 'cybexos', 'revision')):
+        candidate = sources.get(source) or {}
+        if candidate.get('state') != 'available':
+            continue
+        attempted = (selected.get(name) or {}).get('rev')
+        revision = candidate.get(field)
+        if not attempted or not revision:
+            unknown = True
+        elif attempted != revision:
+            return 'changed'
+        else:
+            known = True
+    return 'same' if known and not unknown else 'unknown'
+
+
 def name(path):
     """`/nix/store/<hash>-gimp-3.0.6.drv` -> `gimp-3.0.6`."""
     base = path.rsplit('/', 1)[-1]

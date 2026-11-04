@@ -417,6 +417,10 @@ class Engine:
                     if selected.get('rev') != candidate['revision'] or selected.get('narHash') != candidate['narHash']:
                         raise Failure('Selected source does not match the release revision and its downloaded content')
                     atomic(tx / 'release.json', candidate)
+                # Retain the attempted identities even when the prebuilt guard
+                # holds this candidate, so discovery can recognise it after reboot.
+                self.status(inputs={name: inputs.identity(new, name) for name in ('nixpkgs', 'cybexos')},
+                            baseline=baseline)
                 self.status(state='building', phase='Downloading inputs and building the complete system')
                 self.archive(config, tx)
                 if kind in ('update', 'software'):
