@@ -70,6 +70,11 @@ class Parsing(unittest.TestCase):
         self.assertEqual(prebuilt.kind(GRAPH[ROOT]), 'trivial')
         structured = {'outputs': {}, 'env': {'__json': json.dumps({'allowSubstitutes': False, 'src': 'x'})}}
         self.assertEqual(prebuilt.kind(structured), 'trivial')
+        # Nix 2.34 (format version 4) keeps only output paths in `env`.
+        package = {'outputs': {}, 'env': {'out': store('o', 'out')}, 'structuredAttrs': {'src': store('x', 'source')}}
+        self.assertEqual(prebuilt.kind(package), 'compile')
+        local = {'outputs': {}, 'env': {'out': store('o', 'out')}, 'structuredAttrs': {'preferLocalBuild': True}}
+        self.assertEqual(prebuilt.kind(local), 'trivial')
         self.assertEqual(prebuilt.kind(GRAPH[CONFIG]), 'configuration')
         self.assertEqual(prebuilt.kind(GRAPH[HELLO]), 'compile')
         self.assertEqual(prebuilt.name(HELLO), 'hello-2.12')
@@ -78,9 +83,15 @@ class Parsing(unittest.TestCase):
 class Classification(unittest.TestCase):
     def test_versioned_nix_metadata_cannot_hide_an_uncached_dependency(self):
         # Captured installed Nix format: version 4 wraps the graph, uses
-        # store basenames, and moves inputDrvs to inputs.drvs.
+        # store basenames, moves inputDrvs to inputs.drvs, and moves a
+        # structured-attributes package's attributes (here opencode 2.2.5,
+        # missed on 2026-11-04) from env to structuredAttrs.
+        structured = store('p', 'opencode-2.2.5.drv')
+        source = dict(GRAPH, **{CONFIG: node(HELLO, structured), structured: {
+            'outputs': {'out': {'path': store('q', 'opencode-2.2.5')}}, 'inputDrvs': {},
+            'env': {'out': store('q', 'opencode-2.2.5')}, 'structuredAttrs': {'src': store('x', 'source')}}})
         graph = {}
-        for path, info in GRAPH.items():
+        for path, info in source.items():
             value = dict(info)
             value['inputs'] = {'drvs': {Path(key).name: {'outputs': ['out'], 'dynamicOutputs': {}}
                                        for key in value.pop('inputDrvs')}}
@@ -88,11 +99,12 @@ class Classification(unittest.TestCase):
             graph[Path(path).name] = value
         def run(*args, **kwargs):
             return json.dumps({'version': 4, 'derivations': graph})
-        self.assertEqual(prebuilt.compiles(run, list(GRAPH), root=ROOT, expected=[VENDOR]), ['hello-2.12'])
+        self.assertEqual(prebuilt.compiles(run, list(source), root=ROOT, expected=[VENDOR]), ['hello-2.12', 'opencode-2.2.5'])
         self.assertEqual(prebuilt.show(run, [ROOT])[ROOT]['outputs']['out']['path'], store('o', 'out'))
 
     def test_missing_or_malformed_metadata_never_passes_as_prebuilt(self):
-        for data in ({}, {'version': 4, 'derivations': []}, {ROOT: {}}, []):
+        malformed = dict(GRAPH[ROOT], structuredAttrs='{}')
+        for data in ({}, {'version': 4, 'derivations': []}, {ROOT: {}}, [], {ROOT: malformed}):
             with self.subTest(data=data), self.assertRaises(Failure):
                 prebuilt.compiles(lambda *args, **kwargs: json.dumps(data), [ROOT], root=ROOT)
 

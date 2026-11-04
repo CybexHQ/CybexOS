@@ -50,8 +50,18 @@ def dry_run(run, *installables, options=(), timeout=900):
     return parse_dry_run(output)
 
 
-def attributes(env):
-    """Derivation attributes, including structured ones (`__json`)."""
+def attributes(info):
+    """Derivation attributes, including structured ones.
+
+    Nix 2.34's derivation format (version 4) moves `__structuredAttrs`
+    packages' attributes out of `env` into `structuredAttrs`, leaving only
+    the output paths in `env`; older Nix keeps them as JSON in `env.__json`.
+    Reading `env` alone makes such a package look source-less and lets an
+    uncached build through as configuration.
+    """
+    if isinstance(info.get('structuredAttrs'), dict):
+        return info['structuredAttrs']
+    env = info.get('env') or {}
     if '__json' in env:
         try:
             value = json.loads(env['__json'])
@@ -72,7 +82,7 @@ def kind(info):
     """
     if any(isinstance(output, dict) and 'hash' in output for output in (info.get('outputs') or {}).values()):
         return 'fetch'
-    attrs = attributes(info.get('env') or {})
+    attrs = attributes(info)
     if attrs.get('preferLocalBuild') in (True, '1') or attrs.get('allowSubstitutes') in (False, ''):
         return 'trivial'
     if not any(attrs.get(key) for key in ('src', 'srcs')):
@@ -98,7 +108,8 @@ def derivation_graph(data):
         if not isinstance(wire_inputs, dict):
             raise Failure('Nix returned invalid derivation metadata.')
         inputs = info.get('inputDrvs', wire_inputs.get('drvs'))
-        if not isinstance(inputs, dict) or not isinstance(info.get('env'), dict) or not isinstance(info.get('outputs'), dict):
+        if (not isinstance(inputs, dict) or not isinstance(info.get('env'), dict) or not isinstance(info.get('outputs'), dict)
+                or not isinstance(info.get('structuredAttrs', {}), dict)):
             raise Failure('Nix returned invalid derivation metadata.')
         info['inputDrvs'] = {key if key.startswith('/nix/store/') else '/nix/store/' + key: value
                              for key, value in inputs.items()}
