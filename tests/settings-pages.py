@@ -241,7 +241,7 @@ def main():
             'downloads': {theme['package']: '/nix/store/' + 'a' * 32 + '-' + theme['package'].replace('.', '-')
                           for theme in catalogue['themes'] if not theme.get('bundled')}}))
         (base / 'bin').mkdir()
-        for name in ('gsettings', 'dbus-update-activation-environment', 'nix-store'):
+        for name in ('gsettings', 'dbus-update-activation-environment', 'nix-store', 'systemctl', 'xrdb', 'xsetroot'):
             path = base / 'bin' / name
             path.write_text(FAKE_POINTER_TOOL)
             path.chmod(0o700)
@@ -430,6 +430,11 @@ def main():
                     'XCURSOR_SIZE=64'] in applied, applied
             record = home / '.local/state/cybexos/pointer/session.env'
             assert record.read_text() == 'XCURSOR_THEME=Bibata-Modern-Classic-Right\nXCURSOR_SIZE=64\n'
+            # X11 applications: xsettingsd's file, reloaded. No X display here.
+            assert ['systemctl', '--user', 'reload', 'cybexos-xsettings.service'] in applied, applied
+            assert not [call for call in applied if call[0] in ('xrdb', 'xsetroot')], applied
+            assert (home / '.local/state/cybexos/pointer/xsettings.conf').read_text() == \
+                'Gtk/CursorThemeName "Bibata-Modern-Classic-Right"\nGtk/CursorThemeSize 64\n'
             # A download that cannot reach the cache says so and changes nothing.
             ipc('settings-test', 'pickPointer', 'WhiteSur-cursors')
             failed = wait(lambda: (p := pointer()).get('failure') and p, 'the failed download')

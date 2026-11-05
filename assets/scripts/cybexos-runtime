@@ -12,7 +12,7 @@ usage() {
   cat <<'EOF'
 Usage:
   cybexos-runtime path quickshell|hypr-source|hypr-generated|hypr-config
-  cybexos-runtime exec quickshell|hypridle|hyprlock
+  cybexos-runtime exec quickshell|hypridle|hyprlock|xsettings
   cybexos-runtime ipc TARGET FUNCTION [ARGUMENT...]
   cybexos-runtime dev enable CHECKOUT
   cybexos-runtime dev disable
@@ -318,6 +318,12 @@ exec_runtime() {
         exec python3 "$selected/scripts/shell-recovery.py" run "$selected"
       fi
       exec qs -p "$selected"
+      ;;
+    xsettings)
+      # X11 applications' pointer (cybexos-xsettings.service): the selected
+      # shell's pointer helper writes it, then becomes xsettingsd.
+      selected=$(runtime_path quickshell)
+      exec python3 "$selected/scripts/pointer.py" x11-session
       ;;
     hypridle|hyprlock)
       user_config=$config_root/hypr/$kind.conf

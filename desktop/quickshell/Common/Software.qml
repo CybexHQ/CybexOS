@@ -572,7 +572,7 @@ Singleton {
     function launch(desktopIds, name) {
         const entry = entryFor(desktopIds, name);
         if (entry) {
-            entry.execute();
+            Pointer.launch(entry);
             return true;
         }
         const path = packageEntry(desktopIds, name);

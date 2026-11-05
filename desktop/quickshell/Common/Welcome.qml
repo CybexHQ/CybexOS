@@ -192,7 +192,7 @@ Singleton {
         if (aside) connectAside = "password";
         passwordOpened = true;
         passwordWindow = "";
-        passwordEntry.execute();
+        Pointer.launch(passwordEntry);
     }
     // The sign-in opens a terminal and a browser, so the guide steps aside.
     function signIn(agentId) {

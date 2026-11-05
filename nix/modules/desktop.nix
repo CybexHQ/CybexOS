@@ -33,6 +33,10 @@ let cfg = config.cybexos;
     # profile link that activation moves (see quickshell.service).
     sessionPath = "/run/current-system/sw";
     pointerDefaultSize = builtins.tryEval (lib.toInt (toString (config.environment.sessionVariables.XCURSOR_SIZE or "24")));
+    pointerDefault = {
+      theme = toString (config.environment.sessionVariables.XCURSOR_THEME or "Bibata-Modern-Classic");
+      size = if pointerDefaultSize.success then pointerDefaultSize.value else 24;
+    };
 in {
   config = lib.mkIf cfg.enable {
     # Cybex OS starts Hyprland itself (cybexos-session), never through UWSM.
@@ -90,6 +94,12 @@ in {
       XCURSOR_THEME = lib.mkDefault "Bibata-Modern-Classic";
       XCURSOR_SIZE = lib.mkDefault "24";
       XCURSOR_PATH = lib.mkDefault "~/.icons:~/.local/share/icons:${pkgs.bibata-cursors}/share/icons:/run/current-system/sw/share/icons";
+      # Chromium- and Electron-based applications Nixpkgs wraps (Spotify,
+      # Brave, 1Password, VS Code, Discord, Obsidian) run natively on Wayland
+      # instead of through XWayland. Hyprland then draws their pointer
+      # (cursor-shape-v1), so it follows Settings -> Appearance -> Pointer at
+      # once, and they render at the display's own scale, not stretched from 1x.
+      NIXOS_OZONE_WL = lib.mkDefault "1";
       CYBEXOS_CONNECTED_WIDGETS = if cfg.features.connectedWidgets then "1" else "0";
       CYBEXOS_ASSISTANT = if cfg.features.assistant then "1" else "0";
       CYBEXOS_DEVELOPER_TOOLS = if cfg.features.developer then "1" else "0";
@@ -102,23 +112,23 @@ in {
       v = 1;
       # The pointer this installation starts with, personal modules included;
       # Settings returns to it on reset.
-      default = {
-        theme = toString (config.environment.sessionVariables.XCURSOR_THEME or "Bibata-Modern-Classic");
-        size = if pointerDefaultSize.success then pointerDefaultSize.value else 24;
-      };
+      default = pointerDefault;
       downloads = pointerDownloads;
     };
     system.build.cybexosPointerDownloads = lib.unique (lib.attrValues pointerDownloads);
     environment.pathsToLink = [ "/share/icons" ];
+    # The installation's pointer, personal modules included. The person's own
+    # choice reaches GTK through gsettings (Wayland) and XSETTINGS (X11,
+    # cybexos-xsettings below), which both take precedence over these files.
     environment.etc."xdg/gtk-3.0/settings.ini".text = ''
       [Settings]
-      gtk-cursor-theme-name=Bibata-Modern-Classic
-      gtk-cursor-theme-size=24
+      gtk-cursor-theme-name=${pointerDefault.theme}
+      gtk-cursor-theme-size=${toString pointerDefault.size}
     '';
     environment.etc."xdg/gtk-4.0/settings.ini".text = ''
       [Settings]
-      gtk-cursor-theme-name=Bibata-Modern-Classic
-      gtk-cursor-theme-size=24
+      gtk-cursor-theme-name=${pointerDefault.theme}
+      gtk-cursor-theme-size=${toString pointerDefault.size}
     '';
     services.displayManager.sddm.settings.Theme = {
       CursorTheme = "Bibata-Modern-Classic";
@@ -126,8 +136,8 @@ in {
     };
     programs.dconf.profiles.user.databases = [{
       settings."org/gnome/desktop/interface" = {
-        cursor-theme = "Bibata-Modern-Classic";
-        cursor-size = lib.gvariant.mkInt32 24;
+        cursor-theme = pointerDefault.theme;
+        cursor-size = lib.gvariant.mkInt32 pointerDefault.size;
       };
     }];
     xdg.portal = {
@@ -160,6 +170,21 @@ in {
         Restart = "on-failure"; RestartSec = 2;
       };
       environment.PYTHONDONTWRITEBYTECODE = "1";
+    };
+    # X11 applications under XWayland draw their own pointer. GTK (and
+    # Chromium through it) reads the theme from XSETTINGS; Settings rewrites
+    # the file and reloads this service, so running applications follow
+    # (desktop/quickshell/scripts/pointer.py). Hyprland starts XWayland with
+    # the session; without it (xwayland.enabled = false) this stays off.
+    systemd.user.services.cybexos-xsettings = {
+      description = "Cybex OS pointer settings for X11 applications";
+      partOf = [ "hyprland-session.target" ]; wantedBy = [ "hyprland-session.target" ];
+      unitConfig.ConditionEnvironment = "DISPLAY";
+      serviceConfig = {
+        ExecStart = "${cfg.desktopPackage}/bin/cybexos-runtime exec xsettings";
+        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+        Restart = "on-failure"; RestartSec = 2;
+      };
     };
     systemd.user.services.cybexos-session-lock = {
       partOf = [ "hyprland-session.target" ];

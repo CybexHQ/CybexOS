@@ -26,7 +26,7 @@ Singleton {
         const entry = entries.find(item => String(item.id).replace(/\.desktop$/, "") === id);
         if (!entry)
             return false;
-        entry.execute();
+        Pointer.launch(entry);
         return true;
     }
     function remove(desktopId, name) {

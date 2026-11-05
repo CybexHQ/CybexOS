@@ -148,6 +148,11 @@
         # Wiz on the disk unlock screen, the lock screen and in kitty.
         plymouth-unlock = import ./nix/tests/plymouth-unlock.nix { inherit pkgs; inherit (self.packages.${system}) plymouth; };
         lock-terminal = import ./nix/tests/lock-terminal.nix { inherit pkgs module; };
+        # Spotify on a 2x display, through XWayland and natively: sharpness and the chosen pointer.
+        wayland-scale = import ./nix/tests/wayland-scale.nix {
+          inherit module;
+          pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
+        };
         # 1Password and Brave Origin are the proprietary application choice.
         browser-1password = import ./nix/tests/browser-1password.nix {
           inherit module;

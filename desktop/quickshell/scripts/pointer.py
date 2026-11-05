@@ -5,6 +5,7 @@ usage: pointer.py list
        pointer.py download THEME
        pointer.py remove THEME
        pointer.py apply THEME SIZE [--explicit]
+       pointer.py x11-session
 
 Each command prints one JSON object; `success` is false with an `error` when
 it could not do what was asked, and a `detail` when a tool said why.
@@ -27,10 +28,20 @@ previews are drawn on first sight into ~/.cache/cybexos/pointer-previews.
 
 `apply` gives Hyprland the pointer at once (hyprctl setcursor), sets GTK's
 gsettings keys and the systemd/D-Bus activation environment, so applications
-started later inherit it. With --explicit it also records the choice in
+started later inherit it. Hyprland's own environment follows too (hl.env), for
+what it starts from key bindings. With --explicit it also records the choice in
 ~/.local/state/cybexos/pointer/session.env, which cybexos-session reads at the
 next login before Hyprland starts; without, that record goes and the
 installation's own default applies again.
+
+X11 applications under XWayland draw their own pointer and never ask Hyprland.
+Chromium-based ones (Spotify, Electron apps) take the theme from GTK, which on
+X11 reads XSETTINGS, and reload it when the X resources change; plain Xlib
+ones read Xcursor.theme and Xcursor.size. So `apply` also rewrites
+~/.local/state/cybexos/pointer/xsettings.conf, has cybexos-xsettings.service
+(xsettingsd) reload it, merges the two X resources and gives the X root window
+the new arrow. `x11-session` is that service: it does the same for the
+pointer the session started with and then becomes xsettingsd.
 """
 import fcntl
 import hashlib
@@ -54,6 +65,7 @@ MAX_EXTRA = 48
 DOWNLOAD_TIMEOUT = 900
 STEP_TIMEOUT = 15
 SCHEMA = 'org.gnome.desktop.interface'
+XSETTINGS_UNIT = 'cybexos-xsettings.service'
 
 
 class PointerError(Exception):
@@ -303,10 +315,10 @@ def remove(name):
     return {'success': True}
 
 
-def run_step(command):
+def run_step(command, stdin=None, environment=None):
     try:
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                timeout=STEP_TIMEOUT)
+        result = subprocess.run(command, input=stdin, stdin=None if stdin is not None else subprocess.DEVNULL,
+                                capture_output=True, text=True, timeout=STEP_TIMEOUT, env=environment)
     except subprocess.TimeoutExpired:
         return f'{command[0]} timed out'
     except OSError as error:
@@ -331,6 +343,79 @@ def write_session(theme, size, explicit):
     os.replace(path + '.part', path)
 
 
+def xsettings_path():
+    return os.path.join(state_dir(), 'xsettings.conf')
+
+
+def write_xsettings(theme, size):
+    """xsettingsd's configuration: only the pointer, so GTK keeps reading
+    everything else from its settings.ini as before."""
+    os.makedirs(state_dir(), exist_ok=True)
+    path = xsettings_path()
+    with open(path + '.part', 'w', encoding='utf-8') as handle:
+        handle.write(f'Gtk/CursorThemeName "{theme}"\nGtk/CursorThemeSize {size}\n')
+    os.replace(path + '.part', path)
+    return path
+
+
+def x11_resources(theme, size):
+    """The X resources and root-window arrow for XWayland clients. Nothing to
+    do without an X display; a failure is reported, not fatal."""
+    if not os.environ.get('DISPLAY'):
+        return None
+    if not shutil.which('xrdb'):
+        return 'xrdb is not installed'
+    error = run_step(['xrdb', '-nocpp', '-merge'], f'Xcursor.theme: {theme}\nXcursor.size: {size}\n')
+    if error or not shutil.which('xsetroot'):
+        return error
+    # Hyprland sets the root arrow only when XWayland starts; libXcursor reads
+    # the theme from the environment before the resources.
+    environment = dict(os.environ, XCURSOR_THEME=theme, XCURSOR_SIZE=str(size))
+    return run_step(['xsetroot', '-cursor_name', 'left_ptr'], environment=environment)
+
+
+def apply_x11(theme, size):
+    try:
+        write_xsettings(theme, size)
+    except OSError as error:
+        return f'could not write the X11 settings: {error.strerror}'
+    # Only a running service is reloaded: without an X display, or in a
+    # source-tree session on another system, there is none.
+    error = None
+    if shutil.which('systemctl') and not run_step(['systemctl', '--user', 'is-active', '--quiet', XSETTINGS_UNIT]):
+        error = run_step(['systemctl', '--user', 'reload', XSETTINGS_UNIT])
+    return x11_resources(theme, size) or error
+
+
+def hyprland_environment(theme, size):
+    """Hyprland's own environment, inherited by what it starts from key
+    bindings. Both values are validated, so they are plain Lua strings."""
+    return run_step(['hyprctl', 'eval', f'hl.env("XCURSOR_THEME", "{theme}") '
+                     f'hl.env("XCURSOR_SIZE", "{size}")'])
+
+
+def session_pointer():
+    """The pointer this session started with: cybexos-session exported it,
+    and systemd's environment carries it (or a later apply's) to the unit."""
+    default, _downloads, _known = machine()
+    theme = os.environ.get('XCURSOR_THEME', '')
+    size = os.environ.get('XCURSOR_SIZE', '')
+    theme = theme if pointer_xcursor.valid_name(theme) else default['theme']
+    size = int(size) if size.isdigit() and MIN_SIZE <= int(size) <= MAX_SIZE else default['size']
+    return theme, size
+
+
+def x11_session():
+    """cybexos-xsettings.service: the session's pointer for X11 clients, then
+    xsettingsd, which serves it and rereads it on SIGHUP."""
+    theme, size = session_pointer()
+    path = write_xsettings(theme, size)
+    error = x11_resources(theme, size)
+    if error:
+        print(f'pointer: X resources: {error}', file=sys.stderr)
+    os.execvp('xsettingsd', ['xsettingsd', '-c', path])
+
+
 def apply(theme, size, explicit):
     if not pointer_xcursor.valid_name(theme):
         raise PointerError('not a pointer theme name')
@@ -340,7 +425,8 @@ def apply(theme, size, explicit):
         raise PointerError(f'{theme} is not installed')
     steps = {}
     if os.environ.get('HYPRLAND_INSTANCE_SIGNATURE'):
-        steps['hyprland'] = run_step(['hyprctl', 'setcursor', theme, size])
+        steps['hyprland'] = (run_step(['hyprctl', 'setcursor', theme, size])
+                             or hyprland_environment(theme, size))
     if shutil.which('gsettings'):
         steps['gsettings'] = (run_step(['gsettings', 'set', SCHEMA, 'cursor-theme', theme])
                               or run_step(['gsettings', 'set', SCHEMA, 'cursor-size', size]))
@@ -349,6 +435,7 @@ def apply(theme, size, explicit):
         steps['environment'] = run_step(['dbus-update-activation-environment', '--systemd'] + variables)
     elif shutil.which('systemctl'):
         steps['environment'] = run_step(['systemctl', '--user', 'set-environment'] + variables)
+    steps['x11'] = apply_x11(theme, size)
     try:
         write_session(theme, size, explicit)
         steps['session'] = None
@@ -373,6 +460,9 @@ def main(argv):
                 report = (download if command == 'download' else remove)(arguments[0])
         elif command == 'apply' and len(arguments) in (2, 3) and arguments[2:] in ([], ['--explicit']):
             report = apply(arguments[0], arguments[1], arguments[2:] == ['--explicit'])
+        elif command == 'x11-session' and not arguments:
+            x11_session()
+            return 1
         else:
             print(json.dumps({'success': False, 'error': __doc__.split('\n\n')[1].strip()}))
             return 2

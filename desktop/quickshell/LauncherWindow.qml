@@ -122,7 +122,7 @@ PanelWindow {
             if (!app)
                 return "unknown";
             Launcher.recordLaunch(app);
-            app.execute();
+            Pointer.launch(app);
             return "ok";
         }
 

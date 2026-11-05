@@ -322,7 +322,7 @@ Singleton {
         switch (row.providerId) {
         case "apps":
             Launcher.recordLaunch(row.app);
-            row.app.execute();
+            Pointer.launch(row.app);
             Launcher.close();
             break;
         case "files":

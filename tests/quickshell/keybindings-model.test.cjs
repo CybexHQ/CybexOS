@@ -170,9 +170,9 @@ test('singleton is registered, lazy and acquires/releases the existing backend',
 test('desktop launch IPC validates filenames and uses the Apps tab execute path', () => {
     const source = fs.readFileSync(path.join(root,'desktop/quickshell/LauncherWindow.qml'),'utf8');
     const body = source.match(/function launchDesktop\(desktopId: string\): string \{([\s\S]*?)\n        \}/)[1];
-    const invoke = new Function('desktopId','DesktopEntries','Launcher',body);
+    const invoke = (id, entries, launcher) => new Function('desktopId','DesktopEntries','Launcher','Pointer',body)(id, entries, launcher, {launch(value) {assert.equal(value,app);calls.push('execute');}});
     const calls = [];
-    const app = {execute() {calls.push('execute');}};
+    const app = {command: ['gimp'], workingDirectory: ''};
     const entries = {byId(id) {calls.push(id); return id === 'gimp' ? app : null;}};
     const launcher = {recordLaunch(value) {assert.equal(value,app);calls.push('record');}};
     assert.equal(invoke('gimp.desktop',entries,launcher),'ok');

@@ -90,12 +90,14 @@ class Scratch(unittest.TestCase):
         environ = {
             "HOME": str(self.home), "XCURSOR_PATH": f"~/.icons:~/.local/share/icons:{self.system}",
             "PATH": f"{self.bin}:{os.environ.get('PATH', '')}", "XDG_DATA_HOME": "", "XDG_STATE_HOME": "",
-            "XDG_CACHE_HOME": "", "HYPRLAND_INSTANCE_SIGNATURE": "",
+            "XDG_CACHE_HOME": "", "HYPRLAND_INSTANCE_SIGNATURE": "", "DISPLAY": "",
+            "XCURSOR_THEME": "", "XCURSOR_SIZE": "",
         }
         patcher = mock.patch.dict(os.environ, environ)
         patcher.start()
         self.addCleanup(patcher.stop)
-        for name in ("XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "HYPRLAND_INSTANCE_SIGNATURE"):
+        for name in ("XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "HYPRLAND_INSTANCE_SIGNATURE", "DISPLAY",
+                     "XCURSOR_THEME", "XCURSOR_SIZE"):
             del os.environ[name]
         machine = mock.patch.object(pointer, "MACHINE", str(self.machine))
         machine.start()
@@ -108,10 +110,18 @@ class Scratch(unittest.TestCase):
     def icons(self) -> Path:
         return self.home / ".local/share/icons"
 
-    def recorder(self, name: str, status: int = 0, stdout: str = "", stderr: str = "") -> None:
-        executable(self.bin / name, f"""import json, sys
+    def recorder(self, name: str, status: int = 0, stdout: str = "", stderr: str = "", stdin: bool = False,
+                 environment: tuple = ()) -> None:
+        """A command that logs its arguments, and with `stdin` or `environment`
+        also what it read and those variables, as a final object."""
+        executable(self.bin / name, f"""import json, os, sys
+seen = {{}}
+if {stdin!r}:
+    seen["stdin"] = sys.stdin.read()
+for variable in {list(environment)!r}:
+    seen[variable] = os.environ.get(variable)
 with open({str(self.calls)!r}, "a") as log:
-    log.write(json.dumps([{name!r}] + sys.argv[1:]) + "\\n")
+    log.write(json.dumps([{name!r}] + sys.argv[1:] + ([seen] if seen else [])) + "\\n")
 sys.stdout.write({stdout!r})
 sys.stderr.write({stderr!r})
 sys.exit({status})
@@ -309,25 +319,78 @@ class Apply(Scratch):
     def setUp(self) -> None:
         super().setUp()
         theme(self.system, "Bibata-Modern-Classic")
-        for name in ("hyprctl", "gsettings", "dbus-update-activation-environment"):
+        for name in ("hyprctl", "gsettings", "dbus-update-activation-environment", "systemctl"):
             self.recorder(name, stdout="ok\n" if name == "hyprctl" else "")
+        self.recorder("xrdb", stdin=True)
+        self.recorder("xsetroot", environment=("XCURSOR_THEME", "XCURSOR_SIZE"))
         os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = "test"
+        os.environ["DISPLAY"] = ":9"
 
     def session(self) -> Path:
         return self.home / ".local/state/cybexos/pointer/session.env"
 
-    def test_apply_reaches_hyprland_gtk_the_environment_and_the_next_login(self) -> None:
+    def xsettings(self) -> Path:
+        return self.home / ".local/state/cybexos/pointer/xsettings.conf"
+
+    def x11_calls(self, theme_name: str, size: str):
+        return [
+            ["xrdb", "-nocpp", "-merge", {"stdin": f"Xcursor.theme: {theme_name}\nXcursor.size: {size}\n"}],
+            ["xsetroot", "-cursor_name", "left_ptr", {"XCURSOR_THEME": theme_name, "XCURSOR_SIZE": size}],
+        ]
+
+    def test_apply_reaches_hyprland_gtk_the_environment_x11_and_the_next_login(self) -> None:
         report = pointer.apply("Bibata-Modern-Classic", "48", True)
         self.assertTrue(report["success"], report)
         self.assertEqual(self.recorded(), [
             ["hyprctl", "setcursor", "Bibata-Modern-Classic", "48"],
+            ["hyprctl", "eval", 'hl.env("XCURSOR_THEME", "Bibata-Modern-Classic") hl.env("XCURSOR_SIZE", "48")'],
             ["gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", "Bibata-Modern-Classic"],
             ["gsettings", "set", "org.gnome.desktop.interface", "cursor-size", "48"],
             ["dbus-update-activation-environment", "--systemd", "XCURSOR_THEME=Bibata-Modern-Classic", "XCURSOR_SIZE=48"],
-        ])
+            ["systemctl", "--user", "is-active", "--quiet", "cybexos-xsettings.service"],
+            ["systemctl", "--user", "reload", "cybexos-xsettings.service"],
+        ] + self.x11_calls("Bibata-Modern-Classic", "48"))
+        self.assertEqual(report["steps"]["x11"], "ok")
+        self.assertEqual(self.xsettings().read_text(),
+                         'Gtk/CursorThemeName "Bibata-Modern-Classic"\nGtk/CursorThemeSize 48\n')
         self.assertEqual(self.session().read_text(), "XCURSOR_THEME=Bibata-Modern-Classic\nXCURSOR_SIZE=48\n")
         self.assertTrue(pointer.apply("Bibata-Modern-Classic", "24", False)["success"])
         self.assertFalse(self.session().exists(), "back to the installation's own: nothing to tell the next login")
+        self.assertIn("Gtk/CursorThemeSize 24", self.xsettings().read_text(), "X11 follows the default as well")
+
+    def test_x11_is_skipped_without_a_display_and_a_stopped_service_is_left_alone(self) -> None:
+        del os.environ["DISPLAY"]
+        self.recorder("systemctl", status=3)
+        report = pointer.apply("Bibata-Modern-Classic", "32", True)
+        self.assertTrue(report["success"], report)
+        calls = self.recorded()
+        self.assertIn(["systemctl", "--user", "is-active", "--quiet", "cybexos-xsettings.service"], calls)
+        self.assertFalse([call for call in calls if call[0] in ("xrdb", "xsetroot") or call[1:3] == ["--user", "reload"]])
+        self.assertTrue(self.xsettings().exists(), "the next start of the service reads it")
+
+    def test_an_x11_failure_is_reported(self) -> None:
+        self.recorder("xrdb", status=1, stderr="xrdb: Can't open display ':9'\n")
+        report = pointer.apply("Bibata-Modern-Classic", "32", True)
+        self.assertFalse(report["success"])
+        self.assertEqual(report["error"], "x11: xrdb: Can't open display ':9'")
+        self.assertEqual(report["steps"]["hyprland"], "ok")
+
+    def test_the_service_serves_the_sessions_pointer_then_becomes_xsettingsd(self) -> None:
+        self.machine.write_text(json.dumps({"v": 1, "default": {"theme": "Adwaita", "size": 30}, "downloads": {}}))
+        os.environ.update(XCURSOR_THEME="Bibata-Modern-Classic", XCURSOR_SIZE="32")
+        with mock.patch.object(pointer.os, "execvp", side_effect=SystemExit(0)) as execvp:
+            with self.assertRaises(SystemExit):
+                pointer.x11_session()
+        execvp.assert_called_once_with("xsettingsd", ["xsettingsd", "-c", str(self.xsettings())])
+        self.assertEqual(self.recorded(), self.x11_calls("Bibata-Modern-Classic", "32"))
+        self.assertIn('"Bibata-Modern-Classic"', self.xsettings().read_text())
+        # Nothing usable in the environment: the installation's own pointer.
+        os.environ.update(XCURSOR_THEME="../x", XCURSOR_SIZE="999")
+        self.calls.unlink()
+        with mock.patch.object(pointer.os, "execvp", side_effect=SystemExit(0)):
+            with self.assertRaises(SystemExit):
+                pointer.x11_session()
+        self.assertEqual(self.recorded(), self.x11_calls("Adwaita", "30"))
 
     def test_a_failing_step_is_reported_and_the_others_still_run(self) -> None:
         self.recorder("gsettings", status=1, stderr="No such schema\n")

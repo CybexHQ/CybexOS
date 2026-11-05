@@ -171,3 +171,25 @@ test("Hyprland starts with the stored pointer hiding", { skip: !lua && "no Lua i
     assert.equal(persistedCursor(t, '{"pointerHideTyping": "true", "pointerHideIdle": 7}'), "false 0 false",
         "only the offered values count");
 });
+
+test("applications started from the shell get the pointer in use now", () => {
+    const entry = { command: ["spotify", "--uri=x"], workingDirectory: "/home/a" };
+    assert.deepEqual(P.launchContext(entry, "WhiteSur-cursors 48"), {
+        command: ["spotify", "--uri=x"], workingDirectory: "/home/a",
+        environment: { XCURSOR_THEME: "WhiteSur-cursors", XCURSOR_SIZE: "48" } });
+    assert.deepEqual(P.launchContext({ command: ["x"] }, "WhiteSur-cursors 48 explicit").environment,
+        { XCURSOR_THEME: "WhiteSur-cursors", XCURSOR_SIZE: "48" });
+    // Nothing known yet (a session without the variables) or anything odd:
+    // the shell's own environment, exactly as DesktopEntry.execute().
+    for (const current of [" ", "", "a;b 24", "Adwaita x", undefined])
+        assert.deepEqual(P.launchContext({ command: ["x"] }, current), { command: ["x"], workingDirectory: "" });
+    const pointer = read("Common/Pointer.qml");
+    assert.match(pointer, /Quickshell\.execDetached\(PointerHelpers\.launchContext\(desktopEntry, current\)\)/);
+    assert.match(pointer, /root\.current = record\.split/, "only a successful apply changes it");
+    // Every launch of a desktop entry goes through it.
+    const files = spawnSync("git", ["-C", repo, "ls-files", "desktop/quickshell"], { encoding: "utf8" }).stdout
+        .split("\n").filter(file => /\.(qml|js)$/.test(file));
+    const direct = files.filter(file => /\.execute\(\)/.test(
+        fs.readFileSync(path.join(repo, file), "utf8").replace(/\/\/.*$/gm, "")));
+    assert.deepEqual(direct, []);
+});

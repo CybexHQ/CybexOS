@@ -8,7 +8,7 @@
   wf-recorder, ffmpeg, libva-utils, jq, procps, findutils, gnugrep, gnused, gawk,
   xdg-utils, xdg-terminal-exec, curl, nodejs, iw, iproute2, brightnessctl, playerctl, bluez, upower,
   power-profiles-daemon, gnome-keyring, restic, openssh, age, gnutar, zstd, util-linux, kitty, libxkbcommon, xkeyboard-config,
-  pciutils, librsvg,
+  pciutils, librsvg, xsettingsd, xrdb, xsetroot,
   fetchFromGitHub }:
 let
   lazyvimStarter = fetchFromGitHub {
@@ -28,7 +28,8 @@ let
     procps findutils gnugrep gnused gawk xdg-utils xdg-terminal-exec curl nodejs iw iproute2 brightnessctl playerctl
     networkmanager bluez upower power-profiles-daemon gnome-keyring restic openssh age gnutar zstd util-linux kitty libsecret fwupd
     libxkbcommon  # xkbcli: the shortcut recorder's keycode -> keysym map
-    pciutils ];  # lspci: device names in cybex doctor
+    pciutils  # lspci: device names in cybex doctor
+    xsettingsd xrdb xsetroot ];  # the pointer for X11 applications (scripts/pointer.py)
   images = stdenv.mkDerivation {
     pname = "cybexos-notification-images";
     version = "1";

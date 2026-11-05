@@ -123,6 +123,19 @@ function sizeLimit(entry, size) {
     return size > largest ? largest : 0;
 }
 
+// How the shell starts an application: exactly DesktopEntry.execute()
+// (its command and working directory), with the pointer last applied. The
+// shell's own environment is the session's from login, so without this an
+// application started after a change would get the old pointer. `current` is
+// "THEME SIZE" as Pointer.qml keeps it; anything else adds nothing.
+function launchContext(entry, current) {
+    const context = { command: entry.command, workingDirectory: entry.workingDirectory || "" };
+    const parts = String(current || "").split(" ");
+    if (THEME.test(parts[0] || "") && /^[0-9]{2,3}$/.test(parts[1] || ""))
+        context.environment = { XCURSOR_THEME: parts[0], XCURSOR_SIZE: parts[1] };
+    return context;
+}
+
 var exported = {
     THEME: THEME,
     SIZES: SIZES,
@@ -133,7 +146,8 @@ var exported = {
     find: find,
     resolve: resolve,
     inUse: inUse,
-    sizeLimit: sizeLimit
+    sizeLimit: sizeLimit,
+    launchContext: launchContext
 };
 
 if (typeof module !== "undefined" && module.exports)

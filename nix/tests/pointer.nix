@@ -8,7 +8,10 @@
 # for cache.nixos.org. Choosing Hackneyed through the shell must substitute
 # it as the user under a garbage-collector root, link it into
 # ~/.local/share/icons and hand it to Hyprland, GTK and the activation
-# environment. A size and the hiding options are then edited into shell.json
+# environment. X11 applications must be told too (XSETTINGS from
+# cybexos-xsettings.service, and the X resources), and an application the
+# shell's launcher or Hyprland starts afterwards must get it, although both
+# inherited the old pointer at login. A size and the hiding options are then edited into shell.json
 # and the shell restarted, which applies the difference; signing out and in
 # again must start Hyprland with that pointer (cybexos-session) and leave the
 # shell nothing to apply. Choosing Bibata again and removing the download
@@ -54,6 +57,14 @@ let
         json.dump(data, target, indent=2)
     os.replace(path + ".pointer-test", path)
   '';
+  # An application that records the pointer it was started with: from the
+  # shell's launcher (its desktop entry) and from Hyprland (hl.dsp.exec_cmd).
+  envProbe = pkgs.writeShellScript "cybexos-pointer-env-probe" ''
+    env > "/tmp/pointer-probe-$1.part" && mv "/tmp/pointer-probe-$1.part" "/tmp/pointer-probe-$1"
+  '';
+  envProbeEntry = pkgs.makeDesktopItem {
+    name = "cybexos-pointer-probe"; desktopName = "Pointer probe"; exec = "${envProbe} launcher";
+  };
 in pkgs.testers.runNixOSTest {
   name = "cybexos-pointer";
   nodes.machine = { lib, ... }: {
@@ -65,6 +76,7 @@ in pkgs.testers.runNixOSTest {
     services.displayManager.sddm.autoLogin.relogin = lib.mkForce true;
     nix.settings = { substituters = lib.mkForce [ "file:///var/lib/pointer-cache" ]; require-sigs = false; };
     system.extraDependencies = [ cache ];
+    environment.systemPackages = [ envProbeEntry ];
     systemd.tmpfiles.rules = [
       "d /home/tester/.config 0700 tester users -"
       "d /home/tester/.config/cybexos 0700 tester users -"
@@ -152,6 +164,36 @@ in pkgs.testers.runNixOSTest {
         data = json.loads(user(f"env HYPRLAND_INSTANCE_SIGNATURE={signature()} hyprctl -j getoption {name}"))
         return next((data[key] for key in ("bool", "int", "float") if key in data), data)
 
+    def display():
+        environment = dict(line.split("=", 1) for line in user("systemctl --user show-environment").splitlines() if "=" in line)
+        return environment["DISPLAY"]
+
+    def x11_pointer():
+        """What X11 applications are told: XSETTINGS (GTK, and Chromium through
+        it) and the X resources (Xlib; a change reloads Chromium's pointers)."""
+        machine.wait_until_succeeds(f"runuser -u tester -- env {session} systemctl --user is-active cybexos-xsettings.service", timeout=60)
+        served = user(f"env DISPLAY={display()} ${pkgs.xsettingsd}/bin/dump_xsettings")
+        resources = user(f"env DISPLAY={display()} ${pkgs.xrdb}/bin/xrdb -query")
+        theme = re.search(r'Gtk/CursorThemeName\s+"([^"]*)"', served)
+        size = re.search(r"Gtk/CursorThemeSize\s+(\d+)", served)
+        x_theme = re.search(r"^Xcursor\.theme:\s*(\S+)", resources, re.M)
+        x_size = re.search(r"^Xcursor\.size:\s*(\d+)", resources, re.M)
+        return {"xsettings": [theme and theme.group(1), size and size.group(1)],
+                "resources": [x_theme and x_theme.group(1), x_size and x_size.group(1)]}
+
+    def launched(source):
+        """XCURSOR_THEME and XCURSOR_SIZE of an application started from the
+        shell's launcher or by Hyprland."""
+        machine.succeed(f"rm -f /tmp/pointer-probe-{source}")
+        if source == "launcher":
+            assert user("cybexos-runtime ipc launcher launchDesktop cybexos-pointer-probe.desktop").strip() == "ok"
+        else:
+            user(f"env HYPRLAND_INSTANCE_SIGNATURE={signature()} hyprctl dispatch "
+                 + shlex.quote(f'hl.dsp.exec_cmd("${envProbe} {source}")'))
+        machine.wait_for_file(f"/tmp/pointer-probe-{source}", timeout=30)
+        variables = dict(line.split("=", 1) for line in machine.succeed(f"cat /tmp/pointer-probe-{source}").splitlines() if "=" in line)
+        return [variables.get("XCURSOR_THEME"), variables.get("XCURSOR_SIZE")]
+
     def session_ready():
         machine.wait_until_succeeds(f"runuser -u tester -- env {session} systemctl --user is-active quickshell.service", timeout=600)
         ready = wait(lambda: (lambda s: s if s.get("loaded") and s.get("applied") == s.get("wanted") else None)(pointer()), 180)
@@ -209,6 +251,10 @@ in pkgs.testers.runNixOSTest {
     assert themes["Bibata-Modern-Ice"]["installed"] and themes["Adwaita"]["installed"], themes
     assert hyprland_environment()[1] == {"XCURSOR_THEME": "Bibata-Modern-Classic", "XCURSOR_SIZE": "24"}
     assert gsetting("cursor-theme") == "'Bibata-Modern-Classic'"
+    assert x11_pointer() == {"xsettings": ["Bibata-Modern-Classic", "24"], "resources": ["Bibata-Modern-Classic", "24"]}, x11_pointer()
+    # Chromium- and Electron-based applications run natively on Wayland.
+    pid = hyprland_pid()
+    assert "NIXOS_OZONE_WL=1" in machine.succeed(f"tr '\\0' '\\n' < /proc/{pid}/environ").splitlines()
     assert drawn("bibata") < 0.45, results
     machine.screenshot("bibata")
 
@@ -224,6 +270,11 @@ in pkgs.testers.runNixOSTest {
     assert gsetting("cursor-theme") == "'Hackneyed'" and gsetting("cursor-size") == "24"
     assert "XCURSOR_THEME=Hackneyed" in user("systemctl --user show-environment")
     assert machine.succeed(f"cat {RECORD}") == "XCURSOR_THEME=Hackneyed\nXCURSOR_SIZE=24\n"
+    # X11 applications, and what the shell and Hyprland start from now on,
+    # although both inherited Bibata at login.
+    assert x11_pointer() == {"xsettings": ["Hackneyed", "24"], "resources": ["Hackneyed", "24"]}, x11_pointer()
+    assert launched("launcher") == ["Hackneyed", "24"]
+    assert launched("hyprland") == ["Hackneyed", "24"]
     assert drawn("hackneyed") > 0.55, results
     machine.screenshot("hackneyed")
 
@@ -246,6 +297,7 @@ in pkgs.testers.runNixOSTest {
     machine.wait_until_succeeds(f"pgrep -u tester -f '[H]yprland.*--config' | grep -vx {old_pid}", timeout=300)
     relogged = session_ready()
     assert relogged["applied"] == "Hackneyed 48 explicit", relogged
+    assert x11_pointer() == {"xsettings": ["Hackneyed", "48"], "resources": ["Hackneyed", "48"]}, x11_pointer()
     assert hyprland_environment()[1] == {"XCURSOR_THEME": "Hackneyed", "XCURSOR_SIZE": "48"}, hyprland_environment()
     assert option("cursor:hide_on_key_press") in (1, True), "looknfeel.lua read the stored choice"
     assert float(option("cursor:inactive_timeout")) == 3.0
@@ -257,6 +309,7 @@ in pkgs.testers.runNixOSTest {
     assert user("cybexos-runtime ipc pointer use Bibata-Modern-Classic").strip() == "ok"
     assert wait(lambda: pointer().get("applied") == "Bibata-Modern-Classic-Right 48 explicit", 60), pointer()
     assert gsetting("cursor-theme") == "'Bibata-Modern-Classic-Right'"
+    assert x11_pointer()["xsettings"] == ["Bibata-Modern-Classic-Right", "48"], x11_pointer()
     assert user("cybexos-runtime ipc pointer remove Hackneyed").strip() == "ok"
     removed = wait(lambda: (lambda s: s if not s.get("removing") and not {t["id"]: t for t in s["themes"]}["Hackneyed"]["installed"] else None)(pointer()), 60)
     assert removed and not removed["failure"], pointer()

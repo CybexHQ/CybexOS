@@ -45,6 +45,10 @@ Singleton {
     property string applied: (Quickshell.env("XCURSOR_THEME") || "") + " "
         + (Quickshell.env("XCURSOR_SIZE") || "")
     property bool startChecked: false
+    // The pointer applications started from the shell get (launch()): the
+    // session's until an apply succeeds.
+    property string current: (Quickshell.env("XCURSOR_THEME") || "") + " "
+        + (Quickshell.env("XCURSOR_SIZE") || "")
 
     readonly property var resolved: {
         return PointerHelpers.resolve({
@@ -56,6 +60,13 @@ Singleton {
     readonly property string wanted: resolved.theme + " " + resolved.size
     readonly property string wantedRecord: wanted + (resolved.explicit ? " explicit" : "")
     readonly property bool busy: downloading !== "" || removing !== ""
+
+    // Starts a desktop entry as DesktopEntry.execute() does, with the pointer
+    // in use now rather than the one this shell inherited at login.
+    function launch(desktopEntry) {
+        if (desktopEntry)
+            Quickshell.execDetached(PointerHelpers.launchContext(desktopEntry, current));
+    }
 
     function entry(id) {
         return PointerHelpers.find(themes, id);
@@ -281,6 +292,7 @@ Singleton {
             const reply = root.parse(body);
             if (code === 0 && reply && reply.success === true) {
                 root.applyError = "";
+                root.current = record.split(" ").slice(0, 2).join(" ");
             } else {
                 root.applyError = root.errorOf(code, body, stderr, "Could not apply the pointer");
                 console.warn("pointer:", root.applyError);

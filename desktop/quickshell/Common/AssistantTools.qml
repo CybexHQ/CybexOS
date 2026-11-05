@@ -208,7 +208,7 @@ Singleton {
             ?? apps.find(app => (app.name || "").toLowerCase().indexOf(wanted) !== -1);
         if (!entry)
             return fail(I18n.format("No app called %1 is installed.", [name]));
-        entry.execute();
+        Pointer.launch(entry);
         return respond({ opened: entry.name, id: entry.id });
     }
 

@@ -159,7 +159,7 @@ Singleton {
     function launch(key) {
         const entry = entryFor(appByKey[key]);
         if (entry)
-            entry.execute();
+            Pointer.launch(entry);
     }
 
     function activate(key) {

@@ -165,12 +165,31 @@ without Apply, and the next login starts with it.
     `-left`). It is unavailable for a theme without one.
   - **Size** is 24, 32, 48 or 64 px before each display's scale.
 
-  `scripts/pointer.py apply` then runs `hyprctl setcursor`, sets GTK's
-  `cursor-theme` and `cursor-size` keys and updates the systemd/D-Bus
-  activation environment. A choice that differs from the installation's own is
-  recorded in `~/.local/state/cybexos/pointer/session.env`. `cybexos-session`
-  exports it before Hyprland starts, so the next login draws it from the
-  first frame.
+  `scripts/pointer.py apply` then runs `hyprctl setcursor`, sets Hyprland's
+  own `XCURSOR_THEME` and `XCURSOR_SIZE` (`hl.env`, for what key bindings
+  start), sets GTK's `cursor-theme` and `cursor-size` keys and updates the
+  systemd/D-Bus activation environment. A choice that differs from the
+  installation's own is recorded in `~/.local/state/cybexos/pointer/session.env`.
+  `cybexos-session` exports it before Hyprland starts, so the next login draws
+  it from the first frame.
+- **X11 applications.** Under XWayland an application draws its own pointer.
+  Chromium-based ones such as Spotify take the theme from GTK, which on X11
+  reads XSETTINGS, never `XCURSOR_THEME`. `cybexos-xsettings.service`
+  (xsettingsd, through `cybexos-runtime exec xsettings`) serves the pointer
+  from `~/.local/state/cybexos/pointer/xsettings.conf`. `apply` rewrites that
+  file and reloads the service. It also merges `Xcursor.theme` and
+  `Xcursor.size` into the X resources, which plain Xlib applications read and
+  whose change makes Chromium reload its pointers, and gives the X root window
+  the new arrow (`xsetroot`).
+- **Wayland first.** `NIXOS_OZONE_WL=1` starts the Chromium- and
+  Electron-based applications Nixpkgs wraps natively on Wayland: Spotify,
+  Brave, 1Password, VS Code, Discord, Obsidian and others. Hyprland then draws
+  their pointer (cursor-shape-v1), and they render at each display's scale
+  instead of being drawn at 1× and doubled.
+- **Launching.** The launcher, the dock, Software and the assistant start
+  applications with `Pointer.launch()`: the desktop entry's command, as
+  `DesktopEntry.execute()` runs it, with the pointer last applied. The shell's
+  own environment is still the one from login.
 - **Hiding.** Hide while typing and Hide when idle (3, 10 or 20 seconds;
   Hyprland's limit is 20) are Hyprland's `cursor:hide_on_key_press` and
   `cursor:inactive_timeout`. `looknfeel.lua` reads them from `shell.json` as the
@@ -181,11 +200,10 @@ without Apply, and the next login starts with it.
     the pointer again (`setcursor` only reloads the theme), so the new style
     shows as soon as the pointer moves onto something else.
   - Some applications draw their own pointer and read the theme when they
-    start, among them some GTK 3, XWayland and Java ones. They change when
+    start, among them Xlib and Java ones under XWayland. They change when
     reopened.
-  - Applications that the launcher starts inherit the shell's environment, so
-    an XWayland application started that way follows the choice from the next
-    login.
+  - A terminal, or another application, already open passes the pointer from
+    when it started to what it starts, until the next login.
   - The login screen keeps Bibata Modern Classic: it is system configuration.
 - **Scripting.** `cybexos-runtime ipc pointer` provides:
   - `status`;
@@ -226,10 +244,15 @@ first view.
      real NAR.
   2. Check the root and the link.
   3. Check what Hyprland draws, in a screen copy.
-  4. Check GTK and the activation environment.
+  4. Check GTK, the activation environment, XSETTINGS and the X resources,
+     and the pointer of an application the launcher or Hyprland starts.
   5. Apply edited settings when the shell starts.
   6. Sign out and in again, and check that Hyprland starts with the pointer.
   7. Remove the download, after which Nix may collect it.
+- `checks.x86_64-linux.wayland-scale` (`nix/tests/wayland-scale.nix`) runs
+  Spotify on a 2× display, through XWayland and natively. It measures how
+  sharp each draws in a screen copy and checks that both show the chosen
+  pointer over Spotify's window.
 - `tests/nixos/test_pointer.py` covers the XCursor reader, `scripts/pointer.py`
   and `cybexos-session`'s record. `tests/quickshell/pointer.test.cjs` covers the
   resolution, the schema, the catalogue and its previews, and `looknfeel.lua`.
