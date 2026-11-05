@@ -1,7 +1,7 @@
-# Cybex OS 1.0.17
+# Cybex OS 1.0.18
 
-- OpenCode is no longer bundled with the default developer tools. Its broken Nixpkgs 2.2.5 dependency download was blocking system updates. Personal package declarations remain untouched, and NixOS package updates remain enabled.
-- When NixOS has not supplied a prebuilt package, Software Update now shows **Waiting for NixOS packages**, names the packages and offers **Check Again**. That explanation survives restarting the desktop. The same held candidate no longer produces a new-update indicator; changed sources and firmware remain discoverable.
-- With automatic preparation enabled, package holds are checked again for a new source or personal configuration, or after a day, even when the first attempt was manual. Other failures and personal software changes still require attention.
+- Cybex OS releases now have two channels. **Stable** gets a release once it has proven itself; **beta** gets new releases first. Turn on **Get beta releases** in Settings → Bar & Control Center → Updates, or run `cybex update channel beta`. Changing it asks for your password and needs no rebuild. NixOS package updates are the same on both channels.
+- Leaving beta never downgrades Cybex OS. If you run a newer version than the newest stable release, Software Update says so and offers the next stable release once it passes yours, instead of reporting an error.
+- An update prepared from a beta release is set aside when the computer moves to stable, so it is never installed by accident.
 
 This is a source update with no new ISO. Installation, boot and physical hardware qualification are separate from source, build and isolated updater/UI checks.
