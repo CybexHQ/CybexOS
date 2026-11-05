@@ -6,6 +6,48 @@
   request or passing GitHub Actions checks before pushing.
 - The NixOS qualification workflow runs manually. Ordinary pushes, pull
   requests and releases do not start it.
+- Work on your own branch. Make small, focused commits with imperative
+  messages (`Apply the chosen pointer to X11 apps`).
+- End every commit message with your co-author line, for Claude
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Commit `flake.lock` changes in the same commit as the change that caused
+  them.
+- A workflow sub-agent or delegated task in a worktree does not push, rebase
+  shared branches or merge into `main` unless its task says so: the
+  orchestrator merges. The exception is a direct instruction (next section).
+
+## Direct instructions: land on main and publish to beta
+
+When John gives you an instruction directly in the main checkout
+(`/home/john/Code/CybexOS`, not a workflow sub-agent in a worktree), the task
+always includes shipping it to the beta channel. Do this without asking, so he
+can try it right away:
+
+1. Implement on a short-lived branch, or in a worktree for larger work. Other
+   sessions use this checkout too, and their worktrees are in
+   `~/.t3/worktrees/CybexOS`. Commit as above.
+2. Verify quickly with `tests/run` and `nix flake check --no-build`, plus a Nix
+   build of what changed when one exists. Don't run NixOS qualification,
+   installation VMs or an ISO build for this.
+3. Merge into `main` (`git merge --no-ff <branch>`), check that `HEAD`
+   actually moved, delete the branch, and `git push origin main`.
+4. Publish it to beta:
+   - Set `VERSION` to the next patch version. It must be past the highest of
+     `VERSION`, the repository's `v*` tags and `/data/pxe/iso`.
+   - Rewrite `release/notes.md` for this release, in the shape the file
+     already has: `# Cybex OS X.Y.Z`, one short paragraph per change that
+     says what the person notices, then the closing line about ISO and
+     qualification.
+   - Commit `Prepare Cybex OS X.Y.Z release` and push it.
+   - Run `release/publish X.Y.Z` from a clean `main` equal to `origin/main`.
+     It reaches beta machines only. When the tag already exists, another
+     session published first: take the next version.
+5. Finish with what changed, the version, and how to get it. Beta machines
+   take it with their next update check (Software Update, or
+   `cybex update check`).
+
+Never pass `--stable`, run `release/promote` or build an ISO unless John asks
+for it. An ISO follows the ISO rules below.
 
 ## Release channels
 
@@ -16,7 +58,9 @@
   `release/promote VERSION` later moves that same release to stable after its
   checks (soak time, stable-updater compatibility, combined notes). Publish
   with `--stable`, or promote with `--now`, only when the owner asks for it.
-  Publishing and promoting each need the owner's explicit decision.
+  Publishing to beta is part of shipping a direct instruction (above).
+  Publishing with `--stable` and promoting each need the owner's explicit
+  decision.
 - Never fix stable from a maintenance branch: fix forward on `main`.
 
 ## NixOS installation and lifecycle contract
@@ -58,7 +102,8 @@
   qualification. Test ISO/source parity and use the exact same source identity
   for release artifacts and qualification. Record what was actually exercised.
 - Do not modify the running workstation, partition existing systems, publish
-  releases, or reboot the host without explicit authorization. Use isolated
+  releases other than a direct instruction's beta release, or reboot the
+  host without explicit authorization. Use isolated
   build/test environments and preserve unrelated work.
 
 ## ISO testing location
