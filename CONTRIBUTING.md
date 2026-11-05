@@ -19,7 +19,7 @@ Use isolated environments. Do not deploy a development shell onto the running
 workstation without authorization. Any live Quickshell test must use
 `tests/lib/quickshell-live`, including its final PID/service/journal checks.
 
-Publishing a release reaches every installed machine on its channel; do it only
-with the owner's explicit decision, with `release/publish` (beta) and
-`release/promote` (stable). See
-[release operations](docs/releasing.md).
+Publishing a release reaches every installed machine on its channel. A direct
+instruction from the owner ships to beta with `release/publish` (AGENTS.md).
+Publishing to stable, with `--stable` or `release/promote`, needs the owner's
+explicit decision. See [release operations](docs/releasing.md).
