@@ -7,6 +7,18 @@
 - The NixOS qualification workflow runs manually. Ordinary pushes, pull
   requests and releases do not start it.
 
+## Release channels
+
+- Cybex OS releases have a beta and a stable channel
+  ([docs/releasing.md](docs/releasing.md#channels)). Only Cybex OS releases
+  follow them; NixOS package updates do not.
+- `release/publish VERSION` publishes to beta only (a GitHub prerelease).
+  `release/promote VERSION` later moves that same release to stable after its
+  checks (soak time, stable-updater compatibility, combined notes). Publish
+  with `--stable`, or promote with `--now`, only when the owner asks for it.
+  Publishing and promoting each need the owner's explicit decision.
+- Never fix stable from a maintenance branch: fix forward on `main`.
+
 ## NixOS installation and lifecycle contract
 
 - NixOS is the sole supported operating system. Target fresh installations.

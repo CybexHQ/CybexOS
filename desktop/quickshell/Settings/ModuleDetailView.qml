@@ -1592,6 +1592,19 @@ SettingsPage {
                 onToggled: value => Updates.setAutomatic("confirm", value)
             }
 
+            // Only Cybex OS releases follow the channel; NixOS packages do not.
+            SwitchRow {
+                width: parent.width
+                visible: Updates.channel !== ""
+                label: I18n.tr("Get beta releases")
+                description: I18n.tr("New Cybex OS releases arrive here first, before they reach everyone. Turning this off waits for the next stable release.")
+                checked: Updates.channel === "beta"
+                disabledReason: !Updates.statusLoaded ? I18n.tr("The update status is unavailable") : Updates.choosingChannel ? I18n.tr("Waiting for authorization…") : ""
+                dirty: false
+                resetKeys: []
+                onToggled: value => Updates.setChannel(value ? "beta" : "stable")
+            }
+
             SettingsHint {
                 width: parent.width
                 text: I18n.tr("The indicator appears when system updates are available and opens Software Update. Personal inputs and Flatpak apps are managed separately.")

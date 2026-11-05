@@ -14,6 +14,11 @@
   The signed-in desktop normally requests this itself.
 - `cybex update automatic prepare|confirm on|off`: background preparation and
   automatic trial-boot confirmation (machine policy; both default on).
+- `cybex update channel [stable|beta]`: show or choose the Cybex OS release
+  channel (machine policy; changing it asks for authorization). Beta gets new
+  Cybex OS releases first; NixOS package updates do not follow a channel. A
+  `cybexos` source in state `ahead` runs a newer version than its channel's
+  newest release and waits for the next one; it is not an error.
 - `cybex update discard ID`: discard an unapplied preview or dismiss a
   finished failure, keeping its files and logs.
 - `cybexos-software-update`: open the Software Update app.

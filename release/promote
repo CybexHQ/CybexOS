@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Move a beta release of Cybex OS to the stable channel.
+
+    release/promote VERSION [--soak HOURS | --now] [--notes FILE] [--yes] [--dry-run]
+
+release/publish puts a release on the beta channel as a GitHub prerelease.
+Promotion clears that flag on the same release: its tag, exact commit and
+downloaded content stay what beta machines installed and qualified, so nothing
+is rebuilt and no version changes. Stable machines then take it as their
+newest release, possibly skipping beta releases that were never promoted.
+
+Before it changes anything, promotion checks that every stable machine can
+install the release: it must be a published final version newer than the
+current stable release, it must have been on beta for at least the soak time
+(24 hours unless --soak or --now), and its release/compatibility.json must suit
+the updater, configuration/plugin APIs, architectures and NixOS branch that the
+current stable release installed. Its notes become the combined notes of every
+release since the current stable one, so What's New on a stable machine covers
+everything it receives; edit them before promoting (or pass --notes FILE).
+
+The GitHub repository stays the trust root: promotion needs the same access
+as publishing, and is visible in the release's own history.
+"""
+import argparse
+import datetime
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(ROOT / 'lifecycle'))
+from cybexos.common import Failure  # noqa: E402
+from cybexos.trust import version  # noqa: E402
+
+REPO = os.environ.get('CYBEXOS_RELEASE_REPO', 'CybexHQ/CybexOS')
+SOAK_HOURS = 24
+
+
+def fail(message):
+    print(f'release/promote: {message}', file=sys.stderr)
+    sys.exit(1)
+
+
+def run(*arguments, check=True):
+    result = subprocess.run(arguments, cwd=ROOT, capture_output=True, text=True)
+    if check and result.returncode != 0:
+        fail(f"{' '.join(arguments[:3])} failed: {(result.stderr or result.stdout).strip()}")
+    return result
+
+
+def releases():
+    """The release listing exactly as installed machines read it."""
+    listing = json.loads(run('gh', 'api', f'repos/{REPO}/releases?per_page=100').stdout)
+    if not isinstance(listing, list):
+        fail('GitHub returned an invalid release listing')
+    found = []
+    for item in listing:
+        tag = item.get('tag_name') if isinstance(item, dict) else None
+        try:
+            key = version(tag[1:]) if isinstance(tag, str) and tag.startswith('v') else None
+        except Failure:
+            key = None
+        if key is not None and item.get('draft') is False:
+            found.append(item | {'key': key, 'version': tag[1:]})
+    return found
+
+
+def stable(item):
+    return item['prerelease'] is False and '-' not in item['version']
+
+
+def source(tag, path):
+    result = run('git', 'show', f'{tag}:{path}', check=False)
+    if result.returncode != 0:
+        fail(f'{tag} has no {path}; fetch its tag or check the release')
+    return result.stdout
+
+
+def declared(tag, name):
+    """A constant the release's updater declares in lifecycle/cybexos/trust.py."""
+    match = re.search(rf'^{name} = (.+)$', source(tag, 'lifecycle/cybexos/trust.py'), re.M)
+    if not match:
+        fail(f'{tag} does not declare its updater {name}')
+    return json.loads(match[1].replace("'", '"'))
+
+
+def compatible(candidate, current):
+    """Whether every machine on the current stable release can install the candidate."""
+    wanted = json.loads(source(candidate, 'release/compatibility.json'))
+    have = json.loads(source(current, 'release/compatibility.json'))
+    problems = []
+    if wanted.get('minUpdater', 0) > declared(current, 'API'):
+        problems.append(f'it requires updater API {wanted["minUpdater"]}, but {current} provides '
+                        f'{declared(current, "API")}: promote an overlap release that raises it first')
+    for name in ('schema', 'configurationApi', 'pluginApi'):
+        if wanted.get(name) != have.get(name):
+            problems.append(f'its {name} {wanted.get(name)} differs from {have.get(name)} in {current}')
+    missing = set(have.get('architectures', [])) - set(wanted.get('architectures', []))
+    if missing:
+        problems.append(f'it drops architectures {", ".join(sorted(missing))}')
+    branch = declared(current, 'NIXOS')
+    if branch not in wanted.get('nixos', []):
+        problems.append(f'it does not support NixOS {branch}, which machines on {current} run')
+    return problems
+
+
+def body(item):
+    """A release's notes without their own "# Cybex OS VERSION" heading."""
+    text = (item.get('body') or '').strip()
+    return re.sub(rf'^#\s+Cybex OS {re.escape(item["version"])}\s*\n+', '', text).strip()
+
+
+def combined(target, skipped, previous):
+    if not skipped:
+        return (target.get('body') or '').strip() + '\n'
+    names = ', '.join(item['version'] for item in reversed(skipped))
+    since = f'Cybex OS {previous}' if previous else 'the previous stable release'
+    parts = [f'# Cybex OS {target["version"]}',
+             f'This stable release also includes {names}, published on the beta channel since {since}.',
+             body(target)]
+    for item in skipped:
+        parts += [f'## From Cybex OS {item["version"]}', body(item)]
+    return '\n\n'.join(part for part in parts if part) + '\n'
+
+
+def edit(text):
+    with tempfile.NamedTemporaryFile('w', suffix='.md', prefix='cybexos-notes-', delete=False) as stream:
+        stream.write(text)
+    try:
+        editor = os.environ.get('VISUAL') or os.environ.get('EDITOR') or 'vi'
+        if subprocess.run([*editor.split(), stream.name]).returncode != 0:
+            fail('the editor exited with an error; nothing was promoted')
+        return Path(stream.name).read_text()
+    finally:
+        os.unlink(stream.name)
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='release/promote', description=__doc__.splitlines()[0])
+    parser.add_argument('version')
+    parser.add_argument('--soak', type=float, default=SOAK_HOURS, metavar='HOURS',
+                        help=f'minimum time on beta (default {SOAK_HOURS})')
+    parser.add_argument('--now', action='store_true', help='promote without waiting for the soak time')
+    parser.add_argument('--notes', type=Path, metavar='FILE', help='use these stable release notes')
+    parser.add_argument('--yes', action='store_true', help='do not ask for confirmation')
+    parser.add_argument('--dry-run', action='store_true', help='report the result and change nothing')
+    args = parser.parse_args()
+
+    try:
+        key = version(args.version)
+    except Failure:
+        fail(f'{args.version} is not a semantic release version (1.2.3)')
+    if '-' in args.version:
+        fail(f'{args.version} is a prerelease version; publish a final version to reach stable')
+    tag = 'v' + args.version
+    run('git', 'fetch', '--quiet', '--tags', 'origin')
+
+    listing = releases()
+    target = next((item for item in listing if item['version'] == args.version), None)
+    if target is None:
+        fail(f'{tag} is not a published release; publish it to beta first with release/publish {args.version}')
+    if stable(target):
+        fail(f'{tag} is already on the stable channel')
+    current = max((item for item in listing if stable(item)), key=lambda item: item['key'], default=None)
+    if current and current['key'] >= key:
+        fail(f'{tag} is not newer than the current stable release {current["tag_name"]}')
+
+    revision = run('git', 'rev-parse', '--verify', '--quiet', f'{tag}^{{commit}}', check=False).stdout.strip()
+    if not re.fullmatch('[0-9a-f]{40}', revision):
+        fail(f'the tag {tag} is not available from origin')
+    if source(tag, 'VERSION').strip() != args.version:
+        fail(f'the VERSION file at {tag} is not {args.version}')
+
+    published = datetime.datetime.fromisoformat(target['published_at'].replace('Z', '+00:00'))
+    hours = (datetime.datetime.now(datetime.timezone.utc) - published).total_seconds() / 3600
+    if not args.now and hours < args.soak:
+        fail(f'{tag} has been on beta for {hours:.1f} hours, less than {args.soak:g}; '
+             'wait, or pass --now to promote an urgent fix')
+
+    if current:
+        problems = compatible(tag, current['tag_name'])
+        if problems:
+            fail(f'stable machines on {current["tag_name"]} cannot install {tag}: ' + '; '.join(problems))
+
+    skipped = sorted((item for item in listing
+                      if item['key'] < key and (current is None or item['key'] > current['key'])),
+                     key=lambda item: item['key'], reverse=True)
+    notes = args.notes.read_text() if args.notes else combined(target, skipped, current and current['version'])
+    if not args.notes and skipped and not args.yes and not args.dry_run and sys.stdin.isatty():
+        notes = edit(notes)
+    if not notes.strip():
+        fail('the stable release notes are empty; nothing was promoted')
+
+    print(f'Promote {tag} ({revision[:12]}) from beta to stable.')
+    print(f'Stable machines on {current["tag_name"] if current else "no stable release"} receive it'
+          + (f', including {", ".join(item["version"] for item in reversed(skipped))}.' if skipped else '.'))
+    if args.dry_run:
+        print('\n' + notes.rstrip())
+        print('\nDry run: nothing was changed.')
+        return
+    if not args.yes:
+        if not sys.stdin.isatty():
+            fail('confirm with --yes when not running in a terminal')
+        if input('Promote to stable? [y/N] ').strip().lower() not in ('y', 'yes'):
+            fail('cancelled; nothing was promoted')
+
+    with tempfile.NamedTemporaryFile('w', suffix='.md', prefix='cybexos-notes-', delete=False) as stream:
+        stream.write(notes)
+    try:
+        run('gh', 'release', 'edit', tag, '--repo', REPO, '--prerelease=false', '--latest',
+            '--notes-file', stream.name)
+    finally:
+        os.unlink(stream.name)
+    after = next((item for item in releases() if item['version'] == args.version), None)
+    if not after or not stable(after):
+        fail(f'GitHub still lists {tag} as a prerelease; check the release page')
+    print(f'Promoted {tag} to stable.')
+
+
+if __name__ == '__main__':
+    main()

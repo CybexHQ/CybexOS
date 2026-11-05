@@ -308,7 +308,7 @@ def release_delivery(base, revision):
         checks = {'keylessHttpsDiscoveryAndCache': {'result': 'passed'}}
         for name, setup, channel, installed, message in (
             ('noStableRelease', lambda: None, 'stable', '1.0.0-beta.1', 'no cybex os release'),
-            ('downgradeRejected', lambda: None, 'beta', '1.0.0', 'downgrade'),
+            ('aheadOfChannel', lambda: None, 'beta', '1.0.0', 'next beta release after 1.0.0'),
             ('inexactTag', lambda: route(routes, api + '/commits/v1.0.0-beta.2', 200, b'main'), 'beta', '1.0.0-beta.1', 'exact git commit'),
             ('unavailableListing', lambda: route(routes, api + '/releases?per_page=100', 503, b'unavailable'), 'beta', '1.0.0-beta.1', 'unavailable'),
         ):

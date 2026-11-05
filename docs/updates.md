@@ -132,6 +132,7 @@ default to on. An unreadable file turns both off.
 ```sh
 cybex update automatic prepare on|off   # download and prepare in the background
 cybex update automatic confirm on|off   # keep a trial boot that passes its checks
+cybex update channel stable|beta        # which Cybex OS releases to follow
 ```
 
 Changing either asks for administrator authorization. Software Update's up to
@@ -367,7 +368,15 @@ app); each lists any other build and exits 1.
 Cybex OS updates arrive only as published GitHub releases of `CybexHQ/CybexOS`;
 there are no publisher keys or channel documents ([releases](releasing.md)).
 An installed machine never follows a branch: a release that is not published,
-or that is a draft, is not offered. An unpublished channel is quietly skipped;
+or that is a draft, is not offered. It follows the stable or the beta release
+channel ([channels](releasing.md#channels)): new releases reach beta first and
+stable once promoted. **Get beta releases** in Settings → Bar & Control
+Center → Updates and `cybex update channel stable|beta` choose it; like the
+automatic policies, a change asks for administrator authorization. Software
+Update offers no channel choice and does not name the channel. A machine running a newer version
+than its channel's newest release (after leaving beta) waits for that
+channel's next release instead of going back, and says so on the up-to-date
+page. An unpublished channel is quietly skipped;
 other delivery failures remain visible. Independent NixOS package updates remain
 usable when their source check succeeds.
 

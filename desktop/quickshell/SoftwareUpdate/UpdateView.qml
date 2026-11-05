@@ -76,6 +76,17 @@ Item {
             : I18n.format("Last checked %1", [service.checkedAt.toLocaleDateString(Qt.locale(), Locale.ShortFormat)]);
     }
 
+    // After leaving beta (or a withdrawn release) this computer runs a newer
+    // Cybex OS than its channel offers: say why no Cybex OS update comes. The
+    // channel itself is chosen in Settings only.
+    function aheadNote() {
+        if (vendor.state !== "ahead")
+            return "";
+        return service.channel === "beta"
+            ? I18n.format("Cybex OS %1 is newer than the newest beta release. Cybex OS updates resume with the next beta release.", [vendor.installed])
+            : I18n.format("Cybex OS %1 is newer than the newest stable release. Cybex OS updates resume with the next stable release.", [vendor.installed]);
+    }
+
     function availableBody() {
         const upstream = service.sources.upstream.state === "available";
         const lead = vendor.state === "available" && upstream
@@ -93,7 +104,8 @@ Item {
             return { tone: "ok", busy: false,
                 title: kept ? I18n.format("You're on Cybex OS %1", [kept.version]) : I18n.tr("Your system is up to date"),
                 body: (deployment.state === "done" && deployment.changeKind === "update"
-                    ? I18n.tr("The last update was installed and passed its checks.") + "\n" : "") + checked() };
+                    ? I18n.tr("The last update was installed and passed its checks.") + "\n" : "")
+                    + (aheadNote() !== "" ? aheadNote() + "\n" : "") + checked() };
         case "available":
             return { tone: "accent", busy: false, title: I18n.tr("Updates are available"),
                 body: availableBody() };

@@ -71,6 +71,11 @@ else:
         (root / 'status.json').write_text(json.dumps(state))
         print(json.dumps({'automatic': state['automatic']}))
         sys.exit(0)
+    if args[1] == 'channel':
+        state['channel'] = {'selected': args[2], 'declared': 'stable', 'override': args[2] != 'stable'}
+        (root / 'status.json').write_text(json.dumps(state))
+        print(json.dumps({'channel': state['channel']}))
+        sys.exit(0)
     request = {'id':'c'*32, 'state':'done', 'action':args[1], 'createdAt':time.time()}
     if fixture.get('reject'):
         request.update(state='failed',error='The worker rejected this request before starting.')
@@ -173,6 +178,8 @@ IPC = '''
             const item = shell.updateItem(name);
             if (item && item.enabled) item.triggered();
         }
+        // Settings → Updates chooses the channel; Software Update has no switch.
+        function channel(name: string): void { Updates.setChannel(name); }
         function toggle(name: string, value: string): void {
             const item = shell.updateItem(name);
             if (item && item.enabled) item.toggled(value === "true");
@@ -220,6 +227,8 @@ IPC = '''
                 apps: shell.updateCount(content, "updateApp"),
                 details: !!shell.updateItem("updateChanges"),
                 automaticToggle: !!shell.updateItem("updateAutomatic"),
+                betaSwitch: !!shell.updateItem("updateBeta"),
+                channel: Updates.channel,
                 chip: rect ? {x:rect.x+chip.width/2,y:rect.y+chip.height/2} : null});
         }
     }
@@ -262,6 +271,7 @@ class Session(welcome.Session):
 
     def status(self, **values):
         values.setdefault('automatic', {'prepare': False, 'confirm': True})
+        values.setdefault('channel', {'selected': 'stable', 'declared': 'stable', 'override': False})
         (self.runtime / 'status.json').write_text(json.dumps({'installedIdentity':'installed-lock', **values}))
         self.call('update-test', 'refresh')
 
@@ -611,6 +621,26 @@ def main():
             session.call('update-test','toggle','updateAutomatic','true')
             session.wait(lambda:session.state().get('automatic',{}).get('prepare') is True,'automatic downloads chosen')
             assert session.calls()[-1]==['automatic','prepare','on'], session.calls()
+            # The release channel is chosen in Settings only; this page offers no
+            # switch and names no channel, except to explain a wait after leaving beta.
+            assert session.state()['channel']=='stable' and not session.state()['betaSwitch'], session.state()
+            session.call('update-test','channel','beta')
+            session.wait(lambda:session.state().get('channel')=='beta', 'beta releases chosen')
+            assert session.calls()[-1]==['channel','beta'], session.calls()
+            state = session.state()
+            assert not state['betaSwitch'] and 'beta' not in state['body'], state
+            # Back on stable, ahead of its newest release: neutral, no update offered.
+            session.fixture(sources={'upstream':{'state':'current'},
+                                     'cybexos':{'state':'ahead','installed':'1.0.19','available':'1.0.17','channel':'stable'}})
+            session.call('update-test','channel','stable')
+            session.wait(lambda:session.state().get('channel')=='stable'
+                and 'Cybex OS 1.0.19 is newer than the newest stable release.' in (session.state().get('body') or ''),
+                'ahead of the stable channel')
+            assert session.calls()[-1]==['channel','stable'], session.calls()
+            state = session.state()
+            assert state['page']=='current' and not state['indicator'] and not state['hasUpdates'] and not state['error'], state
+            assert not state['betaSwitch'], state
+            shot('software-update-ahead.png')
             # Background work waits for the session to settle; checking now is
             # the person's explicit go-ahead.
             session.fixture(sources=sources)

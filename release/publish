@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Publish a Cybex OS release: tag the current main commit and create its GitHub
 # release. The GitHub repository is the trust root; there is no signing step.
-# Installed machines take the newest release on their channel: a prerelease
-# version (1.2.3-beta.1) reaches only beta, any other version reaches both.
+# Installed machines take the newest release on their channel.
 #
-#   release/publish VERSION [--dry-run] [ASSET...]
+#   release/publish VERSION [--stable] [--dry-run] [ASSET...]
+#
+# A release goes to the beta channel first: it is published as a GitHub
+# prerelease, which only beta machines install. Once it has proven itself,
+# release/promote moves that same release (same tag, commit and content) to
+# stable. --stable publishes straight to both channels, for an urgent fix or
+# when no beta is wanted; a prerelease version (1.2.3-beta.1) is beta only.
 #
 # VERSION must equal the committed VERSION file. release/notes.md is the
 # release text. Optional assets (an ISO, its checksum) are uploaded with it.
@@ -15,15 +20,25 @@ REPO=${CYBEXOS_RELEASE_REPO:-CybexHQ/CybexOS}
 fail() { echo "release/publish: $*" >&2; exit 1; }
 
 version=${1:-}
-[[ -n $version ]] || fail 'usage: release/publish VERSION [--dry-run] [ASSET...]'
+[[ -n $version && $version != -* ]] || fail 'usage: release/publish VERSION [--stable] [--dry-run] [ASSET...]'
 shift
-dry_run=0
-if [[ ${1:-} == --dry-run ]]; then dry_run=1; shift; fi
+dry_run=0 stable=0
+while [[ ${1:-} == --* ]]; do
+    case $1 in
+        --dry-run) dry_run=1 ;;
+        --stable) stable=1 ;;
+        *) fail "unknown option $1" ;;
+    esac
+    shift
+done
 assets=("$@")
 
 [[ $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(beta|rc)\.[1-9][0-9]*)?$ ]] \
     || fail "$version is not a semantic release version (1.2.3 or 1.2.3-beta.1)"
 [[ $(<VERSION) == "$version" ]] || fail "VERSION is $(<VERSION), not $version; commit the version first"
+if ((stable)) && [[ $version == *-* ]]; then
+    fail "$version is a prerelease version; it can only reach the beta channel"
+fi
 python3 -c 'import json, sys; c = json.load(open("release/compatibility.json")); sys.exit(c.get("schema") != 1)' \
     || fail 'release/compatibility.json is missing or invalid'
 [[ -s release/notes.md ]] || fail 'release/notes.md is empty'
@@ -39,15 +54,19 @@ tag=v$version
 if git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
     fail "$tag already exists; a published version is never reused"
 fi
-kind=(--latest)
-if [[ $version == *-* ]]; then kind=(--prerelease --latest=false); fi
+# GitHub's prerelease flag is what keeps a release off the stable channel.
+kind=(--prerelease --latest=false) channel=beta
+if ((stable)); then kind=(--latest) channel='stable and beta'; fi
 revision=$(git rev-parse HEAD)
 if ((dry_run)); then
-    echo "Would publish $tag at $revision to $REPO (${kind[*]}) with ${#assets[@]} asset(s)."
+    echo "Would publish $tag at $revision to $REPO for $channel (${kind[*]}) with ${#assets[@]} asset(s)."
     exit 0
 fi
 git tag --annotate "$tag" --message "Cybex OS $version"
 git push --quiet origin "refs/tags/$tag"
 gh release create "$tag" --repo "$REPO" --verify-tag --title "Cybex OS $version" \
     --notes-file release/notes.md "${kind[@]}" "${assets[@]}"
-echo "Published $tag at $revision to $REPO."
+echo "Published $tag at $revision to $REPO for $channel."
+if ! ((stable)) && [[ $version != *-* ]]; then
+    echo "Move it to stable once it has proven itself: release/promote $version"
+fi

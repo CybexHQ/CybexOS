@@ -80,6 +80,10 @@ Singleton {
     readonly property string runPhaseLabel: deployment.phase || ""
     readonly property var automatic: deployment.automatic || ({prepare: false, confirm: false})
     readonly property bool choosingAutomatic: chooser.busy
+    // The Cybex OS release channel this machine follows ("stable" or
+    // "beta"; "" when it declares none), another machine policy.
+    readonly property string channel: Helpers.channel(deployment)
+    readonly property bool choosingChannel: channelChooser.busy
     // This request's refusal, or the latest worker request's durable failure.
     readonly property string requestFailure: requestError
         || ((deployment.request || {}).state === "failed"
@@ -100,7 +104,9 @@ Singleton {
         (sources.firmware || {}).error || "", (deployment.firmware || {}).error || ""].filter(value => value))].join("\n\n")
     readonly property string projectNotes: ready || rebootRecommended ? deployment.notes || "" : sources.cybexos.notes || ""
     readonly property string installedVersion: ready ? deployment.installedVersion || "" : sources.cybexos.installed || ""
-    readonly property string projectVersion: ready ? deployment.availableVersion || "" : sources.cybexos.available || ""
+    // An "ahead" source names its channel's older newest release, never an update.
+    readonly property string projectVersion: ready ? deployment.availableVersion || ""
+        : sources.cybexos.state !== "ahead" ? sources.cybexos.available || "" : ""
     readonly property string checkedLabel: checkedAt ? "Checked " + Qt.formatTime(checkedAt, "HH:mm") : "Not checked"
     readonly property string scopeLabel: Helpers.scopeLabel(ready || runActive || rebootRecommended ? deployment.scope : selectedScope)
     readonly property bool overviewVisible: Helpers.overviewVisible(hasUpdates, deployment, error)
@@ -200,6 +206,14 @@ Singleton {
         if (chooser.busy || !["prepare", "confirm"].includes(name)) return;
         requestError = "";
         chooser.run(["cybex", "update", "automatic", name, enabled ? "on" : "off"]);
+    }
+    // Only Cybex OS releases follow the channel. The next check offers what
+    // the chosen channel has; a beta release prepared for review goes stale
+    // when the machine moves to stable.
+    function setChannel(name) {
+        if (channelChooser.busy || !["stable", "beta"].includes(name) || name === channel) return;
+        requestError = "";
+        channelChooser.run(["cybex", "update", "channel", name]);
     }
     // The units validate state as root and take no input; a polkit rule lets
     // the signed-in administrator start them without a prompt.
@@ -384,6 +398,11 @@ Singleton {
     JsonCommand {
         id: chooser
         onCompleted: () => root.refreshStatus()
+        onFailed: message => { root.requestError = message; root.refreshStatus(); }
+    }
+    JsonCommand {
+        id: channelChooser
+        onCompleted: () => { root.refreshStatus(); root.check(); }
         onFailed: message => { root.requestError = message; root.refreshStatus(); }
     }
     Timer {

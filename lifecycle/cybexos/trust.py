@@ -35,6 +35,20 @@ class NoPublishedRelease(Failure):
     """No release has been published for this channel yet."""
 
 
+class AheadOfChannel(Failure):
+    """This machine runs a newer version than its channel's newest release.
+
+    It is on a beta release and now follows stable, or its release was
+    withdrawn. It is never moved back: Cybex OS updates resume once the
+    channel publishes a newer version. Explicit generation rollback is separate.
+    """
+
+    def __init__(self, channel, installed, newest):
+        super().__init__(f'Cybex OS {installed} is newer than the newest {channel} release ({newest}). '
+                         f'Cybex OS updates resume with the next {channel} release after {installed}.')
+        self.channel, self.installed, self.newest = channel, installed, newest
+
+
 def version(value):
     match = SEMVER.fullmatch(value) if isinstance(value, str) else None
     if not match:
@@ -121,7 +135,7 @@ def discover(fetch, channel, installed):
         raise NoPublishedRelease('No Cybex OS release has been published for this channel yet.')
     key, tag, notes = max(eligible)
     if key < version(installed):
-        raise Failure('Channel downgrade rejected. Use explicit generation rollback instead.')
+        raise AheadOfChannel(channel, installed, tag[1:])
     revision = fetch.get(f'{GITHUB_API}/commits/{urllib.parse.quote(tag)}', limit=64,
                          accept='application/vnd.github.sha').decode('ascii', 'replace').strip()
     if not re.fullmatch('[0-9a-f]{40}', revision):

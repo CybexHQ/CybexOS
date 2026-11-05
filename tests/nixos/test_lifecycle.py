@@ -227,7 +227,8 @@ class TrustTests(unittest.TestCase):
                 trust.discover(self.fetch(body), 'stable', '1.0.0')
 
     def test_downgrade_and_inexact_tags_rejected(self):
-        with self.assertRaisesRegex(Failure, 'downgrade'):
+        # Never a downgrade: a machine ahead of its channel waits for its next release.
+        with self.assertRaisesRegex(trust.AheadOfChannel, 'next stable release after 1.1.0'):
             trust.discover(self.fetch(listing(('v1.0.0', False, False))), 'stable', '1.1.0')
         self.assertEqual(trust.discover(self.fetch(listing(('v1.0.0', False, False))), 'stable', '1.0.0')['version'], '1.0.0')
         for answer in ('main', 'a' * 39, 'A' * 40, ''):
@@ -984,7 +985,7 @@ class EngineTests(unittest.TestCase):
     def test_unpublished_channel_has_no_error_and_never_blocks_upstream(self):
         self.engine.channel = lambda: (_ for _ in ()).throw(trust.NoPublishedRelease('No release yet'))
         result = self.engine.check()
-        self.assertEqual(result['cybexos'], {'state': 'unpublished', 'installed': '1.0.0'})
+        self.assertEqual(result['cybexos'], {'state': 'unpublished', 'installed': '1.0.0', 'channel': 'stable'})
         self.assertEqual(result['upstream']['state'], 'available')
         record = self.engine.stage('upstream')
         self.assertEqual(read(self.engine.status_path)['state'], 'ready')

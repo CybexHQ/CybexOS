@@ -9,11 +9,42 @@ commit and content (NAR) identity, never by following a moving branch.
 
 ## Channels
 
-Each machine follows `cybexos.updates.channel`. **Stable** takes the newest
-published release that is neither marked as a prerelease nor has a prerelease
-version; **beta** takes the newest published release of either kind. Drafts and
-tags that are not semantic versions are ignored. Upstream-only (Nixpkgs)
-updates do not consult releases.
+Each machine follows a release channel. **Stable** takes the newest published
+release that is neither marked as a prerelease nor has a prerelease version;
+**beta** takes the newest published release of either kind, so a beta machine
+is never behind stable. Drafts and tags that are not semantic versions are
+ignored. Only Cybex OS releases follow the channel: NixOS package updates are
+selected independently and never consult releases.
+
+A release reaches beta first. `release/publish` creates it as a GitHub
+prerelease; `release/promote` later clears that flag on the same release, so
+stable machines install exactly the tag, commit and content that beta machines
+already ran. Nothing is rebuilt and the version does not change. A release
+that is never promoted stays beta-only, and stable machines move straight to
+the next promoted one (1.0.17 to 1.0.19, skipping 1.0.18). Versions stay plain
+`MAJOR.MINOR.PATCH`; a `-beta.N` or `-rc.N` version is possible but can never
+reach stable.
+
+The machine's configuration declares its channel
+(`cybexos.updates.channel`; the installer writes the medium's, stable for a
+final ISO). An administrator can choose the other one at runtime with
+`cybex update channel stable|beta` or **Get beta releases** in Settings →
+Bar & Control Center → Updates; Software Update itself offers no channel
+choice. The choice is kept in
+`/var/lib/cybexos/update-channel.json`, so it needs no rebuild and survives a
+generation rollback; choosing the declared channel again removes it.
+`cybex update channel` without an argument and `cybex update status`
+(`channel`) report `{selected, declared, override}`.
+
+A machine is never moved back to an older version. After moving from beta to
+stable, or when its release is withdrawn, it can run a newer version than its
+channel's newest release. Discovery then reports the neutral state `ahead`
+(`installed`, and the channel's newest as `available`): no error, no update
+indicator, and Software Update's up-to-date page says that Cybex OS updates
+resume with the channel's next release. NixOS package updates continue. A Cybex OS update
+prepared on beta becomes stale when the machine moves to stable, and
+installation checks the channel again; moving to beta keeps a prepared
+update, since every stable release is on beta too.
 
 ## What an installed machine checks
 
@@ -56,14 +87,43 @@ Development commits may be pushed directly to `main`. To publish a release:
 3. Run `release/publish VERSION` from a clean `main` equal to `origin/main`.
    It checks the version against `VERSION`, `release/compatibility.json` and
    the notes, refuses an existing tag, creates and pushes the annotated
-   `vVERSION` tag and creates the GitHub release with `gh`. A prerelease
-   version is marked as a prerelease and reaches beta only; any other version
-   becomes the latest release. Pass asset paths (an ISO and its checksum) to
-   upload them with the release, or `--dry-run` to only report the result.
+   `vVERSION` tag and creates the GitHub release with `gh` as a prerelease:
+   it reaches beta machines only. Pass asset paths (an ISO and its checksum)
+   to upload them with the release, or `--dry-run` to only report the result.
+   `--stable` publishes straight to both channels and marks the release as
+   the latest. Keep it for an urgent fix, or a release that needs no beta
+   period; a prerelease version refuses it.
+4. Once the release has proven itself on beta, run
+   `release/promote VERSION`. It changes nothing about the release's source:
+   it clears the prerelease flag, marks it as the latest and replaces its notes
+   with stable notes. Before that it checks that every stable machine can
+   install it:
+   - it is a published, final version, still a prerelease, and newer than the
+     current stable release;
+   - it has been on beta for at least 24 hours (`--soak HOURS` changes the
+     minimum; `--now` skips it for an urgent fix);
+   - its `release/compatibility.json` suits the current stable release:
+     `minUpdater` at most that release's updater API, the same schema,
+     configuration and plugin APIs, all of its architectures and its NixOS
+     branch.
+
+   Stable machines skip the beta releases in between, so their What's New
+   should cover those too. Promotion proposes combined notes, the release's
+   own followed by a section per skipped beta release, and opens them in
+   `$VISUAL`/`$EDITOR` when run in a terminal. `--notes FILE` supplies them
+   instead. It asks for confirmation (`--yes` skips it) and `--dry-run` only
+   prints the result. A refused promotion changes nothing.
+
+Fix forward on `main`: there are no maintenance branches. When stable needs a
+fix while beta carries changes that are not ready, revert those on `main` or
+publish the fix as the next version and promote it at once. A fix built on an
+older branch would give beta machines a newer version without beta's changes.
 
 Raise `minUpdater` in `release/compatibility.json` only with an overlap release
-that the previous updater can install. Installed machines refuse a release
-that changes `configurationApi` or `pluginApi`.
+that the previous updater can install, and promote that overlap release before
+one that requires it: `release/promote` refuses a release the current stable
+updater cannot install. Installed machines refuse a release that changes
+`configurationApi` or `pluginApi`.
 
 ## Qualification
 

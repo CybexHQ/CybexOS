@@ -111,6 +111,16 @@ in pkgs.testers.runNixOSTest {
     machine.succeed("systemctl start cybexos-update-auto.service")
     machine.succeed("journalctl -u cybexos-update-auto.service --no-pager | grep -F '\"skipped\": \"disabled\"'")
     machine.succeed("cybex update automatic prepare on")
+    # The release channel: declared by the machine, chosen at runtime by an
+    # administrator (no rebuild), readable by the signed-in person.
+    assert json.loads(machine.succeed("runuser -u tester -- cybex update channel")) == {"selected": "stable", "declared": "stable", "override": False}
+    machine.succeed("cybex update channel beta")
+    machine.succeed("test \"$(stat -c %a /var/lib/cybexos/update-channel.json)\" = 644")
+    assert json.loads(machine.succeed("runuser -u tester -- cybex update status"))["channel"] == {"selected": "beta", "declared": "stable", "override": True}
+    machine.fail("cybex update channel nightly")
+    machine.succeed("cybex update channel stable")
+    machine.succeed("test ! -e /var/lib/cybexos/update-channel.json")
+    assert json.loads(machine.succeed("runuser -u tester -- cybex update channel"))["selected"] == "stable"
     machine.succeed("systemctl start cybexos-update-confirm.service")
     machine.succeed("journalctl -u cybexos-update-confirm.service --no-pager | grep -F '\"skipped\": \"idle\"'")
     machine.succeed("test ! -e /var/lib/cybexos/update-request.json")

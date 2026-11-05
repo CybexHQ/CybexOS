@@ -151,6 +151,7 @@ var ROWS = [
     { page: "bar", pageLabel: "Bar & Control Center", group: "Fusebox", label: "Fusebox server", key: "", widget: "fusebox", terms: "ai proxy cliproxy subscriptions accounts management key url faults load requests sessions quota used remaining left meters pace breaker priority clients budgets connected addresses notifications privacy email" },
     { page: "bar", pageLabel: "Bar & Control Center", group: "Model Usage", label: "Model Usage", key: "", widget: "modelusage", terms: "ai claude codex kimi quota limits reset percentage providers cliproxy proxy accounts credentials cost tokens t3 refresh warning critical" },
     { page: "bar", pageLabel: "Bar & Control Center", group: "Updates", label: "Download updates automatically", key: "", widget: "updates", terms: "background download updates automatic schedule timer nix packages metered power check every interval notify software update finish confirm restart" },
+    { page: "bar", pageLabel: "Bar & Control Center", group: "Updates", label: "Get beta releases", key: "", widget: "updates", terms: "beta stable release channel prerelease early testing preview cybex os version software update" },
 
     { page: "bar", pageLabel: "Bar & Control Center", group: "Control Center", label: "Control Center widget", key: "", widget: "control", terms: "cybexos button move drag reorder show hide drawer" },
 

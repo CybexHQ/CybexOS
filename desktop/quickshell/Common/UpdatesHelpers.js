@@ -15,7 +15,9 @@ function statusPollInterval(appOpen, runActive, state) {
 }
 
 function validSources(value) {
-    const states = ["available", "current", "unpublished", "unavailable", "unreachable", "unknown"];
+    // "ahead": this machine runs a newer Cybex OS than its channel's newest
+    // release, after moving to stable or a withdrawn release. Not an error.
+    const states = ["available", "current", "ahead", "unpublished", "unavailable", "unreachable", "unknown"];
     return value && typeof value === "object" && ["upstream", "cybexos"].every(name =>
         value[name] && states.includes(value[name].state)
         && (value[name].state !== "available" || (typeof value[name].available === "string"
@@ -30,6 +32,13 @@ function validDeployment(value) {
         || (/^[a-f0-9]{32}$/.test(value.transaction || "")
             && /^[a-f0-9]{64}$/.test(value.reviewToken || "")
             && (Array.isArray(value.packageChanges) || value.packageChanges instanceof Array) && typeof value.changes === "string"));
+}
+
+// The release channel in `cybex update status`; "" when the machine declares
+// none or the status predates channels. Never guessed.
+function channel(deployment) {
+    const value = ((deployment || {}).channel || {}).selected;
+    return ["stable", "beta"].includes(value) ? value : "";
 }
 
 function scope(sources, selected) {
@@ -400,7 +409,7 @@ function downloadSize(bytes) {
 }
 
 if (typeof module !== "undefined") module.exports = {
-    active, pending, statusPollInterval, validSources, validDeployment, scope, scopeLabel, capabilities, firmwareRestart,
+    active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
     overviewVisible, indicator, waitingPackages, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease,
     summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize

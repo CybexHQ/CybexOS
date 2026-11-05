@@ -12,7 +12,8 @@ import uuid
 
 from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse, read, syncdir
 from . import inputs
-from .trust import REPO, Fetcher, NoPublishedRelease, discover, validate_source, version
+from .trust import REPO, AheadOfChannel, Fetcher, NoPublishedRelease, discover, validate_source, version
+from . import channel as channels
 from . import review, firmware, prebuilt
 from .progress import NixProgress
 
@@ -169,9 +170,12 @@ def config_digest(path):
 class Engine:
     def __init__(self, state='/var/lib/cybexos', working='/etc/nixos', run=None,
                  release='/etc/cybexos/release.json', policy='/etc/cybexos/update.json',
-                 system='/run/current-system', booted='/run/booted-system'):
+                 system='/run/current-system', booted='/run/booted-system', channel_state=None):
         self.state, self.working = Path(state), Path(working)
         self.release, self.policy = map(Path, (release, policy))
+        # The administrator's channel choice; discovery as the signed-in
+        # person uses its own cache directory as state, so it is separate.
+        self.channel_state = Path(channel_state or state)
         self.current_system = Path(system)
         self.booted_system = Path(booted)
         self.run = run or Runner()
@@ -226,12 +230,37 @@ class Engine:
             raise Failure('Invalid deployment identifier')
         return self.state / 'transactions' / identifier
 
+    def selected_channel(self):
+        return channels.selected(self.channel_state, self.policy)['selected']
+
     def channel(self):
-        installed, policy = read(self.release), read(self.policy)
-        candidate = discover(Fetcher(self.state / 'cache'), policy['channel'], installed['version'])
+        installed, selected = read(self.release), self.selected_channel()
+        candidate = discover(Fetcher(self.state / 'cache'), selected, installed['version'])
         if self.replaced(candidate, installed, candidate['revision'] != installed.get('revision')):
             raise Failure('Published version was replaced with different source content. Update rejected.')
-        return candidate
+        return candidate | {'channel': selected}
+
+    def left_channel(self, record):
+        """A Cybex OS release prepared on beta, after the machine moved to stable.
+
+        Every stable release is also on beta, so moving to beta keeps a preview.
+        """
+        try:
+            return record.get('channel') == 'beta' and self.selected_channel() == 'stable'
+        except Failure:
+            return True
+
+    def channel_changed(self):
+        """Mark a beta preview stale once the machine follows stable (operation lock held)."""
+        status = read(self.status_path, {})
+        if status.get('state') != 'ready' or not status.get('transaction'):
+            return False
+        record = read(self.tx(status['transaction']) / 'deployment.json', {}) or {}
+        if not self.left_channel(record):
+            return False
+        message = 'The update channel changed to stable after this beta release was prepared. Prepare again.'
+        self.status(state='stale', phase=message, error=message, reviewToken=None)
+        return True
 
     @staticmethod
     def replaced(candidate, installed, differs):
@@ -302,14 +331,22 @@ class Engine:
                 'Nixpkgs (nixos-unstable) package-source status is unknown. ' + problem +
                 ' Run `' + ' '.join(UPSTREAM_METADATA) + '` locally for read-only diagnostics.'}
         try:
+            selected = self.selected_channel()
+        except (Failure, KeyError, TypeError, ValueError):
+            selected = ''
+        try:
             candidate = self.channel()
             result['cybexos'] = {'state': 'available' if version(candidate['version']) > version(read(self.release)['version']) else 'current',
                                 'installed': read(self.release)['version'], 'available': candidate['version'],
                                 'revision': candidate['revision'], 'notes': candidate['notes']}
+        except AheadOfChannel as error:
+            # Not an error: the next release on this channel will be offered.
+            result['cybexos'] = {'state': 'ahead', 'installed': error.installed, 'available': error.newest}
         except NoPublishedRelease:
             result['cybexos'] = {'state': 'unpublished', 'installed': read(self.release)['version']}
         except (Failure, KeyError, TypeError, ValueError) as error:
             result['cybexos'] = {'state': 'unavailable', 'installed': read(self.release)['version'], 'error': str(error)}
+        result['cybexos']['channel'] = selected
         return result
 
     def components(self, system):
@@ -465,7 +502,8 @@ class Engine:
                           'inputs': {name: inputs.identity(new, name) for name in ('nixpkgs', 'cybexos')},
                           'changeKind': kind, 'requestId': request_id, 'software': selections,
                           'packageChanges': package_changes, 'highlights': highlights,
-                          'firmware': device_firmware, 'sessionRestarts': session}
+                          'firmware': device_firmware, 'sessionRestarts': session,
+                          'channel': candidate.get('channel') if candidate else None}
                 record['reviewToken'] = hashlib.sha256((record['configDigest'] + changes + review.identity(package_changes)
                                                         + review.identity(highlights) + review.identity(device_firmware)
                                                         + review.identity(session)).encode()).hexdigest()
@@ -675,6 +713,10 @@ class Engine:
                 unchanged = False
             except OSError:
                 unchanged = False
+            if unchanged and self.left_channel(record):
+                message = 'The update channel changed to stable after this beta release was prepared. Prepare again.'
+                self.status(state='stale', phase=message, error=message, reviewToken=None)
+                raise Failure(message)
             if not unchanged:
                 message = reason + 'The system or personal configuration changed after preparation. Prepare again to preserve those changes.'
                 self.status(state='stale', phase=message, error=message, reviewToken=None)

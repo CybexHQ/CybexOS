@@ -23,6 +23,14 @@ in {
       # follows beta by default. Administrators may still select either.
       default = if builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+-.+" cfg.release.version != null then "beta" else "stable";
       defaultText = lib.literalMD ''`"beta"` for a prerelease `cybexos.release.version`, otherwise `"stable"`'';
+      description = ''
+        The Cybex OS release channel this machine declares. Stable takes the
+        newest release published to stable; beta also takes releases on the
+        beta channel first. An administrator's runtime choice
+        (`cybex update channel`, Settings or Software Update, kept in
+        /var/lib/cybexos/update-channel.json) overrides it without a rebuild.
+        NixOS package updates do not follow a channel.
+      '';
     };
     additionalHealthServices = lib.mkOption {
       type = lib.types.listOf lib.types.str;

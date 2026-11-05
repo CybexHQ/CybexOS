@@ -9,6 +9,7 @@ import time
 import uuid
 
 from . import automatic
+from . import channel as channels
 from .common import Failure, atomic, digest, locked, read
 from .engine import Engine, config_digest
 
@@ -100,7 +101,15 @@ def enqueue_update(state, action, values):
         return {'accepted': True, 'requestId': identifier, 'unit': unit}
 
 
-def update_status(state=Path('/var/lib/cybexos'), working=Path('/etc/nixos')):
+def release_channel(state=Path('/var/lib/cybexos'), policy=channels.DECLARED):
+    """The channel in effect; empty when the machine declares none (never guessed)."""
+    try:
+        return channels.selected(state, policy)
+    except Failure:
+        return {'selected': '', 'declared': '', 'override': False}
+
+
+def update_status(state=Path('/var/lib/cybexos'), working=Path('/etc/nixos'), policy=channels.DECLARED):
     """Read-only reconciliation; worker failure must survive polls and reloads."""
     state, working = Path(state), Path(working)
     status = read(state / 'status.json', {'state': 'idle'})
@@ -115,6 +124,7 @@ def update_status(state=Path('/var/lib/cybexos'), working=Path('/etc/nixos')):
         latest = {}
     status['request'] = latest
     status['automatic'] = automatic.policy(state)
+    status['channel'] = release_channel(state, policy)
     device_firmware = status.get('firmware') or {}
     if device_firmware.get('needsReboot') and device_firmware.get('bootId'):
         boot_id = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
@@ -239,6 +249,8 @@ def main():
     discard = sub.add_parser('discard'); discard.add_argument('transaction')
     choice = sub.add_parser('automatic', help='Prepare updates or confirm restarts automatically')
     choice.add_argument('name', choices=('prepare', 'confirm')); choice.add_argument('enabled', choices=('on', 'off'))
+    release_choice = sub.add_parser('channel', help='Show or choose the Cybex OS release channel (stable or beta)')
+    release_choice.add_argument('name', nargs='?', choices=channels.CHANNELS)
     args, extra = parser.parse_known_args()
     if extra and args.command not in ('agent', 'assistant', 'backup', 'report', 'doctor'):
         parser.error('unrecognized arguments: ' + ' '.join(extra))
@@ -320,6 +332,8 @@ def main():
         raise Failure(LIVE_UPDATE_REASON)
     if args.action == 'status':
         print(json.dumps(update_status()))
+    elif args.action == 'channel' and not args.name:
+        print(json.dumps(release_channel()))
     elif args.action == 'request':
         print(json.dumps(request_status(args.identifier)))
     elif args.action == 'check':
@@ -329,7 +343,8 @@ def main():
         engine.state.mkdir(parents=True, exist_ok=True)
         engine.working = Path('/etc/nixos')
         engine.release = Path('/etc/cybexos/release.json')
-        engine.policy = Path('/etc/cybexos/update.json')
+        engine.policy = channels.DECLARED
+        engine.channel_state = Path('/var/lib/cybexos')
         from .common import Runner
         engine.run = Runner()
         print(json.dumps(engine.check()))
@@ -338,9 +353,24 @@ def main():
     else:
         extra = ([args.scope] if args.action == 'stage' else
                  [args.name, args.enabled] if args.action == 'automatic' else
+                 [args.name] if args.action == 'channel' else
                  [args.transaction, args.review_token] if args.action == 'apply' else
                  [args.transaction] if args.action in ('rollback', 'retry-failed', 'log', 'discard') and args.transaction else [])
         os.execv(PKEXEC, [PKEXEC, '/run/current-system/sw/bin/cybexos-request', args.action, *extra])
+
+
+def choose_channel(state, name, policy=channels.DECLARED, engine=None):
+    """Follow another release channel; a beta preview is stale once on stable.
+
+    A running operation holds the lock for its whole build, so the choice
+    never waits for it: installation checks the channel again before it
+    applies anything.
+    """
+    chosen = channels.choose(state, name, policy)
+    with locked(Path(state) / 'operation.lock', skip_busy=True) as held:
+        if held:
+            (engine or Engine(state=state, policy=policy)).channel_changed()
+    return chosen
 
 
 def request():
@@ -382,6 +412,8 @@ def request():
         print(json.dumps({'accepted': True})); return
     if action == 'automatic' and len(values) == 2 and values[1] in ('on', 'off'):
         print(json.dumps({'automatic': automatic.choose(state, values[0], values[1] == 'on')})); return
+    if action == 'channel' and len(values) == 1:
+        print(json.dumps({'channel': choose_channel(state, values[0])})); return
     if action == 'log' and len(values) == 1:
         import re
         if not re.fullmatch('[0-9a-f]{32}', values[0]):

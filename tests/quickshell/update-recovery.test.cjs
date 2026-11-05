@@ -63,6 +63,22 @@ test("an unpublished vendor channel is neutral and leaves NixOS updates selectab
     assert.equal(H.capabilities({state: "idle"}, false, true, H.scope(sources, ["upstream"])).prepare, true);
 });
 
+test("a machine ahead of its release channel is neutral and offers no Cybex OS update", () => {
+    const sources = { ...available, cybexos: {state: "ahead", installed: "1.0.19", available: "1.0.17", channel: "stable"} };
+    assert.equal(H.validSources(sources), true);
+    assert.equal(H.scope(sources, ["upstream", "cybexos"]), "upstream");
+    assert.equal(H.scope({ ...sources, upstream: {state: "current"} }, ["upstream", "cybexos"]), "");
+    assert.equal(H.newerRelease({state: "ready", changeKind: "update", availableVersion: "1.0.16"}, sources), "",
+        "the channel's older newest release is never offered as newer");
+});
+
+test("the release channel comes from status and is never guessed", () => {
+    assert.equal(H.channel({channel: {selected: "beta", declared: "stable", override: true}}), "beta");
+    assert.equal(H.channel({channel: {selected: "stable"}}), "stable");
+    for (const value of [{}, {channel: {selected: ""}}, {channel: {selected: "nightly"}}, {channel: "beta"}, null])
+        assert.equal(H.channel(value), "", JSON.stringify(value));
+});
+
 test("failed discovery, zero updates and completed history create no update badge", () => {
     for (const state of ["idle", "done", "failed", "interrupted", "ready", "recovery-failed"]) {
         assert.equal(H.indicator(false, state), false, state);
