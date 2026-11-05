@@ -103,8 +103,8 @@ Surface {
             opacity: modelData.connected || btMouse.containsMouse || activeFocus ? 1 : 0.75
             enabled: !busy
             activeFocusOnTab: enabled
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
             Accessible.role: Accessible.Button
             Accessible.name: actionName
             Accessible.description: busy ? "Bluetooth action in progress"

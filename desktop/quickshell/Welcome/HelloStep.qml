@@ -31,13 +31,17 @@ Item {
         return variant ? variant.label : layout ? layout.label : entry.layout + (entry.variant ? " · " + entry.variant : "");
     }
     function city(zone) { return String(zone || "").split("/").pop().replace(/_/g, " "); }
+    // `missing` marks a value the backends could not read: it gets a neutral
+    // mark, never the check that says the installer set it.
     readonly property var rows: [
         {label: I18n.tr("Language"), value: region.locale ? I18n.localeName(region.locale) : I18n.tr("Not available"),
-            detail: region.locale || "", sheet: "language"},
+            detail: region.locale || "", sheet: "language", missing: !region.locale},
         {label: I18n.tr("Keyboard"), value: layouts.map(entry => root.layoutName(entry)).join(", ") || I18n.tr("Not available"),
-            detail: layouts.map(entry => entry.layout + (entry.variant ? " · " + entry.variant : "")).join(", "), sheet: "keyboard"},
-        {label: I18n.tr("Time zone"), value: region.timezone ? root.city(region.timezone) + " · " + Qt.formatTime(clock.date, "HH:mm") : I18n.tr("Not available"),
-            detail: region.timezone || "", sheet: "timezone"},
+            detail: layouts.map(entry => entry.layout + (entry.variant ? " · " + entry.variant : "")).join(", "), sheet: "keyboard",
+            missing: layouts.length === 0},
+        {label: I18n.tr("Time zone"), value: region.timezone ? root.city(region.timezone) + " · "
+                + Qt.formatTime(clock.date, Settings.clock24 ? "HH:mm" : "h:mm AP") : I18n.tr("Not available"),
+            detail: region.timezone || "", sheet: "timezone", missing: !region.timezone},
         {label: I18n.tr("Network"), value: EthernetState.connected ? I18n.tr("Ethernet · connected")
                 : WifiState.connected ? I18n.format("%1 · connected", [WifiState.name]) : online ? I18n.tr("Connected") : I18n.tr("Not connected"),
             detail: ethernet ? [ethernet.device, ethernet.ipv4].filter(Boolean).join(" · ") : online ? "" : I18n.tr("You can explore offline, too."),
@@ -45,7 +49,7 @@ Item {
         {label: I18n.tr("Account"), value: Welcome.fullName !== "" ? Welcome.fullName + " · " + Welcome.userName : Welcome.userName,
             detail: Quickshell.env("HOME") || "", mono: Welcome.fullName === ""},
         {label: I18n.tr("Computer"), value: root.hostName || I18n.tr("Not available"),
-            detail: I18n.format("Cybex OS %1", [Welcome.version]), mono: true}
+            detail: I18n.format("Cybex OS %1", [Welcome.version]), mono: true, missing: !root.hostName}
     ]
     Claim { active: root.visible; onClaimed: EthernetState.acquire(); onReleased: EthernetState.release() }
     SystemClock { id: clock; precision: SystemClock.Minutes; enabled: root.visible }
@@ -214,16 +218,19 @@ Item {
                     Rectangle { width: parent.width; height: Math.max(1, Kiosk.px(1)); color: Kiosk.line }
                     Rectangle {
                         id: mark
+                        objectName: "helloMark"
                         anchors.verticalCenter: parent.verticalCenter
                         width: Kiosk.px(24)
                         height: width
                         radius: width / 2
-                        color: row.modelData.warn ? Kiosk.amberTint : Kiosk.accentTint
+                        color: row.modelData.warn ? Kiosk.amberTint : row.modelData.missing ? Kiosk.card2 : Kiosk.accentTint
+                        border.width: row.modelData.missing ? Math.max(1, Kiosk.px(1)) : 0
+                        border.color: Kiosk.line2
                         KioskIcon {
                             anchors.centerIn: parent
-                            name: row.modelData.warn ? "wifi_off" : "check"
+                            name: row.modelData.warn ? "wifi_off" : row.modelData.missing ? "minus" : "check"
                             designSize: 14
-                            color: row.modelData.warn ? Kiosk.amber : Kiosk.accent
+                            color: row.modelData.warn ? Kiosk.amber : row.modelData.missing ? Kiosk.fog : Kiosk.accent
                         }
                     }
                     KioskText {

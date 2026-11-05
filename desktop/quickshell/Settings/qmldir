@@ -90,6 +90,8 @@ DraftFieldRow DraftFieldRow.qml
 BarPreview BarPreview.qml
 IdleTimeline IdleTimeline.qml
 ValueRow ValueRow.qml
+AttentionRow AttentionRow.qml
+StatusPill StatusPill.qml
 FieldRow FieldRow.qml
 RowCluster RowCluster.qml
 PluginRow PluginRow.qml

@@ -73,7 +73,6 @@ RowCluster {
                 metrics: Theme.switchRow
                 checked: root.plugin.enabled === true
                 enabled: !UserPlugins.busy
-                opacity: enabled ? 1 : 0.45
                 accessibleName: "Enable " + root.plugin.name
                 onToggled: value => root.run([value ? "enable" : "disable", root.plugin.id])
             }

@@ -231,4 +231,7 @@ PanelWindow {
             }
         }
     }
+
+    // Pointer vs keyboard modality for focus rings (Common/FocusModality).
+    FocusModalityObserver {}
 }

@@ -29,6 +29,7 @@ Loader {
     // module contract below is checked rather than duck-typed.
     readonly property BarModule mod: item as BarModule
     readonly property real detailSaving: mod ? mod.detailSaving : 0
+    readonly property real detailShrinkable: mod ? mod.detailShrinkable : 0
 
     anchors.verticalCenter: parent ? parent.verticalCenter : undefined
     // Every output carries a bar, but only the mapped one is visible; the
@@ -66,6 +67,7 @@ Loader {
 
     onWidthChanged: host.scheduleFit()
     onDetailSavingChanged: host.scheduleFit()
+    onDetailShrinkableChanged: host.scheduleFit()
     onGroupHoveredChanged: {
         if (slot.mod)
             slot.mod.groupHovered = slot.groupHovered;

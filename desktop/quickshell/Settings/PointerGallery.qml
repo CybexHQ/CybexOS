@@ -12,6 +12,10 @@ import "../Common"
 // a spinner until the theme arrives and is picked (Pointer.pick). A
 // downloaded theme that is not in use offers to remove itself on hover, or
 // with Delete.
+//
+// It marks its states as the theme gallery does (docs/shell-states.md): the
+// pointer in use wears a 2 px textHi frame and the haloed accent check, and
+// keyboard focus is a separate ring 2 px clear of the picture.
 Item {
     id: root
 
@@ -19,10 +23,13 @@ Item {
     readonly property string current: Pointer.resolved.chosen
 
     readonly property int gap: Theme.scaled(10)
+    // Room around the tiles for the focus ring, inside the gallery's bounds.
+    readonly property int edge: Theme.focusRingWidth + 2
+    readonly property real innerWidth: Math.max(0, width - edge * 2)
     // Wide enough for "Bibata Original Classic" in one line.
     readonly property int minimumTile: Theme.scaled(160, Theme.typeScale)
-    readonly property int columns: Math.max(2, Math.floor((width + gap) / (minimumTile + gap)))
-    readonly property real tileWidth: (width - gap * (columns - 1)) / columns
+    readonly property int columns: Math.max(2, Math.floor((innerWidth + gap) / (minimumTile + gap)))
+    readonly property real tileWidth: (innerWidth - gap * (columns - 1)) / columns
     readonly property real thumbHeight: Math.round(Math.max(Theme.scaled(56), tileWidth * 0.42))
     // Screen pixels per preview pixel. Four 48 px shapes fill about half the
     // thumb's height and fit its width.
@@ -31,7 +38,7 @@ Item {
     readonly property real tileHeight: thumbHeight + Theme.scaled(6) + nameMetrics.height
 
     implicitHeight: entries.length === 0 ? 0
-        : Math.ceil(entries.length / columns) * (tileHeight + gap) - gap + Theme.scaled(8)
+        : Math.ceil(entries.length / columns) * (tileHeight + gap) - gap + Theme.scaled(4) + edge * 2
 
     TextMetrics {
         id: nameMetrics
@@ -56,8 +63,8 @@ Item {
             readonly property string action: modelData.installed ? I18n.tr("Use")
                 : modelData.downloadable ? I18n.tr("Download and use") : I18n.tr("Not available")
 
-            x: (index % root.columns) * (root.tileWidth + root.gap)
-            y: Theme.scaled(4) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
+            x: root.edge + (index % root.columns) * (root.tileWidth + root.gap)
+            y: root.edge + Theme.scaled(2) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
             width: root.tileWidth
             height: root.tileHeight
             activeFocusOnTab: available
@@ -118,7 +125,6 @@ Item {
                     radius: parent.radius
                     hovered: tileHover.hovered
                     pressed: tileMouse.pressed
-                    focused: tile.activeFocus
                     tint: Theme.textHi
                     pressPoint: Qt.point(tileMouse.mouseX, tileMouse.mouseY)
                 }
@@ -134,21 +140,32 @@ Item {
 
             Rectangle {
                 anchors.fill: thumb
-                anchors.margins: tile.selected ? -3 : 0
-                radius: thumb.radius + (tile.selected ? 3 : 0)
+                radius: thumb.radius
                 color: "transparent"
-                border.width: tile.selected ? 2 : 1
-                border.color: tile.selected ? Theme.accent : tile.activeFocus ? Theme.accentText : Theme.hairline
+                border.width: tile.selected ? Theme.selectedBorderWidth : 1
+                border.color: tile.selected ? Theme.textHi : Theme.hairline
+            }
+
+            Rectangle {
+                anchors.fill: thumb
+                anchors.margins: -root.edge
+                radius: thumb.radius + root.edge
+                color: "transparent"
+                visible: border.width > 0
+                border.width: Theme.focusWidth(tile.activeFocus)
+                border.color: Theme.focusRing
             }
 
             Rectangle {
                 visible: tile.selected
-                x: Theme.scaled(6)
-                y: thumb.height - height - Theme.scaled(6)
-                width: Theme.scaled(18)
+                x: Theme.scaled(5)
+                y: thumb.height - height - Theme.scaled(5)
+                width: Theme.scaled(22)
                 height: width
                 radius: width / 2
                 color: Theme.accent
+                border.width: 2
+                border.color: Theme.panelSurface
                 Sym {
                     anchors.centerIn: parent
                     name: "check"

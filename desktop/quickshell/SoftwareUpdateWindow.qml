@@ -43,4 +43,7 @@ FloatingWindow {
             else Updates.close();
         }
     }
+
+    // Pointer vs keyboard modality for focus rings (Common/FocusModality).
+    FocusModalityObserver {}
 }

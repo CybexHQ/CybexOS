@@ -56,6 +56,12 @@ finishing after the restart, and a problem page. Worker state wins over
 discovery, so a prepared or restarting update is shown even when a source
 cannot be checked.
 
+Every page lays its content in one centred column of at most 560 px; the
+window keeps its size, and the ready page's action bar spans it. Times such as
+**Last checked today at 07:03** follow the clock's 12/24-hour setting, as the
+menubar does. Release notes are prose: at most 72 characters a line, at
+`Theme.proseLineHeight`, in the interface font.
+
 Wiz, the assistant's character, heads every status page in the pose language
 he uses everywhere ([the assistant](assistant.md)); `UpdatesHelpers.statusPose`
 maps the page to it. He thinks while checking and while finishing after the

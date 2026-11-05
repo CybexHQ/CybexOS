@@ -142,3 +142,15 @@ test("uptime parsing and formatting stay compact at minute boundaries", () => {
     assert.equal(H.formatUptime(90060), "1d 1h 1m");
     assert.equal(H.formatUptime(-1), "Unavailable");
 });
+
+test("formatStorageBytes counts storage in decimal units with three significant digits", () => {
+    assert.equal(H.formatStorageBytes(0), "0 B");
+    assert.equal(H.formatStorageBytes(999), "999 B");
+    assert.equal(H.formatStorageBytes(1000), "1 KB");
+    assert.equal(H.formatStorageBytes(412e9), "412 GB");
+    assert.equal(H.formatStorageBytes(31.94e9), "31.9 GB");
+    assert.equal(H.formatStorageBytes(1e12), "1 TB");
+    assert.equal(H.formatStorageBytes(1.34e12), "1.3 TB");
+    assert.equal(H.formatStorageBytes(-1), "Unavailable");
+    assert.equal(H.formatStorageBytes("x"), "Unavailable");
+});

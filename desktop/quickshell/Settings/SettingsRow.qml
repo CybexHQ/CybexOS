@@ -57,8 +57,9 @@ Item {
     property string hintTone: "info"
     property string disabledReason: ""
     readonly property bool unavailable: disabledReason !== ""
-    // Subclasses fade their control, never the reason beside it.
-    readonly property real controlOpacity: unavailable ? 0.45 : 1
+    // Subclasses fade their control, never the reason beside it. `enabled`
+    // reads false inside a disabled group too, which must not look live.
+    readonly property real controlOpacity: enabled ? 1 : 0.45
 
     // Reflow metrics. Each row reserves a different slice of the narrow line
     // for its own control, and the switch row's label sits 2px lower because

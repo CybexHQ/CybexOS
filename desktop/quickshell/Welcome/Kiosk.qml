@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import "../Common/SettingsHelpers.js" as SettingsHelpers
 
 // The installer's design tokens, so the welcome guide continues the screen
 // people just installed with. The colours are installer/kiosk/ui/theme.slint
@@ -38,6 +39,10 @@ Singleton {
     readonly property color accentLine: "#5960a5fa"
     readonly property color accentGlow: "#2960a5fa"
     readonly property color amberLine: "#66f2c14e"
+    // Faint copy (captions, details) lifted to 4.5:1 on the card, the lighter
+    // of the two surfaces it sits on; it measured 3.2:1. `faint` stays the
+    // installer's token for rules and glyphs.
+    readonly property color faintText: SettingsHelpers.ensureContrast(faint.toString(), card.toString(), 4.5)
 
     readonly property string sans: "Space Grotesk"
     readonly property string mono: "JetBrains Mono"

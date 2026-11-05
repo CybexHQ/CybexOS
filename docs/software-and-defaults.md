@@ -36,7 +36,10 @@ installer's profiles (**Install all** adds a collection's missing apps), and the
 most popular apps by Flathub's install counts. A category page has subcategory
 filters, an Editor's choice and every app in it by popularity. An app page
 shows how it arrives, its licence, the download, its version in this system,
-its Nixpkgs attribute, a description and similar apps.
+its Nixpkgs attribute, a description and similar apps. The description is
+prose: at most 72 characters a line, at `Theme.proseLineHeight`. In a window
+under 800 px tall the screenshots stay within 220 px, so the description is in
+reach.
 
 The app catalogue (`desktop/software/catalogue.json` and its icons, see
 `desktop/software/README.md`) ships with Cybex OS in
@@ -57,6 +60,12 @@ takes a while; later searches use a cache that is invalidated when the machine
 configuration changes. Discovery neither refreshes inputs nor creates a second
 package universe. A package from that list is checked before Install is
 offered.
+
+In a narrow window, where the search field's minimum width no longer fits
+beside **Explore**, **Installed** and **Updates**, the field folds to a
+search button. The button, typing, / or Ctrl+F opens it over the tabs;
+Escape, a click elsewhere or moving focus away folds it again, and the query
+and its results stay.
 
 ## The install list
 

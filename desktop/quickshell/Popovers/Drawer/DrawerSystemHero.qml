@@ -1,73 +1,104 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import Quickshell.Io
 import "../../Common"
 import "../../Common/SysInfoHelpers.js" as SysInfoHelpers
+import "DrawerFormat.js" as DrawerFormat
 import ".."
 
-// The fixed identity and health summary at the top of Overview. It stays
-// independent of drawer section settings: opening the Cybex OS button always
-// answers which machine this is and how its core resources are doing.
+// Overview's system summary: which system this is, then how its core
+// resources are doing. It stays independent of drawer section settings:
+// opening the Cybex OS button always answers both.
+//
+// One identity line ("Cybex OS 1.0.17 · NixOS 26.11", as Settings Home
+// writes it) and the machine with its uptime; then CPU, memory and disk as
+// two-line meters, a label and its full reading over a segmented meter, so
+// the reading never has to be cut short. Storage is decimal and memory
+// binary (docs/shell-states.md). Kernel, processor, filesystem and swap size
+// wait behind Details.
 Rectangle {
     id: root
 
+    // View state, not a setting: Details stays as it was left while the
+    // shell runs.
+    property bool detailsOpen: false
+    property string releaseVersion: ""
+
     width: parent ? parent.width : 0
     height: implicitHeight
-    implicitHeight: heroContent.implicitHeight + Theme.scaled(20)
+    implicitHeight: heroContent.implicitHeight + Theme.scaled(24)
     radius: Theme.rowRadius + 2
     color: Theme.chip
     border.width: 1
     border.color: Theme.hairlineSoft
 
-    readonly property int logoSize: Theme.scaled(56)
+    readonly property int logoSize: Theme.scaled(32)
     readonly property bool cybexosIdentity:
         SysInfo.osId.toLowerCase() === "nixos" && SysInfo.osName !== ""
-    readonly property string osTitle:
-        SysInfo.osName !== "" ? SysInfo.osName : "System information unavailable"
-    readonly property string osReleaseLine: {
-        const details = [];
-        if (SysInfo.osVersion !== "")
-            details.push("Version " + SysInfo.osVersion);
-        if (SysInfo.osVariant !== "")
-            details.push(SysInfo.osVariant);
-        return details.length > 0 ? details.join(" · ") : "OS release unavailable";
-    }
-    readonly property string machine: {
-        const details = [];
-        if (SysInfo.deviceVendor !== "")
-            details.push(SysInfo.deviceVendor);
-        if (SysInfo.deviceModel !== "")
-            details.push(SysInfo.deviceModel);
-        return details.length > 0 ? details.join(" ") : "Device model unavailable";
-    }
-    readonly property string kernelUptime: "Kernel "
-        + (SysInfo.kernelRelease !== "" ? SysInfo.kernelRelease : "unavailable")
-        + " · Up " + SysInfoHelpers.formatUptime(SysInfo.uptimeSecs)
-    readonly property string memoryDetail: {
+    readonly property string osRelease:
+        [SysInfo.osName, SysInfo.osVersion].filter(Boolean).join(" ")
+    readonly property string identityLine: cybexosIdentity
+        ? [root.releaseVersion !== "" ? "Cybex OS " + root.releaseVersion : "Cybex OS",
+            root.osRelease].filter(Boolean).join(" · ")
+        : root.osRelease !== "" ? root.osRelease
+        : I18n.tr("System information unavailable")
+    readonly property string fullModel:
+        DrawerFormat.fullModel(SysInfo.deviceVendor, SysInfo.deviceModel)
+    readonly property string machineModel:
+        DrawerFormat.compactModel(SysInfo.deviceVendor, SysInfo.deviceModel)
+    readonly property string machineLine: [
+        root.machineModel || I18n.tr("Device model unavailable"),
+        SysInfo.uptimeKnown
+            ? I18n.format("up %1", [DrawerFormat.shortUptime(SysInfo.uptimeSecs)]) : ""
+    ].filter(Boolean).join(" · ")
+
+    readonly property string cpuReading: SysInfo.cpuUsageKnown
+        ? Math.round(SysInfo.cpuUsage) + "%" : I18n.tr("Unavailable")
+    readonly property string memoryReading: {
         if (!SysInfo.memKnown)
-            return "Memory unavailable";
-        let result = root.capacity(true, SysInfo.memUsedBytes) + " / "
-            + root.capacity(true, SysInfo.memTotalBytes) + " used";
+            return I18n.tr("Memory unavailable");
+        const used = DrawerFormat.pair(SysInfoHelpers.formatIecBytes(SysInfo.memUsedBytes),
+            SysInfoHelpers.formatIecBytes(SysInfo.memTotalBytes));
         if (!SysInfo.swapKnown)
-            return result + " · Swap unavailable";
+            return used;
         if (SysInfo.swapTotalBytes === 0)
-            return result + " · No swap";
-        return result + " · Swap "
-            + root.capacity(true, SysInfo.swapUsedBytes) + " / "
-            + root.capacity(true, SysInfo.swapTotalBytes) + " used";
+            return used + " · " + I18n.tr("no swap");
+        return used + " · " + I18n.format("swap %1",
+            [SysInfoHelpers.formatIecBytes(SysInfo.swapUsedBytes)]);
     }
-    readonly property string diskDetail: SysInfo.rootFsKnown
-        ? root.capacity(true, SysInfo.rootFsUsedBytes) + " / "
-            + root.capacity(true, SysInfo.rootFsTotalBytes) + " used · "
-            + root.capacity(true, SysInfo.rootFsAvailableBytes) + " free · "
-            + SysInfo.rootFsType
-        : "Storage unavailable"
+    readonly property string diskReading: SysInfo.rootFsKnown
+        ? DrawerFormat.pair(SysInfoHelpers.formatStorageBytes(SysInfo.rootFsUsedBytes),
+            SysInfoHelpers.formatStorageBytes(SysInfo.rootFsTotalBytes))
+            + " · " + I18n.format("%1 free",
+                [SysInfoHelpers.formatStorageBytes(SysInfo.rootFsAvailableBytes)])
+        : I18n.tr("Storage unavailable")
+    readonly property string swapDetail: !SysInfo.swapKnown ? ""
+        : SysInfo.swapTotalBytes === 0 ? I18n.tr("No swap")
+        : I18n.format("%1 used of %2", [SysInfoHelpers.formatIecBytes(SysInfo.swapUsedBytes),
+            SysInfoHelpers.formatIecBytes(SysInfo.swapTotalBytes)])
 
-    function percentage(known, value) {
-        return known ? Math.round(value) + "%" : "Unavailable";
-    }
+    // What Details lists; a fact the system did not report is left out.
+    readonly property var details: [
+        { label: I18n.tr("Model"), value: root.fullModel !== root.machineModel ? root.fullModel : "" },
+        { label: I18n.tr("Processor"), value: SysInfo.cpuModel },
+        { label: I18n.tr("Kernel"), value: SysInfo.kernelRelease },
+        { label: I18n.tr("Filesystem"), value: SysInfo.rootFsType },
+        { label: I18n.tr("Swap"), value: root.swapDetail }
+    ].filter(row => row.value !== "")
 
-    function capacity(known, value) {
-        return known ? SysInfoHelpers.formatIecBytes(value) : "Unavailable";
+    // The installed release, read the way Settings Home reads it.
+    FileView {
+        path: "/etc/cybexos/release.json"
+        printErrors: false
+        blockLoading: true
+        onLoaded: {
+            try {
+                root.releaseVersion = String(JSON.parse(text()).version || "");
+            } catch (error) {
+                root.releaseVersion = "";
+            }
+        }
+        onLoadFailed: root.releaseVersion = ""
     }
 
     component MetricRow: Rectangle {
@@ -76,17 +107,22 @@ Rectangle {
         required property string label
         required property bool known
         required property real percent
-        required property string detail
+        required property string reading
         property string status: ""
-        property color statusColor: Theme.textFaint
+        property color statusColor: Theme.textMid
         property color meterColor: Theme.accent
         property int severity: 0
         property string accessibleDescription: ""
         required property string accessibleName
 
+        // The reading moves under its label only when both no longer fit
+        // on one line (a large text size, a narrow drawer).
+        readonly property bool stacked: metricLabel.implicitWidth + Theme.controlSpacing
+            + metricReadingRow.implicitWidth > metricContent.width
+
         width: parent ? parent.width : 0
         height: implicitHeight
-        implicitHeight: metricContent.implicitHeight + Theme.scaled(14)
+        implicitHeight: metricContent.implicitHeight + Theme.scaled(10)
         radius: Theme.rowRadius
         color: severity >= 2 ? Theme.redBgSoft
             : severity === 1 ? Theme.amberBgSoft : "transparent"
@@ -94,15 +130,6 @@ Rectangle {
         Accessible.role: Accessible.StaticText
         Accessible.name: metric.accessibleName
         Accessible.description: metric.accessibleDescription
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: 1
-            color: Theme.hairlineSoft
-            Accessible.ignored: true
-        }
 
         Column {
             id: metricContent
@@ -112,18 +139,19 @@ Rectangle {
             anchors.top: parent.top
             anchors.leftMargin: Theme.scaled(4)
             anchors.rightMargin: Theme.scaled(4)
-            anchors.topMargin: Theme.scaled(8)
-            spacing: Theme.scaled(3)
+            anchors.topMargin: Theme.scaled(5)
+            spacing: Theme.scaled(5)
 
             Item {
                 width: parent.width
-                height: Math.max(metricLabel.implicitHeight,
-                    metricReadingRow.implicitHeight)
+                height: metric.stacked
+                    ? metricLabel.implicitHeight + Theme.scaled(2) + metricReadingRow.height
+                    : Math.max(metricLabel.implicitHeight, metricReadingRow.height)
 
                 Text {
                     id: metricLabel
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                    y: metric.stacked ? 0
+                        : (parent.height - implicitHeight) / 2
                     text: metric.label
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.metadata
@@ -136,19 +164,22 @@ Rectangle {
                 Row {
                     id: metricReadingRow
 
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                    x: metric.stacked ? 0 : parent.width - width
+                    y: metric.stacked ? metricLabel.implicitHeight + Theme.scaled(2)
+                        : (parent.height - height) / 2
                     spacing: Theme.scaled(5)
 
                     Text {
                         id: metricReading
 
-                        text: root.percentage(metric.known, metric.percent)
+                        width: Math.min(implicitWidth, metricContent.width)
+                        text: metric.reading
+                        wrapMode: Text.Wrap
                         font.family: Theme.fontNumeric
-                        font.pixelSize: Theme.typography.primary
-                        font.weight: Theme.weightSemibold
+                        font.pixelSize: Theme.typography.secondary
+                        font.weight: Theme.weightMedium
                         font.features: Theme.tabularNumberFeatures
-                        color: metric.known ? Theme.textHi : Theme.textFaint
+                        color: metric.known ? Theme.textHi : Theme.textMid
                         Accessible.ignored: true
                     }
 
@@ -156,24 +187,13 @@ Rectangle {
                         visible: metric.status !== ""
                         text: "· " + metric.status
                         font.family: Theme.fontNumeric
-                        font.pixelSize: Theme.typography.primary
-                        font.weight: Theme.weightSemibold
+                        font.pixelSize: Theme.typography.secondary
+                        font.weight: Theme.weightMedium
                         font.features: Theme.tabularNumberFeatures
                         color: metric.statusColor
                         Accessible.ignored: true
                     }
                 }
-            }
-
-            Text {
-                width: parent.width
-                text: metric.detail
-                wrapMode: Text.Wrap
-                font.family: Theme.fontMenu
-                font.pixelSize: Theme.typography.secondary
-                font.weight: Theme.weightMedium
-                color: Theme.textMid
-                Accessible.ignored: true
             }
 
             BlockMeter {
@@ -194,8 +214,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: Theme.scaled(10)
-        spacing: Theme.scaled(7)
+        anchors.margins: Theme.scaled(12)
+        spacing: Theme.scaled(8)
 
         Item {
             width: parent.width
@@ -204,7 +224,7 @@ Rectangle {
             Item {
                 id: mark
                 anchors.left: parent.left
-                anchors.top: parent.top
+                anchors.verticalCenter: parent.verticalCenter
                 width: root.logoSize
                 height: root.logoSize
 
@@ -223,7 +243,7 @@ Rectangle {
                     Sym {
                         anchors.centerIn: parent
                         name: "computer"
-                        size: Theme.iconHero
+                        size: Theme.iconLarge
                         color: Theme.accentText
                     }
                 }
@@ -232,50 +252,31 @@ Rectangle {
             Column {
                 id: identity
                 anchors.left: mark.right
-                anchors.leftMargin: Theme.scaled(12)
+                anchors.leftMargin: Theme.scaled(10)
                 anchors.right: parent.right
-                anchors.top: parent.top
-                spacing: 2
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.scaled(2)
 
                 Text {
                     width: parent.width
-                    text: root.osTitle
+                    text: root.identityLine
                     wrapMode: Text.Wrap
                     font.family: Theme.fontMenu
-                    font.pixelSize: Theme.typography.title
-                    font.weight: Theme.weightBold
+                    font.pixelSize: Theme.typography.primary
+                    font.weight: Theme.weightSemibold
                     color: Theme.textHi
                 }
 
                 Text {
                     width: parent.width
-                    text: root.osReleaseLine
-                    wrapMode: Text.Wrap
-                    font.family: Theme.fontMenu
-                    font.pixelSize: Theme.typography.secondary
-                    font.weight: Theme.weightMedium
-                    color: Theme.textMid
-                }
-
-                Text {
-                    width: parent.width
-                    text: root.machine
+                    text: root.machineLine
                     wrapMode: Text.Wrap
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.metadata
+                    font.features: Theme.tabularNumberFeatures
                     color: Theme.textMid
                 }
             }
-        }
-
-        Text {
-            width: parent.width
-            text: root.kernelUptime
-            wrapMode: Text.WrapAnywhere
-            font.family: Theme.fontNumeric
-            font.pixelSize: Theme.typography.metadata
-            font.features: Theme.tabularNumberFeatures
-            color: Theme.textMid
         }
 
         Column {
@@ -286,13 +287,11 @@ Rectangle {
                 label: I18n.tr("CPU")
                 known: SysInfo.cpuUsageKnown
                 percent: SysInfo.cpuUsage
-                detail: SysInfo.cpuModel !== ""
-                    ? SysInfo.cpuModel : "Processor model unavailable"
-                status: SysInfo.cpuTempKnown
-                    ? SysInfo.cpuTemp + "°C" : "Temp unavailable"
-                statusColor: !SysInfo.cpuTempKnown ? Theme.textFaint
-                    : SysInfo.cpuTemp >= 80 ? Theme.redText
-                    : SysInfo.cpuTemp >= 65 ? Theme.amber : Theme.textMid
+                reading: root.cpuReading
+                // Temperature joins the reading only when a sensor reports it.
+                status: SysInfo.cpuTempKnown ? SysInfo.cpuTemp + " °C" : ""
+                statusColor: SysInfo.cpuTemp >= 80 ? Theme.redText
+                    : SysInfo.cpuTemp >= 65 ? Theme.amber : Theme.textHi
                 severity: !SysInfo.cpuTempKnown ? 0
                     : SysInfo.cpuTemp >= 80 ? 2
                     : SysInfo.cpuTemp >= 65 ? 1 : 0
@@ -310,7 +309,7 @@ Rectangle {
                 label: I18n.tr("MEMORY")
                 known: SysInfo.memKnown
                 percent: SysInfo.memUsage
-                detail: root.memoryDetail
+                reading: root.memoryReading
                 meterColor: !SysInfo.memKnown ? Theme.accent
                     : SysInfo.memUsage >= 95 ? Theme.red
                     : SysInfo.memUsage >= 85 ? Theme.amber : Theme.accent
@@ -319,22 +318,22 @@ Rectangle {
                     : SysInfo.memUsage >= 85 ? 1 : 0
                 accessibleName: "Memory, " + (SysInfo.memKnown
                     ? Math.round(SysInfo.memUsage) + " percent, "
-                        + root.capacity(true, SysInfo.memUsedBytes)
+                        + SysInfoHelpers.formatIecBytes(SysInfo.memUsedBytes)
                             + " used of "
-                        + root.capacity(true, SysInfo.memTotalBytes)
+                        + SysInfoHelpers.formatIecBytes(SysInfo.memTotalBytes)
                     : "unavailable") + ", "
                     + (!SysInfo.swapKnown ? "swap unavailable"
                         : SysInfo.swapTotalBytes === 0 ? "no swap"
-                        : root.capacity(true, SysInfo.swapUsedBytes)
+                        : SysInfoHelpers.formatIecBytes(SysInfo.swapUsedBytes)
                             + " swap used of "
-                            + root.capacity(true, SysInfo.swapTotalBytes))
+                            + SysInfoHelpers.formatIecBytes(SysInfo.swapTotalBytes))
             }
 
             MetricRow {
                 label: I18n.tr("DISK /")
                 known: SysInfo.rootFsKnown
                 percent: SysInfo.rootFsUsage
-                detail: root.diskDetail
+                reading: root.diskReading
                 meterColor: !SysInfo.rootFsKnown ? Theme.accent
                     : SysInfo.rootFsUsage >= 90 ? Theme.red
                     : SysInfo.rootFsUsage >= 80 ? Theme.amber : Theme.accent
@@ -343,14 +342,137 @@ Rectangle {
                     : SysInfo.rootFsUsage >= 80 ? 1 : 0
                 accessibleName: "Disk slash, " + (SysInfo.rootFsKnown
                     ? Math.round(SysInfo.rootFsUsage) + " percent, "
-                        + root.capacity(true, SysInfo.rootFsUsedBytes)
+                        + SysInfoHelpers.formatStorageBytes(SysInfo.rootFsUsedBytes)
                             + " used of "
-                        + root.capacity(true, SysInfo.rootFsTotalBytes) + ", "
-                        + root.capacity(true, SysInfo.rootFsAvailableBytes)
+                        + SysInfoHelpers.formatStorageBytes(SysInfo.rootFsTotalBytes) + ", "
+                        + SysInfoHelpers.formatStorageBytes(SysInfo.rootFsAvailableBytes)
                             + " available, filesystem " + SysInfo.rootFsType
                     : "unavailable" + (SysInfo.rootFsError !== ""
                         ? ", " + SysInfo.rootFsError : ""))
                 accessibleDescription: SysInfo.rootFsError
+            }
+        }
+
+        // ---- details -----------------------------------------------------
+        Rectangle {
+            id: detailsToggle
+            visible: root.details.length > 0
+            x: -Theme.scaled(6)
+            width: detailsRow.implicitWidth + Theme.scaled(12)
+            height: Math.max(Theme.scaled(24), detailsRow.implicitHeight + Theme.scaled(6))
+            radius: Theme.chipRadius
+            color: "transparent"
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
+            activeFocusOnTab: visible
+            Accessible.role: Accessible.Button
+            Accessible.name: root.detailsOpen ? I18n.tr("Hide details") : I18n.tr("Show details")
+            Accessible.onPressAction: root.detailsOpen = !root.detailsOpen
+
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                        || event.key === Qt.Key_Space) {
+                    root.detailsOpen = !root.detailsOpen;
+                    event.accepted = true;
+                }
+            }
+
+            StateLayer {
+                anchors.fill: parent
+                radius: parent.radius
+                hovered: detailsMouse.containsMouse
+                pressed: detailsMouse.pressed
+                pressPoint: Qt.point(detailsMouse.mouseX, detailsMouse.mouseY)
+            }
+
+            Row {
+                id: detailsRow
+                anchors.centerIn: parent
+                spacing: Theme.scaled(4)
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.tr("Details")
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.metadata
+                    font.weight: Theme.weightMedium
+                    color: Theme.accentText
+                }
+
+                Sym {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: root.detailsOpen ? "expand_less" : "expand_more"
+                    size: Theme.iconSmall
+                    color: Theme.accentText
+                }
+            }
+
+            MouseArea {
+                id: detailsMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    detailsToggle.forceActiveFocus();
+                    root.detailsOpen = !root.detailsOpen;
+                }
+            }
+        }
+
+        // A label lane as wide as the longest label, then values that wrap.
+        Column {
+            id: detailList
+            visible: root.detailsOpen && root.details.length > 0
+            width: parent.width
+            spacing: Theme.scaled(3)
+
+            // Reading the font ties the lane to the text size as well.
+            readonly property real lane: detailMetrics.font.pixelSize > 0
+                ? Math.ceil(root.details.reduce((widest, row) =>
+                    Math.max(widest, detailMetrics.advanceWidth(row.label)), 0))
+                : 0
+
+            FontMetrics {
+                id: detailMetrics
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+            }
+
+            Repeater {
+                model: root.details
+
+                delegate: Item {
+                    id: detailRow
+
+                    required property var modelData
+
+                    width: detailList.width
+                    height: Math.max(detailLabel.implicitHeight, detailValue.implicitHeight)
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: modelData.label + ", " + modelData.value
+
+                    Text {
+                        id: detailLabel
+                        width: detailList.lane
+                        text: detailRow.modelData.label
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                        color: Theme.textMid
+                        Accessible.ignored: true
+                    }
+
+                    Text {
+                        id: detailValue
+                        x: detailList.lane + Theme.controlSpacing
+                        width: Math.max(0, parent.width - x)
+                        text: detailRow.modelData.value
+                        wrapMode: Text.Wrap
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                        color: Theme.textHi
+                        Accessible.ignored: true
+                    }
+                }
             }
         }
     }

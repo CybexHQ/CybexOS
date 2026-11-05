@@ -64,8 +64,14 @@ Rectangle {
         }
     }
 
+    // The dots style marks the current workspace with an 18 × 6 accent pill
+    // centred in its cell; numbers keep the wider chip around the label.
+    readonly property real dotPillInset: (WorkspaceMotion.CELL_WIDTH + 4 - 18) / 2
+
     function settleIndicator(animate) {
-        const bounds = WorkspaceMotion.indicatorBounds(visibleIds, focusedId);
+        const cell = WorkspaceMotion.indicatorBounds(visibleIds, focusedId);
+        const inset = numbered ? 0 : dotPillInset;
+        const bounds = cell ? { left: cell.left + inset, right: cell.right - inset } : null;
         if (!bounds) {
             indicatorReady = false;
             previousFocusedId = focusedId;
@@ -149,8 +155,8 @@ Rectangle {
             x: leftEdge
             y: (parent.height - height) / 2
             width: Math.max(1, rightEdge - leftEdge)
-            height: root.numbered ? Theme.chipInnerHeight : 8
-            radius: Theme.chipRadius
+            height: root.numbered ? Theme.chipInnerHeight : 6
+            radius: root.numbered ? Theme.chipRadius : height / 2
             color: Theme.barWsCurrent
             z: 1
 
@@ -196,8 +202,11 @@ Rectangle {
                 readonly property bool focused: root.focusedId === wsId
                 readonly property bool urgent: exists && ws.urgent
                 readonly property bool showNumber: root.numbered && exists
+                // In the dots style the accent pill is the current workspace's
+                // mark, so its own dot steps aside rather than sit on it.
                 readonly property color restingTone: urgent
                     ? (showNumber ? Theme.barRedBg : Theme.barRed)
+                    : focused && !root.numbered ? "transparent"
                     : showNumber
                         ? (workspaceState.over ? Theme.barChip : "transparent")
                         : exists ? Theme.barWsOccupied : Theme.barWsEmpty
@@ -238,10 +247,11 @@ Rectangle {
                     anchors.margins: 1
                     host: root.host
                     target: slot
+                    hitArea: wsMouse
                     radius: Theme.chipRadius
                     pressed: wsMouse.pressed
                     tint: Theme.barTextHi
-                    pressPoint: Qt.point(wsMouse.mouseX - 1, wsMouse.mouseY - 1)
+                    pressPoint: Qt.point(wsMouse.mouseX - 1, wsMouse.mouseY + wsMouse.y - 1)
                     z: 2
                 }
 
@@ -268,9 +278,13 @@ Rectangle {
                     }
                 }
 
+                // The bar's full height, like every bar target; the cells
+                // already meet side by side.
                 MouseArea {
                     id: wsMouse
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: Math.max(parent.height, Theme.barHeight)
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.focusWorkspace(slot.wsId)
@@ -303,10 +317,11 @@ Rectangle {
             anchors.fill: parent
             host: root.host
             target: layoutChip
+            hitArea: layoutMouse
             radius: Theme.chipRadius
             pressed: layoutMouse.pressed
             tint: Theme.barTextHi
-            pressPoint: Qt.point(layoutMouse.mouseX, layoutMouse.mouseY)
+            pressPoint: Qt.point(layoutMouse.mouseX, layoutMouse.mouseY + layoutMouse.y)
         }
         Sym {
             anchors.centerIn: parent
@@ -316,7 +331,9 @@ Rectangle {
         }
         MouseArea {
             id: layoutMouse
-            anchors.fill: parent
+            anchors.centerIn: parent
+            width: parent.width
+            height: Math.max(parent.height, Theme.barHeight)
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: DesktopWorkspaces.cycleLayout(root.focusedId)

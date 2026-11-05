@@ -32,8 +32,12 @@ modules beside it never move.
 | Wheel | This player's volume, ±5 %, with the volume OSD naming the player |
 
 The media module's settings (**Settings → Bar**) keep its title order (title · artist, artist ·
-title, or title only) and its maximum width. A compact bar keeps only the cover
-and the button.
+title, or title only) and its maximum width. The chip is as wide as that
+maximum allows and the bar has room for: in a side column it ends 12 px short
+of the centre group, the title shortening first (`BarGeometry.fitMenubar`).
+Below about eight characters the title goes and the chip keeps only the cover
+and the button; with less room still, the chip moves to the bar's **More**
+menu before the clock, the workspaces or the right cluster give anything up.
 
 ## The panel
 

@@ -62,8 +62,8 @@ Item {
         radius: Theme.chipRadius
         color: mouse.pressed ? Theme.hoverFillStrong
             : mouse.containsMouse || root.activeFocus ? Theme.hoverFill : "transparent"
-        border.width: root.activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
     }
 
     Sym {

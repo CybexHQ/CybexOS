@@ -10,6 +10,7 @@
 # resolve a registered type. qmldir.test.cjs carries both exemptions.
 
 singleton Theme Theme.qml
+singleton FocusModality FocusModality.qml
 singleton I18n I18n.qml
 singleton Activity Activity.qml
 singleton T3Theme T3Theme.qml
@@ -102,6 +103,7 @@ SocketContract SocketContract.qml
 StatusPlaceholder StatusPlaceholder.qml
 Toggle Toggle.qml
 StateLayer StateLayer.qml
+FocusModalityObserver FocusModalityObserver.qml
 HugCorner HugCorner.qml
 OmarchyPluginApi OmarchyPluginApi.qml
 OmarchyEntryHost OmarchyEntryHost.qml

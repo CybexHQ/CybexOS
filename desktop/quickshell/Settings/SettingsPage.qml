@@ -29,6 +29,11 @@ Flickable {
     // the narrower content re-wraps taller, which flips scrollbarVisible.
     readonly property int scrollGutter: 8
     readonly property alias columnWidth: contentRoot.width
+    // Below ~560 px of column a page reflows rather than elides: Home moves
+    // its update state under the identity, pairs its readings two by two and
+    // stacks its attention items; the theme gallery shrinks its previews.
+    readonly property int compactWidth: Theme.scaled(560, Theme.typeScale)
+    readonly property bool compact: columnWidth < compactWidth
 
     contentWidth: width
     contentHeight: contentRoot.height

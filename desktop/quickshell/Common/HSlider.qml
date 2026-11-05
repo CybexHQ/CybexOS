@@ -164,8 +164,8 @@ Item {
         height: sliderMouse.pressed ? 18 : 10
         radius: width / 2
         color: Theme.textHi
-        border.width: root.activeFocus ? 2 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
 
         Behavior on width {
             NumberAnimation {

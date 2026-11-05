@@ -277,13 +277,95 @@ function defaultAction(actions) {
     return null;
 }
 
-function secondaryActions(actions) {
+// Every labelled action a sender offers besides its default and close. The
+// card shows the first two as buttons and keeps the rest under More.
+function senderActions(actions) {
     var list = actionList(actions);
     return list.filter(function(action) {
         var identifier = actionIdentifier(action).toLowerCase();
         return identifier !== "default" && identifier !== "close"
             && singleLine(action && action.text) !== "";
-    }).slice(0, 2);
+    });
+}
+
+function secondaryActions(actions) {
+    return senderActions(actions).slice(0, 2);
+}
+
+// ---- card anatomy (2026-11) ------------------------------------------------
+// Toasts and the drawer's list draw one card: icon, an app + time line, the
+// title on its own line, the body, then up to two buttons. These rules are
+// the parts of that anatomy that are decisions rather than layout.
+
+var TITLE_LINES = 2;
+var ACTION_BUTTONS = 2;
+
+// Body lines a card shows at rest: the caller's limit (the toast's Body
+// preview setting, the drawer's 3), and no more than 2 once it carries
+// buttons, so a card with actions stays about as tall as one without.
+function bodyLineLimit(limit, hasButtons) {
+    var lines = Math.max(0, Math.min(3, Math.floor(Number(limit)) || 0));
+    return hasButtons ? Math.min(lines, 2) : lines;
+}
+
+// Which actions may take a button slot, best first. The sender's own come
+// first; the shell's verification-code, Ask Wiz and link shortcuts fill a
+// free slot. Snoozing is never the next step, so it always waits under More.
+function actionRank(action) {
+    var kind = action && action.kind;
+    if (!kind)
+        return 0;
+    if (kind === "copy-code")
+        return 1;
+    if (kind === "ask-wiz")
+        return 2;
+    if (kind === "link")
+        return 3;
+    return -1;
+}
+
+// Split a card's actions into its buttons and the More list. `primary` is
+// the one action that takes the accent (a staged update's "Restart now");
+// it leads the buttons. The More list keeps the caller's order.
+function actionPlan(actions, primary) {
+    var list = (Array.isArray(actions) || actions instanceof Array) ? actions.slice(0, 32) : [];
+    var lead = primary || null;
+    var buttons = lead ? [lead] : [];
+    var eligible = [];
+    for (var i = 0; i < list.length; i++) {
+        if (list[i] !== lead && actionRank(list[i]) >= 0)
+            eligible.push({ action: list[i], rank: actionRank(list[i]), order: i });
+    }
+    eligible.sort(function(a, b) { return a.rank - b.rank || a.order - b.order; });
+    for (var j = 0; j < eligible.length && buttons.length < ACTION_BUTTONS; j++)
+        buttons.push(eligible[j].action);
+    return {
+        buttons: buttons,
+        more: list.filter(function(action) {
+            return action !== lead && buttons.indexOf(action) < 0;
+        }),
+        primary: lead ? 0 : -1
+    };
+}
+
+// The mark a card shows when no icon resolves: the source's first letter or
+// digit, rather than a generic bell, so two icon-less senders still look
+// different. A hostname drops its "www." first; astral characters (emoji,
+// historic scripts) stay whole. "" when the name has nothing to show.
+function monogram(name) {
+    var text = singleLine(name).replace(/^www\./i, "");
+    for (var i = 0; i < text.length; i++) {
+        var code = text.charCodeAt(i);
+        var ch = text.charAt(i);
+        if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length)
+            return text.slice(i, i + 2);
+        // ASCII punctuation, symbols and the general punctuation block.
+        if (/[\s!-\/:-@\[-`{-~]/.test(ch) || (code >= 0x2000 && code <= 0x206f))
+            continue;
+        var upper = ch.toUpperCase();
+        return upper.length === 1 ? upper : ch;
+    }
+    return "";
 }
 
 function visibleCharacterCount(entry) {
@@ -367,7 +449,14 @@ var exported = {
     derivePresentation: derivePresentation,
     actionIdentifier: actionIdentifier,
     defaultAction: defaultAction,
+    senderActions: senderActions,
     secondaryActions: secondaryActions,
+    TITLE_LINES: TITLE_LINES,
+    ACTION_BUTTONS: ACTION_BUTTONS,
+    bodyLineLimit: bodyLineLimit,
+    actionRank: actionRank,
+    actionPlan: actionPlan,
+    monogram: monogram,
     visibleCharacterCount: visibleCharacterCount,
     timeoutMs: timeoutMs,
     iconPreference: iconPreference,

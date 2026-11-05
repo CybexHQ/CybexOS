@@ -454,7 +454,7 @@ Item {
         Accessible.role: Accessible.Button
         Accessible.name: drawer.label + ", " + drawer.count
         Accessible.onPressAction: drawer.toggled()
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: T3Theme.focus
 
         Keys.onPressed: event => {

@@ -5,8 +5,9 @@ import "../Common/ControlIconHelpers.js" as ControlIconHelpers
 // The Control Center button's icon as the bar draws it
 // (Common/ControlIconHelpers.js): the Cybex OS mark from its SVG, or a Nerd
 // Font glyph for the operating system's logo or a chosen icon, in the same
-// resting and hover ink as the bar's other marks. Settings previews it with
-// the value being chosen.
+// resting and hover ink as the bar's other marks. The Cybex X alone is drawn
+// two-tone so it does not read as a close button (BarBrandIcon). Settings
+// previews it with the value being chosen.
 Item {
     id: root
 

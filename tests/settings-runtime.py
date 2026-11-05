@@ -502,9 +502,9 @@ class Audit:
 
     def notifications(self):
         self.page('notifications')
-        self.edit(True,label='Do Not Disturb')
+        self.edit(True,label='Focus')
         assert self.evaluate('Notifs.dnd')
-        self.edit(False,label='Do Not Disturb')
+        self.edit(False,label='Focus')
         self.edit('custom',key='notifQuiet')
         for key in ['notifQuietStart','notifQuietEnd']:
             for value in [0,435,1425]:

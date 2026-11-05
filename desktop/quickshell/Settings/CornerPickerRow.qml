@@ -63,7 +63,7 @@ SettingsRow {
                 radius: Theme.scaled(3)
                 color: selected ? Theme.accent
                     : cornerMouse.containsMouse ? Theme.textLow : Theme.stroke
-                border.width: activeFocus ? 2 : 0
+                border.width: Theme.focusWidth(activeFocus)
                 border.color: Theme.textHi
                 activeFocusOnTab: selected || (root.corners.indexOf(root.current) === -1 && index === 0)
                 Accessible.role: Accessible.RadioButton

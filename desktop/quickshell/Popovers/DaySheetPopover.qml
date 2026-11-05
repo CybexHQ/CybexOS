@@ -170,7 +170,12 @@ Surface {
                     width: weekGrid.cellWidth
                     height: Theme.scaled(96)
                     radius: 10
-                    color: modelData.today ? Theme.chipHover : Theme.chip
+                    // Today is the selected tile (docs/shell-states.md): the
+                    // accent tint and a 2 px accent border, which still reads
+                    // at 3:1 on a light sheet where chipHover did not.
+                    color: modelData.today ? Theme.selectedFill : Theme.chip
+                    border.width: modelData.today ? Theme.selectedBorderWidth : 0
+                    border.color: Theme.selectedMark
 
                     Column {
                         anchors.centerIn: parent
@@ -194,8 +199,9 @@ Surface {
                             font.pixelSize: Theme.typography.heading
                             font.weight: Theme.weightSemibold
                             font.features: Theme.tabularNumberFeatures
-                            color: dayCell.modelData.today
-                                ? Theme.accentText : Theme.textHi
+                            // The border carries the accent; the number keeps
+                            // full contrast on the tint.
+                            color: Theme.textHi
                         }
 
                         Item {

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import "../Common"
+import "../Common/UpdatesHelpers.js" as UpdatesHelpers
 
 // Apps update together with the system, all prebuilt, in Software Update.
 // This page only reads that: which installed apps a prepared update
@@ -178,7 +179,7 @@ PageScroll {
         Text {
             width: parent.width
             visible: Updates.checkedAt !== null
-            text: Updates.checkedAt ? I18n.format("Last checked at %1", [Qt.formatTime(Updates.checkedAt, Qt.locale().timeFormat(Locale.ShortFormat))]) : ""
+            text: Updates.checkedAt ? I18n.format("Last checked at %1", [Qt.formatTime(Updates.checkedAt, UpdatesHelpers.clockFormat(Settings.clock24))]) : ""
             color: Theme.textFaint
             font.family: Theme.fontMenu
             font.pixelSize: Theme.typography.metadata

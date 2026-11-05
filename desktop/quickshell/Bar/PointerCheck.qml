@@ -26,6 +26,10 @@ QtObject {
     // The item the pointer is claimed to be over. The hover region is this
     // item's rectangle, so it is whatever the MouseArea fills.
     required property Item target
+    // Where the pointer counts as over the target, when that is wider than
+    // the target itself: a bar target's MouseArea reaches the bar's full
+    // height past its inset chip, and hover follows the click.
+    property Item region: null
     // The caller's first opinion. Legacy non-visual checks pass their local
     // MouseArea state; BarHover passes true so the bar-wide scene hit test is
     // authoritative for every visual hover surface.
@@ -52,11 +56,12 @@ QtObject {
                 || root.target.height <= 0)
             return false;
         const scenePoint = root.host.tooltipPointerPosition;
-        if (!root.inside(root.target, scenePoint))
+        const area = root.region ?? root.target;
+        if (!root.inside(area, scenePoint))
             return false;
         // Partially clipped: the point must also fall inside every clipping
         // ancestor, or a half-revealed strip claims its hidden half.
-        for (let item = root.target.parent; item; item = item.parent) {
+        for (let item = area.parent; item; item = item.parent) {
             if (item.clip && !root.inside(item, scenePoint))
                 return false;
         }

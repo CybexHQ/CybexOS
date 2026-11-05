@@ -85,7 +85,9 @@ def main():
         entry = shell / 'shell.qml'
         source = entry.read_text().replace('import "Common"', 'import "Common"\nimport "Common" as TestCommon\nimport "Popovers/Drawer" as TestDrawer').replace('SettingsWindow {}', 'SettingsWindow { id: wallpaperSettings }')
         source = source.replace('    id: shell', '''    id: shell
-    TestDrawer.DrawerOverview {
+    // The session row moved out of the Overview into the drawer's pinned
+    // footer (2026-11); its eight buttons must still fit at every scale.
+    TestDrawer.DrawerSessionFooter {
         id: drawerProbe
         width: Theme.drawerWidth - Theme.panelPadding * 2
         visible: false
@@ -107,7 +109,9 @@ def main():
         target: "wallpaper-test"
         function scale(value: int): void { Settings.set("shellScale", value); }
         function footer(): string {
-            const footer = drawerProbe.children[drawerProbe.children.length - 1];
+            // The footer's zone: the child that holds the two button rows.
+            const footer = [...drawerProbe.children].find(child =>
+                [...(child.children || [])].filter(row => row.spacing !== undefined).length >= 2);
             const buttons = [];
             for (const row of footer.children) {
                 // The probe is not mapped; positioners need an explicit polish.

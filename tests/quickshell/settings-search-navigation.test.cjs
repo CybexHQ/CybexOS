@@ -85,3 +85,15 @@ test("palette actions are searchable and each names a page or runs on its own", 
     assert.ok(search.searchActions("passwd").some(entry => entry.action === "change-password"));
     assert.deepEqual(search.searchActions(""), []);
 });
+
+test("a renamed row is still found first by its former name", () => {
+    // Do Not Disturb became Focus (2026-11); the old name must not lose the
+    // row behind another that merely mentions it in hidden terms.
+    assert.equal(search.search("Do Not Disturb")[0].label, "Focus");
+    assert.equal(search.search("Do Not Disturb")[0].key, "notifDnd");
+    for (const row of search.ROWS) {
+        if (row.aliases !== undefined)
+            assert.ok(Array.isArray(row.aliases) && row.aliases.every(alias => typeof alias === "string" && alias !== ""),
+                `${row.label}: aliases must be non-empty strings`);
+    }
+});

@@ -147,7 +147,7 @@ var ALIASES = {
     "network_ping": "activity",
     "network_wifi_1_bar": "wifi-1",
     "network_wifi_2_bar": "wifi-2",
-    "nightlight": "moon",
+    "nightlight": "sunset-2",
     "notes": "notes",
     "notifications": "bell",
     "notifications_active": "bell-ringing",
@@ -828,6 +828,9 @@ var GLYPHS = {
     },
     "sun": {
         "outline": "\ueb30"
+    },
+    "sunset-2": {
+        "outline": "\uf23a"
     },
     "tag": {
         "outline": "\ud800\udc96"

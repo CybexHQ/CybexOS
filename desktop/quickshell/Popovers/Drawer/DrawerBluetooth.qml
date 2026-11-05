@@ -228,8 +228,8 @@ Column {
                     height: Theme.scaled(44)
                     radius: Theme.rowRadius
                     color: modelData.connected || mouse.containsMouse || activeFocus ? Theme.chip : "transparent"
-                    border.width: activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(activeFocus)
+                    border.color: Theme.focusRing
                     enabled: root.ready && root.busyDevice === "" && !busy
                     activeFocusOnTab: enabled
                     Accessible.role: Accessible.Button
@@ -368,8 +368,8 @@ Column {
                 height: 36
                 radius: Theme.rowRadius
                 color: Theme.chipHover
-                border.width: pin.activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                border.width: Theme.focusWidth(pin.activeFocus)
+                border.color: Theme.focusRing
                 TextInput {
                     id: pin
                     anchors.fill: parent

@@ -202,8 +202,8 @@ Surface {
         color: radioMouse.containsMouse || activeFocus ? Theme.chip : "transparent"
         scale: radioMouse.pressed ? 0.99 : 1
         activeFocusOnTab: true
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         Accessible.role: Accessible.Button
         Accessible.name: radio.title
@@ -686,8 +686,8 @@ Surface {
                     Accessible.name: I18n.tr("Choose audio output")
                     Accessible.description: Audio.outputName
                     Accessible.onPressAction: Popouts.openPanel("audio", "right")
-                    border.width: activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(activeFocus)
+                    border.color: Theme.focusRing
 
                     Behavior on color {
                         ColorAnimation { duration: Theme.chipFadeDuration }
@@ -892,8 +892,8 @@ Surface {
                             color: capture.recording ? Theme.redBg
                                 : captureMouse.containsMouse || activeFocus ? Theme.tile : "transparent"
                             activeFocusOnTab: true
-                            border.width: activeFocus ? 1 : 0
-                            border.color: Theme.accentText
+                            border.width: Theme.focusWidth(activeFocus)
+                            border.color: Theme.focusRing
 
                             Accessible.role: Accessible.Button
                             Accessible.name: capture.label
@@ -1012,8 +1012,8 @@ Surface {
             radius: Theme.chipRadius
             color: settingsMouse.containsMouse || activeFocus ? Theme.chip : "transparent"
             activeFocusOnTab: true
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Open Cybex OS Settings")
             Accessible.onPressAction: Settings.showPanel()
@@ -1072,8 +1072,8 @@ Surface {
             radius: Theme.chipRadius
             color: keysMouse.containsMouse || activeFocus ? Theme.chip : "transparent"
             activeFocusOnTab: true
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
 
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Keyboard shortcuts")

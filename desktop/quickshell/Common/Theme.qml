@@ -165,7 +165,10 @@ Singleton {
     readonly property color barWsCurrentFg: barAccentFg
     readonly property color barWsCurrentGlow: barAccentGlow
     readonly property color barWsOccupied: barTextLow
-    readonly property color barWsEmpty: barDotDim
+    // Empty dots sit a step above barDotDim (2026-11): still decorative, but
+    // the row of places reads at a glance.
+    readonly property color barWsEmpty: barLightForeground
+        ? Qt.rgba(1, 1, 1, 0.44) : Qt.rgba(0, 0, 0, 0.38)
     readonly property color barDotDim: barLightForeground
         ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(0, 0, 0, 0.26)
     readonly property color barStroke: barLightForeground
@@ -271,6 +274,42 @@ Singleton {
     readonly property color activeFill: chip
     readonly property color cardFill: chip
     readonly property color insetSurface: chip
+
+    // ---- state system (2026-11, docs/shell-states.md) ---------------------
+    // Hover is the neutral chip above; the current item is an accent tint, so
+    // "where I am" never looks like "where the pointer is". Marks laid on a
+    // state — the 3 px rail edge, a selected tile's border, the focus ring —
+    // clear 3:1 over copyReferenceBg in every palette
+    // (SettingsHelpers.stateTokens, state-tokens.test.cjs).
+    readonly property var stateTokens: SettingsHelpers.stateTokens(
+        accent.toString(), copyReferenceBg.toString(), dark)
+    readonly property color selectedFill: paletteActive
+        ? Qt.rgba(Common.Palette.primaryContainer.r, Common.Palette.primaryContainer.g,
+            Common.Palette.primaryContainer.b, dark ? 0.58 : 0.66)
+        : Qt.rgba(accent.r, accent.g, accent.b, stateTokens.selectedAlpha)
+    readonly property color selectedMark: stateTokens.selectedMark
+    readonly property int selectedEdgeWidth: 3
+    readonly property int selectedBorderWidth: 2
+    // The keyboard focus ring: drawn as a Rectangle border, which Qt Quick
+    // paints inside the item, so clipping parents cannot cut it off and it
+    // lands on whole pixels at fractional scales. Shown only for keyboard
+    // modality (FocusModality); a pointer press hides it.
+    readonly property color focusRing: stateTokens.focusRing
+    readonly property int focusRingWidth: 2
+    readonly property bool focusVisible: Common.FocusModality.keyboard
+    function focusWidth(focused) {
+        return focused && Common.FocusModality.keyboard ? focusRingWidth : 0;
+    }
+    // A switch that is off: a quiet track, a boundary and knob in textMid.
+    readonly property color switchOffTrack: Qt.rgba(textFaint.r, textFaint.g,
+        textFaint.b, stateTokens.switchOffTrackAlpha)
+    readonly property color switchOffBorder: textMid
+    readonly property color switchOffKnob: textMid
+    // Empty workspace dots: decorative, but a step above dotDim so the row of
+    // places still reads. Only the dots workspace style uses it.
+    readonly property color wsEmpty: dark
+        ? Qt.rgba(245 / 255, 244 / 255, 251 / 255, 0.42)
+        : Qt.rgba(28 / 255, 26 / 255, 46 / 255, 0.36)
 
     // ---- text -------------------------------------------------------------
     // The design's --txt3 lands at 3.2:1 over the panel reference, below the

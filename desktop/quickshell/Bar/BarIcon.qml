@@ -134,8 +134,16 @@ Rectangle {
         : alert ? Theme.barRedText
         : held || root.hovered ? hoverColor : idleColor
 
+    // Pointer target (docs/shell-states.md): the bar's full height and at
+    // least 32 px wide. The fill keeps its inset; the click target reaches
+    // half the gap towards each neighbour, so a narrow icon is laid out a
+    // little wider instead of overlapping the target beside it.
+    readonly property real hitSlack: Theme.barSpacing / 2
+    readonly property real hitMinWidth: Theme.scaled(32)
+
     implicitHeight: pillHeight
-    implicitWidth: round ? Theme.roundButton : content.implicitWidth + hPadding * 2
+    implicitWidth: round ? Theme.roundButton
+        : Math.max(content.implicitWidth + hPadding * 2, hitMinWidth - hitSlack * 2)
     radius: round ? pillHeight / 2 : Theme.chipRadius
     color: active ? Theme.barAccent
         : alert ? Theme.barRedBg
@@ -174,11 +182,13 @@ Rectangle {
         anchors.fill: parent
         host: root.host
         target: root
+        // The whole pointer area lights the chip, so hover and click agree.
+        hitArea: mouse
         radius: parent.radius
         visualEnabled: !root.bare
         pressed: mouse.pressed
         tint: root.fg
-        pressPoint: Qt.point(mouse.mouseX, mouse.mouseY)
+        pressPoint: Qt.point(mouse.mouseX + mouse.x, mouse.mouseY + mouse.y)
     }
 
     Row {
@@ -277,7 +287,9 @@ Rectangle {
 
     MouseArea {
         id: mouse
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: parent.width + root.hitSlack * 2
+        height: Math.max(parent.height, Theme.barHeight)
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         cursorShape: Qt.PointingHandCursor
@@ -301,7 +313,7 @@ Rectangle {
             }
             if (root.ownsPanel)
                 root.host.togglePopout(root.panelName, root.isle, root.anchorItem);
-            root.clicked(mouse.x);
+            root.clicked(mouse.x - root.hitSlack);
         }
         onWheel: wheel => {
             const delta = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y

@@ -435,7 +435,7 @@ Rectangle {
                     radius: HermesTheme.controlRadius
                     color: selected ? Theme.chipHover
                         : optionMouse.containsMouse ? HermesTheme.hoverStrong : "transparent"
-                    border.width: activeFocus ? 1 : 0
+                    border.width: Theme.focusWidth(activeFocus)
                     border.color: HermesTheme.focus
                     activeFocusOnTab: !root.pending
                     opacity: root.pending ? 0.5 : 1

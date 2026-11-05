@@ -53,10 +53,12 @@ BarModule {
                     anchors.fill: parent
                     host: root.host
                     target: chevron
+                    hitArea: chevronMouse
                     radius: Theme.chipRadius
                     pressed: chevronMouse.pressed
                     tint: Theme.barTextHi
-                    pressPoint: Qt.point(chevronMouse.mouseX, chevronMouse.mouseY)
+                    pressPoint: Qt.point(chevronMouse.mouseX,
+                        chevronMouse.mouseY + chevronMouse.y)
                 }
 
                 Sym {
@@ -77,9 +79,12 @@ BarModule {
                     }
                 }
 
+                // The bar's full height, like every bar target.
                 MouseArea {
                     id: chevronMouse
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: Math.max(parent.height, Theme.barHeight)
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.expanded = !root.expanded

@@ -26,8 +26,8 @@ Rectangle {
     color: primary ? Theme.accent : danger ? Theme.redBgSoft : Theme.chip
     opacity: enabled ? 1 : 0.45
     activeFocusOnTab: enabled && visible
-    border.width: activeFocus ? 1 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
 
     Accessible.role: Accessible.Button
     Accessible.name: root.accessibleName

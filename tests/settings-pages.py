@@ -126,6 +126,7 @@ TEST_IPC = '''
                 prepared: SettingsUi.RegionDrafts.prepared, highlight: Settings.highlightKey,
                 shortcuts: shell.findNamed(pagesSettings.contentItem, "shortcutsPage") !== null,
                 home: shell.findNamed(pagesSettings.contentItem, "settingsHomePage") !== null,
+                searchHint: view ? view.searchHintShown : false, compactNav: view ? view.compactNav : false,
                 dnd: Settings.notifDnd, clock24: Settings.clock24 });
         }
         function openPalette(text: string): void { shell.settingsView().openPalette(text); }
@@ -354,6 +355,20 @@ def main():
             assert first['page'] == 'home' and not first['canGoBack'], first
             time.sleep(2)
             screenshot('01-home.png')
+            assert not first['searchHint'], 'the full rail shows its own "/" key cap'
+
+            # The icon rail says once that "/" searches; using it retires the tip.
+            subprocess.run(['swaymsg', '[title="Cybex OS Settings"]', 'resize', 'set', '640', '620'],
+                           env=env, check=True, capture_output=True)
+            wait(lambda: (s := state()).get('compactNav') and s.get('searchHint'), 'the icon rail\'s search tip')
+            screenshot('01b-narrow-home.png')
+            keys('/')
+            wait(lambda: ((s := state()).get('palette') or {}).get('open') and not s.get('searchHint'),
+                 '"/" opens the palette and retires the tip')
+            assert ipc('settings-test', 'pressEscape') == 'true'
+            subprocess.run(['swaymsg', '[title="Cybex OS Settings"]', 'resize', 'set', '1120', '816'],
+                           env=env, check=True, capture_output=True)
+            wait(lambda: not state().get('compactNav'), 'the full rail again')
 
             # Every page and tab loads; the tabbed pages keep their tab.
             for page, tab in (('appearance', None), ('wallpaper', None), ('bar', None), ('workspaces', None),
@@ -460,7 +475,8 @@ def main():
             # Ctrl+Enter flips a switch where it stands.
             dnd = state()['dnd']
             ipc('settings-test', 'openPalette', 'Do Not Disturb')
-            wait(lambda: (state().get('palette') or {}).get('choices', [])[:1] == ['row:Do Not Disturb'], 'DND row')
+            # The row is named Focus (2026-11); its old name still finds it.
+            wait(lambda: (state().get('palette') or {}).get('choices', [])[:1] == ['row:Focus'], 'Focus row')
             keys('-M', 'ctrl', '-k', 'Return', '-m', 'ctrl')
             wait(lambda: state()['dnd'] is (not dnd), 'Ctrl+Enter toggled Do Not Disturb')
             assert state()['palette']['open'], 'the palette stays open after a toggle'

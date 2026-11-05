@@ -25,7 +25,8 @@ SettingsRow {
         id: control
         x: root.contentRight - width - 2
         y: (root.lineHeight - height) / 2
-        opacity: root.controlOpacity
+        // The row disables itself while unavailable; the switch then fades
+        // on its own and the reason under it stays at full contrast.
         metrics: Theme.switchRow
         checked: root.checked
         accessibleName: root.accessibleName

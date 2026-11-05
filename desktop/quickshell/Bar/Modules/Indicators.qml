@@ -147,8 +147,8 @@ BarModule {
             return (SysInfo.nightLight ? "Turn off night light" : "Turn on night light")
                 + " · middle click settings";
         case "dnd":
-            return (Notifs.dnd ? "Turn off Do Not Disturb · " + Notifs.dndStatus
-                : "Turn on Do Not Disturb") + " · middle click settings";
+            return (Notifs.dnd ? "Turn off Focus · " + Notifs.dndStatus
+                : "Turn on Focus") + " · middle click settings";
         case "stay-awake":
             return (SysInfo.idleInhibited ? "Allow idle and sleep · "
                 + SysInfo.idleInhibitStatus : "Stay awake · "
@@ -318,10 +318,11 @@ BarModule {
             anchors.fill: parent
             host: root.host
             target: button
+            hitArea: actionMouse
             radius: button.radius
             pressed: actionMouse.pressed
             tint: button.recording ? Theme.barRedFg : Theme.barTextHi
-            pressPoint: Qt.point(actionMouse.mouseX, actionMouse.mouseY)
+            pressPoint: Qt.point(actionMouse.mouseX, actionMouse.mouseY + actionMouse.y)
         }
 
         Row {
@@ -364,9 +365,13 @@ BarModule {
             }
         }
 
+        // The bar's full height, like every bar target. The inactive
+        // revealer clips, so its actions keep their chip height.
         MouseArea {
             id: actionMouse
-            anchors.fill: parent
+            anchors.centerIn: parent
+            width: parent.width
+            height: Math.max(parent.height, Theme.barHeight)
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor

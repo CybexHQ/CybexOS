@@ -1,12 +1,16 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.Notifications
+import "NotifHelpers.js" as Helpers
 
-// The notification card anatomy, drawn by both the toast overlay and the
-// notification centre: source icon, app/summary header, a timestamp that
-// becomes a close button on hover, wrapped body, and contextual action pills.
-// Toasts stack app and summary for a calmer hierarchy; compact centre rows
-// keep them together.
+// The notification card anatomy (2026-11), drawn by both the toast overlay
+// and the drawer's Notifications tab: source icon (monogram fallback) · a
+// meta line with the app and its time · the title on its own line, two lines
+// at most · the body, which gives up a line once the card carries buttons ·
+// up to two action buttons, the rest under More (NotifActions). Toasts show
+// × in place of the time while hovered; the drawer keeps 24 px expand and
+// dismiss targets beside it. A nested centre row (showApp false) folds its
+// title into the meta line, under a header that already names the app.
 //
 // Surface chrome stays with the caller. This is a Rectangle, so `color`,
 // `border` and `radius` are set at the call site the ordinary way, and extra
@@ -14,7 +18,7 @@ import Quickshell.Services.Notifications
 // parent into it like any other child.
 //
 // Callers share Theme.typography.notification for message copy. The style
-// object carries presentation differences (stacking, timestamps, line limits).
+// object carries presentation differences (targets, timestamps, line limits).
 Rectangle {
     id: card
 
@@ -33,6 +37,8 @@ Rectangle {
     property int iconExtent: 28
     property int iconSize: 28
     property bool framedIcon: false
+    // The icon well's fill: a step above whatever the card itself is.
+    property color iconWell: Theme.chip
     // Toasts can trade their compact resting height for the complete text
     // while the pointer is holding their expiry timer. History rows instead
     // opt into an explicit disclosure so merely moving through them never
@@ -60,6 +66,8 @@ Rectangle {
     readonly property bool showTextDisclosure: allowTextExpansion
         && (textExpandedByUser || textTruncated)
     readonly property bool actionable: groupCount > 1 || Notifs.canActivate(entry)
+    readonly property int bodyLines: Helpers.bodyLineLimit(card.style.bodyLines,
+        notificationActions.hasButtons)
     // Real, not int: a card's height is text metrics plus padding and lands
     // on fractions, and truncating it costs a pixel that then shifts every
     // card below this one.
@@ -128,8 +136,18 @@ Rectangle {
         anchors.fill: parent
         radius: card.radius
         color: "transparent"
-        border.width: card.activeFocus ? 2 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(card.activeFocus)
+        border.color: Theme.focusRing
+    }
+
+    TextMetrics {
+        id: stampReserve
+        // The widest relative time this card shows, so the meta line keeps
+        // its width as "now" becomes "12m".
+        font.family: card.style.stampFace
+        font.pixelSize: card.style.stampSize
+        font.weight: Theme.weightMedium
+        text: "88m"
     }
 
     Row {
@@ -137,7 +155,7 @@ Rectangle {
         x: card.padH
         y: card.padV
         width: parent.width - card.padH * 2
-        spacing: card.showIcon ? 10 : 0
+        spacing: card.showIcon ? Theme.scaled(10) : 0
 
         NotifIcon {
             visible: card.showIcon
@@ -145,6 +163,7 @@ Rectangle {
             height: card.iconExtent
             iconSize: card.iconSize
             framed: card.framedIcon
+            wellColor: card.iconWell
             entry: card.entry
             urgent: card.urgent
         }
@@ -152,8 +171,10 @@ Rectangle {
         Column {
             width: cardContent.width
                 - (card.showIcon ? card.iconExtent + cardContent.spacing : 0)
-            spacing: 4
+            spacing: Theme.scaled(2)
 
+            // Line 1: the source and its time. Its trailing controls keep
+            // one target height so the title below never moves on hover.
             Item {
                 width: parent.width
                 height: Math.max(header.implicitHeight, trailing.height)
@@ -163,39 +184,54 @@ Rectangle {
                     textFormat: Text.PlainText
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - trailing.width - 8
-                    text: card.style.stackedHeader && card.showApp
-                        ? card.entry.displayAppName
-                        : card.showApp
-                            ? card.entry.displayAppName
-                                + (card.entry.displaySummary
-                                    ? " · " + card.entry.displaySummary : "")
+                    width: parent.width - trailing.width - Theme.controlSpacing
+                    text: card.showApp ? card.entry.displayAppName
                         : (card.entry.displaySummary || card.entry.displayAppName)
                     font.family: card.style.face
-                    font.pixelSize: card.style.stackedHeader && card.showApp
-                        ? card.style.pill : card.style.header
-                    font.weight: card.style.stackedHeader && card.showApp
+                    font.pixelSize: card.showApp
+                        ? Theme.typography.metadata : card.style.header
+                    font.weight: card.showApp
                         ? Theme.weightMedium : Theme.weightSemibold
-                    color: card.style.stackedHeader && card.showApp
-                        ? Theme.textMid : Theme.textHi
+                    color: card.showApp ? Theme.textLow : Theme.textHi
                     wrapMode: card.textExpanded ? Text.Wrap : Text.NoWrap
                     elide: card.textExpanded ? Text.ElideNone : Text.ElideRight
                 }
 
+                // [count] [time | ×] [expand] for toasts and nested rows,
+                // [count] [expand] [time] [×] for the drawer, whose × is
+                // always there. An expand slot is reserved whenever the
+                // card allows one: letting `textTruncated` add its width
+                // creates a binding loop at runtime.
                 Item {
                     id: trailing
+
+                    readonly property real target: card.style.target
+                    readonly property real gap: Theme.scaled(2)
+                    readonly property bool closeBeside: card.style.closeAlways
+                    readonly property real countWidth: card.groupCount > 1
+                        ? countPill.width + gap : 0
+                    readonly property real stampWidth: Math.ceil(Math.max(
+                        stampReserve.advanceWidth, stamp.implicitWidth))
+                    readonly property real stampSlot: closeBeside
+                        ? stampWidth : Math.max(stampWidth, target)
+                    readonly property real expandWidth: card.allowTextExpansion
+                        ? target + gap : 0
+                    readonly property real expandX: closeBeside
+                        ? countWidth : countWidth + stampSlot + gap
+                    readonly property real stampRight: closeBeside
+                        ? countWidth + expandWidth + stampSlot
+                        : countWidth + stampSlot
+
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: (card.groupCount > 1 ? 60 : 32)
-                        // Keep the title's collapsed width stable while the
-                        // disclosure appears. Letting `textTruncated` add its
-                        // own width creates a binding loop at runtime.
-                        + (card.allowTextExpansion ? textDisclosure.width : 0)
-                    height: card.style.trailingHeight
+                    width: countWidth + expandWidth + stampSlot
+                        + (closeBeside ? gap + target : 0)
+                    height: target
 
                     // Collapsed-group count. The toast never groups, so this
                     // never renders there.
                     Rectangle {
+                        id: countPill
                         visible: card.groupCount > 1
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -216,91 +252,20 @@ Rectangle {
                         }
                     }
 
-                    // The timestamp and the close button occupy the same
-                    // spot, so a card never reflows when the pointer enters.
-                    // The toast centres them in the trailing box and the
-                    // centre right-aligns them; `stampCentred` keeps both
-                    // surfaces where they were rather than picking one.
+                    // A toast's time and × share one spot, so the card never
+                    // reflows when the pointer enters.
                     Text {
-                        anchors.right: card.style.stampCentred ? undefined : parent.right
-                        anchors.rightMargin: card.showTextDisclosure
-                            && !card.style.stampCentred ? textDisclosure.width : 0
-                        anchors.horizontalCenter: card.style.stampCentred
-                            ? parent.horizontalCenter : undefined
+                        id: stamp
+                        x: trailing.stampRight - width
                         anchors.verticalCenter: parent.verticalCenter
-                        opacity: card.hovered || closeButton.activeFocus ? 0 : 1
+                        opacity: trailing.closeBeside
+                            || !(card.hovered || closeButton.activeFocus) ? 1 : 0
                         text: Notifs.timeAgo(card.entry.arrived, card.nowMs)
                         font.family: card.style.stampFace
                         font.pixelSize: card.style.stampSize
                         font.weight: Theme.weightMedium
                         font.features: Theme.tabularNumberFeatures
-                        color: Theme.textDim
-
-                        Behavior on opacity {
-                            NumberAnimation {
-                                duration: Theme.chipFadeDuration / 2
-                                easing.type: Easing.OutCubic
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        id: closeButton
-                        anchors.right: card.style.stampCentred ? undefined : parent.right
-                        anchors.rightMargin: card.showTextDisclosure
-                            && !card.style.stampCentred ? textDisclosure.width : 0
-                        anchors.horizontalCenter: card.style.stampCentred
-                            ? parent.horizontalCenter : undefined
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: card.style.trailingHeight + 4
-                        height: width
-                        radius: width / 2
-                        opacity: card.hovered || activeFocus ? 1 : 0
-                        color: closeMouse.containsMouse || activeFocus
-                            ? Theme.hoverFillStrong : "transparent"
-                        activeFocusOnTab: card.keyboardEnabled
-                        border.width: activeFocus ? 1 : 0
-                        border.color: Theme.accentText
-                        Accessible.role: Accessible.Button
-                        Accessible.name: card.entry.displayAppName
-                            ? I18n.format("Dismiss notification from %1", [card.entry.displayAppName])
-                            : I18n.tr("Dismiss notification from this app")
-                        Accessible.onPressAction: card.closeRequested()
-
-                        Keys.onPressed: event => {
-                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-                                    || event.key === Qt.Key_Space
-                                    || event.key === Qt.Key_Delete) {
-                                card.closeRequested();
-                                event.accepted = true;
-                            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
-                                card.moveFocus(closeButton, true);
-                                event.accepted = true;
-                            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
-                                card.moveFocus(closeButton, false);
-                                event.accepted = true;
-                            }
-                        }
-
-                        Sym {
-                            anchors.centerIn: parent
-                            name: "close"
-                            size: card.style.close
-                            color: closeMouse.containsMouse
-                                ? Theme.textHi : card.style.closeColor
-                        }
-
-                        MouseArea {
-                            id: closeMouse
-                            anchors.fill: parent
-                            enabled: card.hovered || closeButton.activeFocus
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                closeButton.forceActiveFocus();
-                                card.closeRequested();
-                            }
-                        }
+                        color: Theme.textLow
 
                         Behavior on opacity {
                             NumberAnimation {
@@ -314,16 +279,16 @@ Rectangle {
                         id: textDisclosure
 
                         visible: card.showTextDisclosure
-                        anchors.right: parent.right
+                        x: trailing.expandX
                         anchors.verticalCenter: parent.verticalCenter
-                        width: card.style.trailingHeight + 4
+                        width: trailing.target
                         height: width
-                        radius: width / 2
+                        radius: Theme.chipRadius
                         color: disclosureMouse.containsMouse || activeFocus
                             ? Theme.hoverFillStrong : "transparent"
                         activeFocusOnTab: visible && card.keyboardEnabled
-                        border.width: activeFocus ? 1 : 0
-                        border.color: Theme.accentText
+                        border.width: Theme.focusWidth(activeFocus)
+                        border.color: Theme.focusRing
 
                         Accessible.role: Accessible.Button
                         Accessible.name: card.textExpandedByUser
@@ -366,14 +331,83 @@ Rectangle {
                             }
                         }
                     }
+
+                    Rectangle {
+                        id: closeButton
+
+                        readonly property bool shown: trailing.closeBeside
+                            || card.hovered || activeFocus
+
+                        x: trailing.closeBeside ? trailing.width - width
+                            : trailing.stampRight - width
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: trailing.target
+                        height: width
+                        radius: Theme.chipRadius
+                        opacity: shown ? 1 : 0
+                        color: closeMouse.containsMouse || activeFocus
+                            ? Theme.hoverFillStrong : "transparent"
+                        activeFocusOnTab: card.keyboardEnabled
+                        border.width: Theme.focusWidth(activeFocus)
+                        border.color: Theme.focusRing
+                        Accessible.role: Accessible.Button
+                        Accessible.name: card.entry.displayAppName
+                            ? I18n.format("Dismiss notification from %1", [card.entry.displayAppName])
+                            : I18n.tr("Dismiss notification from this app")
+                        Accessible.onPressAction: card.closeRequested()
+
+                        Keys.onPressed: event => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                                    || event.key === Qt.Key_Space
+                                    || event.key === Qt.Key_Delete) {
+                                card.closeRequested();
+                                event.accepted = true;
+                            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+                                card.moveFocus(closeButton, true);
+                                event.accepted = true;
+                            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+                                card.moveFocus(closeButton, false);
+                                event.accepted = true;
+                            }
+                        }
+
+                        Sym {
+                            anchors.centerIn: parent
+                            name: "close"
+                            size: card.style.close
+                            color: closeMouse.containsMouse
+                                ? Theme.textHi : card.style.closeColor
+                        }
+
+                        MouseArea {
+                            id: closeMouse
+                            anchors.fill: parent
+                            enabled: closeButton.shown
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (card.keyboardEnabled)
+                                    closeButton.forceActiveFocus();
+                                card.closeRequested();
+                            }
+                        }
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: Theme.chipFadeDuration / 2
+                                easing.type: Easing.OutCubic
+                            }
+                        }
+                    }
+
                 }
             }
 
+            // Line 2: the title on its own line.
             Text {
                 id: summary
                 textFormat: Text.PlainText
-                visible: card.style.stackedHeader && card.showApp
-                    && card.entry.displaySummary !== ""
+                visible: card.showApp && card.entry.displaySummary !== ""
                 width: parent.width
                 text: card.entry.displaySummary === "Verification notification"
                     ? I18n.tr("Verification notification") : card.entry.displaySummary || ""
@@ -381,14 +415,16 @@ Rectangle {
                 font.pixelSize: card.style.header
                 font.weight: Theme.weightSemibold
                 color: Theme.textHi
-                wrapMode: card.textExpanded ? Text.Wrap : Text.NoWrap
+                wrapMode: Text.Wrap
+                maximumLineCount: card.textExpanded
+                    ? 2147483647 : Helpers.TITLE_LINES
                 elide: card.textExpanded ? Text.ElideNone : Text.ElideRight
             }
 
             Text {
                 id: bodyText
                 textFormat: Text.PlainText
-                visible: text !== "" && card.style.bodyLines > 0
+                visible: text !== "" && card.bodyLines > 0
                 width: parent.width
                 text: card.entry.displayBody === "Content redacted"
                     ? I18n.tr("Content redacted") : card.entry.displayBody || ""
@@ -397,7 +433,7 @@ Rectangle {
                 color: card.urgent ? Theme.textHi : card.style.bodyColor
                 wrapMode: Text.Wrap
                 maximumLineCount: card.textExpanded
-                    ? 2147483647 : Math.max(1, card.style.bodyLines)
+                    ? 2147483647 : Math.max(1, card.bodyLines)
                 elide: card.textExpanded ? Text.ElideNone : Text.ElideRight
                 lineHeight: card.style.bodyLeading
             }
@@ -412,7 +448,10 @@ Rectangle {
 
             NotifActions {
                 id: notificationActions
+                width: parent.width
+                topPadding: Theme.scaled(6)
                 entry: card.entry
+                available: card.groupCount === 1
                 reveal: card.groupCount === 1 && (card.hovered || card.activeFocus
                     || closeButton.activeFocus || textDisclosure.activeFocus
                     || notificationActions.hasFocusedAction)

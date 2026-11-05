@@ -126,11 +126,15 @@ function service(){
     const queue=[];
     const context={Helpers:H,Policy:P,Smart:S,Format:load('Format.js'),console,Date, NotificationUrgency:{Normal:1,Critical:2},
         BrandIcons:{has:()=>false},Settings:{notifHistoryCount:50,notifDedupeSeconds:10,notifBurstLimit:5,
-            notifPopupGroups:3,notifPopupPerGroup:3,notifFullscreen:'away',notifDuration:8},
+            notifPopupGroups:3,notifPopupPerGroup:3,notifFullscreen:'away',notifDuration:8,
+            notifPosition:'top-right'},
         Screens:{focused:{name:'one'}},Quickshell:{screens:[{name:'one'}]},Qt:{callLater:fn=>{if(!queue.includes(fn))queue.push(fn);}},
         entries:[],toasts:[],snoozes:[],burstEvents:[],heldGroups:{},fullscreenOutputs:[],dnd:false,quietActive:false,
         localSerial:0,historyGeneration:0,historyProcess:{running:false},historyWrite:{stop(){}},fingerprintImage:()=>'',
-        I18n:{tr:s=>s},queue};
+        I18n:{tr:s=>s},queue,
+        // The drawer collision rule: closed unless a test opens it.
+        drawerState:{open:false,tab:'',screen:'',side:'right',tabEnabled:true},
+        unreadKeys:[],pinnedKeys:[],arrivalKey:'',overflow:[],arrivalLife:{restart(){},stop(){}}};
     context.root=context;
     context.groupHoldQueue=Holds.create(context.Qt.callLater,groups=>{context.heldGroups=groups;});
     context.historyRetention={stop(){},start(){}};
@@ -142,7 +146,8 @@ function service(){
     for(const name of ['describe','remoteSource','publish','updateEntry','removeEntry','hideToast','dismiss','invoke',
         'defaultAction','secondaryActions','canActivate','invokeDefault','timeoutFor','send','clearAll',
         'historyReply','queueHistory','pruneHistory','scheduleRetention','setDndMode','setDnd','scheduleDndTick',
-        'snoozeSource','unsnooze','scheduleSnoozes','holdGroup']){
+        'snoozeSource','unsnooze','scheduleSnoozes','holdGroup',
+        'routeToDrawer','unpin','noteOverflow','activate','updateNotice','primaryAction']){
         const match=source.match(new RegExp('^    function '+name+'\\([^]*?^    }','m'));
         assert.ok(match,name);
         vm.runInContext(match[0],context);

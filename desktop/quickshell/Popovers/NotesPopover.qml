@@ -274,8 +274,8 @@ Surface {
         color: buttonMouse.containsMouse || activeFocus
             ? Theme.hoverFillStrong : "transparent"
         opacity: enabled ? 1 : 0.4
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
         // Visibility is already enforced by the parent view. Keeping this
         // independent avoids changing the flag while a focused view exits.
         activeFocusOnTab: enabled
@@ -534,8 +534,8 @@ Surface {
                             color: noteHover.hovered || activeFocus
                                 || cardActions.activeFocus
                                     ? Theme.hoverFillStrong : "transparent"
-                            border.width: activeFocus ? 1 : 0
-                            border.color: Theme.accentText
+                            border.width: Theme.focusWidth(activeFocus)
+                            border.color: Theme.focusRing
                             activeFocusOnTab: true
                             Accessible.role: Accessible.Button
                             Accessible.name: "Edit note: " + modelData.title

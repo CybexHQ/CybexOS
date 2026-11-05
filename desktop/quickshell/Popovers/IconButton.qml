@@ -35,7 +35,7 @@ Rectangle {
     color: iconMouse.containsMouse || activeFocus ? T3Theme.hoverStrong : "transparent"
     opacity: enabled ? 1 : 0.4
     activeFocusOnTab: enabled && visible
-    border.width: activeFocus ? 1 : 0
+    border.width: Theme.focusWidth(activeFocus)
     border.color: T3Theme.focus
 
     Keys.onPressed: event => {

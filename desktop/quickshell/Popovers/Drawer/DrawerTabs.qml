@@ -4,12 +4,15 @@ import QtQuick.Controls as Controls
 import "../../Common"
 import "../../Common/PanelRegistryData.js" as PanelRegistry
 
-// The drawer's tab strip. The current tab carries its icon and label on a
-// lit segment with the design's 12px side padding; the others compress to
-// icons sharing the remaining width, so the strip holds one row at every
-// drawer width. Selecting a tab reopens the popout under that tab's
-// canonical panel name — same name space as the bar glyphs and IPC — which
-// keeps the surface exactly where it is.
+// The drawer's tab strip. The current tab carries its icon and label on the
+// shared selected state (docs/shell-states.md: accent tint, an inset accent
+// edge along its foot, accent icon, textHi label) with the design's 12px side
+// padding; the others compress to icons sharing the remaining width, so the
+// strip holds one row at every drawer width, and hover stays the neutral
+// chip. Selecting a tab reopens the popout under that tab's canonical panel
+// name — same name space as the bar glyphs and IPC — which keeps the surface
+// exactly where it is. The Notifications tab counts arrivals the drawer took
+// instead of a toast until it is shown (Notifs.unread).
 Rectangle {
     id: root
 
@@ -37,6 +40,7 @@ Rectangle {
             rotate: tabMeta[entry.id].rotate === true
         }))
 
+    readonly property int unreadCount: Notifs.unread.length
     readonly property real tabPadding: Theme.controlSpacing
     readonly property real tabIconSize: Theme.iconMedium
     readonly property real usableWidth: Math.max(0, tabRow.width - tabRow.spacing * (tabs.length - 1))
@@ -102,11 +106,14 @@ Rectangle {
                     + root.tabIconSize + Theme.iconTextSpacing + Theme.typography.navigation
                 width: root.tabs.length === 1 ? root.usableWidth : on ? root.selectedWidth
                     : Math.max(0, (root.usableWidth - root.selectedWidth) / (root.tabs.length - 1))
+                readonly property bool counted: modelData.tab === "notifications"
+                    && root.unreadCount > 0
+
                 height: parent.height
                 radius: 8
-                color: on ? Theme.chipHover : "transparent"
-                border.width: activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                color: on ? Theme.selectedFill : "transparent"
+                border.width: Theme.focusWidth(activeFocus)
+                border.color: Theme.focusRing
                 activeFocusOnTab: on
                 Accessible.selected: on
                 Accessible.onPressAction: root.activateTab(index, true)
@@ -150,7 +157,7 @@ Rectangle {
                             name: segment.modelData.glyph
                             size: root.tabIconSize
                             rotation: segment.modelData.rotate === true ? 90 : 0
-                            color: segment.on ? Theme.textHi : Theme.textFaint
+                            color: segment.on ? Theme.accentText : Theme.textFaint
                         }
                     }
 
@@ -167,11 +174,26 @@ Rectangle {
                     }
                 }
 
-                // Unread mark on the resting Notifications tab, in the same
-                // place the bar's bell wears its dot.
+                // The selected tab's inset accent edge along its foot, kept
+                // inside the rounded corners.
+                Rectangle {
+                    visible: segment.on
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: segment.radius
+                    anchors.rightMargin: segment.radius
+                    height: Theme.selectedEdgeWidth
+                    radius: height / 2
+                    color: Theme.selectedMark
+                }
+
+                // Kept notifications on the resting Notifications tab, in the
+                // same place the bar's bell wears its dot — unless the count
+                // below says more.
                 Rectangle {
                     visible: segment.modelData.tab === "notifications"
-                        && !segment.on && Notifs.count > 0
+                        && !segment.on && !segment.counted && Notifs.count > 0
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.rightMargin: 8
@@ -180,6 +202,37 @@ Rectangle {
                     height: 6
                     radius: 3
                     color: Theme.accent
+                }
+
+                // The unread count: arrivals the open drawer took instead of
+                // a toast. It sits over the icon's top end, outside the label,
+                // and is drawn last so nothing in the segment covers it.
+                Rectangle {
+                    id: countBadge
+                    visible: segment.counted
+                    z: 2
+                    x: segment.showLabel
+                        ? segment.width - width - Theme.scaled(2)
+                        : Math.min(segment.width - width,
+                            segment.width / 2 + root.tabIconSize / 2 - Theme.scaled(4))
+                    y: Theme.scaled(2)
+                    height: Math.max(Theme.scaled(16), countLabel.implicitHeight + 2)
+                    width: Math.max(height, countLabel.implicitWidth + Theme.scaled(8))
+                    radius: height / 2
+                    color: Theme.accent
+                    border.width: 2
+                    border.color: Theme.barSurface
+
+                    Text {
+                        id: countLabel
+                        anchors.centerIn: parent
+                        text: root.unreadCount > 99 ? "99+" : String(root.unreadCount)
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.metadata
+                        font.weight: Theme.weightBold
+                        font.features: Theme.tabularNumberFeatures
+                        color: Theme.accentFg
+                    }
                 }
 
                 StateLayer {
@@ -202,7 +255,9 @@ Rectangle {
                 }
 
                 Accessible.role: Accessible.PageTab
-                Accessible.name: segment.modelData.label
+                Accessible.name: segment.counted
+                    ? I18n.format("%1, %2 unread", [segment.modelData.label, root.unreadCount])
+                    : segment.modelData.label
             }
         }
     }

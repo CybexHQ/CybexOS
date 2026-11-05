@@ -52,8 +52,8 @@ Item {
         height: parent.height
         radius: height / 2
         color: chipMouse.containsMouse ? Theme.chipHover : Theme.chip
-        border.width: root.activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
 
         Row {
             id: chipRow

@@ -144,9 +144,9 @@ var BUILTIN_ACTIONS = [
     {
         id: "dnd-toggle",
         verb: "toggle",
-        name: "Toggle Do Not Disturb",
+        name: "Toggle Focus",
         subtitle: "Enable or disable notification toasts",
-        keywords: ["notifications", "quiet", "dnd"],
+        keywords: ["notifications", "quiet", "dnd", "do not disturb"],
         glyph: "notifications_off"
     },
     {

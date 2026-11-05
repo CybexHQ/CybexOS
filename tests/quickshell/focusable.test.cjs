@@ -55,6 +55,7 @@ function ownerBlock(lines, at) {
 
 // A MouseArea that is not a click target: the cursor must not claim it is.
 const CURSOR_EXEMPT = {
+    "Common/FocusModalityObserver.qml": "an observer that declines every press so the control underneath keeps its own cursor",
     "Bar/Bar.qml": "a right-button-only context area covering the whole bar",
     "LauncherWindow.qml": "the click-to-dismiss strip the launcher surface keeps around its card",
     "OsdWindow.qml": "a wheel handler; nothing in the OSD is clickable",

@@ -112,8 +112,104 @@ function targetScreen(focused, screens, fullscreen, policy) {
     return names.find(function(candidate) { return fullscreen.indexOf(candidate) < 0; }) || "";
 }
 
+// ---- the drawer collision rule (2026-11) ------------------------------------
+// A toast drawn over the open Control Center hides the drawer it lands on. So
+// while the drawer is open on the output a toast would use, on the side of
+// the screen its corner is on, and it can show the Notifications tab, a new
+// arrival goes to the drawer instead: a persistent unread count on the tab
+// and a short strip under the tabs, or a pinned banner when it is critical.
+// The drawer is an edge column that can run the output's full height, so
+// only the side matters, not whether the toasts sit at its top or bottom.
+// Admission policy (Focus, quiet hours, snoozes, bursts, fullscreen) runs
+// before this; nothing it held back is replayed when the drawer closes.
+//
+// `drawer` is { open, tab, screen, side, tabEnabled }: whether a drawer tab is
+// presented, which one, its output name, the screen edge it is pinned to
+// ("left"/"right") and whether the person keeps the Notifications tab in the
+// strip (Settings.drawerTabs).
+
+function toastSide(position) {
+    return String(position || "").indexOf("left") !== -1 ? "left" : "right";
+}
+
+function notificationsTabEnabled(tabs) {
+    var list = (Array.isArray(tabs) || tabs instanceof Array) ? tabs : [];
+    return list.some(function(tab) { return !!tab && tab.id === "notifications" && tab.on === true; });
+}
+
+function drawerCovers(drawer, screen, position) {
+    if (!drawer || !drawer.open || !drawer.tab || !drawer.screen || drawer.screen !== screen)
+        return false;
+    if (toastSide(position) !== (drawer.side === "left" ? "left" : "right"))
+        return false;
+    // A tab switched off in settings still presents when opened by name, and
+    // then it is the list itself.
+    return drawer.tab === "notifications" || drawer.tabEnabled === true;
+}
+
+// Where an admitted arrival is shown: "toast", or in the covering drawer as
+// "list" (the Notifications tab is showing: it lands at the top of the list),
+// "banner" (critical: pinned under the tabs until handled) or "strip".
+function drawerRoute(drawer, screen, position, critical) {
+    if (!drawerCovers(drawer, screen, position))
+        return "toast";
+    if (drawer.tab === "notifications")
+        return "list";
+    return critical ? "banner" : "strip";
+}
+
+// Keys still present in `entries`, in entry order. Unread and pinned marks
+// name entries by key; a dismissed or evicted entry drops out on its own.
+function presentKeys(entries, keys) {
+    var wanted = Object.create(null), result = [];
+    for (var i = 0; i < keys.length; i++)
+        wanted[keys[i]] = true;
+    for (var j = 0; j < entries.length; j++) {
+        if (wanted[entries[j].key])
+            result.push(entries[j].key);
+    }
+    return result;
+}
+
+// Remember up to 64 keys, newest first, without repeats.
+function markKey(keys, key) {
+    return [key].concat(keys.filter(function(item) { return item !== key; })).slice(0, 64);
+}
+
+// The stack's "+n more" count per output: notifications the group bounds,
+// a burst or a held deck kept off that output's stack, still in history and
+// not showing. Rows are { key, screenName }.
+function overflowCounts(rows, entries, toasts) {
+    var kept = Object.create(null), shown = Object.create(null), seen = Object.create(null);
+    var counts = Object.create(null);
+    for (var i = 0; i < entries.length; i++)
+        kept[entries[i].key] = true;
+    for (var j = 0; j < toasts.length; j++)
+        shown[toasts[j].key] = true;
+    for (var k = 0; k < rows.length; k++) {
+        var row = rows[k], id = row.screenName + "\u0000" + row.key;
+        if (!row.screenName || !kept[row.key] || shown[row.key] || seen[id])
+            continue;
+        seen[id] = true;
+        counts[row.screenName] = (counts[row.screenName] || 0) + 1;
+    }
+    return counts;
+}
+
+// An output's count starts over once its stack has emptied.
+function liveOverflow(rows, toasts) {
+    var live = Object.create(null);
+    for (var i = 0; i < toasts.length; i++)
+        live[toasts[i].screenName] = true;
+    return rows.filter(function(row) { return !!live[row.screenName]; }).slice(-256);
+}
+
 if (typeof module !== "undefined" && module.exports)
     module.exports = { sourceKey: sourceKey, isQsImage: isQsImage, imageIdentity: imageIdentity,
         signature: signature, duplicate: duplicate,
         activeSnoozes: activeSnoozes, quietReason: quietReason, burst: burst,
-        groups: groups, popupPlan: popupPlan, targetScreen: targetScreen };
+        groups: groups, popupPlan: popupPlan, targetScreen: targetScreen,
+        toastSide: toastSide, notificationsTabEnabled: notificationsTabEnabled,
+        drawerCovers: drawerCovers, drawerRoute: drawerRoute,
+        presentKeys: presentKeys, markKey: markKey,
+        overflowCounts: overflowCounts, liveOverflow: liveOverflow };

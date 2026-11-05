@@ -226,6 +226,9 @@ IPC = '''
                 firmwareRequests: shell.updateCount(content, "updateFirmwareRequest"),
                 apps: shell.updateCount(content, "updateApp"),
                 details: !!shell.updateItem("updateChanges"),
+                overviewRestart: !!shell.updateItem("overviewUpdateRestart"),
+                overviewReview: !!shell.updateItem("overviewUpdateReview"),
+                sessionQuestion: !!shell.updateItem("drawerSessionConfirm"),
                 automaticToggle: !!shell.updateItem("updateAutomatic"),
                 betaSwitch: !!shell.updateItem("updateBeta"),
                 channel: Updates.channel,
@@ -523,6 +526,29 @@ def main():
             session.trigger('updatePrimary')
             session.wait(lambda:session.records('session.jsonl')==[['reboot']],'restart requested through the session action')
 
+            # Control Center offers the same restart as its one primary
+            # action, and asks in the pinned session row before it acts.
+            # Counted from here: the window's request above can land twice
+            # under this harness, which is not what this part checks.
+            time.sleep(2)
+            restarts = len(session.records('session.jsonl'))
+            session.call('popouts','open','control')
+            session.wait(lambda:session.state().get('panel')=='control' and session.state().get('overviewRestart'),
+                'Overview offers the staged restart')
+            assert not session.state()['overviewReview'], 'a staged restart is the one action'
+            session.trigger('overviewUpdateRestart')
+            session.wait(lambda:session.state().get('sessionQuestion'),'the session row asks first')
+            time.sleep(1)
+            assert len(session.records('session.jsonl'))==restarts, ('asking must not restart', session.records('session.jsonl'))
+            session.trigger('drawerSessionCancel')
+            session.wait(lambda:not session.state().get('sessionQuestion'),'cancelled question')
+            assert session.state()['popout'], 'cancelling keeps the drawer open'
+            session.trigger('overviewUpdateRestart')
+            session.wait(lambda:session.state().get('sessionQuestion'),'the session row asks again')
+            session.trigger('drawerSessionConfirm')
+            session.wait(lambda:session.records('session.jsonl')[restarts:]==[['reboot']] and not session.state().get('popout'),
+                'confirmed restart through the same session action')
+
             # After the restart the signed-in desktop confirms automatically.
             session.status(state='awaiting-login',transaction='a'*32)
             session.wait(lambda:session.state().get('page')=='finishing','automatic confirmation')
@@ -737,7 +763,8 @@ def main():
                     assert not errors, '\n'.join(errors)
             print('PASS: menubar and Control Center open the app, authorization cancellation, durable worker errors, '
                   'shell restart, durable package waits without duplicate indicators, newer-candidate discovery, '
-                  'readable review, install once, reopening after the activation restart, restart, '
+                  'readable review, install once, reopening after the activation restart, restart '
+                  '(also from Control Center, confirmed in its session row), '
                   'automatic and manual confirmation, Wiz\'s pose on every status page, a kept release with Wiz '
                   'celebrating and What\'s New, one toast whose action opens What\'s New and is never repeated, '
                   'NixOS packages alone just up to date, '

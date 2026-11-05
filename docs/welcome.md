@@ -9,7 +9,11 @@ the same on every screen size.
 
 **Hello** greets you by name and lists what the installer already set:
 language, keyboard layout, time zone, network, account and computer name.
-Nothing is asked twice. Wiz, the assistant's character
+Nothing is asked twice. A value the guide could not read says **Not
+available** beside a neutral mark, never the tick that says the installer set
+it; the time follows the clock's 12/24-hour setting. Faint copy (captions,
+details) is the installer's faint tone lifted to 4.5:1 on the card
+(`Kiosk.faintText`). Wiz, the assistant's character
 ([assistant](assistant.md)), stands on that card, lifts his hat for a moment
 and says hello in a speech bubble: the only place he speaks. With the
 assistant on the system he adds that he lives in the corner of the screen

@@ -17,6 +17,11 @@ BarModule {
 
     moduleId: "media"
     detailSaving: titleClip.naturalWidth > 0 ? titleClip.naturalWidth + mediaChip.spacing : 0
+    // The chip is as wide as the user's maxWidth allows and the bar has room
+    // for, ending a gap short of the centre group (BarGeometry.fitMenubar).
+    // Below about eight characters the title is given up instead.
+    readonly property real titleMinimum: Theme.scaled(64)
+    detailShrinkable: Math.max(0, titleClip.naturalWidth - titleMinimum)
 
     readonly property var player: Media.player
     readonly property bool playing: Media.playing
@@ -113,13 +118,15 @@ BarModule {
 
             readonly property real naturalWidth: Math.min(fullTitle.implicitWidth,
                 Settings.modOpts.media.maxWidth)
+            readonly property real cut: root.host
+                ? Math.min(root.host.mediaTitleCut, root.detailShrinkable) : 0
             readonly property real overflow: Math.max(0, fullTitle.implicitWidth - width)
             readonly property bool drifting: (mediaChip.hovered || mediaChip.held)
                 && overflow > 0 && !Theme.reducedMotion
 
             visible: !root.compact && naturalWidth > 0
             anchors.verticalCenter: parent.verticalCenter
-            width: naturalWidth
+            width: naturalWidth - cut
             height: fullTitle.implicitHeight
             clip: true
 

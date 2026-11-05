@@ -96,12 +96,11 @@ Surface {
         bodyLeading: 1.25,
         stampFace: Theme.fontMenu,
         stampSize: Theme.fontCaption,
-        stampCentred: false,
-        trailingHeight: 20,
-        close: Theme.fontHeading,
+        target: Theme.scaled(24),
+        closeAlways: false,
+        close: Theme.iconMedium,
         closeColor: Theme.textDim,
-        pill: Theme.fontCaption,
-        stackedHeader: false
+        pill: Theme.fontCaption
     })
 
     // A nested card is a row inside an expanded source group: no fill, no
@@ -174,7 +173,7 @@ Surface {
                 if (block.group.items.length > 1)
                     root.toggleApp(block.group.key);
                 else
-                    Notifs.invokeDefault(block.newest);
+                    Notifs.activate(block.newest);
             }
             onCloseRequested: root.clearGroup(block.group)
         }
@@ -223,8 +222,8 @@ Surface {
                         anchors.fill: parent
                         radius: Theme.chipRadius
                         color: "transparent"
-                        border.width: groupHeader.activeFocus ? 1 : 0
-                        border.color: Theme.accentText
+                        border.width: Theme.focusWidth(groupHeader.activeFocus)
+                        border.color: Theme.focusRing
                     }
 
                     HoverHandler {
@@ -340,7 +339,7 @@ Surface {
                         entry: modelData
                         nested: true
                         showApp: false
-                        onActivated: Notifs.invokeDefault(entry)
+                        onActivated: Notifs.activate(entry)
                         onCloseRequested: Notifs.dismiss(entry)
                     }
                 }
@@ -487,7 +486,7 @@ Surface {
         Text {
             x: 10
             anchors.verticalCenter: parent.verticalCenter
-            text: I18n.tr("Do Not Disturb")
+            text: I18n.tr("Focus")
             font.family: Theme.fontMenu
             font.pixelSize: Theme.typography.control
             color: Theme.textDim
@@ -499,7 +498,7 @@ Surface {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             checked: Notifs.dnd
-            accessibleName: "Do Not Disturb"
+            accessibleName: I18n.tr("Focus: silences notifications")
             onToggled: value => Notifs.setDnd(value)
         }
     }

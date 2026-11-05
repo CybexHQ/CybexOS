@@ -54,8 +54,8 @@ Column {
             height: Theme.chipHeight
             radius: Theme.chipRadius
             color: "transparent"
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: root.text

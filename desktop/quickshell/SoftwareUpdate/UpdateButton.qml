@@ -28,7 +28,7 @@ Rectangle {
     implicitHeight: Theme.scaled(38)
     radius: Theme.chipRadius + 3
     color: !primary ? Theme.hoverFill : attention ? Theme.amber : Theme.accent
-    border.width: activeFocus ? 2 : 0
+    border.width: Theme.focusWidth(activeFocus)
     border.color: primary ? Theme.textHi : Theme.accentText
     opacity: enabled ? 1 : 0.45
     activeFocusOnTab: enabled && visible

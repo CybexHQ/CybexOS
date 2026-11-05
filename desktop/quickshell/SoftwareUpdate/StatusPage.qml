@@ -30,7 +30,8 @@ Flickable {
 
     Column {
         id: column
-        width: Math.min(root.width - Theme.scaled(56), Theme.scaled(520))
+        // The shared Software Update column: centred, at most 560 px.
+        width: Math.min(root.width - Theme.scaled(56), Theme.scaled(560))
         x: Math.round((root.width - width) / 2)
         y: Math.max(Theme.scaled(32), Math.round((root.contentHeight - implicitHeight) / 2))
         spacing: Theme.scaled(10)

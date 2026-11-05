@@ -401,7 +401,7 @@ Item {
         color: entryMouse.containsMouse && enabled ? T3Theme.hoverStrong : "transparent"
         opacity: enabled ? 1 : 0.4
         activeFocusOnTab: enabled && visible
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: T3Theme.focus
 
         Keys.onPressed: event => {
@@ -995,7 +995,7 @@ Item {
                     radius: 6
                     color: changesMouse.containsMouse ? T3Theme.hoverStrong : "transparent"
                     activeFocusOnTab: visible
-                    border.width: activeFocus ? 1 : 0
+                    border.width: Theme.focusWidth(activeFocus)
                     border.color: T3Theme.focus
 
                     Keys.onPressed: event => {

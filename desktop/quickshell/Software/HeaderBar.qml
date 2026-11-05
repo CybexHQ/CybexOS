@@ -14,8 +14,34 @@ Rectangle {
         { id: "updates", label: I18n.tr("Updates") }
     ]
 
-    function focusSearch(text) {
+    // When the search's minimum width, the tabs and the buttons no longer fit
+    // side by side, the search folds to an icon button. Activating it, typing,
+    // / or Ctrl+F opens the field over the tabs; Escape or leaving the field
+    // folds it again. The query stays, and with it the results.
+    readonly property real searchMinimum: Theme.scaled(180)
+    readonly property bool searchFolded: back.x + back.width + Theme.scaled(10)
+        + searchMinimum + Theme.scaled(12) > tabTrack.x
+    property bool searchOpen: false
+    readonly property bool searchCovering: searchFolded && searchOpen
+    readonly property bool fieldShown: !searchFolded || searchOpen
+
+    function openSearch() {
+        searchOpen = true;
         input.forceActiveFocus();
+    }
+
+    // SoftwareView reports every press in the window: one outside the open
+    // field folds it, as leaving it by keyboard does.
+    function pressedAt(scenePoint) {
+        if (!searchCovering)
+            return;
+        const local = search.mapFromItem(null, scenePoint.x, scenePoint.y);
+        if (local.x < 0 || local.y < 0 || local.x > search.width || local.y > search.height)
+            searchOpen = false;
+    }
+
+    function focusSearch(text) {
+        openSearch();
         if (text) {
             input.insert(input.cursorPosition, text);
             Software.search(input.text);
@@ -49,19 +75,63 @@ Rectangle {
 
     Rectangle {
         id: search
+        objectName: "softwareSearchBox"
         anchors.left: back.right
         anchors.leftMargin: Theme.scaled(10)
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(Theme.scaled(290), Math.max(Theme.scaled(180), (root.width - tabTrack.width) / 2 - Theme.scaled(70)))
+        // Over the tabs it reaches the refresh button.
+        width: !root.searchFolded
+            ? Math.min(Theme.scaled(290), Math.max(root.searchMinimum, (root.width - tabTrack.width) / 2 - Theme.scaled(70)))
+            : root.searchOpen ? refresh.x - Theme.scaled(10) - x : Theme.scaled(36)
         height: Theme.scaled(34)
+        z: root.searchCovering ? 1 : 0
         radius: Theme.chipRadius + 1
         color: Theme.chip
-        border.width: input.activeFocus ? 2 : 1
-        border.color: input.activeFocus ? Theme.accentText : Theme.hairlineSoft
+        // The field shows focus after a click too; the folded button shows
+        // the keyboard ring.
+        border.width: input.activeFocus ? 2 : activeFocus ? Theme.focusWidth(activeFocus) : 1
+        border.color: input.activeFocus ? Theme.accentText : activeFocus ? Theme.focusRing : Theme.hairlineSoft
+        activeFocusOnTab: !root.fieldShown
+        Accessible.role: root.fieldShown ? Accessible.Grouping : Accessible.Button
+        Accessible.name: I18n.tr("Search apps and packages")
+        Accessible.onPressAction: root.openSearch()
+        Keys.onPressed: event => {
+            if (!root.fieldShown && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                    || event.key === Qt.Key_Space)) {
+                root.openSearch();
+                event.accepted = true;
+            }
+        }
+
+        Behavior on width {
+            enabled: root.searchFolded && !Theme.reducedMotion
+            NumberAnimation {
+                duration: Theme.chipFadeDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        StateLayer {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: !root.fieldShown
+            hovered: foldedMouse.containsMouse
+            pressed: foldedMouse.pressed
+            tint: Theme.textHi
+            pressPoint: Qt.point(foldedMouse.mouseX, foldedMouse.mouseY)
+        }
+        MouseArea {
+            id: foldedMouse
+            anchors.fill: parent
+            enabled: !root.fieldShown
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.openSearch()
+        }
 
         Sym {
             id: glass
-            x: Theme.scaled(10)
+            x: root.fieldShown ? Theme.scaled(10) : (parent.width - width) / 2
             anchors.verticalCenter: parent.verticalCenter
             name: "search"
             size: Theme.iconMedium
@@ -70,6 +140,7 @@ Rectangle {
         TextInput {
             id: input
             objectName: "softwareSearch"
+            visible: root.fieldShown
             anchors.left: glass.right
             anchors.leftMargin: Theme.scaled(8)
             anchors.right: clear.visible ? clear.left : parent.right
@@ -87,7 +158,22 @@ Rectangle {
             Accessible.role: Accessible.EditableText
             Accessible.name: I18n.tr("Search apps and packages")
             onTextEdited: Software.search(text)
+            onActiveFocusChanged: {
+                if (!activeFocus)
+                    root.searchOpen = false;
+            }
             Keys.onDownPressed: event => { event.accepted = false; }
+            // Folded, Escape first folds the field back over the tabs and
+            // returns focus to the search button; with a query it also goes
+            // on to leave the search, as it does unfolded.
+            Keys.onEscapePressed: event => {
+                const folding = root.searchCovering;
+                if (folding) {
+                    root.searchOpen = false;
+                    search.forceActiveFocus();
+                }
+                event.accepted = folding && input.text === "";
+            }
             Text {
                 anchors.fill: parent
                 visible: input.text === ""
@@ -103,7 +189,7 @@ Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: Theme.scaled(8)
             anchors.verticalCenter: parent.verticalCenter
-            visible: input.text !== ""
+            visible: root.fieldShown && input.text !== ""
             name: "x"
             size: Theme.iconSmall
             color: clearMouse.containsMouse ? Theme.textHi : Theme.textDim
@@ -126,6 +212,8 @@ Rectangle {
     Rectangle {
         id: tabTrack
         anchors.centerIn: parent
+        // Covered by the open search, and out of the Tab order meanwhile.
+        visible: !root.searchCovering
         width: tabRow.implicitWidth + Theme.scaled(6)
         height: Theme.scaled(36)
         radius: Theme.chipRadius + 2
@@ -231,6 +319,7 @@ Rectangle {
     }
 
     SoftwareButton {
+        id: refresh
         objectName: "softwareRefresh"
         anchors.right: parent.right
         anchors.rightMargin: Theme.scaled(14)

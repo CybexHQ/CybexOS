@@ -122,7 +122,7 @@ test("shared state layers use Material interaction strengths", () => {
     assert.match(theme, /stateHoverOpacity:\s*0\.08/);
     assert.match(theme, /statePressedOpacity:\s*0\.12/);
     assert.match(layer,
-        /opacity:\s*root\.pressed \|\| root\.focused \? Theme\.statePressedOpacity\s*:\s*root\.hovered \? Theme\.stateHoverOpacity : 0/);
+        /opacity:\s*root\.pressed \|\| \(root\.focused && FocusModality\.keyboard\) \? Theme\.statePressedOpacity\s*:\s*root\.hovered \? Theme\.stateHoverOpacity : 0/);
     assert.match(read("Bar/BarHover.qml"), /StateLayer\s*\{/,
         "bar targets must adapt the shared state overlay in one place");
     for (const rel of [

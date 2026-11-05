@@ -31,7 +31,17 @@ test("workspace states restore the accent-number-and-dot hierarchy", () => {
     assert.match(theme, /barWsCurrent:\s*barAccent\b/);
     assert.match(theme, /barWsCurrentFg:\s*barAccentFg\b/);
     assert.match(theme, /barWsOccupied:\s*barTextLow\b/);
-    assert.match(theme, /barWsEmpty:\s*barDotDim\b/);
+    // Empty dots read a step stronger than the decorative barDotDim
+    // (2026-11 review), on light and dark bars alike.
+    const alphas = token => {
+        const body = theme.match(new RegExp(`readonly property color ${token}:([^\\n]*\\n[^\\n]*)`))[1];
+        return [...body.matchAll(/Qt\.rgba\([01], [01], [01], ([0-9.]+)\)/g)].map(match => Number(match[1]));
+    };
+    const empty = alphas("barWsEmpty");
+    const dim = alphas("barDotDim");
+    assert.equal(empty.length, 2);
+    assert.equal(dim.length, 2);
+    assert.ok(empty[0] > dim[0] && empty[1] > dim[1], `${empty} over ${dim}`);
     assert.match(workspaces, /exists\s*\?\s*", occupied"\s*:\s*", empty"/,
         "assistive output must announce the same distinction shown visually");
 });

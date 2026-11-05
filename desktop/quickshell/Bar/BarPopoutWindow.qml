@@ -63,4 +63,7 @@ PanelWindow {
         centerIslandRect: root.bar.centerIslandRect
         rightIslandRect: root.bar.rightIslandRect
     }
+
+    // Pointer vs keyboard modality for focus rings (Common/FocusModality).
+    FocusModalityObserver {}
 }

@@ -649,9 +649,15 @@ test("dialog chrome carries the menubar's grammar rather than a card stack", () 
     assert.doesNotMatch(pills, /Theme\.accentAlpha/,
         "broad selected controls must not paint the accent");
 
+    // The current page is the state system's selected row (2026-11,
+    // docs/shell-states.md): a calm accent tint apart from the neutral hover,
+    // a 3 px edge and the accent icon, never a saturated accent field.
     assert.doesNotMatch(view, /Theme\.accentBg/,
-        "the navigation rail's accent survives on the icon, never as a field");
-    assert.match(view, /color:\s*current \? Theme\.chip : "transparent"/);
+        "the rail's selection is the calm selectedFill tint, never an accent field");
+    assert.match(view, /color:\s*current \? Theme\.selectedFill : "transparent"/);
+    assert.match(view, /visible: navItem\.current[\s\S]{0,200}?width: Theme\.selectedEdgeWidth[\s\S]{0,200}?color: Theme\.selectedMark/,
+        "the current page carries the 3 px edge");
+    assert.match(view, /color: navItem\.current \? Theme\.accentText : Theme\.icon/);
     assert.match(view, /surfaceColor:\s*Theme\.panelSurface/,
         "a dialog sits on the shell's deepest surface, not on a lighter card");
 });

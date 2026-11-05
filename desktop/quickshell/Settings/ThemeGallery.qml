@@ -8,6 +8,14 @@ import "../Common/ThemeHelpers.js" as ThemeHelpers
 // lines of text and the accent — rather than named in a dropdown. Picking one
 // is the same single undoable change the dropdown made (Themes.apply). The
 // last tile saves the current look as a theme of its own.
+//
+// States (2026-11, docs/shell-states.md): the chosen theme wears a 2 px
+// textHi frame and an accent check badge haloed in the window surface. Both
+// survive a pack whose accent sits close to its own edge colours, which an
+// accent ring alone did not. Keyboard focus is a separate ring just outside
+// the picture, so focus never reads as the choice. In a narrow column
+// (`compact`, below ~560 px) the previews drop to 72 px and more of them
+// share a row; the page around the gallery keeps its order.
 Item {
     id: root
 
@@ -15,17 +23,22 @@ Item {
     property string current: Themes.current.value
     // { dark|light: { background, surface, raised, text, dim } }
     property var references: ({})
+    property bool compact: width < Theme.scaled(560, Theme.typeScale)
     signal saveRequested()
 
     readonly property int gap: Theme.scaled(10)
-    readonly property int minimumTile: Theme.scaled(104, Theme.typeScale)
-    readonly property int columns: Math.max(2, Math.floor((width + gap) / (minimumTile + gap)))
-    readonly property real tileWidth: (width - gap * (columns - 1)) / columns
-    readonly property real thumbHeight: Math.round(tileWidth * 0.56)
+    // Room around the tiles for the focus ring, so the gallery's own edge
+    // (and the page's clip beyond it) never cuts the ring off.
+    readonly property int edge: Theme.focusRingWidth + 2
+    readonly property int minimumTile: Theme.scaled(root.compact ? 92 : 104, Theme.typeScale)
+    readonly property real innerWidth: Math.max(0, width - edge * 2)
+    readonly property int columns: Math.max(2, Math.floor((innerWidth + gap) / (minimumTile + gap)))
+    readonly property real tileWidth: (innerWidth - gap * (columns - 1)) / columns
+    readonly property real thumbHeight: root.compact ? Theme.scaled(72) : Math.round(tileWidth * 0.56)
     readonly property real tileHeight: thumbHeight + Theme.scaled(6) + nameMetrics.height
     readonly property int count: entries.length + 1
 
-    implicitHeight: Math.ceil(count / columns) * (tileHeight + gap) - gap + Theme.scaled(8)
+    implicitHeight: Math.ceil(count / columns) * (tileHeight + gap) - gap + Theme.scaled(4) + edge * 2
 
     TextMetrics {
         id: nameMetrics
@@ -46,8 +59,8 @@ Item {
                       accent: Theme.accent, text: Theme.textHi, dim: Theme.textLow })
             readonly property bool selected: modelData.id === root.current
 
-            x: (index % root.columns) * (root.tileWidth + root.gap)
-            y: Theme.scaled(4) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
+            x: root.edge + (index % root.columns) * (root.tileWidth + root.gap)
+            y: root.edge + Theme.scaled(2) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
             width: root.tileWidth
             height: root.tileHeight
             activeFocusOnTab: true
@@ -110,31 +123,45 @@ Item {
                     radius: parent.radius
                     hovered: tileMouse.containsMouse
                     pressed: tileMouse.pressed
-                    focused: tile.activeFocus
                     tint: Theme.textHi
                     pressPoint: Qt.point(tileMouse.mouseX, tileMouse.mouseY)
                 }
             }
 
-            // The ring sits outside the picture, so the theme's own edge
-            // colors stay readable; a hairline gives pale themes an edge.
+            // The frame: a hairline gives pale themes an edge, and the chosen
+            // one a 2 px textHi frame, which no pack's own colours can match
+            // the way they could match its accent.
             Rectangle {
                 anchors.fill: thumb
-                anchors.margins: tile.selected ? -3 : 0
-                radius: thumb.radius + (tile.selected ? 3 : 0)
+                radius: thumb.radius
                 color: "transparent"
-                border.width: tile.selected ? 2 : 1
-                border.color: tile.selected ? Theme.accent : tile.activeFocus ? Theme.accentText : Theme.hairline
+                border.width: tile.selected ? Theme.selectedBorderWidth : 1
+                border.color: tile.selected ? Theme.textHi : Theme.hairline
             }
 
+            // Keyboard focus, 2 px clear of the picture.
+            Rectangle {
+                anchors.fill: thumb
+                anchors.margins: -root.edge
+                radius: thumb.radius + root.edge
+                color: "transparent"
+                visible: border.width > 0
+                border.width: Theme.focusWidth(tile.activeFocus)
+                border.color: Theme.focusRing
+            }
+
+            // The check, haloed in the window surface so it stands off a
+            // preview drawn in the same accent.
             Rectangle {
                 visible: tile.selected
-                x: Theme.scaled(6)
-                y: thumb.height - height - Theme.scaled(6)
-                width: Theme.scaled(18)
+                x: thumb.width - width - Theme.scaled(5)
+                y: Theme.scaled(5)
+                width: Theme.scaled(22)
                 height: width
                 radius: width / 2
                 color: Theme.accent
+                border.width: 2
+                border.color: Theme.panelSurface
                 Sym {
                     anchors.centerIn: parent
                     name: "check"
@@ -173,8 +200,8 @@ Item {
     Item {
         id: saveTile
         readonly property int index: root.entries.length
-        x: (index % root.columns) * (root.tileWidth + root.gap)
-        y: Theme.scaled(4) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
+        x: root.edge + (index % root.columns) * (root.tileWidth + root.gap)
+        y: root.edge + Theme.scaled(2) + Math.floor(index / root.columns) * (root.tileHeight + root.gap)
         width: root.tileWidth
         height: root.tileHeight
         activeFocusOnTab: true
@@ -194,7 +221,7 @@ Item {
             height: root.thumbHeight
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
-            readonly property color stroke: saveTile.activeFocus ? Theme.accentText : Theme.hairline
+            readonly property color stroke: Theme.hairline
             onStrokeChanged: requestPaint()
             onPaint: {
                 const ctx = getContext("2d");
@@ -213,6 +240,15 @@ Item {
                 size: Theme.iconMedium
                 color: saveMouse.containsMouse ? Theme.textHi : Theme.textFaint
             }
+        }
+        Rectangle {
+            anchors.fill: dashes
+            anchors.margins: -root.edge
+            radius: Theme.chipRadius + 1 + root.edge
+            color: "transparent"
+            visible: border.width > 0
+            border.width: Theme.focusWidth(saveTile.activeFocus)
+            border.color: Theme.focusRing
         }
         Text {
             y: dashes.height + Theme.scaled(6)

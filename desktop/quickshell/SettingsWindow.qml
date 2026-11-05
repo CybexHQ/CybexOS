@@ -52,4 +52,7 @@ FloatingWindow {
             event.accepted = true;
         }
     }
+
+    // Pointer vs keyboard modality for focus rings (Common/FocusModality).
+    FocusModalityObserver {}
 }

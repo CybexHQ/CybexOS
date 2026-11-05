@@ -44,8 +44,11 @@ test("notification widget shows an unread mark and compact glyph state", () => {
         /color:\s*Notifs\.hasUrgent \? Theme\.barRedText : Theme\.barAccent/);
     assert.doesNotMatch(moduleSource, /label:\s*Notifs\.count/,
         "the bell carries a dot, not a number");
-    assert.match(moduleSource, /Notifs\.count \+ " notifications"/,
+    assert.match(moduleSource, /I18n\.format\("%1 notifications", \[Notifs\.count\]\)/,
         "the tooltip still says how many");
+    // One name for Do Not Disturb everywhere (2026-11): Focus.
+    assert.match(moduleSource, /I18n\.format\("Notifications · Focus · %1", \[Notifs\.count\]\)/);
+    assert.doesNotMatch(moduleSource, /"[^"\n]*Do Not Disturb[^"\n]*"/);
     assert.match(moduleSource,
         /glyph:\s*Notifs\.dnd \? "notifications_off" : "notifications"/);
     assert.match(moduleSource, /alert:\s*Notifs\.hasUrgent/);

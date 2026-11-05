@@ -88,8 +88,19 @@ Rectangle {
     signal entered()
     signal exited()
 
+    // Pointer target (docs/shell-states.md): the bar's full height and at
+    // least 32 px wide, as in BarIcon. The fill keeps its inset; the target
+    // reaches half the gap towards each neighbour.
+    readonly property real hitSlack: Theme.barSpacing / 2
+    readonly property real hitMinWidth: Theme.scaled(32)
+
+    readonly property real naturalWidth: content.implicitWidth + leftPadding + rightPadding
+    // What the minimum adds, split either side so narrow content stays
+    // centred, in whole pixels so a mark does not land between them.
+    readonly property real minimumInset: Math.ceil(Math.max(0, hitMinWidth - hitSlack * 2 - naturalWidth) / 2)
+
     implicitHeight: pillHeight
-    implicitWidth: content.implicitWidth + leftPadding + rightPadding
+    implicitWidth: naturalWidth + minimumInset * 2
     radius: Theme.chipRadius
     color: held ? hoverFill : restFill
     anchors.verticalCenter: parent ? parent.verticalCenter : undefined
@@ -122,23 +133,27 @@ Rectangle {
         anchors.fill: parent
         host: root.host
         target: root
+        // The whole pointer area lights the chip, so hover and click agree.
+        hitArea: mouse
         radius: root.radius
         pressed: mouse.pressed
         tint: Theme.barTextHi
-        pressPoint: Qt.point(mouse.mouseX, mouse.mouseY)
+        pressPoint: Qt.point(mouse.mouseX + mouse.x, mouse.mouseY + mouse.y)
     }
 
     Row {
         id: content
         z: root.contentTakesInput ? 1 : 0
         anchors.verticalCenter: parent.verticalCenter
-        x: root.leftPadding
+        x: root.leftPadding + root.minimumInset
         spacing: root.spacing
     }
 
     MouseArea {
         id: mouse
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: parent.width + root.hitSlack * 2
+        height: Math.max(parent.height, Theme.barHeight)
         hoverEnabled: true
         acceptedButtons: root.middleClickable ? Qt.LeftButton | Qt.MiddleButton : Qt.LeftButton
         cursorShape: Qt.PointingHandCursor

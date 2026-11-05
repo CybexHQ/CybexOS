@@ -309,7 +309,7 @@ Item {
                                 || root.highlighted === index
                                 ? HermesTheme.hoverStrong
                                 : "transparent"
-                        border.width: activeFocus ? 1 : 0
+                        border.width: Theme.focusWidth(activeFocus)
                         border.color: HermesTheme.focus
                         activeFocusOnTab: true
                         Accessible.role: Accessible.ListItem

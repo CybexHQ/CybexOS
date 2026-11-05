@@ -456,7 +456,7 @@ Column {
                             Accessible.checked: traitRow.modelData.currentValue === true
                             opacity: root.editable && !root.sending ? 1 : 0.48
                             activeFocusOnTab: root.editable && !root.sending
-                            border.width: activeFocus ? 1 : 0
+                            border.width: Theme.focusWidth(activeFocus)
                             border.color: T3Theme.focus
 
                             Keys.onPressed: event => {
@@ -788,7 +788,7 @@ Column {
                     Accessible.role: Accessible.Button
                     Accessible.name: root.stopMode ? "Stop" : root.sendLabel
                     Accessible.onPressAction: root.activatePrimary()
-                    border.width: activeFocus ? 2 : 0
+                    border.width: Theme.focusWidth(activeFocus)
                     border.color: root.stopMode
                         ? T3Theme.dangerForeground : T3Theme.accentForeground
 

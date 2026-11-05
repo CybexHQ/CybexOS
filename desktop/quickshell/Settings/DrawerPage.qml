@@ -122,8 +122,8 @@ SettingsPage {
                             radius: Theme.rowRadius
                             color: "transparent"
                             opacity: tabRow.dragged ? 0.35 : 1
-                            border.width: activeFocus ? 1 : 0
-                            border.color: Theme.accentText
+                            border.width: Theme.focusWidth(activeFocus)
+                            border.color: Theme.focusRing
                             activeFocusOnTab: index === 0
                             Accessible.role: Accessible.ListItem
                             Accessible.name: tabRow.meta.label + " tab"
@@ -258,7 +258,6 @@ SettingsPage {
                                 metrics: Theme.switchCompact
                                 checked: tabRow.modelData.on
                                 enabled: !tabRow.locked
-                                opacity: tabRow.locked ? 0.4 : 1
                                 accessibleName: "Show the " + tabRow.meta.label + " tab"
                                 onToggled: value =>
                                     Settings.setDrawerTabEnabled(tabRow.modelData.id, value)

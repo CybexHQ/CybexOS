@@ -291,7 +291,7 @@ test("Hermes approvals and selectors expose safe keyboard semantics", () => {
     assert.match(reasoning, /Qt\.Key_Escape && root\.expanded/);
     assert.match(reasoning, /Accessible\.role:\s*Accessible\.ListItem/);
     assert.match(reasoning, /function focusAdjacentChoice\(index, delta\)/);
-    assert.match(reasoning, /border\.width:\s*activeFocus \? 1 : 0/);
+    assert.match(reasoning, /border\.width:\s*Theme\.focusWidth\(activeFocus\)/);
     assert.match(reasoning, /trigger\.forceActiveFocus\(\)/,
         "closing a reasoning menu must restore focus to its visible trigger");
 
@@ -311,7 +311,7 @@ test("Hermes approvals and selectors expose safe keyboard semantics", () => {
     assert.doesNotMatch(models, /providerRail|providerFlick|chooseProvider/,
         "provider selection belongs in Hermes configuration, not the composer");
     assert.match(models,
-        /id:\s*modelRow[\s\S]{0,1000}?border\.width:\s*activeFocus \? 1 : 0/,
+        /id:\s*modelRow[\s\S]{0,1000}?border\.width:\s*Theme\.focusWidth\(activeFocus\)/,
         "tab-focused model rows need a visible focus ring");
 });
 

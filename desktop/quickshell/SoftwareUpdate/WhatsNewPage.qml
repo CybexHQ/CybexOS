@@ -91,17 +91,24 @@ Item {
                 color: Theme.cardFill
                 border.width: 1
                 border.color: Theme.hairlineSoft
+                // Release notes are prose: at most 72 characters a line, at
+                // the prose line height (docs/updates.md).
+                FontMetrics {
+                    id: noteMetrics
+                    font: notesText.font
+                }
                 Text {
                     id: notesText
                     objectName: "updateReleaseNotes"
                     x: Theme.scaled(16)
                     y: Theme.scaled(14)
-                    width: parent.width - Theme.scaled(32)
+                    width: Math.min(parent.width - Theme.scaled(32), noteMetrics.averageCharacterWidth * 72)
                     text: root.notes !== "" ? root.notes : I18n.tr("No release notes were published for this version.")
                     textFormat: root.notes !== "" ? Text.MarkdownText : Text.PlainText
                     color: root.notes !== "" ? Theme.textMid : Theme.textDim
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.primary
+                    lineHeight: Theme.proseLineHeight
                     wrapMode: Text.Wrap
                     // Only web links open, in the browser.
                     onLinkActivated: link => {

@@ -65,8 +65,8 @@ SettingsRow {
                 height: Theme.chipInnerHeight
                 radius: Theme.chipRadius
                 color: chip.on ? Theme.chipHover : "transparent"
-                border.width: activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                border.width: Theme.focusWidth(activeFocus)
+                border.color: Theme.focusRing
                 activeFocusOnTab: true
                 Accessible.role: Accessible.CheckBox
                 Accessible.name: chip.modelData.label

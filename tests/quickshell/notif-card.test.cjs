@@ -17,7 +17,8 @@ const { shellDir } = require("./shell.cjs");
 // every caller supplies.
 
 const CARD = path.join("Common", "NotifCard.qml");
-const CALLERS = ["NotificationToasts.qml", path.join("Popovers", "NotifsPopover.qml")];
+const CALLERS = ["NotificationToasts.qml", path.join("Popovers", "NotifsPopover.qml"),
+    path.join("Popovers", "Drawer", "DrawerNotifications.qml")];
 
 function read(rel) {
     return fs.readFileSync(path.join(shellDir, rel), "utf8");
@@ -101,7 +102,7 @@ test("both surfaces take the one shell face, as typography.test.cjs requires", (
         "the centre style must follow the menu font");
     // The centre is a popover, so every size it names must be a Theme token —
     // the 12px floor is enforced there and nowhere else.
-    assert.doesNotMatch(centre.replace(/^\s*(bodyLines|bodyLeading|trailingHeight):.*$/gm, ""),
+    assert.doesNotMatch(centre.replace(/^\s*(bodyLines|bodyLeading):.*$/gm, ""),
         /:\s*\d+(?:\.\d+)?\s*,?$/m,
         "the centre style names a raw text size instead of a Theme token");
 });
@@ -158,8 +159,14 @@ test("toast hover and a history disclosure reveal the full notification text", (
     ) || []).length, 3,
     "the app name, summary, and body must all stop eliding while expanded");
     assert.match(card,
-        /maximumLineCount:\s*card\.textExpanded\s*\n\s*\? 2147483647\s*:\s*Math\.max\(1, card\.style\.bodyLines\)/,
+        /maximumLineCount:\s*card\.textExpanded\s*\n\s*\? 2147483647\s*:\s*Math\.max\(1, card\.bodyLines\)/,
         "the body line preference is only a collapsed-state limit");
+    assert.match(card,
+        /readonly property int bodyLines:\s*Helpers\.bodyLineLimit\(card\.style\.bodyLines,\s*\n\s*notificationActions\.hasButtons\)/,
+        "a card with buttons gives a body line back (NotifHelpers.bodyLineLimit)");
+    assert.match(card,
+        /id:\s*summary[\s\S]*?wrapMode:\s*Text\.Wrap\s*\n\s*maximumLineCount:\s*card\.textExpanded\s*\n\s*\? 2147483647 : Helpers\.TITLE_LINES/,
+        "the title has its own line and wraps to two");
     assert.match(toast, /expandTextOnHover:\s*true/);
     assert.doesNotMatch(centre, /expandTextOnHover:\s*true/,
         "hovering through notification history should keep its layout stable");
@@ -169,8 +176,12 @@ test("toast hover and a history disclosure reveal the full notification text", (
         /showTextDisclosure:\s*allowTextExpansion\s*\n\s*&& \(textExpandedByUser \|\| textTruncated\)/,
         "the disclosure should only be visible when text is cut off or open");
     assert.match(card,
-        /\+ \(card\.allowTextExpansion \? textDisclosure\.width : 0\)/,
+        /expandWidth:\s*card\.allowTextExpansion\s*\n\s*\? target \+ gap : 0/,
         "history cards must reserve a stable slot so truncation cannot form a geometry loop");
+    // Drawer targets are 24 px and its × stays beside the time; the toast's
+    // × takes the time's place on hover.
+    assert.match(card, /width:\s*trailing\.target\s*\n\s*height:\s*width/);
+    assert.match(card, /readonly property bool closeBeside:\s*card\.style\.closeAlways/);
     assert.match(card, /name:\s*card\.textExpandedByUser\s*\n\s*\? "expand_less" : "expand_more"/);
     assert.match(card, /Accessible\.name:\s*card\.textExpandedByUser\s*\n\s*\? "Collapse notification text"\s*\n\s*:\s*"Show full notification"/);
     assert.match(card, /onClicked:\s*\{[\s\S]*?card\.toggleTextExpansion\(\);[\s\S]*?\}/,

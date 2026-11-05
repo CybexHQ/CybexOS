@@ -69,11 +69,22 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 5
 
+            // A machine without a battery says so instead of "--%".
+            Text {
+                visible: !Battery.isLaptop
+                text: I18n.tr("No battery found")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.title
+                font.weight: Theme.weightSemibold
+                color: Theme.textHi
+            }
+
             Row {
+                visible: Battery.isLaptop
                 spacing: 2
 
                 Text {
-                    text: Battery.isLaptop ? String(root.level) : "--"
+                    text: String(root.level)
                     font.family: Theme.fontNumeric
                     font.pixelSize: Theme.typography.displayLarge
                     font.weight: Theme.weightSemibold
@@ -93,7 +104,7 @@ Column {
             }
 
             Text {
-                text: root.statusLine
+                text: Battery.isLaptop ? root.statusLine : I18n.tr("On external power")
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textFaint
@@ -105,7 +116,8 @@ Column {
             anchors.right: parent.right
             anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            name: Battery.charging ? "battery_charging_full"
+            name: !Battery.isLaptop ? "power"
+                : Battery.charging ? "battery_charging_full"
                 : root.critical ? "battery_alert"
                 : root.level >= 95 ? "battery_full"
                 : root.level >= 80 ? "battery_6_bar"
@@ -119,6 +131,7 @@ Column {
     }
 
     Rectangle {
+        visible: Battery.isLaptop
         width: parent.width - 8
         x: 4
         height: 8

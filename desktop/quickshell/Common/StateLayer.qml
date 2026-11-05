@@ -43,7 +43,9 @@ Item {
         anchors.fill: parent
         radius: root.radius
         color: root.tint
-        opacity: root.pressed || root.focused ? Theme.statePressedOpacity
+        // Focus lifts the layer only for keyboard modality; a clicked control
+        // must not keep looking pressed (FocusModality).
+        opacity: root.pressed || (root.focused && FocusModality.keyboard) ? Theme.statePressedOpacity
             : root.hovered ? Theme.stateHoverOpacity : 0
 
         Behavior on opacity {

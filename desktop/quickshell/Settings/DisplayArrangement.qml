@@ -135,8 +135,8 @@ Item {
                 anchors.margins: -3
                 radius: tile.radius + 3
                 color: "transparent"
-                border.width: tile.activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                border.width: Theme.focusWidth(tile.activeFocus)
+                border.color: Theme.focusRing
             }
 
             Sym {
@@ -269,8 +269,8 @@ Item {
                     anchors.margins: -3
                     radius: chip.radius + 3
                     color: "transparent"
-                    border.width: chip.activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(chip.activeFocus)
+                    border.color: Theme.focusRing
                 }
 
                 Text {

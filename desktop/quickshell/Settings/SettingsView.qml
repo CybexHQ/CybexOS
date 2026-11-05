@@ -72,8 +72,16 @@ PopoutPanel {
     readonly property int recentCount: SettingsRecent.entries.length
     readonly property int changeCount: SettingsChanges.count
 
+    // The icon rail's one-time "Press / to search pages" tip. The window
+    // keeps no state of its own on disk, so "seen" lasts the session: this
+    // view outlives every close (SettingsWindow builds it once).
+    property bool searchHintSeen: false
+    readonly property bool searchHintShown: compactNav && !searchHintSeen
+
     function openPalette(text) {
         changesSheet.hide();
+        // Whoever opened the palette has found it; the tip has done its job.
+        searchHintSeen = true;
         palette.show(text || "");
     }
 
@@ -109,7 +117,23 @@ PopoutPanel {
                 pageRelease.restart();
                 palette.hide();
                 changesSheet.hide();
+                // Shown once is enough: a reopened narrow window starts clean.
+                if (root.searchHintShown)
+                    root.searchHintSeen = true;
             }
+        }
+        // A page change that did not come from the rail (Back, a Home tile,
+        // a search jump) would leave the keyboard ring on the row that was
+        // current, beside a selection somewhere else. While the rings show,
+        // focus follows the selection, which is also the rail's one tab stop.
+        function onPageChanged() {
+            const window = root.Window.window;
+            const focused = (window ? window.activeFocusItem : null) as NavItem;
+            if (!Theme.focusVisible || !focused || focused.navPageId === Settings.page)
+                return;
+            const item = root.navDelegate(Settings.page);
+            if (item)
+                item.forceActiveFocus();
         }
     }
 
@@ -228,16 +252,21 @@ PopoutPanel {
             || (modelData.id === "backup" && SettingsChanges.deploymentKind === "maintenance"
                 && SettingsChanges.deploymentState !== "")
 
+        // What a page change compares to keep keyboard focus on the current
+        // row (onPageChanged above).
+        readonly property string navPageId: modelData.id
+
         width: navColumn.width
         height: Theme.panelRowHeight
         radius: Theme.chipRadius
-        // The current page lights the same surface a bar chip lights when its
-        // popout is open. A 200px slab of accent would be the loudest thing
-        // in the workspace; the accent survives on the icon, where it is a
-        // mark rather than a field.
-        color: current ? Theme.chip : "transparent"
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        // Where you are, apart from where the pointer or the keyboard is
+        // (2026-11, docs/shell-states.md): the current page takes the calm
+        // accent tint, a 3 px edge on its leading side, the accent on its icon
+        // and textHi on its label. Hover stays the neutral layer below and
+        // keyboard focus only the ring, so neither can read as the selection.
+        color: current ? Theme.selectedFill : "transparent"
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
         activeFocusOnTab: navItem.current
         Accessible.role: Accessible.PageTab
         Accessible.name: navItem.modelData.label + (navItem.pending ? ", " + I18n.tr("changes not applied yet") : "")
@@ -246,8 +275,11 @@ PopoutPanel {
             navState.pulseCenter();
             Settings.page = navItem.modelData.id;
         }
+        // The icon rail names each page beside it, for the pointer and for
+        // the keyboard alike.
         SettingsTooltip {
-            visible: root.compactNav && navMouse.containsMouse
+            visible: root.compactNav && (navMouse.containsMouse
+                || Theme.focusWidth(navItem.activeFocus) > 0)
             text: navItem.modelData.label
             x: parent.width + Theme.scaled(6)
             y: (parent.height - height) / 2
@@ -272,15 +304,25 @@ PopoutPanel {
             }
         }
 
+        // Hover and press only: keyboard focus is the ring, never a fill.
         StateLayer {
             id: navState
             anchors.fill: parent
             radius: parent.radius
             hovered: navMouse.containsMouse
             pressed: navMouse.pressed
-            focused: navItem.activeFocus
             tint: navItem.current ? Theme.accent : Theme.textHi
             pressPoint: Qt.point(navMouse.mouseX, navMouse.mouseY)
+        }
+
+        Rectangle {
+            visible: navItem.current
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Theme.selectedEdgeWidth
+            height: Math.max(Theme.scaled(12), parent.height - Theme.scaled(14))
+            radius: width / 2
+            color: Theme.selectedMark
         }
 
         Sym {
@@ -415,8 +457,8 @@ PopoutPanel {
             height: Theme.settingsControlHeight
             radius: Theme.chipRadius
             color: searchMouse.containsMouse ? Theme.chipHover : Theme.chip
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Search settings")
@@ -483,6 +525,14 @@ PopoutPanel {
                 cursorShape: Qt.IBeamCursor
                 onClicked: root.openPalette("")
             }
+            // Compressed to its glyph, the field names itself and its key.
+            SettingsTooltip {
+                visible: root.compactNav && (searchMouse.containsMouse
+                    || Theme.focusWidth(searchBox.activeFocus) > 0)
+                text: I18n.tr("Search settings (/)")
+                x: parent.width + Theme.scaled(6)
+                y: (parent.height - height) / 2
+            }
         }
 
         Flickable {
@@ -544,6 +594,66 @@ PopoutPanel {
         width: parent.width - x
         height: parent.height - y
 
+        // The icon rail hides the search field's "/" key cap, so the
+        // narrow window says it once, above the page, on the content
+        // column's edges. Dismissing it, opening the palette or closing the
+        // window retires it for the session (searchHintSeen).
+        Rectangle {
+            id: searchHint
+            objectName: "settingsSearchHint"
+            readonly property int columnWidth: Math.min(Theme.scaled(640, Theme.typeScale),
+                Math.max(0, pageLoader.width - 8))
+            visible: root.searchHintShown
+            x: pageLoader.x + Math.max(0, Math.floor((pageLoader.width - 8 - columnWidth) / 2))
+            y: root.gutter - Theme.scaled(6)
+            width: columnWidth
+            height: visible ? Math.max(Theme.inlineActionHeight + Theme.scaled(4),
+                hintCopy.implicitHeight + Theme.scaled(12)) : 0
+            radius: Theme.chipRadius
+            color: Theme.chip
+            border.width: 1
+            border.color: Theme.hairlineSoft
+
+            Sym {
+                id: hintGlyph
+                x: Theme.scaled(10)
+                anchors.verticalCenter: parent.verticalCenter
+                name: "search"
+                size: Theme.iconSmall
+                color: Theme.accentText
+            }
+            Text {
+                id: hintCopy
+                anchors.left: hintGlyph.right
+                anchors.leftMargin: Theme.iconTextSpacing + Theme.scaled(2)
+                anchors.right: hintClose.left
+                anchors.rightMargin: Theme.iconTextSpacing
+                anchors.verticalCenter: parent.verticalCenter
+                text: I18n.tr("Press / to search pages")
+                wrapMode: Text.Wrap
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.secondary
+                color: Theme.textHi
+            }
+            SettingsAction {
+                id: hintClose
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.scaled(4)
+                anchors.verticalCenter: parent.verticalCenter
+                compact: true
+                glyph: "close"
+                text: I18n.tr("Dismiss tip")
+                onTriggered: {
+                    root.searchHintSeen = true;
+                    // The button disappears with the tip; keep focus in the
+                    // rail so "/" and the arrows still answer.
+                    const item = root.navDelegate(Settings.page);
+                    if (item)
+                        item.forceActiveFocus();
+                }
+            }
+        }
+
         // A tabbed page's views, on the content column's own edges.
         SettingsTabs {
             id: pageTabs
@@ -551,7 +661,8 @@ PopoutPanel {
                 Math.max(0, pageLoader.width - 8))
             visible: root.currentTabs.length > 0
             x: pageLoader.x + Math.max(0, Math.floor((pageLoader.width - 8 - columnWidth) / 2))
-            y: root.gutter - Theme.scaled(6)
+            y: searchHint.visible ? searchHint.y + searchHint.height + Theme.scaled(12)
+                : root.gutter - Theme.scaled(6)
             width: columnWidth
             height: visible ? implicitHeight : 0
             tabs: root.currentTabs
@@ -574,7 +685,9 @@ PopoutPanel {
             // Settings.page reopens the same page.
             active: Settings.panelOpen || pageRelease.running
             x: root.gutter
-            y: pageTabs.visible ? pageTabs.y + pageTabs.height + Theme.scaled(18) : root.gutter
+            y: pageTabs.visible ? pageTabs.y + pageTabs.height + Theme.scaled(18)
+                : searchHint.visible ? searchHint.y + searchHint.height + Theme.scaled(12)
+                : root.gutter
             width: parent.width - root.gutter * 2
             height: parent.height - y - root.gutter
             focus: true

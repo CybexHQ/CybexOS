@@ -70,7 +70,7 @@ Item {
     function checked() {
         if (!service.checkedAt)
             return I18n.tr("Not checked yet");
-        const time = Qt.formatTime(service.checkedAt, Qt.locale().timeFormat(Locale.ShortFormat));
+        const time = Qt.formatTime(service.checkedAt, Helpers.clockFormat(Settings.clock24));
         return new Date().toDateString() === service.checkedAt.toDateString()
             ? I18n.format("Last checked today at %1", [time])
             : I18n.format("Last checked %1", [service.checkedAt.toLocaleDateString(Qt.locale(), Locale.ShortFormat)]);
@@ -414,7 +414,7 @@ Item {
                 x: Theme.scaled(14)
                 y: Theme.scaled(12)
                 width: parent.width - Theme.scaled(28)
-                spacing: Theme.scaled(4)
+                spacing: Theme.scaled(8)
                 Text {
                     text: I18n.format("What's new in Cybex OS %1", [root.vendor.available || ""])
                     color: Theme.textHi
@@ -423,15 +423,23 @@ Item {
                     font.weight: Theme.weightSemibold
                     textFormat: Text.PlainText
                 }
+                // Release notes are prose: at most 72 characters a line, at
+                // the prose line height (docs/updates.md).
+                FontMetrics {
+                    id: noteMetrics
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.secondary
+                }
                 Repeater {
                     model: root.notes.items
                     delegate: Text {
                         required property string modelData
-                        width: notesColumn.width
+                        width: Math.min(notesColumn.width, noteMetrics.averageCharacterWidth * 72)
                         text: "•  " + modelData
                         color: Theme.textMid
                         font.family: Theme.fontMenu
                         font.pixelSize: Theme.typography.secondary
+                        lineHeight: Theme.proseLineHeight
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
                     }
@@ -561,7 +569,7 @@ Item {
                 visible: root.page === "current" || (root.page === "problem" && root.problem === "check")
                 primary: root.page === "problem"
                 tone: root.current.tone
-                text: root.page === "current" ? I18n.tr("Check Now") : I18n.tr("Try Again")
+                text: root.page === "current" ? I18n.tr("Check now") : I18n.tr("Try Again")
                 enabled: !root.service.busy
                 onTriggered: { root.service.refreshStatus(); root.service.check(true); }
             }

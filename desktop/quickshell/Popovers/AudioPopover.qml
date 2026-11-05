@@ -146,8 +146,8 @@ Surface {
         Accessible.role: Accessible.Button
         Accessible.name: (muted ? "Unmute " : "Mute ") + channelName
         Accessible.onPressAction: muteButton.triggered()
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(muteButton)
 
@@ -331,8 +331,8 @@ Surface {
             : network ? "Network or AirPlay output" : "Output device"
         Accessible.checked: isDefault
         Accessible.onPressAction: root.selectOutput(sinkNode)
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(sinkRow)
 
@@ -425,8 +425,8 @@ Surface {
         Accessible.description: isDefault ? I18n.tr("Current input") : I18n.tr("Input device")
         Accessible.checked: isDefault
         Accessible.onPressAction: root.selectInput(sourceNode)
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(sourceRow)
 

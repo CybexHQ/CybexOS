@@ -326,8 +326,8 @@ SettingsPage {
                                 radius: Theme.rowRadius
                                 color: "transparent"
                                 opacity: dragged ? 0.35 : 1
-                                border.width: activeFocus ? 1 : 0
-                                border.color: Theme.accentText
+                                border.width: Theme.focusWidth(activeFocus)
+                                border.color: Theme.focusRing
                                 activeFocusOnTab: index === 0
                                 Accessible.role: Accessible.ListItem
                                 Accessible.name: meta.label + " indicator"
@@ -615,7 +615,7 @@ SettingsPage {
 
             SettingsGroup {
                 width: parent.width
-                title: I18n.tr("Do Not Disturb")
+                title: I18n.tr("Focus")
 
                 PickerRow {
                     width: parent.width

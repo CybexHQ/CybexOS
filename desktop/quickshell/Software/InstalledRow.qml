@@ -30,8 +30,8 @@ Rectangle {
     implicitHeight: Theme.scaled(56)
     radius: Theme.chipRadius + 3
     color: Theme.cardFill
-    border.width: activeFocus ? 2 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
     activeFocusOnTab: clickable
     Accessible.role: clickable ? Accessible.Button : Accessible.ListItem
     Accessible.name: row.name || ""

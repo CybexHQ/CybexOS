@@ -3,10 +3,11 @@ import QtQuick.Controls as Controls
 import "../Common"
 
 // The hover tip inside the settings window: the panel's own surface and ink
-// rather than Qt's default yellow box. It answers to the pointer only; a
-// keyboard user already hears the control's accessible name, and a tip that
-// opens on focus sat over the page every time the window gave focus to a
-// button.
+// rather than Qt's default yellow box. It answers to the pointer, and to
+// keyboard focus only while focus rings show (Theme.focusWidth, keyboard
+// modality): a tip that opened on any focus sat over the page every time the
+// window gave focus to a button, but one an icon-only control shows as the
+// keyboard reaches it is how a sighted keyboard user learns its name.
 Controls.ToolTip {
     id: root
 

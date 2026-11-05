@@ -21,13 +21,14 @@ BarModule {
         glyph: Notifs.dnd ? "notifications_off" : "notifications"
         glyphSize: Theme.barIconSize
         glyphWeight: 550
-        // Critical history stays visible even while DND suppresses its toast.
+        // Critical history stays visible even while Focus suppresses its toast.
         alert: Notifs.hasUrgent
         active: Notifs.dnd && !Notifs.hasUrgent
+        // Focus is the one name for Do Not Disturb (2026-11).
         tooltip: Notifs.dnd
-            ? "Notifications · Do Not Disturb · " + Notifs.count
-            : Notifs.count === 1 ? "1 notification"
-            : Notifs.count + " notifications"
+            ? I18n.format("Notifications · Focus · %1", [Notifs.count])
+            : Notifs.count === 1 ? I18n.tr("1 notification")
+            : I18n.format("%1 notifications", [Notifs.count])
         tooltipAlign: 1
 
         // The unread mark, ringed in the bar surface so it reads as sitting

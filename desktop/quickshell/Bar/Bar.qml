@@ -22,6 +22,9 @@ PanelWindow {
     property var compactIds: []
     property var overflowIds: []
     property real centerShift: 0
+    // How much of the media title the fit pass withholds so the chip ends a
+    // gap short of the centre group (BarGeometry.fitMenubar).
+    property real mediaTitleCut: 0
     // Follow the clock's local geometry synchronously. Updating this from the
     // deferred fit pass left it one rendered frame behind an animated child,
     // which showed up as a right/left rebound during indicator disclosure.
@@ -519,12 +522,16 @@ PanelWindow {
             const slot = slotRegistry[id];
             if (!slot || !slot.active)
                 continue;
+            // A title cut short to fit is measured at its full width, as a
+            // compacted one is, so the fit can give it back.
+            const cut = id === "media" && !moduleCompact(id) ? mediaTitleCut : 0;
             entries.push({
                 id: id,
                 col: slot.col,
                 saving: slot.detailSaving,
-                width: slot.width + (moduleCompact(id) ? slot.detailSaving : 0),
-                currentWidth: slot.width,
+                shrinkable: slot.detailShrinkable,
+                width: slot.width + (moduleCompact(id) ? slot.detailSaving : 0) + cut,
+                currentWidth: slot.width + cut,
                 policy: slot.modelData.detail ?? "auto",
                 centerSide: slot.col === "center" && id !== "clock"
                     && slot.mapToItem(centerCluster, 0, 0).x + slot.width / 2
@@ -591,6 +598,8 @@ PanelWindow {
                 result += entry.saving;
             if (entry.col === col && moduleOverflowed(entry.id))
                 result += entry.currentWidth;
+            else if (entry.col === col && entry.id === "media" && !moduleCompact(entry.id))
+                result += mediaTitleCut;
         }
         return result;
     }
@@ -598,7 +607,11 @@ PanelWindow {
     function recomputeFit() {
         const entries = measuredSlots();
         const centerExtents = reconstructedCenterExtents(entries);
-        const result = LayoutHelpers.fitBar({
+        // fitBar's compaction and overflow order, plus the media chip's own
+        // rules: its title shrinks to the room before the centre group, and
+        // the chip goes to More before the clock or the right cluster give
+        // anything up (docs/shell-states.md).
+        const result = BarGeometry.fitMenubar(LayoutHelpers.fitBar, {
             width: width,
             sideMargin: Theme.barSideMargin + Theme.barPadding,
             gutter: safetyGutter,
@@ -612,11 +625,13 @@ PanelWindow {
             centerExtents: centerExtents,
             entries: entries,
             overflowWidth: Theme.chipHeight + Theme.barSpacing
-        });
+        }, Theme.scaled(12));
         if (JSON.stringify(compactIds) !== JSON.stringify(result.compact))
             compactIds = result.compact;
         if (JSON.stringify(overflowIds) !== JSON.stringify(result.overflow))
             overflowIds = result.overflow;
+        if (mediaTitleCut !== result.mediaCut)
+            mediaTitleCut = result.mediaCut;
         centerShift = result.centerOffset;
     }
 

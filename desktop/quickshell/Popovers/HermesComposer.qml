@@ -394,7 +394,7 @@ Rectangle {
                     : primaryMouse.containsMouse ? HermesTheme.accentHover
                         : HermesTheme.accent
                 activeFocusOnTab: primaryMouse.enabled
-                border.width: activeFocus ? 1 : 0
+                border.width: Theme.focusWidth(activeFocus)
                 border.color: HermesTheme.focus
                 Accessible.role: Accessible.Button
                 Accessible.name: root.working ? I18n.tr("Stop Hermes") : I18n.tr("Send to Hermes")

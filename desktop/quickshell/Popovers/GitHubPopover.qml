@@ -298,7 +298,7 @@ Surface {
         radius: T3Theme.controlRadius
         color: selected ? T3Theme.hoverStrong
             : tabMouse.containsMouse || activeFocus ? T3Theme.hover : "transparent"
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: T3Theme.focus
         activeFocusOnTab: visible
         Accessible.role: Accessible.PageTab
@@ -375,7 +375,7 @@ Surface {
         // coloured glyph, not a full-row alarm field. Focus retains the one
         // temporary outline needed for keyboard navigation.
         color: "transparent"
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: T3Theme.focus
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
@@ -932,7 +932,7 @@ Surface {
                         radius: T3Theme.controlRadius
                         color: settledMouse.containsMouse || activeFocus
                             ? T3Theme.hoverStrong : "transparent"
-                        border.width: activeFocus ? 1 : 0
+                        border.width: Theme.focusWidth(activeFocus)
                         border.color: T3Theme.focus
                         activeFocusOnTab: visible
                         Accessible.role: Accessible.Button
@@ -1165,7 +1165,7 @@ Surface {
                     height: T3Theme.quietRowHeight
                     radius: T3Theme.rowRadius
                     color: "transparent"
-                    border.width: activeFocus ? 1 : 0
+                    border.width: Theme.focusWidth(activeFocus)
                     border.color: activeFocus ? T3Theme.focus : T3Theme.border
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
@@ -1440,7 +1440,7 @@ Surface {
                         height: T3Theme.quietRowHeight
                         radius: T3Theme.rowRadius
                         color: "transparent"
-                        border.width: activeFocus ? 1 : 0
+                        border.width: Theme.focusWidth(activeFocus)
                         border.color: activeFocus ? T3Theme.focus : T3Theme.border
                         activeFocusOnTab: visible
                         Accessible.role: Accessible.Button

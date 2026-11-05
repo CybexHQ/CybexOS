@@ -38,8 +38,8 @@ Rectangle {
     color: Theme.chip
     opacity: ready ? 1 : 0.4
     activeFocusOnTab: ready
-    border.width: activeFocus ? 2 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
 
     Accessible.role: Accessible.Slider
     Accessible.name: accessibleName
@@ -122,8 +122,8 @@ Rectangle {
         radius: 15
         color: glyphMouse.containsMouse ? Theme.chipHover : "transparent"
         activeFocusOnTab: visible && root.ready
-        border.width: activeFocus ? 2 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
         Accessible.role: Accessible.Button
         Accessible.name: root.glyphAccessibleName
         Accessible.onPressAction: root.glyphClicked()

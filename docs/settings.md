@@ -19,6 +19,18 @@ how it is organised since the October 2026 redesign; the code is
   size, which is 960 × 700 at a 12 px base and about 1120 × 817 at the default
   14 px. In a shorter window it scrolls. Below about 860 units of width it
   compresses to its glyphs.
+
+  The current page is a selected row in the
+  [shared state system](shell-states.md): an accent tint, a 3 px edge on its
+  leading side, the accent on its icon and the label in `textHi`. Hover is the
+  neutral chip and keyboard focus is only the ring, which shows while the
+  keyboard is in use. When a page changes from elsewhere (Back, a Home
+  reading, a search), focus moves with the selection, so the ring is never on
+  one page while another is selected. In the icon rail every page and the
+  search glyph name themselves in a tip on hover and on keyboard focus. The
+  icon rail also shows "Press / to search pages" once above the page.
+  Dismissing it, opening the palette or closing the window retires it. The
+  window keeps no state on disk, so this lasts for the session.
 - **Header.** It holds Back (also Alt+Left), then the page and what it is
   about, the save state ("Saving… / Saved", with Undo after a reset), the
   **Changes** chip and Close. Back walks the pages visited since the window
@@ -35,21 +47,37 @@ how it is organised since the October 2026 redesign; the code is
 
 Home replaces About. From top to bottom it shows:
 
-1. The computer's name, release and hardware, and the update state.
+1. The computer's name, release and hardware, and the update state as a
+   status pill over a secondary **Software Update…** action.
 2. One strip with storage, battery (memory on a desktop), backups and network.
-   Each reading opens its page.
+   Storage and backups open Backup & storage, network opens Network and
+   battery opens Power. Memory has no page, so it is plain text, not a button.
+   Storage is in decimal units ("412 GB free", "of 1 TB") and memory in whole
+   GiB ("31 GiB").
 3. **Needs attention**. This lists:
    - unapplied changes;
    - a system change being prepared, ready to review, or waiting for a restart;
    - backups that are not set up;
    - the [system check](system-check.md)'s problems and suggestions.
 
-   Each item has one action. The system check row runs `cybex doctor` again.
+   Each item has a status pill (a dot and a word or two) beside its one
+   action. The most urgent item's action is the group's only primary, and the
+   others are secondary. The system check row runs `cybex doctor` again.
 4. **Recently changed**. These are the settings changed in this window, each
    with Show and Undo.
 5. **About this computer**. This holds shell health, the Welcome guide and the
    settings file.
 6. **Reset all**, in a group of its own.
+
+Actions follow the three tiers in [shell states](shell-states.md): primary,
+secondary and tertiary. Every tier has at least a 32 px target. Below about
+560 px of content column (`SettingsPage.compact`), Home reflows instead of
+eliding. The update state moves under the identity, the four readings go two
+by two and wrap, and an attention item puts its pill and action on a line
+under its title. An attention item also stacks when its title would not fit
+beside them. The theme and pointer galleries mark the chosen tile with a 2 px
+`textHi` frame and an accent check. In a narrow column the theme previews drop
+to 72 px, and Appearance keeps its order.
 
 Recently changed keeps at most eight entries in
 `~/.local/state/cybexos/shell/settings-recent.json`. It records only settings
@@ -185,6 +213,7 @@ first view.
 
 - `tests/settings-pages.py` runs the real shell under a private headless Sway.
   It opens every page and tab and follows the legacy ids. It also drives Back,
+  the icon rail's one-time search tip ("/" opens the palette and retires it),
   the palette (Enter and Ctrl+Enter), Recently changed with Undo, and two
   drafts reviewed and applied from the Changes sheet. A recording `cybex`
   checks that the sheet sends one combined `cybex config region` call. Its
@@ -205,6 +234,7 @@ first view.
   and `cybexos-session`'s record. `tests/quickshell/pointer.test.cjs` covers the
   resolution, the schema, the catalogue and its previews, and `looknfeel.lua`.
 - `tests/quickshell/settings-*.test.cjs` hold the page model, search, palette,
-  Changes and Recently changed contracts.
+  Changes and Recently changed contracts. `settings-states.test.cjs` covers the
+  state system, the action tiers and Home's narrow-column reflow.
 - `tests/settings-runtime.py` is the installed-VM audit of every page and tab;
   see [the settings audit](measurements/settings-audit-2026-10-27.md).

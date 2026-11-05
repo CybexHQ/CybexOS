@@ -6,13 +6,24 @@ import "../../Common/ProcessListHelpers.js" as ProcessListHelpers
 import "../../Common/SysInfoHelpers.js" as SysInfoHelpers
 import ".."
 
-// Overview's Top processes: the six busiest processes by CPU or by memory,
-// read only while this list is on screen (Common/ProcessList.qml). A row
-// offers End process for the person's own processes, behind a confirmation;
-// a process that ignores the request is offered a force quit. The full
-// picture is one click away in the system monitor.
+// Overview's Top processes: the busiest processes by CPU or by memory, read
+// only while this list is on screen (Common/ProcessList.qml). Five rows, or
+// three when the drawer is short (`maxRows`, set by DrawerOverview). A row
+// offers End process for the person's own processes, behind a confirmation
+// that names the process and its PID; a process that ignores the request is
+// offered a force quit. The full picture is one click away in the system
+// monitor.
+//
+// The × stays out of sight until the row is hovered, holds keyboard focus,
+// or is the row the confirmation is about, so a list of numbers does not
+// read as a list of close buttons. It stays in the Tab order throughout:
+// reaching it by keyboard is what reveals it.
 Column {
     id: root
+
+    property int maxRows: 5
+    // The control focus returns to when the confirmation is answered.
+    property Item returnFocus: null
 
     width: parent ? parent.width : 0
     spacing: Theme.scaled(2)
@@ -27,6 +38,35 @@ Column {
 
     readonly property var stuck: ProcessList.ending !== null
         && ProcessList.ending.stage === "stuck" ? ProcessList.ending : null
+
+    // The process the confirmation (or a pending end) is about.
+    readonly property var subject: ProcessList.confirming !== null ? ProcessList.confirming
+        : ProcessList.ending
+    readonly property bool asking: ProcessList.confirming !== null || stuck !== null
+
+    // A new question takes focus to its Cancel, as the session row's does;
+    // the × that asked (focused by its own press) gets it back after.
+    Connections {
+        target: ProcessList
+        function onConfirmingChanged() {
+            if (ProcessList.confirming === null || !root.visible)
+                return;
+            root.returnFocus = root.Window.activeFocusItem;
+            Qt.callLater(() => {
+                if (root.asking)
+                    cancelLink.forceActiveFocus();
+            });
+        }
+    }
+
+    function answered() {
+        const origin = returnFocus;
+        returnFocus = null;
+        if (origin && origin.visible && origin.enabled && origin.opacity > 0)
+            origin.forceActiveFocus();
+        else
+            monitorLink.forceActiveFocus();
+    }
 
     function openMonitor() {
         Popouts.close();
@@ -70,8 +110,8 @@ Column {
                     height: Theme.scaled(24)
                     radius: Theme.chipRadius
                     color: taken ? Theme.chip : "transparent"
-                    border.width: activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(activeFocus)
+                    border.color: Theme.focusRing
                     activeFocusOnTab: true
                     Accessible.role: Accessible.RadioButton
                     Accessible.name: "Sort by " + modelData.label
@@ -129,7 +169,7 @@ Column {
     // Fixed slots: each shows whichever process holds that rank, so the
     // rows are not rebuilt on every two-second sample.
     Repeater {
-        model: ProcessList.limit
+        model: Math.min(ProcessList.limit, root.maxRows)
 
         delegate: Rectangle {
             id: slot
@@ -138,12 +178,17 @@ Column {
             readonly property var row: ProcessList.rows[index] ?? null
             readonly property bool endable: row !== null && ProcessList.canEnd(row)
             readonly property bool byMemory: ProcessList.mode === "memory"
+            // Bound to the PID and start time the confirmation captured, not
+            // to this slot's rank, which changes with every sample.
+            readonly property bool selected: row !== null && root.subject !== null
+                && root.subject.pid === row.pid && root.subject.start === row.start
+            readonly property bool revealed: slotHover.hovered || endButton.activeFocus || selected
 
             visible: row !== null
             width: root.width
             height: Theme.listRowHeight
             radius: Theme.rowRadius
-            color: slotHover.hovered ? Theme.chip : "transparent"
+            color: revealed ? Theme.chip : "transparent"
 
             Accessible.role: Accessible.StaticText
             Accessible.name: row ? row.name + ", CPU " + ProcessListHelpers.formatCpu(row.cpu)
@@ -205,9 +250,10 @@ Column {
                 height: Theme.scaled(28)
                 visible: slot.endable
                 enabled: ProcessList.ending === null
+                opacity: !slot.revealed ? 0 : enabled ? 1 : 0.4
                 glyph: "close"
                 glyphSize: Theme.iconSmall
-                tint: Theme.textFaint
+                tint: Theme.textMid
                 accessibleName: slot.row ? "End " + slot.row.name : "End process"
                 onClicked: ProcessList.requestEnd(slot.row)
             }
@@ -217,7 +263,7 @@ Column {
     // The confirmation, then — if the process ignored the request — the
     // offer to force it. Both say what is at stake before acting.
     Rectangle {
-        visible: ProcessList.confirming !== null || root.stuck !== null
+        visible: root.asking
         width: parent.width
         height: confirmContent.implicitHeight + Theme.scaled(20)
         radius: Theme.rowRadius
@@ -256,12 +302,17 @@ Column {
                             ProcessList.confirmEnd();
                         else
                             ProcessList.forceQuit();
+                        root.answered();
                     }
                 }
 
                 LinkText {
+                    id: cancelLink
                     text: I18n.tr("Cancel")
-                    onClicked: ProcessList.cancel()
+                    onClicked: {
+                        ProcessList.cancel();
+                        root.answered();
+                    }
                 }
             }
         }

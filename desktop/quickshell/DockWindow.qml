@@ -409,8 +409,8 @@ PanelWindow {
                             color: "transparent"
                             focus: index === 0
                             activeFocusOnTab: true
-                            border.width: activeFocus ? 1 : 0
-                            border.color: Theme.accentText
+                            border.width: Theme.focusWidth(activeFocus)
+                            border.color: Theme.focusRing
                             Accessible.role: Accessible.MenuItem
                             Accessible.name: modelData.label
                             Accessible.onPressAction: action.trigger()

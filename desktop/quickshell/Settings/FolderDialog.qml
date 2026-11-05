@@ -130,10 +130,10 @@ Controls.Dialog {
             id: upButton
             width: parent.width
             height: Theme.listRowHeight
-            border.width: activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
             radius: Theme.rowRadius
-            color: upMouse.containsMouse || activeFocus ? Theme.hoverFill : "transparent"
+            color: upMouse.containsMouse ? Theme.hoverFill : "transparent"
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: I18n.tr("Parent folder")
@@ -218,11 +218,13 @@ Controls.Dialog {
 
                     width: folderList.width
                     height: Theme.listRowHeight
-                    border.width: activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(activeFocus)
+                    border.color: Theme.focusRing
                     radius: Theme.rowRadius
-                    color: selected ? Theme.chipHover
-                        : rowMouse.containsMouse || activeFocus ? Theme.hoverFill : "transparent"
+                    // Selected is the accent tint, hover the neutral chip,
+                    // focus the ring (docs/shell-states.md).
+                    color: selected ? Theme.selectedFill
+                        : rowMouse.containsMouse ? Theme.hoverFill : "transparent"
                     activeFocusOnTab: index === folderList.currentIndex
                     Accessible.role: Accessible.ListItem
                     Accessible.name: fileName

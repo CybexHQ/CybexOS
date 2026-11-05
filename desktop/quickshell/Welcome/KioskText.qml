@@ -6,11 +6,12 @@ import QtQuick
 Text {
     property real size: 16
     property bool mono: false
-    // ink, fog, faint, accent, red, amber or onAccent.
+    // ink, fog, faint, accent, red, amber or onAccent. Faint copy takes the
+    // contrast-lifted faintText (Kiosk.qml).
     property string tone: "ink"
     font.family: mono ? Kiosk.mono : Kiosk.sans
     font.pixelSize: Math.max(1, Math.round(Kiosk.px(size)))
-    color: tone === "fog" ? Kiosk.fog : tone === "faint" ? Kiosk.faint : tone === "accent" ? Kiosk.accent
+    color: tone === "fog" ? Kiosk.fog : tone === "faint" ? Kiosk.faintText : tone === "accent" ? Kiosk.accent
         : tone === "red" ? Kiosk.red : tone === "amber" ? Kiosk.amber : tone === "onAccent" ? Kiosk.accentInk : Kiosk.ink
     textFormat: Text.PlainText
     Accessible.role: Accessible.StaticText

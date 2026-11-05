@@ -123,8 +123,8 @@ PanelWindow {
                     Accessible.role: Accessible.Button
                     Accessible.name: I18n.tr("Close network dialog")
                     Accessible.onPressAction: NetworkOverlayState.close()
-                    border.width: activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(activeFocus)
+                    border.color: Theme.focusRing
 
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
@@ -278,7 +278,7 @@ PanelWindow {
         Accessible.role: Accessible.Button
         Accessible.name: label
         Accessible.onPressAction: button.triggered()
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: primary ? Theme.accentFg : Theme.accentText
 
         Keys.onPressed: event => {

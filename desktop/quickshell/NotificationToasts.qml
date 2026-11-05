@@ -10,7 +10,10 @@ import "Common/NotifHolds.js" as Holds
 // One source-grouped, bounded popup surface per output. Decks stay on the
 // display chosen on arrival. Hover or explicit expansion pauses all members;
 // critical cards wait for dismissal. Popups never take keyboard focus;
-// keyboard interaction is available in the notification centre.
+// keyboard interaction is available in the drawer's Notifications tab
+// (Super+N). Notifications the group bounds kept off the stack are counted
+// on a "+n more" chip that opens that tab, and while the drawer is open over
+// this corner new arrivals go to it instead (NotifPolicy.drawerRoute).
 Scope {
     Variants {
         model: Screens.layerSurfaceModel
@@ -25,6 +28,8 @@ Scope {
                 items: group.items.filter(entry => root.modelData.screen && entry.screenName === root.modelData.screen.name)
             })).filter(group => group.items.length > 0)
             readonly property var groupKeys: screenGroups.map(group => group.key)
+            readonly property string screenName: root.modelData.screen ? root.modelData.screen.name : ""
+            readonly property int overflowCount: Notifs.toastOverflow[root.screenName] || 0
 
             readonly property bool onTop: Settings.notifPosition.indexOf("top") === 0
             readonly property bool onLeft: Settings.notifPosition.indexOf("left") !== -1
@@ -36,7 +41,10 @@ Scope {
             readonly property int padH: Theme.scaled(Settings.notifDensity === "compact" ? 10
                 : Settings.notifDensity === "roomy" ? 16 : 12)
 
-            // Toast and history messages use the shared notification role.
+            // Toast and history messages use the shared notification role. The
+            // body follows the Body preview setting (NotifHelpers.bodyLineLimit
+            // gives a line back to the card's buttons); × takes the time's
+            // place while the pointer is on the card.
             readonly property var cardStyle: ({
                 face: Theme.fontMenu,
                 header: Theme.typography.notification,
@@ -46,12 +54,11 @@ Scope {
                 bodyLeading: 1.15,
                 stampFace: Theme.fontMono,
                 stampSize: Theme.fontMicro,
-                stampCentred: true,
-                trailingHeight: Theme.scaled(18),
-                close: Theme.scaled(17, Theme.typeScale),
+                target: Theme.scaled(24),
+                closeAlways: false,
+                close: Theme.scaled(16, Theme.typeScale),
                 closeColor: Theme.textLow,
-                pill: Theme.fontTiny,
-                stackedHeader: true
+                pill: Theme.fontTiny
             })
 
             // Keep the layer mapped through the final card's remove transition.
@@ -202,6 +209,64 @@ Scope {
                     }
                 }
 
+                // "+n more" sits at the stack's far end from the screen edge.
+                header: root.onTop ? null : moreChip
+                footer: root.onTop ? moreChip : null
+
+                Component {
+                    id: moreChip
+
+                    Item {
+                        width: toastList.width
+                        height: root.overflowCount > 0 ? chip.height + toastList.spacing : 0
+                        visible: root.overflowCount > 0
+
+                        // Notifications the group bounds (Settings → Notifications →
+                        // Grouped popups), a burst or a held deck kept off this
+                        // stack. Like the cards it never takes keyboard focus.
+                        Rectangle {
+                            id: chip
+
+                            anchors.right: root.onLeft ? undefined : parent.right
+                            anchors.left: root.onLeft ? parent.left : undefined
+                            y: root.onTop ? toastList.spacing : 0
+                            width: chipLabel.implicitWidth + Theme.controlSpacing * 3
+                            height: Theme.chipHeight
+                            radius: Theme.chipRadius
+                            color: chipMouse.containsMouse ? Theme.surfaceMenu : Theme.panelSurface
+                            border.width: Theme.surfaceBorderWidth
+                            border.color: Theme.surfaceBorderColor
+                            Accessible.role: Accessible.Button
+                            Accessible.name: I18n.format("%1 more notifications", [root.overflowCount])
+                            Accessible.onPressAction: chip.open()
+
+                            function open() {
+                                Popouts.openPanel("notifications", undefined, undefined, root.screenName);
+                            }
+
+                            Text {
+                                id: chipLabel
+                                anchors.centerIn: parent
+                                text: I18n.format("+%1 more", [root.overflowCount])
+                                textFormat: Text.PlainText
+                                font.family: Theme.fontMenu
+                                font.pixelSize: Theme.typography.metadata
+                                font.weight: Theme.weightMedium
+                                font.features: Theme.tabularNumberFeatures
+                                color: chipMouse.containsMouse ? Theme.textHi : Theme.textMid
+                            }
+
+                            MouseArea {
+                                id: chipMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: chip.open()
+                            }
+                        }
+                    }
+                }
+
                 // ScriptModel diffs by entry identity, so removing one toast reuses
                 // the surviving delegates instead of recreating them — a plain array
                 // model would reset every card's countdown (and hover state) whenever
@@ -311,7 +376,7 @@ Scope {
                                 color: slot.critical ? Qt.tint(baseSurface, Theme.redBgSoft) : baseSurface
                                 border.width: Theme.surfaceBorderWidth
                                 border.color: slot.critical ? Theme.redBorder : Theme.surfaceBorderColor
-                                onActivated: Notifs.invokeDefault(slot.modelData)
+                                onActivated: Notifs.activate(slot.modelData)
                                 onCloseRequested: Notifs.dismiss(slot.modelData)
 
                                 Rectangle {

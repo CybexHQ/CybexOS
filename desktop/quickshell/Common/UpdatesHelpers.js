@@ -408,9 +408,16 @@ function downloadSize(bytes) {
         : value >= 1e6 ? (value / 1e6).toFixed(1) + " MB" : Math.round(value / 1000) + " kB";
 }
 
+// Times in Software Update follow the clock's 12/24-hour setting, as the
+// menubar does (docs/shell-states.md: Formats), not the locale's default.
+function clockFormat(clock24) {
+    return clock24 ? "HH:mm" : "h:mm AP";
+}
+
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
     overviewVisible, indicator, waitingPackages, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease,
-    summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize
+    summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize,
+    clockFormat
 };

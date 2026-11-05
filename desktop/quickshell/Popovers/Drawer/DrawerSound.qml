@@ -95,7 +95,10 @@ Column {
 
             Text {
                 width: parent.width
-                text: (Audio.muted ? "Muted" : "Output " + Audio.volume + "%")
+                // Without an output there is no level to report; the
+                // slider below fades rather than claiming 0 %.
+                text: (!Audio.ready ? I18n.tr("Volume unavailable")
+                        : Audio.muted ? "Muted" : "Output " + Audio.volume + "%")
                     + (Audio.sourceReady
                         ? " · mic " + (Audio.sourceMuted
                             ? "muted" : Audio.sourceVolume + "%")

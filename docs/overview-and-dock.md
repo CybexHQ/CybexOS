@@ -73,21 +73,27 @@ could put the dock under the bar.
 
 ## Top processes
 
-The Control Center's Overview tab lists the six busiest processes under the
-CPU and memory meters. **CPU** and **Memory** choose the ranking. CPU is each
-process's share of the whole machine since the previous reading, on the same
-scale as the CPU meter. The list is read every two seconds only while it is on
-screen, by one short-lived helper (`desktop/quickshell/scripts/processes`) that uses shell
-builtins only. Hide it under the Control Center widget's **Overview** settings
-(**Top processes**).
+The Control Center's Overview tab ends with the five busiest processes,
+under the system summary and its CPU and memory meters. When the drawer is
+short (a 1280×720 laptop) it lists three, decided from the drawer's height so
+the list does not jump as other cards come and go. **CPU** and **Memory**
+choose the ranking. CPU is each process's share of the whole machine since the
+previous reading, on the same scale as the CPU meter. The list is read every
+two seconds only while it is on screen, by one short-lived helper
+(`desktop/quickshell/scripts/processes`) that uses shell builtins only. Hide it
+under the Control Center widget's **Overview** settings (**Top processes**).
 
-The × on a row ends one of your own processes after a confirmation. The shell
-sends SIGTERM so the application can save and quit. If it is still running
-three seconds later, the list offers **Force quit** (SIGKILL). Both signals
-check the process's start time, so a process ID reused in the meantime is never
-signalled. Processes that belong to other users have no end button, and neither
-do processes whose end would end the session or the shell (Hyprland, systemd,
-Xwayland, the lock screen and the shell itself).
+The × on a row ends one of your own processes after a confirmation. It shows
+while the pointer is over the row, while it has keyboard focus (Tab reaches
+it), and on the row a confirmation is about. The confirmation names the process
+and its ID and warns that unsaved work may be lost; it acts on that process,
+whatever the list shows by then. The shell sends SIGTERM so the application can
+save and quit. If it is still running three seconds later, the list offers
+**Force quit** (SIGKILL). Both signals check the process's start time, so a
+process ID reused in the meantime is never signalled. Processes that belong to
+other users have no end button, and neither do processes whose end would end
+the session or the shell (Hyprland, systemd, Xwayland, the lock screen and the
+shell itself).
 
 **Open system monitor** opens `btop` in your terminal, as `Super+Shift+T` does.
 

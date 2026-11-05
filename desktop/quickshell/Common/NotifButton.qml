@@ -8,8 +8,8 @@ Rectangle {
     implicitHeight: Math.max(Theme.chipHeight, label.implicitHeight + 10)
     radius: Theme.chipRadius
     color: hover.hovered || activeFocus ? Theme.hoverFillStrong : Theme.hoverFill
-    border.width: activeFocus ? 1 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
     activeFocusOnTab: visible && enabled
     Accessible.role: Accessible.Button
     Accessible.name: text

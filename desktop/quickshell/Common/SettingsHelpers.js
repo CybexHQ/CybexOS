@@ -167,7 +167,7 @@ var INDICATOR_ACTION_CHOICES = [
     { id: "ocr", label: "OCR", glyph: "document_scanner" },
     { id: "reminder", label: "Reminders", glyph: "notifications_active" },
     { id: "night-light", label: "Night light", glyph: "nightlight" },
-    { id: "dnd", label: "Do Not Disturb", glyph: "do_not_disturb_on" },
+    { id: "dnd", label: "Focus", glyph: "do_not_disturb_on" },
     { id: "stay-awake", label: "Stay awake", glyph: "coffee" }
 ];
 var INDICATOR_ACTION_IDS = INDICATOR_ACTION_CHOICES.map(
@@ -875,6 +875,28 @@ function ensureContrast(value, background, target) {
             low = mid;
     }
     return mixHex(source, foreground, high);
+}
+
+// The 2026-11 state system (docs/shell-states.md). Hover keeps the neutral
+// chip; the current item takes an accent tint, so hover and selection can no
+// longer look alike (they used to share one fill). The accent marks drawn on
+// top of state — a rail's 3 px edge, a selected tile's border, the keyboard
+// focus ring — are graphics a person must find, so they are lifted to 3:1
+// (WCAG 1.4.11) over `reference`, the least favourable backdrop copy sits on.
+// Pure, so state-tokens.test.cjs checks every theme pack in its mode.
+function stateTokens(accent, reference, dark) {
+    var bg = hexIn(reference, dark ? "#201e1b" : "#e3e2ea").toLowerCase();
+    var tone = hexIn(accent, "#60a5fa").toLowerCase();
+    var mark = ensureContrast(tone, bg, 3.0);
+    return {
+        // Alpha of the accent laid over whatever surface hosts the item.
+        selectedAlpha: dark ? 0.18 : 0.14,
+        selectedMark: mark,
+        focusRing: mark,
+        // An off switch's track is a quiet tint of the faint ink; its border
+        // and knob carry the 3:1 boundary instead (textMid clears 4.5:1).
+        switchOffTrackAlpha: dark ? 0.30 : 0.22
+    };
 }
 
 function barPalette(background) {
@@ -2116,6 +2138,7 @@ var exported = {
     contrastRatio: contrastRatio,
     foregroundFor: foregroundFor,
     ensureContrast: ensureContrast,
+    stateTokens: stateTokens,
     mixHex: mixHex,
     barPalette: barPalette,
     semanticPalette: semanticPalette,

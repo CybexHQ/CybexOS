@@ -75,7 +75,11 @@ Bar & Control Center -> Control Center -> Button icon chooses its icon: the
 Cybex OS mark (the default), the operating system's logo (NixOS), or any Nerd
 Font icon, searched by name in `desktop/quickshell/assets/nerd-icons`
 (regenerate with `scripts/update-nerd-icons` when Nixpkgs moves to a new
-Nerd Fonts release). The fish prompt shows the same icon: the shell writes it
+Nerd Fonts release). On the bar the Cybex X is two-tone, so it does not read
+as a window's close button: at rest its short stroke takes 55 % of the bar's
+icon ink, and on hover or while Control Center is open it turns the brand red
+`#DC1E37` (`Bar/BarBrandIcon.qml`). Every other mark on the bar keeps the
+shared monochrome ink. The fish prompt shows the same icon: the shell writes it
 to `~/.local/state/cybexos/prompt-icon`, which fish reads with builtins before
 each prompt. The Cybex OS mark reaches terminals through Cybex OS Symbols, a
 one-glyph font built from the brand's monochrome symbol at U+1000CB

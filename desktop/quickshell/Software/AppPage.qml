@@ -241,7 +241,11 @@ PageScroll {
         property int failed: 0
         visible: root.shots.length > 0
         width: parent.width
-        height: visible ? Math.min(Theme.scaled(300), width * (root.shots.length >= 3 ? 0.34 : 0.4)) : 0
+        // A short window keeps About in reach: the gallery is capped at
+        // 220 px when the window is under 800 px tall.
+        readonly property real cap: root.Window.height > 0 && root.Window.height < Theme.scaled(800)
+            ? Theme.scaled(220) : Theme.scaled(300)
+        height: visible ? Math.min(cap, width * (root.shots.length >= 3 ? 0.34 : 0.4)) : 0
         readonly property var shown: root.shots.slice(0, 3)
         readonly property real gap: Theme.scaled(8)
 
@@ -307,8 +311,15 @@ PageScroll {
 
         Column {
             id: about
+            // Prose keeps a measure of at most 72 characters a line.
+            readonly property real measure: aboutMetrics.averageCharacterWidth * 72
             width: root.wide ? (parent.width - Theme.scaled(20)) * 0.6 : parent.width
             spacing: Theme.scaled(8)
+            FontMetrics {
+                id: aboutMetrics
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.primary
+            }
             SectionTitle {
                 width: parent.width
                 text: I18n.tr("About")
@@ -318,7 +329,7 @@ PageScroll {
                 delegate: Item {
                     id: paragraph
                     required property var modelData
-                    width: about.width
+                    width: Math.min(about.width, about.measure)
                     implicitHeight: body.implicitHeight
                     Text {
                         visible: paragraph.modelData.bullet
@@ -343,11 +354,12 @@ PageScroll {
             }
             Text {
                 visible: Helpers.paragraphs(root.app.description).length === 0
-                width: parent.width
+                width: Math.min(parent.width, about.measure)
                 text: root.app.summary || ""
                 color: Theme.textMid
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.primary
+                lineHeight: Theme.proseLineHeight
                 wrapMode: Text.Wrap
                 textFormat: Text.PlainText
             }

@@ -200,8 +200,8 @@ Surface {
                 return button.hovered ? Qt.lighter(Theme.textHi, 1.08) : Theme.textHi;
             return button.hovered || button.activeFocus ? Theme.chipHover : "transparent";
         }
-        border.width: activeFocus ? 2 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         Keys.onPressed: event => {
             if (button.available && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
@@ -282,8 +282,8 @@ Surface {
         height: 30
         radius: Theme.chipRadius
         color: hovered || activeFocus ? Theme.chipHover : "transparent"
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: accessibleName
@@ -853,8 +853,8 @@ Surface {
                 height: 48
                 radius: Theme.rowRadius
                 color: rowMouse.containsMouse || activeFocus ? Theme.chip : "transparent"
-                border.width: activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                border.width: Theme.focusWidth(activeFocus)
+                border.color: Theme.focusRing
                 activeFocusOnTab: true
                 Accessible.role: Accessible.Button
                 Accessible.name: I18n.format("Show %1", [modelData ? modelData.identity : ""])

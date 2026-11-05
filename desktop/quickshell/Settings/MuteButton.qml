@@ -18,8 +18,8 @@ Rectangle {
     height: Theme.settingsControlHeight
     radius: Theme.chipRadius
     color: muted ? Theme.redBgSoft : "transparent"
-    border.width: activeFocus ? 1 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
     opacity: enabled ? 1 : 0.45
     activeFocusOnTab: enabled && visible
     Accessible.role: Accessible.CheckBox

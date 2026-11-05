@@ -47,6 +47,10 @@ Row {
     // Width this module would give back if its detail text were hidden. The
     // fit pass reads it to decide what to compact; 0 means nothing to give.
     property real detailSaving: 0
+    // How much of that detail can shrink away before it is worth dropping;
+    // only the media title does. The fit pass shrinks it to the room left
+    // (Bar.mediaTitleCut, BarGeometry.fitMenubar) before compacting it.
+    property real detailShrinkable: 0
 
     spacing: 0
     anchors.verticalCenter: parent ? parent.verticalCenter : undefined

@@ -14,6 +14,8 @@ StateLayer {
 
     required property Bar host
     required property Item target
+    // The target's pointer area when it reaches past the target (PointerCheck).
+    property Item hitArea: null
     property bool visualEnabled: true
 
     readonly property bool over: pointer.over
@@ -25,6 +27,7 @@ StateLayer {
         id: pointer
         host: root.host
         target: root.target
+        region: root.hitArea
         // The bar-wide point is the primary opinion for a visual target. It
         // does not depend on a child MouseArea receiving the same event.
         hovered: true

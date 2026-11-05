@@ -150,9 +150,10 @@ SettingsGroup {
                 width: appList.width - Theme.settingsMarkInset - Theme.chipHeight
                 height: Theme.listRowHeight
                 radius: Theme.rowRadius
-                color: chosen ? Theme.chipHover : appMouse.containsMouse || activeFocus ? Theme.hoverFill : "transparent"
-                border.width: activeFocus ? 1 : 0
-                border.color: Theme.accentText
+                // Chosen is the accent tint, hover the neutral chip, focus the ring.
+                color: chosen ? Theme.selectedFill : appMouse.containsMouse ? Theme.hoverFill : "transparent"
+                border.width: Theme.focusWidth(activeFocus)
+                border.color: Theme.focusRing
                 activeFocusOnTab: index === Math.min(appList.current, root.apps.length - 1)
                 Accessible.role: Accessible.RadioButton
                 Accessible.name: modelData.name
@@ -182,6 +183,15 @@ SettingsGroup {
                     }
                 }
 
+                Rectangle {
+                    visible: app.chosen
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.selectedEdgeWidth
+                    height: Math.max(Theme.scaled(12), parent.height - Theme.scaled(14))
+                    radius: width / 2
+                    color: Theme.selectedMark
+                }
                 Sym {
                     id: appCheck
                     anchors.left: parent.left

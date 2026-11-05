@@ -15,6 +15,11 @@ import ".."
 // held states and hover-crossing all keep working unchanged. The host keys
 // its slots by source, so every one of those names reuses this same instance
 // and a tab switch swaps content in place instead of cross-fading a clone.
+//
+// Only the body scrolls. The tabs stay above it and the session row
+// (DrawerSessionFooter) stays pinned below it on every tab, so Lock and
+// Restart are one click away however long a tab is. Tab order follows the
+// layout: tabs, then the body, then the session row.
 Surface {
     id: root
 
@@ -26,8 +31,18 @@ Surface {
 
     readonly property real bodyHeightLimit: availableHeight > 0
         ? Math.max(1, availableHeight - padding * 2
-            - drawerTabs.height - spacing)
+            - drawerTabs.height - spacing
+            - (drawerArrival.visible ? drawerArrival.height + spacing : 0)
+            - sessionFooter.height - spacing)
         : Math.max(1, bodyLoader.implicitHeight)
+    // The same envelope for content that adapts to it (Overview's process
+    // rows); 0 while the host gives none, so nothing reads its own height.
+    readonly property real bodyHeightBudget: availableHeight > 0 ? bodyHeightLimit : 0
+    // Values, links and switches stay 12 px clear of the scroll thumb's lane
+    // (ScrollChrome: 2 px margin, 3 px thumb) while the body scrolls. Only a
+    // body that already overflows narrows, and narrowing only makes it taller,
+    // so the gutter cannot toggle itself back off.
+    readonly property real scrollGutter: bodyFlick.interactive ? Theme.scaled(12) + 5 : 0
 
     onTabChanged: {
         bodyFlick.cancelFlick();
@@ -44,6 +59,16 @@ Surface {
         return false;
     }
 
+    // Escape answers a pending session question first; only then does it
+    // close the drawer (PopoutPanel.handleEscape).
+    function handleEscape(): bool {
+        if (sessionFooter.confirming) {
+            sessionFooter.cancel();
+            return true;
+        }
+        return false;
+    }
+
     function revealFocus(item) {
         if (!item || !bodyFlick.interactive || !bodyContains(item))
             return;
@@ -51,7 +76,8 @@ Surface {
             if (!item || !item.visible || !root.bodyContains(item))
                 return;
             const point = item.mapToItem(bodyFlick.contentItem, 0, 0);
-            const margin = Theme.scaled(8);
+            // Clear of the body's 24 px edge fades, not under them.
+            const margin = bodyChrome.fadeSize + Theme.scaled(4);
             const itemHeight = Math.max(item.height, item.implicitHeight || 0);
             let next = bodyFlick.contentY;
             if (point.y < bodyFlick.contentY + margin)
@@ -91,6 +117,15 @@ Surface {
         current: root.tab
     }
 
+    // New notifications that arrive while the drawer covers their corner
+    // land here instead of as a toast over the drawer.
+    DrawerArrival {
+        id: drawerArrival
+        width: parent.width
+        currentTab: root.tab
+        onOpenNotifications: root.tab = "notifications"
+    }
+
     Item {
         id: bodyViewport
 
@@ -115,7 +150,7 @@ Surface {
             Loader {
                 id: bodyLoader
 
-                width: bodyFlick.width
+                width: Math.max(0, bodyFlick.width - root.scrollGutter)
                 sourceComponent: root.tab === "sound" ? soundTab
                     : root.tab === "network" ? networkTab
                     : root.tab === "bluetooth" ? bluetoothTab
@@ -125,10 +160,19 @@ Surface {
             }
         }
 
+        // A 24 px fade at whichever edge still has content past it.
         ScrollChrome {
+            id: bodyChrome
             anchors.fill: parent
             target: bodyFlick
+            edgeColor: root.surfaceColor
         }
+    }
+
+    DrawerSessionFooter {
+        id: sessionFooter
+        width: parent.width
+        bottomInset: root.padding
     }
 
     Connections {
@@ -144,7 +188,11 @@ Surface {
 
     Component {
         id: overviewTab
-        DrawerOverview {}
+        DrawerOverview {
+            bodyHeightBudget: root.bodyHeightBudget
+            onSessionConfirmRequested: (action, origin, version) =>
+                sessionFooter.ask(action, origin, version)
+        }
     }
 
     Component {

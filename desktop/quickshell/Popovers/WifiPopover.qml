@@ -366,7 +366,7 @@ Surface {
         Accessible.name: label
         Accessible.description: selected ? "Selected" : ""
         Accessible.onPressAction: pill.triggered()
-        border.width: activeFocus ? 1 : 0
+        border.width: Theme.focusWidth(activeFocus)
         border.color: selected ? Theme.accentFg : Theme.accentText
 
         Keys.onPressed: event => {
@@ -411,8 +411,8 @@ Surface {
         Accessible.role: Accessible.Button
         Accessible.name: accessibleName
         Accessible.onPressAction: action.triggered()
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
@@ -448,8 +448,8 @@ Surface {
             : Tailscale.connected ? Theme.chip : "transparent"
         scale: summaryMouse.pressed ? 0.99 : 1
         activeFocusOnTab: true
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
 
         Accessible.role: Accessible.Button
         Accessible.name: I18n.tr("Tailscale")
@@ -684,8 +684,8 @@ Surface {
             + (actionError !== "" ? errorLabel.implicitHeight + 8 : 0)
         radius: Theme.rowRadius
         color: network.connected ? Theme.chip : rowMouse.containsMouse ? Theme.hoverFill : "transparent"
-        border.width: activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(activeFocus)
+        border.color: Theme.focusRing
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: network.ssid

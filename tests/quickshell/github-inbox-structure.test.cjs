@@ -159,7 +159,7 @@ test("the GitHub workspace follows the integrated T3 module hierarchy", () => {
         /component InboxRow: Rectangle \{([\s\S]*?)\n {4}\}\n\n {4}\/\/ ---- header/)?.[1] ?? "";
     assert.match(inboxRow, /height:\s*T3Theme\.quietRowHeight/);
     assert.match(inboxRow, /color:\s*"transparent"/);
-    assert.match(inboxRow, /border\.width:\s*activeFocus \? 1 : 0/,
+    assert.match(inboxRow, /border\.width:\s*Theme\.focusWidth\(activeFocus\)/,
         "attention must not bring back a resting border");
     assert.match(inboxRow,
         /name:\s*root\.inboxStatusIcon\(inboxCard\.row\)[\s\S]{0,140}?color:\s*inboxCard\.statusColor/,

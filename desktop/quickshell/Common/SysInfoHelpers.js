@@ -215,6 +215,29 @@ function formatIecBytes(bytes) {
     return rounded + " " + units[unit];
 }
 
+// Storage in decimal units, the way drives are sold and every file manager
+// counts them ("412 GB free of 1 TB"). Memory keeps formatIecBytes (GiB):
+// RAM is built in powers of two, and 32 GB of it would otherwise read
+// "34 GB". One rule per quantity, shared by Settings Home and the drawer
+// (2026-11 formats, docs/shell-states.md).
+function formatStorageBytes(bytes) {
+    var value = Number(bytes);
+    if (!Number.isFinite(value) || value < 0)
+        return "Unavailable";
+    var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+    var unit = 0;
+    while (value >= 1000 && unit < units.length - 1) {
+        value /= 1000;
+        unit++;
+    }
+    if (unit === 0)
+        return Math.round(value) + " B";
+    // Three significant digits at most: 412 GB, 31.9 GB, 1.3 TB.
+    var rounded = value >= 100 ? String(Math.round(value))
+        : value.toFixed(1).replace(/\.0$/, "");
+    return rounded + " " + units[unit];
+}
+
 function formatUptime(seconds) {
     var value = Number(seconds);
     if (!Number.isFinite(value) || value < 0)
@@ -257,6 +280,7 @@ var exported = {
     parseDf: parseDf,
     parseUptime: parseUptime,
     formatIecBytes: formatIecBytes,
+    formatStorageBytes: formatStorageBytes,
     formatUptime: formatUptime,
     countdownTickMs: countdownTickMs
 };

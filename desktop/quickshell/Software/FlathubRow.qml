@@ -25,8 +25,8 @@ Item {
         anchors.fill: parent
         radius: Theme.chipRadius + 3
         color: mouse.containsMouse || root.activeFocus ? Theme.cardFill : "transparent"
-        border.width: root.activeFocus ? 2 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
         Behavior on color {
             ColorAnimation { duration: Theme.chipFadeDuration }
         }

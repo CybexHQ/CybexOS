@@ -164,7 +164,7 @@ var ROWS = [
     { page: "bar", pageLabel: "Bar & Control Center", widget: "control", group: "Button icon", label: "Use in terminal prompt", key: "controlIconPrompt", terms: "fish prompt terminal shell icon logo oh-my-posh" },
 
     // Notifications
-    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Do Not Disturb", key: "notifDnd", terms: "dnd silence mute focus" },
+    { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Focus", aliases: ["Do Not Disturb"], key: "notifDnd", terms: "dnd silence mute quiet" },
     { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Quiet hours", key: "notifQuiet", terms: "night schedule silence" },
     { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Duration", key: "notifDuration", terms: "toast timeout seconds" },
     { page: "notifications", pageLabel: "Notifications", group: "Behavior", label: "Position", key: "notifPosition", terms: "toast corner top bottom" },
@@ -217,7 +217,9 @@ var ACTIONS = [
 
 // Case-insensitive substring match over the words a user would type. Results
 // keep index order — the pages' own order — with label hits ranked above
-// hits that only matched hidden search terms.
+// hits that only matched hidden search terms. A renamed row lists its former
+// names in `aliases`, which rank as labels, so the old name still finds it
+// first (Do Not Disturb became Focus in 2026-11).
 function search(query, translate) {
     var tr = translate || function(text) { return text; };
     var q = (query || "").trim().toLowerCase();
@@ -226,7 +228,7 @@ function search(query, translate) {
     var labelHits = [];
     var termHits = [];
     ROWS.forEach(function(row) {
-        var labels = [row.label, row.group, row.pageLabel];
+        var labels = [row.label, row.group, row.pageLabel].concat(row.aliases || []);
         // Follow launcher actions: translated labels plus English aliases.
         var direct = labels.concat(labels.map(function(label) { return tr(label); }))
             .join(" ").toLowerCase().indexOf(q) !== -1;

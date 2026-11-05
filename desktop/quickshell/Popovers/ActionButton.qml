@@ -44,7 +44,7 @@ Rectangle {
             root.triggered();
         }
     }
-    border.width: activeFocus ? 1 : 0
+    border.width: Theme.focusWidth(activeFocus)
     border.color: focusColor
 
     Keys.onPressed: event => {

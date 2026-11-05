@@ -9,6 +9,13 @@ import QtQuick
 // than a theoretical one: a popout takes WlrKeyboardFocus.OnDemand while it is
 // open (Bar/BarPopoutWindow.qml), so the Wi-Fi, Bluetooth, Tailscale and DND
 // switches sat inside a focused surface with nothing to focus them with.
+//
+// States (2026-11, docs/shell-states.md): off is a quiet track with a 1 px
+// boundary and knob in the per-pack switchOff* tokens, which carry the 3:1
+// edge a faint track alone missed; on is the accent track. Keyboard focus is
+// a separate ring around the track, never a tint on it, so focus cannot be
+// misread as a state. A disabled switch fades itself; whatever explains why
+// sits outside it and stays at full contrast.
 Item {
     id: root
 
@@ -22,6 +29,7 @@ Item {
 
     width: metrics.box.width
     height: metrics.box.height
+    opacity: enabled ? 1 : 0.45
     activeFocusOnTab: true
     Accessible.role: Accessible.CheckBox
     Accessible.checked: checked
@@ -41,15 +49,28 @@ Item {
         }
     }
 
+    // The ring stands 1 px clear of the track and stays inside the hit box,
+    // where no clipping parent can cut it.
+    Rectangle {
+        anchors.centerIn: parent
+        width: Math.min(root.width, root.trackWidth + (Theme.focusRingWidth + 1) * 2)
+        height: Math.min(root.height, root.trackHeight + (Theme.focusRingWidth + 1) * 2)
+        radius: height / 2
+        color: "transparent"
+        visible: border.width > 0
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
+    }
+
     Rectangle {
         id: track
         anchors.centerIn: parent
         width: root.trackWidth
         height: root.trackHeight
         radius: height / 2
-        color: root.checked ? Theme.accent : Qt.rgba(1, 1, 1, 0.12)
-        border.width: root.activeFocus ? 1 : 0
-        border.color: Theme.textHi
+        color: root.checked ? Theme.accent : Theme.switchOffTrack
+        border.width: root.checked ? 0 : 1
+        border.color: Theme.switchOffBorder
 
         StateLayer {
             id: toggleState
@@ -57,7 +78,6 @@ Item {
             radius: parent.radius
             hovered: toggleMouse.containsMouse
             pressed: toggleMouse.pressed
-            focused: root.activeFocus
             tint: root.checked ? Theme.accentFg : Theme.textHi
             pressPoint: Qt.point(toggleMouse.mouseX - track.x,
                 toggleMouse.mouseY - track.y)
@@ -78,7 +98,7 @@ Item {
         width: toggleMouse.pressed ? pressedSize : restingSize
         height: width
         radius: height / 2
-        color: root.checked ? Theme.accentFg : Theme.textLow
+        color: root.checked ? Theme.accentFg : Theme.switchOffKnob
 
         Behavior on x {
             NumberAnimation {

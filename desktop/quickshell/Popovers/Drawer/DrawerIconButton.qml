@@ -14,7 +14,9 @@ Rectangle {
     property color tint: Theme.textMid
     property string accessibleName: ""
     signal clicked()
-    Controls.ToolTip.visible: mouse.containsMouse || activeFocus
+    // Focus shows the name only for keyboard modality: the latched drawer
+    // keeps its last focus, and reopening it must not wake a stale tooltip.
+    Controls.ToolTip.visible: mouse.containsMouse || (activeFocus && FocusModality.keyboard)
     Controls.ToolTip.text: accessibleName
 
     width: Theme.inlineActionHeight
@@ -23,8 +25,8 @@ Rectangle {
     color: "transparent"
     opacity: enabled ? 1 : 0.4
     activeFocusOnTab: enabled && visible
-    border.width: activeFocus ? 1 : 0
-    border.color: Theme.accentText
+    border.width: Theme.focusWidth(activeFocus)
+    border.color: Theme.focusRing
     Accessible.role: Accessible.Button
     Accessible.name: accessibleName
     Accessible.onPressAction: if (root.enabled) root.clicked()

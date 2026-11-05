@@ -854,7 +854,7 @@ Item {
                         color: selected ? HermesTheme.hoverStrong
                             : rowMouse.containsMouse || activeFocus
                                 ? HermesTheme.hover : "transparent"
-                        border.width: activeFocus ? 1 : 0
+                        border.width: Theme.focusWidth(activeFocus)
                         border.color: HermesTheme.focus
                         activeFocusOnTab: true
                         Accessible.role: Accessible.Button
@@ -1064,7 +1064,7 @@ Item {
                     radius: HermesTheme.controlRadius
                     color: (entryMouse.containsMouse || activeFocus) && actionEnabled
                         ? HermesTheme.hoverStrong : "transparent"
-                    border.width: activeFocus ? 1 : 0
+                    border.width: Theme.focusWidth(activeFocus)
                     border.color: HermesTheme.focus
                     opacity: actionEnabled ? 1 : 0.38
                     activeFocusOnTab: actionEnabled && visible

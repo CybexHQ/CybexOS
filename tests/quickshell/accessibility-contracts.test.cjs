@@ -70,13 +70,15 @@ test("notification history exposes primary, action, disclosure, dismiss, and cle
     assert.match(centre, /keyboardEnabled:\s*true/);
     assert.match(centre, /DrawerFooter \{[\s\S]*actionText: Notifs\.count > 0[\s\S]*onActionClicked: Notifs\.clearAll\(\)/);
     assert.match(footer, /onClicked: root\.actionClicked\(\)/);
-    assert.match(centre, /delegate: ActionButton \{[\s\S]*id: modeChoice[\s\S]*onTriggered: Notifs\.setDnd\(modelData\.dnd\)/);
-    assert.match(centre, /Accessible\.role: Accessible\.RadioButton[\s\S]*Accessible\.checked: modeChoice\.on/);
+    // The On | Focus segment became one labelled Focus switch (2026-11): the
+    // same Focus the Overview's tile toggles, named the same everywhere.
+    assert.match(centre, /Toggle \{[\s\S]*?id: focusSwitch[\s\S]*?checked: Notifs\.dnd[\s\S]*?onToggled: value => Notifs\.setDnd\(value\)/);
+    assert.match(centre, /accessibleName: "Focus: silences notifications"/);
     const primitive = read("Popovers/ActionButton.qml");
     assert.match(primitive, /activeFocusOnTab: enabled && visible && revealed/);
     assert.match(primitive, /Accessible\.onPressAction:/);
     assert.match(primitive, /Qt\.Key_Return[\s\S]*Qt\.Key_Enter[\s\S]*Qt\.Key_Space/);
-    assert.match(primitive, /border\.width: activeFocus \? 1 : 0/);
+    assert.match(primitive, /border\.width: Theme\.focusWidth\(activeFocus\)/);
 
 });
 

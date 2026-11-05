@@ -102,16 +102,28 @@ SettingsPage {
 
         height: cardColumn.implicitHeight + Theme.scaled(20)
         radius: Theme.chipRadius
-        color: selected ? Theme.chipHover : cardMouse.containsMouse && enabled ? Theme.hoverFillStrong : Theme.hoverFill
-        border.width: selected ? 2 : 1
-        border.color: selected ? Theme.accent : Theme.stroke
-        opacity: enabled ? 1 : 0.55
+        // A chosen card is a selected tile (docs/shell-states.md): the accent
+        // tint and a 2 px mark border, apart from the neutral hover.
+        color: selected ? Theme.selectedFill : cardMouse.containsMouse && enabled ? Theme.hoverFillStrong : Theme.hoverFill
+        border.width: selected ? Theme.selectedBorderWidth : 1
+        border.color: selected ? Theme.selectedMark : Theme.stroke
         activeFocusOnTab: enabled
         Accessible.role: Accessible.RadioButton
         Accessible.name: title + ". " + detail + (status !== "" ? ". " + status : "")
         Accessible.checked: selected
         Keys.onSpacePressed: choice.chosen()
         Keys.onReturnPressed: choice.chosen()
+
+        // Keyboard focus stands 2 px clear of the card, never on its border.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -(Theme.focusRingWidth + 2)
+            radius: parent.radius + Theme.focusRingWidth + 2
+            color: "transparent"
+            visible: border.width > 0
+            border.width: Theme.focusWidth(choice.activeFocus)
+            border.color: Theme.focusRing
+        }
 
         Column {
             id: cardColumn
@@ -120,7 +132,10 @@ SettingsPage {
             width: parent.width - Theme.scaled(20)
             spacing: Theme.scaled(4)
 
+            // A card that cannot be chosen fades its name and description;
+            // the status line under them says why, at full contrast.
             Row {
+                opacity: choice.enabled ? 1 : 0.55
                 spacing: Theme.scaled(6)
                 Text {
                     text: choice.title
@@ -149,6 +164,7 @@ SettingsPage {
             }
             Text {
                 width: parent.width
+                opacity: choice.enabled ? 1 : 0.55
                 wrapMode: Text.WordWrap
                 text: choice.detail
                 font.family: Theme.fontMenu

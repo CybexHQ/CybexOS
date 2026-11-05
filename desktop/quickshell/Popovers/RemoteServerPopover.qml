@@ -345,8 +345,8 @@ PopoutPanel {
         width: parent ? parent.width : 0
         radius: Theme.chipRadius
         color: rowMouse.containsMouse || row.activeFocus ? Theme.hoverFill : "transparent"
-        border.width: row.activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(row.activeFocus)
+        border.color: Theme.focusRing
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: row.accessibleName

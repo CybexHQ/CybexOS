@@ -48,8 +48,8 @@ SettingsPage {
 
             SwitchRow {
                 width: parent.width
-                label: I18n.tr("Do Not Disturb")
-                description: I18n.tr("Mutes pop-ups; notifications still collect in the center")
+                label: I18n.tr("Focus")
+                description: I18n.tr("Silences pop-ups; notifications still collect in the center")
                 checked: Notifs.dnd
                 dirty: Settings.notifDnd !== Settings.defaults.notifDnd
                     || Settings.notifDndUntilMs !== Settings.defaults.notifDndUntilMs
@@ -286,7 +286,7 @@ SettingsPage {
                         inset: false
                         visible: Notifs.toastsSuppressed
                         text: Notifs.dnd
-                            ? "Do Not Disturb is on, so a test only collects in the center"
+                            ? "Focus is on, so a test only collects in the center"
                             : "Quiet hours are on, so a test only collects in the center"
                     }
                 }

@@ -40,4 +40,7 @@ FloatingWindow {
         anchors.fill: parent
         focus: true
     }
+
+    // Pointer vs keyboard modality for focus rings (Common/FocusModality).
+    FocusModalityObserver {}
 }

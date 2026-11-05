@@ -42,6 +42,16 @@ FocusScope {
         z: 2
     }
 
+    // Sees every press after the control under it has taken it, so a click
+    // anywhere else folds the search back over the tabs (HeaderBar).
+    PointHandler {
+        enabled: header.searchCovering
+        onActiveChanged: {
+            if (active)
+                header.pressedAt(point.scenePosition);
+        }
+    }
+
     Item {
         id: content
         anchors.top: header.bottom

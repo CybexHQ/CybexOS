@@ -334,8 +334,8 @@ PopoutPanel {
                     radius: Theme.chipRadius - 2
                     color: segment.chosen ? Theme.chipHover
                         : segmentMouse.containsMouse && seg.enabled ? Theme.hoverFill : "transparent"
-                    border.width: segment.activeFocus ? 1 : 0
-                    border.color: Theme.accentText
+                    border.width: Theme.focusWidth(segment.activeFocus)
+                    border.color: Theme.focusRing
                     activeFocusOnTab: segment.chosen && seg.enabled
                     Accessible.role: Accessible.RadioButton
                     Accessible.name: segment.modelData.description || segment.modelData.label
@@ -1300,8 +1300,8 @@ PopoutPanel {
         height: faultText.implicitHeight + Theme.scaled(18)
         radius: Theme.chipRadius
         color: faultMouse.containsMouse ? Qt.lighter(wash, 1.25) : wash
-        border.width: faultRow.activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        border.width: Theme.focusWidth(faultRow.activeFocus)
+        border.color: Theme.focusRing
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: faultRow.fault.title
@@ -1385,8 +1385,8 @@ PopoutPanel {
             height: width
             radius: Theme.chipRadius
             color: dismissMouse.containsMouse || dismissButton.activeFocus ? Theme.hoverFill : "transparent"
-            border.width: dismissButton.activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(dismissButton.activeFocus)
+            border.color: Theme.focusRing
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: "Dismiss " + faultRow.fault.title
@@ -2219,8 +2219,8 @@ PopoutPanel {
             height: Theme.scaled(28)
             radius: Theme.chipRadius
             color: privacyMouse.containsMouse || privacy.activeFocus ? Theme.hoverFill : "transparent"
-            border.width: privacy.activeFocus ? 1 : 0
-            border.color: Theme.accentText
+            border.width: Theme.focusWidth(privacy.activeFocus)
+            border.color: Theme.focusRing
             activeFocusOnTab: visible
             Accessible.role: Accessible.CheckBox
             Accessible.name: I18n.tr("Hide account emails")

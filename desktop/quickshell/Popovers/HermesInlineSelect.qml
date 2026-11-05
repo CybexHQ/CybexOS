@@ -196,7 +196,7 @@ Item {
                             : choiceMouse.containsMouse || activeFocus
                                 ? HermesTheme.hoverStrong
                                 : "transparent"
-                        border.width: activeFocus ? 1 : 0
+                        border.width: Theme.focusWidth(activeFocus)
                         border.color: HermesTheme.focus
                         opacity: modelData.disabled === true ? 0.35 : 1
                         activeFocusOnTab: modelData.disabled !== true

@@ -4,8 +4,10 @@ import "../Common"
 // One entry in a list whose rows are the control: an output device, a saved
 // connection (2026-09 redesign). The icon says what kind of thing it is, the
 // label which one, `detail` adds a quieter second line and `meta` a short
-// status at the right ("Connected"). The chosen entry is raised out of the
-// page and wears a check. A list whose choice opens settings further down
+// status at the right ("Connected"). The chosen entry is a selected list row
+// (docs/shell-states.md): the accent tint, a 3 px edge on its leading side,
+// the accent on its icon and a check; hover stays neutral and keyboard focus
+// is the ring alone. A list whose choice opens settings further down
 // the page sets `opens`: every row then ends in a chevron instead.
 //
 // The row keeps the settings column's grid: its icon starts on the label
@@ -82,9 +84,9 @@ Item {
         width: Math.max(0, root.contentRight + root.bleed - x)
         height: parent.height
         radius: Theme.rowRadius
-        color: root.checked ? Theme.chip : "transparent"
-        border.width: root.activeFocus ? 1 : 0
-        border.color: Theme.accentText
+        color: root.checked ? Theme.selectedFill : "transparent"
+        border.width: Theme.focusWidth(root.activeFocus)
+        border.color: Theme.focusRing
 
         Behavior on color {
             ColorAnimation { duration: Theme.chipFadeDuration }
@@ -96,9 +98,18 @@ Item {
             radius: parent.radius
             hovered: mouse.containsMouse
             pressed: mouse.pressed
-            focused: root.activeFocus
             tint: Theme.textHi
             pressPoint: Qt.point(mouse.mouseX, mouse.mouseY)
+        }
+
+        Rectangle {
+            visible: root.checked
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Theme.selectedEdgeWidth
+            height: Math.max(Theme.scaled(12), parent.height - Theme.scaled(14))
+            radius: width / 2
+            color: Theme.selectedMark
         }
     }
 

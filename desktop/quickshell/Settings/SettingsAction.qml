@@ -1,9 +1,12 @@
 import QtQuick
 import "../Common"
 
-// A settings button. Quiet by default: copy and an icon on a hover layer.
-// `primary` fills it with the accent for the one action a bar or dialog
-// leads with (Apply, Keep changes, Add account); `danger` inks it red.
+// A settings button in one of three tiers (2026-11, docs/shell-states.md).
+// Tertiary by default: copy and an icon on a hover layer. `secondary` gives
+// it the chip and a hairline, for an action that matters but is not the next
+// step. `primary` fills it with the accent for the one action a group, bar or
+// dialog leads with (Apply, Keep changes, Add account); a group has at most
+// one. `danger` inks a tertiary action red.
 Rectangle {
     id: root
 
@@ -12,19 +15,28 @@ Rectangle {
     property bool compact: false
     property bool danger: false
     property bool primary: false
+    property bool secondary: false
     // An icon-only action names itself in a tip; a labeled one needs none.
     property string tooltip: compact ? text : ""
     signal triggered()
 
     readonly property color ink: primary ? Theme.textOnAccent
         : danger ? Theme.redText : Theme.textMid
+    readonly property bool filled: primary || secondary
+    readonly property bool ringShown: Theme.focusWidth(activeFocus) > 0
+    // Every tier answers to at least a 32 px target, the quiet ones included,
+    // without growing the 28 px chip the rows are laid out around.
+    readonly property real hitInsetX: Math.min(0, (width - Theme.inlineActionHeight) / 2)
+    readonly property real hitInsetY: Math.min(0, (height - Theme.inlineActionHeight) / 2)
 
-    width: compact ? Theme.chipHeight : actionRow.implicitWidth + (primary ? 24 : 16)
+    width: compact ? Theme.chipHeight : actionRow.implicitWidth + (filled ? 24 : 16)
     height: Theme.chipHeight
     radius: Theme.chipRadius
-    color: primary ? Theme.accent : "transparent"
-    border.width: activeFocus ? (primary ? 2 : 1) : 0
-    border.color: primary ? Theme.textHi : danger ? Theme.red : Theme.accentText
+    color: primary ? Theme.accent : secondary ? Theme.chip : "transparent"
+    // The keyboard ring replaces the secondary hairline while it shows. On the
+    // accent fill an accent ring would vanish, so a primary takes textHi.
+    border.width: ringShown ? Theme.focusRingWidth : secondary ? 1 : 0
+    border.color: ringShown ? (primary ? Theme.textHi : Theme.focusRing) : Theme.hairline
     opacity: enabled ? 1 : 0.4
     activeFocusOnTab: enabled && visible
     Accessible.role: Accessible.Button
@@ -37,7 +49,7 @@ Rectangle {
     }
 
     SettingsTooltip {
-        visible: root.tooltip !== "" && mouse.containsMouse
+        visible: root.tooltip !== "" && (mouse.containsMouse || root.ringShown)
         text: root.tooltip
     }
 
@@ -59,7 +71,7 @@ Rectangle {
         pressed: mouse.pressed
         focused: root.activeFocus
         tint: root.primary ? Theme.textOnAccent : root.danger ? Theme.red : Theme.textHi
-        pressPoint: Qt.point(mouse.mouseX, mouse.mouseY)
+        pressPoint: Qt.point(mouse.mouseX + root.hitInsetX, mouse.mouseY + root.hitInsetY)
     }
 
     Row {
@@ -93,6 +105,10 @@ Rectangle {
     MouseArea {
         id: mouse
         anchors.fill: parent
+        anchors.leftMargin: root.hitInsetX
+        anchors.rightMargin: root.hitInsetX
+        anchors.topMargin: root.hitInsetY
+        anchors.bottomMargin: root.hitInsetY
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {

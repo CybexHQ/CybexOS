@@ -11,6 +11,7 @@ import "NotifHolds.js" as Holds
 import "SettingsHelpers.js" as SettingsHelpers
 import "Format.js" as Format
 import "AssistantHelpers.js" as AssistantHelpers
+import "PanelRegistryData.js" as PanelRegistry
 
 Singleton {
     id: root
@@ -71,6 +72,106 @@ Singleton {
     }
     readonly property int count: entries.length
     readonly property bool hasUrgent: entries.some(e => e.urgency === NotificationUrgency.Critical)
+
+    // ---- the drawer collision rule (NotifPolicy.drawerRoute) ---------------
+    // The Control Center tab being presented, "" while no drawer tab is open.
+    readonly property string drawerTab: Popouts.open
+        ? PanelRegistry.drawerTab(Popouts.currentName) : ""
+    readonly property var drawerState: ({
+        open: drawerTab !== "",
+        tab: drawerTab,
+        screen: Popouts.hostScreenName,
+        side: PanelRegistry.edgeSide(Popouts.currentName, Popouts.island),
+        tabEnabled: Policy.notificationsTabEnabled(Settings.drawerTabs)
+    })
+    // Arrivals that went to the drawer instead of a toast and have not been
+    // seen in the Notifications tab, newest first. The tab's count; it
+    // outlives the drawer closing and clears when the tab is shown.
+    property var unreadKeys: []
+    readonly property var unread: Policy.presentKeys(entries, unreadKeys)
+    // Critical arrivals the drawer covered: a banner under the tabs until
+    // the person opens, acts on or dismisses them.
+    property var pinnedKeys: []
+    readonly property var pinned: Policy.presentKeys(entries, pinnedKeys)
+        .map(key => entries.find(entry => entry.key === key))
+    // The newest covered arrival, for the drawer's five-second strip.
+    property string arrivalKey: ""
+    readonly property var arrival: arrivalKey !== ""
+        ? entries.find(entry => entry.key === arrivalKey) || null : null
+    // "+n more" on each output's toast stack ({ screenName: count }).
+    property var overflow: []
+    readonly property var toastOverflow: Policy.overflowCounts(overflow, entries, toasts)
+
+    onDrawerTabChanged: {
+        // Showing the tab is reading it; closing the drawer ends the strip,
+        // which never comes back as a toast.
+        if (drawerTab === "notifications") {
+            unreadKeys = [];
+            pinnedKeys = [];
+        }
+        if (drawerTab === "" || drawerTab === "notifications") {
+            arrivalKey = "";
+            arrivalLife.stop();
+        }
+    }
+
+    // Opening the drawer over a stack also retires the toasts it covers,
+    // as the Notifications tab now holds them: a critical one moves to the
+    // banner. They are not expired, so their actions keep working there.
+    readonly property string drawerCover: Policy.drawerCovers(drawerState,
+        drawerState.screen, Settings.notifPosition)
+        ? drawerState.screen + "|" + drawerState.side : ""
+    onDrawerCoverChanged: {
+        if (drawerCover === "")
+            return;
+        const covered = toasts.filter(item => Policy.drawerCovers(drawerState,
+            item.screenName, Settings.notifPosition));
+        if (!covered.length)
+            return;
+        toasts = toasts.filter(item => covered.indexOf(item) < 0);
+        // Opened straight onto the list, the critical card is in view there.
+        if (drawerTab === "notifications")
+            return;
+        for (const entry of covered.filter(item => item.urgency === NotificationUrgency.Critical))
+            pinnedKeys = Policy.markKey(pinnedKeys, entry.key);
+    }
+
+    Timer {
+        id: arrivalLife
+        interval: 5000
+        onTriggered: root.arrivalKey = ""
+    }
+
+    function routeToDrawer(entry, route) {
+        if (route === "list")
+            return;
+        unreadKeys = Policy.markKey(unreadKeys, entry.key);
+        if (route === "banner") {
+            pinnedKeys = Policy.markKey(pinnedKeys, entry.key);
+            return;
+        }
+        arrivalKey = entry.key;
+        arrivalLife.restart();
+    }
+
+    function unpin(key) {
+        if (pinnedKeys.indexOf(key) >= 0)
+            pinnedKeys = pinnedKeys.filter(item => item !== key);
+    }
+
+    // Kept off an output's stack by its bounds: counted for "+n more".
+    function noteOverflow(rows) {
+        const next = overflow.concat(rows.filter(row => row.screenName)
+            .map(row => ({ key: row.key, screenName: row.screenName })));
+        if (next.length !== overflow.length)
+            overflow = next.slice(-256);
+    }
+
+    onToastsChanged: {
+        const live = Policy.liveOverflow(overflow, toasts);
+        if (live.length !== overflow.length)
+            overflow = live;
+    }
 
     function nextQuietBoundaryMs() {
         const range = SettingsHelpers.quietRange(Settings.notifQuiet,
@@ -232,6 +333,8 @@ Singleton {
         const current = entries.find(item => item.key === entry.key);
         if (!current)
             return;
+        // Acting on a pinned critical card, in any way, is handling it.
+        unpin(current.key);
         if (action.kind === "copy-code") {
             if ((current.codes || []).indexOf(action.value) < 0 || current.restored)
                 return;
@@ -272,6 +375,19 @@ Singleton {
         hideToast(current, false);
     }
 
+    // A card's body click: the default action, then the card is done with,
+    // as its × would leave — the stack and the list both. A resident sender
+    // asked for its notification to outlive its actions, so it stays listed.
+    function activate(entry) {
+        const action = defaultAction(entry);
+        if (!action)
+            return;
+        invoke(entry, action);
+        const current = entries.find(item => item.key === entry.key);
+        if (current && !(current.live && current.notif && current.notif.resident))
+            dismiss(current);
+    }
+
     function defaultAction(entry) {
         return entry && entry.live ? Helpers.defaultAction(entry.actions) : null;
     }
@@ -279,7 +395,8 @@ Singleton {
     function secondaryActions(entry) {
         if (!entry)
             return [];
-        let result = entry.live ? Helpers.secondaryActions(entry.actions) : [];
+        // Every sender action: the card shows two and keeps the rest under More.
+        let result = entry.live ? Helpers.senderActions(entry.actions) : [];
         // Something went wrong: Wiz can be asked about it (docs/assistant.md).
         // (A singleton the notification tests do not load.)
         if (typeof Assistant !== "undefined" && Assistant.canAsk && entry.appName !== "Wiz"
@@ -306,6 +423,23 @@ Singleton {
 
     function canActivate(entry) {
         return defaultAction(entry) !== null;
+    }
+
+    // Cybex OS's own updater posts as "Software Update" (Common/Updates.qml).
+    // Its next step — "Restart now", "What's New" — is the one action in the
+    // notification list that takes the accent. A sender can borrow the name,
+    // but the button only ever invokes that sender's own action.
+    function updateNotice(entry) {
+        return !!entry && !entry.webOrigin && entry.appName === "Software Update";
+    }
+
+    function primaryAction(entry) {
+        if (!updateNotice(entry) || !entry.live)
+            return null;
+        const action = Helpers.defaultAction(entry.actions);
+        if (action && Helpers.singleLine(action.text) !== "")
+            return action;
+        return Helpers.senderActions(entry.actions)[0] || null;
     }
 
     function invokeDefault(entry) {
@@ -365,19 +499,30 @@ Singleton {
         if (!existing) {
             const gate = Policy.burst(burstEvents, entry.sourceKey, arrived, Settings.notifBurstLimit);
             burstEvents = gate.events;
-            if (!gate.allowed || groupHoldQueue.isHeld(entry.sourceKey))
-                return entry;
             const sourceDeck = toasts.find(item => item.sourceKey === entry.sourceKey);
             const display = Policy.targetScreen(sourceDeck ? sourceDeck.screenName
                 : (Screens.focused ? Screens.focused.name : ""), Quickshell.screens, fullscreenOutputs, Settings.notifFullscreen);
             if (!display)
                 return entry;
+            const route = Policy.drawerRoute(drawerState, display, Settings.notifPosition,
+                entry.urgency === NotificationUrgency.Critical);
+            if (!gate.allowed || groupHoldQueue.isHeld(entry.sourceKey)) {
+                if (route === "toast")
+                    noteOverflow([{ key: entry.key, screenName: display }]);
+                return entry;
+            }
             entry = Object.assign({}, entry, { screenName: display });
             updateEntry(entry.key, entry);
+            // Never a toast over the open drawer; nothing replays on close.
+            if (route !== "toast") {
+                routeToDrawer(entry, route);
+                return entry;
+            }
         }
         const next = Policy.popupPlan(toasts, entry, Settings.notifPopupGroups, Settings.notifPopupPerGroup);
         const evicted = toasts.filter(item => !next.some(candidate => candidate.key === item.key));
         toasts = next;
+        noteOverflow(evicted);
         for (const item of evicted) {
             if (item.live && item.notif)
                 item.notif.expire();
@@ -545,6 +690,8 @@ Singleton {
                 if (current && current.notif === notif) {
                     root.updateEntry(entry.key, { live: false, notif: null, actions: [] });
                     root.toasts = root.toasts.filter(item => item.key !== entry.key);
+                    // The sender withdrew it: nothing is left to handle.
+                    root.unpin(entry.key);
                 }
             });
         }
@@ -561,6 +708,10 @@ Singleton {
         const list = entries.slice();
         entries = [];
         toasts = [];
+        unreadKeys = [];
+        pinnedKeys = [];
+        arrivalKey = "";
+        overflow = [];
         for (const entry of list) {
             if (entry.live && entry.notif)
                 entry.notif.dismiss();
@@ -850,7 +1001,7 @@ Singleton {
     function timeAgo(arrived, now) {
         const s = Math.max(0, ((now || Date.now()) - arrived) / 1000);
         if (s < Format.MINUTE)
-            return "now";
+            return I18n.tr("now");
         if (s < Format.HOUR)
             return Math.floor(s / Format.MINUTE) + "m";
         if (s < Format.DAY)

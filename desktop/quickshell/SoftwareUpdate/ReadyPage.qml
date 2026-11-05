@@ -68,11 +68,13 @@ Item {
         flickableDirection: Flickable.VerticalFlick
         Controls.ScrollBar.vertical: Controls.ScrollBar {}
 
+        // One centred column of at most 560 px, as on every Software Update
+        // page; the window keeps its size.
         Column {
             id: column
-            x: Theme.scaled(28)
+            x: Math.round((flick.width - width) / 2)
             y: Theme.scaled(24)
-            width: flick.width - Theme.scaled(56)
+            width: Math.min(flick.width - Theme.scaled(56), Theme.scaled(560))
             spacing: Theme.scaled(10)
 
             Row {
@@ -315,16 +317,24 @@ Item {
                     x: Theme.scaled(14)
                     y: Theme.scaled(12)
                     width: parent.width - Theme.scaled(28)
-                    spacing: Theme.scaled(4)
+                    spacing: Theme.scaled(8)
+                    // Release notes are prose: at most 72 characters a line,
+                    // at the prose line height (docs/updates.md).
+                    FontMetrics {
+                        id: noteMetrics
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.secondary
+                    }
                     Repeater {
                         model: root.notes.items
                         delegate: Text {
                             required property string modelData
-                            width: notesColumn.width
+                            width: Math.min(notesColumn.width, noteMetrics.averageCharacterWidth * 72)
                             text: "•  " + modelData
                             color: Theme.textMid
                             font.family: Theme.fontMenu
                             font.pixelSize: Theme.typography.secondary
+                            lineHeight: Theme.proseLineHeight
                             wrapMode: Text.Wrap
                             textFormat: Text.PlainText
                         }
@@ -468,7 +478,7 @@ Item {
                 id: check
                 objectName: "updateCheck"
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.service.busy ? I18n.tr("Checking…") : I18n.tr("Check Now")
+                text: root.service.busy ? I18n.tr("Checking…") : I18n.tr("Check now")
                 enabled: !root.service.busy && !root.service.requestPending
                 onTriggered: { root.service.refreshStatus(); root.service.check(true); }
             }
