@@ -1,12 +1,11 @@
-# Cybex OS 1.0.19
+# Cybex OS 1.0.20
 
-- The desktop shows what is selected the same way everywhere. The current page, tab or tile has an accent tint and mark, and hovering no longer looks like a selection. Focus rings appear only while you use the keyboard, and a switch that is off is easier to tell from one that is on.
-- The Control Center keeps its tabs and the Lock, Suspend, Log out, Restart and Shut down row in place on every tab. Log out, Restart and Shut down ask first, right in that row: Enter confirms and Esc cancels. The Overview shows quick toggles, sliders, now playing, a ready update, a system summary and the busiest processes, in that order.
-- A notification that arrives while the Control Center is open on the same side no longer covers it. The Notifications tab counts it and a one-line strip shows it briefly; a critical notification stays as a banner until you handle it. Pop-ups and the notification list use the same card.
-- Do Not Disturb is now called **Focus** everywhere. Searching Settings for "Do Not Disturb" still finds it.
-- Menu bar buttons respond across the bar's full height. The Cybex X is two-tone, so it no longer looks like a close button. In the dots style the current workspace is a pill. When the bar runs out of room, the media title shortens first. Night light has a new icon.
-- Settings marks the current page more clearly. Home shows each item that needs attention with its status beside one action, and reflows in a narrow window instead of cutting text off. Disk sizes use decimal units (GB, as disk tools do) and memory uses GiB.
-- In a narrow window, Software folds its search field into a button: click it, or press / or Ctrl+F. Software Update lays its pages in one readable column, and its times follow the clock's 12/24-hour setting.
-- The pointer you choose in Settings now also reaches apps such as Spotify, which kept the installation's pointer before. Chromium- and Electron-based apps (Spotify, Brave, 1Password, VS Code, Discord, Obsidian and others) now run natively on Wayland, so they are sharp on a scaled display instead of drawn at 1× and doubled. Apps started from the launcher, the dock, Software, Wiz or the welcome guide use the pointer you chose last; a terminal that was already open passes on the older one until the next login.
+Experimental hardware profiles now cover Framework 13 AMD 7040 and ThinkPad T14 Gen 5 AMD, alongside the existing Dell XPS and HP ZBook targets. Fresh installations select reviewed profiles by exact model identity. Existing machines keep their settings and receive guidance when a profile is available.
 
-This is a source update with no new ISO. Installation, boot and physical hardware qualification are separate from source, build and isolated updater/UI checks.
+The installer and System Check show hardware support status and known limitations. Hardware inventory distinguishes detected profiles from configured settings and reports the running and configured kernel versions separately. A profile match does not mean every device has been physically tested.
+
+Every Cybex OS configuration now requires the unmodified stock Nixpkgs kernel. Updates refuse custom kernels and pending kernel compilation while preserving personal configuration and machine-owned locks. Ordinary packaged external modules, including NVIDIA drivers, remain allowed.
+
+Fresh XPS installations leave the unsupported built-in camera off and recommend a USB webcam. Existing explicit camera settings remain unchanged; camera capture is still unqualified.
+
+This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package/system builds.
