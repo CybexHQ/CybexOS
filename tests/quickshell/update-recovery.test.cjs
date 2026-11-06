@@ -264,6 +264,34 @@ test("background preparation is requested for each new target, never over a pers
     assert.equal(H.autoPrepare(true, { prepare: true }, "failed", true, true), false);
     for (const state of ["ready", "stale", "failed", "rolled-back", "awaiting-boot", "building"])
         assert.equal(H.autoPrepare(true, { prepare: true }, state, false), false, state);
+    // A prepared update may be prepared again; the unit decides whether.
+    assert.equal(H.autoPrepare(true, { prepare: true }, "ready", false, false, true), true);
+    assert.equal(H.autoPrepare(true, { prepare: true }, "ready", true, false, true), false);
+    assert.equal(H.autoPrepare(true, { prepare: false }, "ready", false, false, true), false);
+    assert.equal(H.autoPrepare(true, { prepare: true }, "stale", false, false, true), false);
+});
+
+test("a prepared update stays installable while preparing it again does not finish", () => {
+    const prepared = { state: "ready", changeKind: "update", scope: "both", availableVersion: "1.0.1" };
+    assert.equal(H.preparedUpdate(prepared), true);
+    for (const value of [{ ...prepared, changeKind: "software" }, { ...prepared, scope: "firmware" },
+                         { ...prepared, scope: "local" }, { ...prepared, state: "stale" }, undefined])
+        assert.equal(H.preparedUpdate(value), false, JSON.stringify(value));
+    const failed = { ...prepared, replacement: { state: "failed", version: "1.0.2", scope: "both", error: "No network.",
+        requestId: "r" }, request: { id: "r", state: "failed", error: "No network." } };
+    assert.deepEqual(H.replacement(failed, "1.0.2"), { state: "failed", error: "No network.", version: "1.0.2", scope: "both" });
+    assert.equal(H.replacement(failed, "1.0.3"), null, "an attempt for an older release is not shown");
+    assert.equal(H.replacement(failed, ""), null);
+    const packages = { ...prepared, replacement: { state: "waiting", version: "1.0.1", scope: "both" } };
+    assert.equal(H.replacement(packages, "").state, "waiting", "a packages-only attempt");
+    assert.equal(H.replacement({ ...packages, scope: "upstream", replacement: { state: "failed", version: null } }, "").scope,
+        "upstream");
+    assert.equal(H.replacement({ ...failed, replacement: { ...failed.replacement, state: "done" } }, "1.0.2"), null);
+    assert.equal(H.replacement({ ...failed, changeKind: "software" }, "1.0.2"), null);
+    assert.equal(H.replacementRequest(failed), true, "the review reports the attempt, not a generic failure");
+    assert.equal(H.replacementRequest({ ...failed, request: { id: "other", state: "failed" } }), false);
+    assert.equal(H.replacementRequest({ ...failed, state: "failed" }), false);
+    assert.equal(H.replacementRequest(prepared), false);
 });
 
 test("versions read as people expect: NixOS builds and firmware as dates", () => {

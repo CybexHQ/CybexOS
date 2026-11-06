@@ -134,13 +134,49 @@ def discover(fetch, channel, installed):
     if not eligible:
         raise NoPublishedRelease('No Cybex OS release has been published for this channel yet.')
     key, tag, notes = max(eligible)
-    if key < version(installed):
+    current = version(installed)
+    if key < current:
         raise AheadOfChannel(channel, installed, tag[1:])
     revision = fetch.get(f'{GITHUB_API}/commits/{urllib.parse.quote(tag)}', limit=64,
                          accept='application/vnd.github.sha').decode('ascii', 'replace').strip()
     if not re.fullmatch('[0-9a-f]{40}', revision):
         raise Failure('Release tag does not name an exact Git commit')
-    return {'version': tag[1:], 'revision': revision, 'notes': notes}
+    # One update installs the newest release; it also brings every release
+    # on this channel the machine skipped, so their notes come along.
+    included = sorted({item[0]: item for item in eligible if current < item[0] <= key}.values(), reverse=True)
+    return {'version': tag[1:], 'revision': revision, 'notes': combined_notes(included) if included else notes,
+            'releases': [item[1][1:] for item in included]}
+
+
+NOTES_LIMIT = 100000
+
+
+def release_body(release, notes):
+    """A release's notes without their own "# Cybex OS VERSION" heading."""
+    return re.sub(rf'^#[ \t]+Cybex OS {re.escape(release)}[ \t]*(?:\n+|$)', '', notes.strip()).strip()
+
+
+def combined_notes(included):
+    """Notes for an update that installs the first release and includes the rest.
+
+    The shape release/promote gives stable notes: the newest release's own
+    notes, then each skipped release's under its own heading, newest first.
+    The oldest sections are left out when the whole would exceed the limit.
+    """
+    (_, tag, notes), skipped = included[0], included[1:]
+    if not skipped:
+        return notes
+    newest = tag[1:]
+    names = [item[1][1:] for item in reversed(skipped)]
+    listed = names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
+    parts = [f'# Cybex OS {newest}', f'This update also includes Cybex OS {listed}.', release_body(newest, notes)]
+    text = '\n\n'.join(part for part in parts if part)
+    for _, older, body in skipped:
+        section = '\n\n'.join(part for part in (f'## From Cybex OS {older[1:]}', release_body(older[1:], body)) if part)
+        if len(text) + 2 + len(section) > NOTES_LIMIT:
+            break
+        text += '\n\n' + section
+    return text[:NOTES_LIMIT] + '\n'
 
 
 def validate_source(version_text, compatibility, release, installed):

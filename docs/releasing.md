@@ -112,7 +112,11 @@ Development commits may be pushed directly to `main`. To publish a release:
    own followed by a section per skipped beta release, and opens them in
    `$VISUAL`/`$EDITOR` when run in a terminal. `--notes FILE` supplies them
    instead. It asks for confirmation (`--yes` skips it) and `--dry-run` only
-   prints the result. A refused promotion changes nothing.
+   prints the result. A refused promotion changes nothing. An installed
+   machine that skipped published releases on its own channel combines their
+   notes the same way when it updates
+   ([combined updates](updates.md#combined-updates)), so a beta release's
+   notes need cover only that release.
 
 Fix forward on `main`: there are no maintenance branches. When stable needs a
 fix while beta carries changes that are not ready, revert those on `main` or

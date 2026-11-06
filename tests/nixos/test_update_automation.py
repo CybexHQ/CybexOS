@@ -202,6 +202,73 @@ class Automation(unittest.TestCase):
         automatic.choose(self.engine.state, 'prepare', False)
         self.assertEqual(self.prepare(), {'skipped': 'disabled'})
 
+    def ready(self, scope='both', version='1.1.0', requestId='b' * 32, finishedAt=1000.0, **values):
+        record = self.engine.state / 'request-status' / (requestId + '.json')
+        if not record.exists():
+            atomic(record, {'id': requestId, 'action': 'stage', 'state': 'done', 'createdAt': 1.0}, 0o644)
+        atomic(self.engine.status_path, {'state': 'ready', 'changeKind': 'update', 'scope': scope,
+            'transaction': 'a' * 32, 'availableVersion': version, 'requestId': requestId,
+            'finishedAt': finishedAt, 'inputs': {'nixpkgs': {'rev': '2' * 40}}, **values})
+
+    def newer(self, release='1.2.0', packages='2' * 40):
+        return {'upstream': {'state': 'available', 'available': packages},
+                'cybexos': {'state': 'available', 'available': release}}
+
+    def test_a_newer_release_prepares_a_prepared_update_again(self):
+        self.ready()
+        self.assertEqual(self.prepare(self.newer('1.1.0')), {'skipped': 'ready'})
+        accepted = self.prepare(self.newer())
+        self.assertEqual(accepted['scope'], 'both')
+        self.assertEqual(read(self.engine.state / 'requests' / (accepted['requestId'] + '.json')),
+                         {'action': 'stage', 'arguments': ['both']})
+        # While it runs, nothing else is submitted.
+        self.assertEqual(self.prepare(self.newer()), {'skipped': 'request'})
+        self.finish(accepted, 'failed')
+        # It failed and the prepared update stayed: the same set waits a day.
+        self.ready(replacement={'state': 'failed', 'requestId': accepted['requestId']})
+        self.assertEqual(self.prepare(self.newer(), now=2000.0), {'skipped': 'prepared'})
+        self.assertEqual(self.prepare(self.newer(), now=1000.0 + automatic.RETRY_SECONDS)['scope'], 'both')
+
+    def test_newer_packages_alone_wait_until_a_prepared_update_is_three_days_old(self):
+        self.ready()
+        packages = self.newer('1.1.0', '3' * 40)
+        self.assertEqual(self.prepare(packages, now=1000.0 + automatic.OUTDATED_SECONDS - 1), {'skipped': 'ready'})
+        self.assertEqual(self.prepare(packages, now=1000.0 + automatic.OUTDATED_SECONDS)['scope'], 'both')
+
+    def test_a_prepared_update_keeps_the_sources_the_person_chose(self):
+        # The person prepared NixOS packages alone: a release is not added.
+        self.ready('upstream', '1.0.0')
+        self.assertEqual(self.prepare(self.newer('1.2.0')), {'skipped': 'ready'})
+        accepted = self.prepare(self.newer('1.2.0', '3' * 40), now=1000.0 + automatic.OUTDATED_SECONDS)
+        self.assertEqual(accepted['scope'], 'upstream')
+        self.finish(accepted)
+        # Cybex OS alone: newer packages are not added, a newer release is.
+        self.ready('cybexos', '1.1.0', requestId='c' * 32)
+        self.assertEqual(self.prepare(self.newer('1.1.0', '3' * 40), now=1000.0 + automatic.OUTDATED_SECONDS),
+                         {'skipped': 'ready'})
+        self.assertEqual(self.prepare(self.newer('1.2.0', '3' * 40))['scope'], 'cybexos')
+
+    def test_background_preparation_takes_in_every_source_for_its_own_preview(self):
+        accepted = self.prepare(self.discovery())
+        self.assertEqual(accepted['scope'], 'upstream')
+        self.finish(accepted)
+        self.ready('upstream', '1.0.0', requestId=accepted['requestId'])
+        self.assertEqual(self.prepare(self.newer('1.2.0'))['scope'], 'both')
+        self.assertEqual(len(read(self.engine.state / automatic.LAST_RUN)['requests']), 2)
+        # A record from before the list counts its one request as its own.
+        atomic(self.engine.state / automatic.LAST_RUN, {'requestId': 'd' * 32, 'target': '', 'at': 0})
+        self.assertEqual(automatic.submitted(read(self.engine.state / automatic.LAST_RUN)), ['d' * 32])
+
+    def test_personal_changes_and_firmware_are_never_prepared_again(self):
+        for values in ({'changeKind': 'software', 'scope': 'local'}, {'changeKind': 'configuration', 'scope': 'local'},
+                       {'scope': 'firmware'}):
+            self.ready(**values)
+            self.assertEqual(self.prepare(self.newer()), {'skipped': 'ready'})
+        self.ready()
+        self.assertEqual(self.prepare(self.newer(), metered=True), {'skipped': 'metered'})
+        automatic.choose(self.engine.state, 'prepare', False)
+        self.assertEqual(self.prepare(self.newer()), {'skipped': 'disabled'})
+
     def test_confirmation_is_requested_only_for_a_trial_boot(self):
         confirm = lambda: automatic.confirm(self.engine, self.enqueue, self.status)
         atomic(self.engine.status_path, {'state': 'awaiting-boot'})

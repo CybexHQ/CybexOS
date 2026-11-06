@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'lifecycle'))
 from cybexos.common import CommandFailure, Failure, Runner, atomic, digest, locked, parse, read, syncdir
 from cybexos import inputs, trust
-from cybexos.engine import Engine, config_digest, configuration_paths, copy_config
+from cybexos.engine import Engine, NotPrebuilt, config_digest, configuration_paths, copy_config
 from cybexos.health import (USER_UNIT, baseline, preexisting_arguments, reported, system_services,
                             user_services)
 
@@ -202,7 +202,7 @@ class TrustTests(unittest.TestCase):
                            ('v1.1.0', False, False), ('v1.1.0-rc.2', False, False), ('v1.0.0', False, False))
         fetch = self.fetch(releases, {'v1.1.0': REV_NEW, 'v1.2.0-beta.1': REV_OLD})
         self.assertEqual(trust.discover(fetch, 'stable', '1.0.0'),
-                         {'version': '1.1.0', 'revision': REV_NEW, 'notes': 'Notes for v1.1.0'})
+                         {'version': '1.1.0', 'revision': REV_NEW, 'notes': 'Notes for v1.1.0', 'releases': ['1.1.0']})
         self.assertEqual(trust.discover(fetch, 'beta', '1.0.0')['version'], '1.2.0-beta.1')
         self.assertEqual(trust.discover(fetch, 'beta', '1.0.0')['revision'], REV_OLD)
         # A release marked as a prerelease, or with a prerelease version, is beta only.
@@ -210,6 +210,37 @@ class TrustTests(unittest.TestCase):
                                         'stable', '1.0.0')['version'], '1.1.0')
         with self.assertRaises(Failure):
             trust.discover(fetch, 'nightly', '1.0.0')
+
+    def test_one_update_brings_the_notes_of_every_skipped_release(self):
+        def notes(*entries):
+            return json.dumps([{'tag_name': tag, 'prerelease': prerelease, 'draft': False, 'body': body}
+                               for tag, prerelease, body in entries]).encode()
+        fetch = self.fetch(notes(
+            ('v1.0.4', True, '# Cybex OS 1.0.4\n\nNewest change.\n'),
+            ('v1.0.3', False, '# Cybex OS 1.0.3\n\nStable change.'),
+            ('v1.0.2', True, 'Unheaded beta change.'),
+            ('v1.0.1', False, '# Cybex OS 1.0.1\n\nInstalled already.'),
+            ('v1.0.0', False, 'Older.')))
+        result = trust.discover(fetch, 'beta', '1.0.1')
+        self.assertEqual((result['version'], result['releases']), ('1.0.4', ['1.0.4', '1.0.3', '1.0.2']))
+        self.assertEqual(result['notes'], '# Cybex OS 1.0.4\n\nThis update also includes Cybex OS 1.0.2 and 1.0.3.\n\n'
+                         'Newest change.\n\n## From Cybex OS 1.0.3\n\nStable change.\n\n'
+                         '## From Cybex OS 1.0.2\n\nUnheaded beta change.\n')
+        # Stable leaves beta releases out; a single release keeps its own notes.
+        stable = trust.discover(fetch, 'stable', '1.0.1')
+        self.assertEqual((stable['version'], stable['releases'], stable['notes']),
+                         ('1.0.3', ['1.0.3'], '# Cybex OS 1.0.3\n\nStable change.'))
+        self.assertEqual(trust.discover(fetch, 'stable', '1.0.0')['notes'].splitlines()[2],
+                         'This update also includes Cybex OS 1.0.1.')
+        # Nothing to install: the newest release's notes, no included releases.
+        current = trust.discover(fetch, 'beta', '1.0.4')
+        self.assertEqual((current['releases'], current['notes']), ([], '# Cybex OS 1.0.4\n\nNewest change.\n'))
+        # The oldest sections give way when the whole would exceed the limit.
+        with patch('cybexos.trust.NOTES_LIMIT', 140):
+            short = trust.discover(fetch, 'beta', '1.0.1')
+        self.assertIn('## From Cybex OS 1.0.3', short['notes'])
+        self.assertNotIn('1.0.2\n\nUnheaded', short['notes'])
+        self.assertLessEqual(len(short['notes']), 141)
 
     def test_nothing_published_and_unavailable_listing(self):
         with self.assertRaises(trust.NoPublishedRelease):
@@ -971,6 +1002,50 @@ class EngineTests(unittest.TestCase):
         self.runner.fail = None
         self.engine.stage('upstream')
         self.assertFalse(authorization.exists())
+
+    def test_preparing_again_replaces_a_prepared_update_only_once_ready(self):
+        first = self.engine.stage('upstream')
+        prepared = read(self.engine.status_path)
+        self.assertEqual((prepared['releases'], prepared['replacement']), ([], None))
+        # A failure leaves the prepared update installable and says why.
+        self.runner.fail = lambda args: args[:2] == ('nix', 'build') and '--dry-run' not in args
+        with self.assertRaises(Failure):
+            self.engine.stage('both', request_id='e' * 32)
+        kept = read(self.engine.status_path)
+        self.assertEqual({key: kept[key] for key in ('state', 'transaction', 'reviewToken', 'scope', 'requestId')},
+                         {key: prepared[key] for key in ('state', 'transaction', 'reviewToken', 'scope', 'requestId')})
+        self.assertEqual({key: kept['replacement'][key] for key in ('scope', 'requestId', 'state', 'version')},
+                         {'scope': 'both', 'requestId': 'e' * 32, 'state': 'failed', 'version': '1.1.0'})
+        self.assertIn('injected command failure', kept['replacement']['error'])
+        # A package hold is recorded as waiting rather than as a failure.
+        self.runner.fail = None
+        with patch.object(self.engine, 'require_prebuilt', side_effect=NotPrebuilt(['opencode-2.2.5'])):
+            with self.assertRaises(NotPrebuilt):
+                self.engine.stage('both')
+        waiting = read(self.engine.status_path)
+        self.assertEqual((waiting['state'], waiting['transaction'], waiting['replacement']['state'],
+                          waiting['replacement']['notPrebuilt']), ('ready', first['id'], 'waiting', ['opencode-2.2.5']))
+        self.engine.apply(first['id'], first['reviewToken'])
+        self.assertEqual(read(self.engine.status_path)['transaction'], first['id'])
+
+    def test_a_successful_preparation_replaces_the_prepared_update(self):
+        first = self.engine.stage('upstream')
+        self.engine.channel = lambda: release() | {'notes': 'Combined', 'releases': ['1.1.0', '1.0.1']}
+        second = self.engine.stage('both')
+        status = read(self.engine.status_path)
+        self.assertEqual((status['transaction'], status['scope'], status['replacement']), (second['id'], 'both', None))
+        self.assertEqual((status['notes'], status['releases'], status['availableVersion']), ('Combined', ['1.1.0', '1.0.1'], '1.1.0'))
+        with self.assertRaises(Failure):
+            self.engine.apply(first['id'], first['reviewToken'])
+
+    def test_personal_changes_are_not_kept_over_by_a_failed_update(self):
+        # Only a prepared update is kept; a prepared personal change is the
+        # person's own and preparing an update over it behaves as before.
+        self.engine.stage('local')
+        self.runner.fail = lambda args: args[:2] == ('nix', 'build') and '--dry-run' not in args
+        with self.assertRaises(Failure):
+            self.engine.stage('upstream')
+        self.assertEqual(read(self.engine.status_path)['state'], 'failed')
 
     def test_channel_unavailable_does_not_block_upstream(self):
         def fail():raise Failure('channel unreachable')
