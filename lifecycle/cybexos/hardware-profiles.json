@@ -1,0 +1,641 @@
+{
+  "schema": 1,
+  "scope": {
+    "architecture": "x86_64",
+    "cpuVendors": [
+      "Intel",
+      "AMD"
+    ],
+    "firmware": "UEFI",
+    "excluded": [
+      "Apple hardware",
+      "ARM",
+      "legacy BIOS"
+    ],
+    "kernelPolicy": "stock-prebuilt-nixpkgs"
+  },
+  "audit": {
+    "date": "2026-11-06",
+    "omarchy": {
+      "release": "v4.5.0",
+      "revision": "ac2690cd7be4f47e4a255f5e2e78d904d436b068"
+    },
+    "nixosHardware": {
+      "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a"
+    },
+    "nixpkgs": {
+      "revision": "31ecbaca1bdefa45dffc409f0250bd8039ea0010"
+    }
+  },
+  "profiles": [
+    {
+      "id": "dell-xps-13-dx13260-wcl",
+      "name": "Dell XPS 13 DX13260 (0E53, Wildcat Lake)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "Dell Inc."
+            ],
+            "product_name": [
+              "XPS 13 DX13260",
+              "DX13260"
+            ],
+            "product_sku": [
+              "0E53"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "7.3",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware.nix",
+        "existingOptions": {
+          "xps": {
+            "enable": true,
+            "sku": "0E53"
+          }
+        },
+        "selectionAloneEnablesLegacyOptions": false
+      },
+      "limitations": [
+        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
+        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
+        "Built-in camera is not enabled or supported by this profile.",
+        "Panel Replay is disabled at an idle-power cost; the Panther Lake speaker fallback has reduced bass until Linux 7.4."
+      ],
+      "sources": [
+        {
+          "project": "Omarchy",
+          "revision": "ac2690cd7be4f47e4a255f5e2e78d904d436b068",
+          "url": "https://github.com/basecamp/omarchy/blob/ac2690cd7be4f47e4a255f5e2e78d904d436b068/install/hardware/dell-xps-touchpad-haptics.sh",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/README.md",
+          "note": "No import: existing exact Cybex OS XPS module is authoritative."
+        },
+        {
+          "project": "Cybex OS",
+          "url": "docs/laptop-support.md",
+          "note": "Existing model/SKU evidence and per-panel limits; no additional physical test performed.",
+          "revision": "c169b7a0"
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "existing-xps-stock-configuration",
+          "implementation": "Existing xps options, not reapplied by the catalogue module",
+          "reason": "Preserve exact SKU/panel/component gates, speaker fallback, haptics and userspace load ordering.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Review each existing quirk against its documented upstream fix and the physical laptop."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "dell-xps-13-dx13260-ptl",
+      "name": "Dell XPS 13 DX13260 (0E54, Panther Lake)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "Dell Inc."
+            ],
+            "product_name": [
+              "XPS 13 DX13260",
+              "DX13260"
+            ],
+            "product_sku": [
+              "0E54"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "7.3",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware.nix",
+        "existingOptions": {
+          "xps": {
+            "enable": true,
+            "sku": "0E54"
+          }
+        },
+        "selectionAloneEnablesLegacyOptions": false
+      },
+      "limitations": [
+        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
+        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
+        "Built-in camera is not enabled or supported by this profile.",
+        "Panel Replay is disabled at an idle-power cost; the Panther Lake speaker fallback has reduced bass until Linux 7.4."
+      ],
+      "sources": [
+        {
+          "project": "Omarchy",
+          "revision": "ac2690cd7be4f47e4a255f5e2e78d904d436b068",
+          "url": "https://github.com/basecamp/omarchy/blob/ac2690cd7be4f47e4a255f5e2e78d904d436b068/install/hardware/dell-xps-touchpad-haptics.sh",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/README.md",
+          "note": "No import: existing exact Cybex OS XPS module is authoritative."
+        },
+        {
+          "project": "Cybex OS",
+          "url": "docs/laptop-support.md",
+          "note": "Existing model/SKU evidence and per-panel limits; no additional physical test performed.",
+          "revision": "c169b7a0"
+        },
+        {
+          "project": "Linux",
+          "revision": "7da2aca12375",
+          "url": "https://git.kernel.org/torvalds/c/7da2aca12375",
+          "note": "Upstream sidecar speaker-ID fix already documented in Cybex OS laptop research."
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "existing-xps-stock-configuration",
+          "implementation": "Existing xps options, not reapplied by the catalogue module",
+          "reason": "Preserve exact SKU/panel/component gates, speaker fallback, haptics and userspace load ordering.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Review each existing quirk against its documented upstream fix and the physical laptop."
+        },
+        {
+          "id": "xps13-ptl-codec-fallback",
+          "implementation": "Existing xps SKU 0E54 sets snd_soc_sof_sdw quirk=1 only below Linux 7.4",
+          "reason": "The stock 7.3 cs42l43 sidecar speaker-ID table lacks subsystem 1028:0e54; the codec amplifier provides reduced-bass fallback.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": "7.4"
+          },
+          "removeWhen": "Linux 7.4 includes 7da2aca12375; verify the proper sidecar speaker path and firmware on the physical laptop."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "dell-xps-14-da14260",
+      "name": "Dell XPS 14 DA14260 (0DB9, Panther Lake)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "Dell Inc."
+            ],
+            "product_name": [
+              "XPS 14 DA14260",
+              "DA14260"
+            ],
+            "product_sku": [
+              "0DB9"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "7.3",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware.nix",
+        "existingOptions": {
+          "xps": {
+            "enable": true,
+            "sku": "0DB9"
+          }
+        },
+        "selectionAloneEnablesLegacyOptions": false
+      },
+      "limitations": [
+        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
+        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
+        "Built-in IPU7 camera remains blocked by the private ABI/sensor graph; do not count it as working.",
+        "The PSR/LOBF display quirk is only reviewed for XPS 14 SKU 0DB9 with EDID 30e4c607; no blanket panel quirk is justified."
+      ],
+      "sources": [
+        {
+          "project": "Omarchy",
+          "revision": "ac2690cd7be4f47e4a255f5e2e78d904d436b068",
+          "url": "https://github.com/basecamp/omarchy/blob/ac2690cd7be4f47e4a255f5e2e78d904d436b068/install/hardware/dell-xps-touchpad-haptics.sh",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/README.md",
+          "note": "No import: existing exact Cybex OS XPS module is authoritative."
+        },
+        {
+          "project": "Cybex OS",
+          "url": "docs/laptop-support.md",
+          "note": "Existing model/SKU evidence and per-panel limits; no additional physical test performed.",
+          "revision": "c169b7a0"
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "existing-xps-stock-configuration",
+          "implementation": "Existing xps options, not reapplied by the catalogue module",
+          "reason": "Preserve exact SKU/panel/component gates, speaker fallback, haptics and userspace load ordering.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Review each existing quirk against its documented upstream fix and the physical laptop."
+        },
+        {
+          "id": "xps14-lg-psr-lobf",
+          "implementation": "Existing xps SKU 0DB9 plus exact panel EDID 30e4c607 disables PSR/LOBF",
+          "reason": "Measured black flashes, repeated link retraining and compositor stalls; not justified for another panel.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "A stock kernel fixes the measured panel fault and physical timing/black-flash/suspend tests pass; do not infer from another XPS panel."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "dell-xps-16-da16260",
+      "name": "Dell XPS 16 DA16260 (0DBA, Panther Lake)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "Dell Inc."
+            ],
+            "product_name": [
+              "XPS 16 DA16260",
+              "DA16260"
+            ],
+            "product_sku": [
+              "0DBA"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "7.3",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware.nix",
+        "existingOptions": {
+          "xps": {
+            "enable": true,
+            "sku": "0DBA"
+          }
+        },
+        "selectionAloneEnablesLegacyOptions": false
+      },
+      "limitations": [
+        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
+        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
+        "Built-in IPU7 camera remains blocked by the private ABI/sensor graph; do not count it as working.",
+        "The PSR/LOBF display quirk is only reviewed for XPS 14 SKU 0DB9 with EDID 30e4c607; no blanket panel quirk is justified."
+      ],
+      "sources": [
+        {
+          "project": "Omarchy",
+          "revision": "ac2690cd7be4f47e4a255f5e2e78d904d436b068",
+          "url": "https://github.com/basecamp/omarchy/blob/ac2690cd7be4f47e4a255f5e2e78d904d436b068/install/hardware/dell-xps-touchpad-haptics.sh",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/README.md",
+          "note": "No import: existing exact Cybex OS XPS module is authoritative."
+        },
+        {
+          "project": "Cybex OS",
+          "url": "docs/laptop-support.md",
+          "note": "Existing model/SKU evidence and per-panel limits; no additional physical test performed.",
+          "revision": "c169b7a0"
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "existing-xps-stock-configuration",
+          "implementation": "Existing xps options, not reapplied by the catalogue module",
+          "reason": "Preserve exact SKU/panel/component gates, speaker fallback, haptics and userspace load ordering.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Review each existing quirk against its documented upstream fix and the physical laptop."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "hp-zbook-ultra-g1a",
+      "name": "HP ZBook Ultra G1a (8D01)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "HP"
+            ],
+            "product_name": [
+              "HP ZBook Ultra G1a 14 inch Mobile Workstation PC",
+              "HP ZBook Ultra G1a"
+            ],
+            "board_name": [
+              "8D01"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "7.3",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware.nix",
+        "existingOptions": {
+          "zbookUltraG1a": {
+            "enable": true
+          }
+        },
+        "selectionAloneEnablesLegacyOptions": false
+      },
+      "limitations": [
+        "Configuration/source evidence only; camera frames, audio, radios, docking and repeated sleep require physical verification.",
+        "BIOS configuration controls ISP4 camera and PMF exposure; firmware must be reviewed on the target.",
+        "AMD PMF Smart PC remains disabled by the existing profile because its policy engine fails after sleep; PPD keeps ownership of power profiles."
+      ],
+      "sources": [
+        {
+          "project": "Nixpkgs",
+          "revision": "31ecbaca1bdefa45dffc409f0250bd8039ea0010",
+          "url": "https://github.com/NixOS/nixpkgs/blob/31ecbaca1bdefa45dffc409f0250bd8039ea0010/pkgs/by-name/li/linux-firmware/package.nix",
+          "note": ""
+        },
+        {
+          "project": "Cybex OS",
+          "url": "docs/laptop-support.md",
+          "note": "Board 8D01 and regional-SKU-independent identity, stock ISP4 and PMF limits.",
+          "revision": "c169b7a0"
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "existing-zbook-smart-pc",
+          "implementation": "Existing zbookUltraG1a.smartPc option defaults false",
+          "reason": "BIOS 01.05.07 and later: PMF policy engine errors after s2idle on Linux 7.3.",
+          "kernel": {
+            "minimum": "7.3",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Re-enable only after the BIOS/kernel combination survives repeated physical sleep without TEE policy errors."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "framework-13-amd-7040",
+      "name": "Framework Laptop 13 (AMD Ryzen 7040 Series)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "Framework"
+            ],
+            "product_name": [
+              "Laptop 13 (AMD Ryzen 7040Series)"
+            ]
+          }
+        }
+      ],
+      "kernel": {
+        "minimum": "6.8",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware-profiles.nix",
+        "options": [
+          "framework13Amd7040.disablePsr",
+          "framework13Amd7040.ethernetAutosuspend"
+        ]
+      },
+      "limitations": [
+        "Configuration/source evidence only; no Cybex OS physical installation, staged update or device qualification.",
+        "PSR is disabled following nixos-hardware to avoid reported display hangs; this can increase idle power.",
+        "Suspend, USB-C expansion cards, external displays, headset/internal microphones and fingerprint firmware still need physical checks.",
+        "Keyboard wake on BIOS 03.03 follows the upstream kernel quirk; do not assume every BIOS has identical wake behavior."
+      ],
+      "sources": [
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/framework/13-inch/7040-amd/default.nix",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/framework/13-inch/common/amd.nix",
+          "note": ""
+        },
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/framework/13-inch/common/default.nix",
+          "note": ""
+        },
+        {
+          "project": "Linux",
+          "revision": "a55bdad5dfd1efd4ed9ffe518897a21ca8e4e193",
+          "url": "https://github.com/torvalds/linux/commit/a55bdad5dfd1efd4ed9ffe518897a21ca8e4e193",
+          "note": "Primary exact vendor/product DMI identity and BIOS 03.03 wake quirk."
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "framework-psr",
+          "implementation": "amdgpu.dcdebugmask=0x10, opt out with framework13Amd7040.disablePsr=false",
+          "reason": "nixos-hardware disables AMD panel self-refresh after reported hangs.",
+          "kernel": {
+            "minimum": "6.8",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Remove after upstream drops the workaround and repeated physical display/suspend testing passes; no proven fixed kernel bound."
+        },
+        {
+          "id": "framework-rtl8156-autosuspend",
+          "implementation": "USB 0bda:8156 autosuspend delay 20 seconds, only on this selected laptop profile",
+          "reason": "nixos-hardware Ethernet expansion card rule.",
+          "kernel": {
+            "minimum": "6.8",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Remove after upstream drops it and expansion-card reconnect, throughput and suspend pass on hardware."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    },
+    {
+      "id": "lenovo-thinkpad-t14-gen5-amd",
+      "name": "Lenovo ThinkPad T14 Gen 5 AMD (21MC/21MD)",
+      "approved": true,
+      "status": "experimental",
+      "matches": [
+        {
+          "dmi": {
+            "sys_vendor": [
+              "LENOVO"
+            ],
+            "product_version": [
+              "ThinkPad T14 Gen 5"
+            ]
+          },
+          "machineTypes": [
+            "21MC",
+            "21MD"
+          ]
+        }
+      ],
+      "kernel": {
+        "minimum": "6.8",
+        "maximumExclusive": null,
+        "reviewed": "7.3"
+      },
+      "configuration": {
+        "owner": "nix/modules/hardware-profiles.nix",
+        "options": [
+          "thinkpadT14Gen5Amd.preventEcWakeup"
+        ]
+      },
+      "limitations": [
+        "Configuration/source evidence only; no Cybex OS physical installation, staged update or device qualification.",
+        "Disabling embedded-controller wake can change wake-source behavior; validate lid, keyboard, AC and dock wake on the exact BIOS.",
+        "Suspend drain, AMD graphics, Qualcomm radio, fingerprint reader and optional camera variants need physical checks.",
+        "P14s Gen 5 21ME/21MF and Intel T14 variants are intentionally excluded despite related firmware or branding."
+      ],
+      "sources": [
+        {
+          "project": "nixos-hardware",
+          "revision": "d645c71a58dbae3eb17ff551a07aea13a541cb1a",
+          "url": "https://github.com/NixOS/nixos-hardware/blob/d645c71a58dbae3eb17ff551a07aea13a541cb1a/lenovo/thinkpad/t14/amd/gen5/default.nix",
+          "note": ""
+        },
+        {
+          "project": "Lenovo",
+          "url": "https://download.lenovo.com/pccbbs/mobiles/r2luj25w.txt",
+          "note": "Vendor BIOS readme identifies T14 Gen 5 machine types 21MC/21MD, distinct from P14s 21ME/21MF."
+        },
+        {
+          "project": "Linux ACPI mailing list",
+          "url": "https://lore.kernel.org/all/ZnFYpWHJ5Ml724Nv@ohnotp/",
+          "note": "EC s2idle wake discussion cited by nixos-hardware; direct fetch returned HTTP 403 during this audit."
+        }
+      ],
+      "workarounds": [
+        {
+          "id": "thinkpad-ec-wake",
+          "implementation": "acpi.ec_no_wakeup=1, opt out with thinkpadT14Gen5Amd.preventEcWakeup=false",
+          "reason": "nixos-hardware documents EC wakeups draining battery in s2idle on this generation.",
+          "kernel": {
+            "minimum": "6.8",
+            "maximumExclusive": null
+          },
+          "removeWhen": "Remove after upstream drops the workaround and measured repeated physical s2idle/wake testing passes on the applicable BIOS; no proven fixed kernel bound."
+        }
+      ],
+      "testStatus": {
+        "source": "reviewed",
+        "configuration": "fixture-tested",
+        "physical": "not-run"
+      },
+      "qualification": {
+        "status": "not-run",
+        "record": null
+      }
+    }
+  ]
+}
