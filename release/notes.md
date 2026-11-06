@@ -1,9 +1,7 @@
-# Cybex OS 1.0.21
+# Cybex OS 1.0.22
 
-Local configuration changes now stop before rebuilding a Linux kernel image, closing an additional path covered by the stock-kernel policy. Personal declarations and machine-owned locks remain unchanged when a change is refused.
+Updates now arrive together. When a newer Cybex OS release comes out while an update is waiting to be installed, Software Update prepares it again in the background so both install with one restart. Newer NixOS packages alone refresh a waiting update once it is three days old. The update you already have stays installable until the new one is ready, and if preparing it again fails, the review says why.
 
-Software now identifies which queued app requires a kernel build. Other apps in the same queue are no longer incorrectly marked as requiring that build.
-
-A refused personal change now shows the failure and asks you to correct it. It no longer appears as “Waiting for NixOS packages”; that message remains available for source updates waiting for cached packages.
+Skipping releases no longer skips their notes. An update that jumps several versions shows what is new in each of them, newest first, in the review and in What's New.
 
 This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
