@@ -83,6 +83,27 @@ for it. An ISO follows the ISO rules below.
   release itself keeps current. Until NixOS 26.11 ships (planned 2026-11-23)
   the tree still follows `nixos-unstable`; moving to 26.11 is the next branch
   change.
+- Hardware support targets non-Apple Intel/AMD x86_64 UEFI PCs only. Every
+  Cybex-supplied hardware profile must retain the exact, unmodified selected
+  Nixpkgs `linuxPackages_latest` kernel derivation. Never obtain hardware
+  support through a kernel fork, patch, custom kernel configuration/rebuild,
+  alternate package set or package overlay. Stock prebuilt kernels only;
+  stop a candidate before compilation if its kernel is not prebuilt. Ordinary
+  packaged external modules (including NVIDIA) remain allowed.
+  `nix/kernel-packages.nix` extends the ZFS module package set, not the kernel;
+  preserve that distinction. Preserve personal declarations and machine locks:
+  refuse an unsupported candidate with a reason rather than overwrite them.
+- Profiles and upstream reports are not physical qualification. A profile may
+  support named features while explicitly declaring others unsupported (such
+  as the built-in XPS IPU7 camera). Keep the optional user-selected camera
+  recipe and its fail-closed ABI guard without auto-selecting it or claiming
+  capture support. Record exact hardware, firmware, source identity, exercised
+  features and exclusions when qualifying; never infer success from detection,
+  evaluation, a build or a different operating system's results.
+- Secure Boot remains unsupported until signed media/payload, safe key
+  enrollment and external-module trust are implemented and physically tested.
+  A hardware profile does not solve these requirements. Never disable firmware
+  verification to make installation or qualification pass.
 - Nixpkgs is selected independently of Cybex OS. Its packages come prebuilt
   from cache.nixos.org, guarded by the updater's prebuilt check
   (`lifecycle/cybexos/prebuilt.py`, `nix/modules/prebuilt.nix`). Only Cybex
