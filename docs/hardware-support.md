@@ -56,10 +56,30 @@ driver and platform checks still apply.
 Fresh installations record `cybexos.hardware.profile` for a matched approved
 profile, alongside the existing exact XPS/ZBook and graphics choices. Installed
 support metadata lives at `/etc/cybexos/hardware-support.json`; the existing
-`hardware-profile.json` continues to describe active laptop fixes. Inventory
-also records the detected profile, which may differ from the chosen one.
+`hardware-profile.json` continues to describe configured laptop fixes. Inventory
+compares the detected profile with those declarations and reports the running
+kernel separately from the configured kernel. System Check suggests reviewing
+an available or mismatched profile through personal configuration and
+`cybex update local`; it does not enable settings automatically. A configured
+profile does not prove that the booted hardware behaves as expected.
 This does not migrate an installed machine or rewrite personal modules,
 explicit camera settings or machine-owned locks.
+
+For an existing Framework 13 AMD 7040 or ThinkPad T14 Gen 5 AMD, review the
+detected ID in `cybex hardware` before setting `cybexos.hardware.profile` in
+your personal NixOS module. Prepare the change with `cybex update local`,
+review the candidate, and use the normal trial boot and confirmation. The
+available profile is not enabled by a source update alone.
+
+The Framework profile disables panel self-refresh and gives its Ethernet
+expansion card a longer autosuspend delay. The ThinkPad profile disables
+embedded-controller wake to address reported sleep battery drain. Each change
+has an opt-out under `cybexos.hardware`: `framework13Amd7040.disablePsr`,
+`framework13Amd7040.ethernetAutosuspend`, and
+`thinkpadT14Gen5Amd.preventEcWakeup`. Set the relevant option to `false` when
+testing a fix or retaining a personal setting. Keep the existing power manager
+and stock kernel. See the [upstream audit](hardware-research.md) for evidence,
+exact model identities, tradeoffs and removal conditions.
 
 ## Current support levels
 
@@ -71,10 +91,10 @@ explicit camera settings or machine-owned locks.
 | Ethernet and Intel/Qualcomm/MediaTek/Realtek Wi-Fi | Broad in-tree drivers and redistributable firmware. Exact PCI/USB IDs, firmware, bands and connection methods need physical qualification. Unbound vendor-specific USB Wi-Fi may appear only in the USB inventory; it cannot be classified reliably from its USB class alone. |
 | Broadcom Wi-Fi | Device-specific `brcmfmac/brcmsmac` coverage. `b43` firmware is nonredistributable and absent. Broadcom STA is marked insecure in the pinned Nixpkgs (CVE-2019-9501/9502, possible remote code execution); it is not enabled and insecure-package policy is not relaxed. Use a supported USB Ethernet adapter or USB tethering when required. |
 | Disks and firmware RAID | Guided installation accepts whole `sd*`, `vd*`, `nvme*n*` and eMMC/SD (`mmcblk*`) disks of at least 64 GiB with no active mappings/mounts/swap. The review and the erase check the same disk by its serial number, else its WWN, else its kernel device path and size (most virtual disks have no serial). It erases the disk and reserves a 16 GiB ESP. Firmware RAID/RST, dual boot and partition-preserving installations are not qualified targets. |
-| Secure Boot | Not supported yet. The installation medium is unsigned, so firmware with Secure Boot on refuses to start it, and the installer stops before erasure while Secure Boot is on. Turn Secure Boot off to install. Signed media, owner key enrollment and module signing are still to be completed and qualified. |
+| Secure Boot | Not supported yet. The installation medium is unsigned, so firmware with Secure Boot on refuses to start it, and the installer stops before erasure while Secure Boot is on. Firmware verification must not be disabled to bypass this limitation. Signed media, owner key enrollment and module signing are still to be completed and qualified. |
 | Exact Dell XPS IPU7 camera | Built-in camera unsupported pending standard upstream support. Fresh installation leaves the experimental camera stack off and uses the stock prebuilt kernel; use a USB webcam. Existing explicitly selected machine-owned camera settings are preserved. A profile match does not qualify camera capture. |
 | Audio, Bluetooth, input, cameras, sleep and docks | Generic Linux support is included. Model-specific routing, haptics, MIPI cameras, fingerprints, suspend and hotplug require physical tests. |
-| Matched laptops | Dell XPS 13 DX13260 (0E53/0E54), XPS 14 DA14260 (0DB9), XPS 16 DA16260 (0DBA) and HP ZBook Ultra G1a (board 8D01) get exact-match profiles on the stock kernel; see [matched laptops](laptop-support.md) for each quirk, the BIOS settings they need and what still waits for a newer kernel. |
+| Matched laptops | Experimental profiles cover Framework 13 AMD 7040 and ThinkPad T14 Gen 5 AMD (21MC/21MD), alongside Dell XPS 13 DX13260 (0E53/0E54), XPS 14 DA14260 (0DB9), XPS 16 DA16260 (0DBA) and HP ZBook Ultra G1a (board 8D01). All use the stock kernel; see [matched laptops](laptop-support.md) for each quirk, the BIOS settings they need and what still waits for a newer kernel. |
 
 Internet access to the release/cache is required. A bundled desktop payload
 does not remove the network prerequisite. Enterprise Wi-Fi certificates,

@@ -65,10 +65,8 @@
         "selectionAloneEnablesLegacyOptions": false
       },
       "limitations": [
-        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
-        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
-        "Built-in camera is not enabled or supported by this profile.",
-        "Panel Replay is disabled at an idle-power cost; the Panther Lake speaker fallback has reduced bass until Linux 7.4."
+        "Built-in IPU7 camera is unsupported pending standard upstream support. Use a USB webcam.",
+        "Display power-saving workarounds can increase idle power. Docks and repeated sleep still need testing."
       ],
       "sources": [
         {
@@ -149,10 +147,8 @@
         "selectionAloneEnablesLegacyOptions": false
       },
       "limitations": [
-        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
-        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
-        "Built-in camera is not enabled or supported by this profile.",
-        "Panel Replay is disabled at an idle-power cost; the Panther Lake speaker fallback has reduced bass until Linux 7.4."
+        "Built-in IPU7 camera is unsupported pending standard upstream support. Use a USB webcam.",
+        "Display power-saving workarounds can increase idle power. Speakers have reduced bass with Linux 7.3."
       ],
       "sources": [
         {
@@ -225,6 +221,7 @@
             ],
             "product_name": [
               "XPS 14 DA14260",
+              "Dell XPS 14 DA14260",
               "DA14260"
             ],
             "product_sku": [
@@ -249,10 +246,8 @@
         "selectionAloneEnablesLegacyOptions": false
       },
       "limitations": [
-        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
-        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
-        "Built-in IPU7 camera remains blocked by the private ABI/sensor graph; do not count it as working.",
-        "The PSR/LOBF display quirk is only reviewed for XPS 14 SKU 0DB9 with EDID 30e4c607; no blanket panel quirk is justified."
+        "Built-in IPU7 camera is unsupported pending standard upstream support. Use a USB webcam.",
+        "The display workaround applies only to the reviewed panel. Other panels, docks and repeated sleep still need testing."
       ],
       "sources": [
         {
@@ -343,10 +338,8 @@
         "selectionAloneEnablesLegacyOptions": false
       },
       "limitations": [
-        "Configuration/source evidence only; this catalogue does not qualify the complete laptop.",
-        "Stock Nixpkgs kernel and firmware only; display, audio, input, radios, docks and repeated sleep require physical verification.",
-        "Built-in IPU7 camera remains blocked by the private ABI/sensor graph; do not count it as working.",
-        "The PSR/LOBF display quirk is only reviewed for XPS 14 SKU 0DB9 with EDID 30e4c607; no blanket panel quirk is justified."
+        "Built-in IPU7 camera is unsupported pending standard upstream support. Use a USB webcam.",
+        "External displays, USB-C docks and repeated sleep still need testing."
       ],
       "sources": [
         {
@@ -426,9 +419,8 @@
         "selectionAloneEnablesLegacyOptions": false
       },
       "limitations": [
-        "Configuration/source evidence only; camera frames, audio, radios, docking and repeated sleep require physical verification.",
-        "BIOS configuration controls ISP4 camera and PMF exposure; firmware must be reviewed on the target.",
-        "AMD PMF Smart PC remains disabled by the existing profile because its policy engine fails after sleep; PPD keeps ownership of power profiles."
+        "Camera and power behavior depend on BIOS settings and still need testing on this computer.",
+        "Automatic Smart PC power adjustments are disabled to avoid reported failures after sleep; manual power profiles remain available."
       ],
       "sources": [
         {
@@ -496,10 +488,9 @@
         ]
       },
       "limitations": [
-        "Configuration/source evidence only; no Cybex OS physical installation, staged update or device qualification.",
-        "PSR is disabled following nixos-hardware to avoid reported display hangs; this can increase idle power.",
-        "Suspend, USB-C expansion cards, external displays, headset/internal microphones and fingerprint firmware still need physical checks.",
-        "Keyboard wake on BIOS 03.03 follows the upstream kernel quirk; do not assume every BIOS has identical wake behavior."
+        "Panel self-refresh is disabled to avoid reported display hangs; this can increase idle power.",
+        "Sleep, expansion cards, external displays, microphones and fingerprint reader still need testing.",
+        "Keyboard wake behavior can vary with BIOS version."
       ],
       "sources": [
         {
@@ -592,10 +583,8 @@
         ]
       },
       "limitations": [
-        "Configuration/source evidence only; no Cybex OS physical installation, staged update or device qualification.",
-        "Disabling embedded-controller wake can change wake-source behavior; validate lid, keyboard, AC and dock wake on the exact BIOS.",
-        "Suspend drain, AMD graphics, Qualcomm radio, fingerprint reader and optional camera variants need physical checks.",
-        "P14s Gen 5 21ME/21MF and Intel T14 variants are intentionally excluded despite related firmware or branding."
+        "The sleep workaround can change which devices wake the computer; lid, keyboard and dock wake need testing.",
+        "Sleep battery drain, graphics, wireless, fingerprint reader and camera variants still need testing."
       ],
       "sources": [
         {

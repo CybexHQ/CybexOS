@@ -231,6 +231,59 @@ class HardwareAssessmentTests(unittest.TestCase):
         self.assertEqual(found['blockers'], [])
         hardware.validate_hardware(found, True)
 
+    def test_real_catalogue_distinguishes_available_configured_and_live_profiles(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        (dmi / 'sys_vendor').write_text('Framework')
+        (dmi / 'product_name').write_text('Laptop 13 (AMD Ryzen 7040Series)')
+        (self.root / 'firmware/efi').mkdir(parents=True)
+        etc = self.root / 'etc'; etc.mkdir()
+        metadata = etc / 'hardware-support.json'
+        profile = 'framework-13-amd-7040'
+        for selected, live, state in ((None, False, 'available'), (profile, False, 'configured'),
+                                      ('lenovo-thinkpad-t14-gen5-amd', False, 'mismatch'),
+                                      (None, True, 'live')):
+            with self.subTest(state=state):
+                metadata.write_text(json.dumps({'schema': 1, 'selectedProfile': selected,
+                                                'installationMedium': live, 'configuredKernel': '7.3.1'}))
+                before = metadata.read_bytes()
+                result = hardware.report(self.root, self.cpu, etc=etc, machine_lock=etc / 'missing',
+                                         catalogue=CATALOGUE, kernel_log='', kernel='7.3')
+                self.assertEqual(result['support']['profileId'], profile)
+                self.assertEqual(result['support']['status'], 'experimental')
+                self.assertEqual(result['configuration']['state'], state)
+                self.assertEqual(result['configuration']['configuredKernel'], '7.3.1')
+                self.assertEqual(result['kernel'], hardware.os.uname().release)
+                self.assertEqual(set(result['qualification'].values()), {'not-run'})
+                self.assertEqual(metadata.read_bytes(), before)
+                if state == 'available':
+                    self.assertIn('cybex update local', result['configuration']['guidance'])
+                    self.assertIn(profile, result['configuration']['guidance'])
+
+    def test_real_dell_catalogue_preserves_component_gates_and_recognizes_legacy_configuration(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        for name, value in {'sys_vendor': 'Dell Inc.', 'product_name': 'Dell XPS 14 DA14260',
+                            'product_sku': '0DB9'}.items():
+            (dmi / name).write_text(value)
+        self.cpu.write_text('Intel Core Ultra')
+        (self.root / 'firmware/efi').mkdir(parents=True)
+        (self.root / 'bus/acpi/devices/OVTI08F4:00').mkdir(parents=True)
+        self.pci('0000:00:05.0', '8086', 'b05d', '048000')
+        panel = self.root / 'class/drm/card1-eDP-1'; panel.mkdir(parents=True)
+        (panel / 'edid').write_bytes(bytes(8) + bytes.fromhex('30e4c607'))
+        etc = self.root / 'etc'; etc.mkdir()
+        (etc / 'hardware-support.json').write_text(json.dumps({'schema': 1, 'selectedProfile': None}))
+        for sku, state in (('0DB9', 'configured'), (None, 'available'), ('0DBA', 'available')):
+            (etc / 'hardware-profile.json').write_text(json.dumps({'schema': 1, 'xps': sku}))
+            result = hardware.report(self.root, self.cpu, etc=etc, machine_lock=etc / 'missing',
+                                     catalogue=CATALOGUE, kernel_log='', kernel='7.3')
+            self.assertEqual(result['configuration']['state'], state)
+            self.assertEqual(result['support']['profileId'], 'dell-xps-14-da14260')
+            self.assertEqual(result['assessment']['panel'], '30e4c607')
+            self.assertTrue(result['assessment']['xps'])
+            self.assertTrue(result['assessment']['cameraDetected'])
+            self.assertFalse(result['assessment']['camera'])
+            self.assertEqual(result['support']['limitations'].count(hardware.CAMERA_LIMIT), 1)
+
     def test_absent_or_malformed_profile_information_remains_generic(self):
         for value in (None, [], {}, {'profileId': 'oops', 'status': 'qualified'},
                       dict(hardware.generic_support(), limitations='invalid')):

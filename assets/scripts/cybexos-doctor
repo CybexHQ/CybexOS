@@ -821,7 +821,7 @@ def check_laptop():
     facts = {'model': model['name'], 'sku': model['sku'], 'profile': active,
              'issues': [{'state': state, 'summary': summary} for state, summary, _ in issues]}
     if not issues:
-        return finding('ok', f"{model['name']}: its hardware profile is active.", **facts)
+        return finding('ok', f"{model['name']}: its hardware profile is configured.", **facts)
     issues.sort(key=lambda issue: LAPTOP_RANK[issue[0]])
     state, summary, detail = issues[0]
     # Further faults by name; the missing profile also with the line to add.
@@ -843,11 +843,21 @@ def check_hardware_support():
     identity = f" ({support['profileId']})" if support.get('profileId') else ''
     limits = support.get('limitations', [])
     limits = [item for item in limits if isinstance(item, str)] if isinstance(limits, list) else []
-    detail = ' '.join([support.get('summary', ''), *limits,
+    configuration = inventory.get('configuration')
+    configuration = configuration if isinstance(configuration, dict) else {}
+    configured_detail = [configuration.get('summary', ''), configuration.get('guidance', '')]
+    running_kernel, configured_kernel = inventory.get('kernel'), configuration.get('configuredKernel')
+    if isinstance(running_kernel, str):
+        configured_detail.append(f'Running kernel: {running_kernel}.')
+    if isinstance(configured_kernel, str):
+        configured_detail.append(f'Configured kernel: {configured_kernel}.')
+    detail = ' '.join([support.get('summary', ''), *limits, *filter(None, configured_detail),
                        'Detection does not verify that every feature works.'])
-    return finding('suggestion' if support['status'] == 'unsupported' else 'info',
+    needs_review = support['status'] == 'unsupported' or configuration.get('state') in ('available', 'mismatch')
+    return finding('suggestion' if needs_review else 'info',
                    f"{name}{identity}: {support['status']}.", detail,
-                   support=support, release=inventory.get('release', {}), nixpkgs=inventory.get('nixpkgs', {}))
+                   support=support, configuration=configuration, kernel=running_kernel,
+                   release=inventory.get('release', {}), nixpkgs=inventory.get('nixpkgs', {}))
 
 
 def probes(scrub):

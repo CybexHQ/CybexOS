@@ -291,6 +291,23 @@ class Contract(unittest.TestCase):
         self.assertEqual(by_id(report)['hardware-support']['state'], 'unknown')
         self.assertEqual(by_id(report)['graphics']['state'], 'ok')
 
+    def test_available_profile_needs_review_and_kernel_versions_remain_distinct(self):
+        inventory = {'support': {'profileId': 'framework-13-amd-7040', 'profileName': 'Framework 13',
+                                 'status': 'experimental', 'summary': 'Needs physical testing.', 'limitations': []},
+                     'kernel': '7.3', 'configuration': {'state': 'available', 'configuredKernel': '7.3.1',
+                         'summary': 'Profile settings are not configured.',
+                         'guidance': 'Review your personal configuration with cybex update local.'}}
+        self.fixture.write('hardware.json', json.dumps(inventory))
+        check = by_id(self.fixture.report())['hardware-support']
+        self.assertEqual(check['state'], 'suggestion')
+        for expected in ('not configured', 'cybex update local', 'Running kernel: 7.3.', 'Configured kernel: 7.3.1.'):
+            self.assertIn(expected, check['detail'])
+        self.assertEqual(check['facts']['configuration'], inventory['configuration'])
+        for state in ('configured', 'live'):
+            inventory['configuration']['state'] = state
+            self.fixture.write('hardware.json', json.dumps(inventory))
+            self.assertEqual(by_id(self.fixture.report())['hardware-support']['state'], 'info')
+
     def test_a_healthy_computer_is_ok_and_private(self):
         report = self.fixture.report()
         self.assertShape(report)
@@ -628,7 +645,7 @@ class Checks(unittest.TestCase):
         self.assertIn('`cybex update stage local`', check['detail'])
         self.profile(xps='0DB9')
         check = self.check('laptop')
-        self.assertEqual((check['state'], check['summary']), ('ok', 'Dell XPS 14 (2026): its hardware profile is active.'))
+        self.assertEqual((check['state'], check['summary']), ('ok', 'Dell XPS 14 (2026): its hardware profile is configured.'))
         self.assertTrue(check['facts']['profile'])
         # A profile for another SKU is not this machine's.
         self.profile(xps='0DBA')
@@ -656,7 +673,7 @@ class Checks(unittest.TestCase):
         self.profile(zbook=True)
         self.acpi('MSFT0201:00', 'OMNI5C10:00')
         check = self.check('laptop')
-        self.assertEqual((check['state'], check['summary']), ('ok', 'HP ZBook Ultra G1a: its hardware profile is active.'))
+        self.assertEqual((check['state'], check['summary']), ('ok', 'HP ZBook Ultra G1a: its hardware profile is configured.'))
         shutil.rmtree(self.fixture.sys / 'bus/acpi/devices/OMNI5C10:00')
         check = self.check('laptop')
         self.assertEqual((check['state'], check['summary']), ('info', 'The camera is turned off in the BIOS.'))

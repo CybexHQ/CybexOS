@@ -63,6 +63,12 @@ class HardwareProfileTests(unittest.TestCase):
                 self.identity(sys_vendor='Dell Inc.', product_name=product, product_sku=sku)
                 self.assertIsNone(self.support()['profileId'])
 
+    def test_existing_installer_dell_identity_retains_its_profile(self):
+        self.identity(sys_vendor='Dell Inc.', product_name='Dell XPS 14 DA14260', product_sku='0DB9')
+        self.assertEqual(self.support()['profileId'], 'dell-xps-14-da14260')
+        self.identity(sys_vendor='Dell Inc.', product_name='Dell XPS 14 DA14260 extra', product_sku='0DB9')
+        self.assertIsNone(self.support()['profileId'])
+
     def test_vendor_generation_and_near_product_strings_do_not_match(self):
         for vendor, product in [('Other Framework vendor', 'Laptop 13 (AMD Ryzen 7040Series)'),
                                 ('Framework', 'Laptop 13 (AMD Ryzen AI 300 Series)'),

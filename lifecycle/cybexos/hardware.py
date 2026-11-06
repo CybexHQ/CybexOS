@@ -232,6 +232,52 @@ def validate_hardware(hardware, nvidia_open):
                       'Use the automatically recommended driver. No disk has been erased.')
 
 
+def configured_support(assessment, etc):
+    """Compare configured declarations with detection, not boot-time behavior."""
+    def metadata(name):
+        try:
+            value = json.loads((etc / name).read_text())
+            return value if isinstance(value, dict) and value.get('schema') == 1 else {}
+        except (OSError, ValueError):
+            return {}
+
+    configured = metadata('hardware-support.json')
+    legacy = metadata('hardware-profile.json')
+    support = assessment['support']
+    detected = support.get('profileId') or support.get('matchedProfileId')
+    selected = configured.get('selectedProfile')
+    selected = selected if isinstance(selected, str) else None
+    kernel = configured.get('configuredKernel')
+    kernel = kernel if isinstance(kernel, str) else None
+    live = configured.get('installationMedium') is True
+    needs_legacy = bool(detected and (detected.startswith('dell-xps-') or detected == 'hp-zbook-ultra-g1a'))
+    legacy_enabled = bool(
+        (assessment['xps'] and legacy.get('xps') == assessment['sku'])
+        or (assessment['zbookUltraG1a'] and legacy.get('zbookUltraG1a') is True))
+    guidance = ''
+    if live:
+        state, summary = 'live', 'The installer will record the selected profile during fresh installation.'
+    elif selected and selected != detected:
+        state, summary = 'mismatch', 'The configured profile differs from the detected hardware.'
+        guidance = 'Review the hardware settings in your personal configuration before staging an update.'
+    elif detected and ((needs_legacy and legacy_enabled) or (not needs_legacy and selected == detected)):
+        state, summary = 'configured', 'The detected hardware profile is configured; runtime behavior still needs checking.'
+    elif detected and configured:
+        state, summary = 'available', 'A profile is available for this computer but its settings are not configured.'
+        if needs_legacy:
+            guidance = 'Review the Laptop fixes check and hardware support documentation before enabling the profile.'
+        else:
+            guidance = (f'To enable it, add cybexos.hardware.profile = "{detected}"; to your personal NixOS module, '
+                        'then prepare and review the change with cybex update local through the normal staged updater.')
+    elif not detected and configured:
+        state, summary = 'generic', 'No model-specific profile is configured.'
+    else:
+        state, summary = 'unknown', 'Configured hardware profile information is unavailable.'
+    return {'state': state, 'profileId': selected, 'detectedProfileId': detected,
+            'legacyProfileConfigured': legacy_enabled, 'configuredKernel': kernel,
+            'installationMedium': live, 'summary': summary, 'guidance': guidance}
+
+
 def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/etc/cybexos'),
            machine_lock=Path('/etc/nixos/flake.lock'), **assessment_options):
     """Collect device facts without changing hardware, networks, disks or firmware.
@@ -288,6 +334,7 @@ def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/et
             pass
     return {'schema': 'cybexos.hardware-inventory.v1', 'scope': 'Read-only inventory; no hardware qualification performed',
             'release': release, 'nixpkgs': nixpkgs, 'support': assessment['support'],
+            'configuration': configured_support(assessment, etc),
             'kernel': os.uname().release, 'architecture': os.uname().machine,
             'system': {key: text(sysroot / 'class/dmi/id' / key) for key in
                        ('sys_vendor', 'product_name', 'product_sku', 'board_vendor', 'board_name', 'bios_vendor', 'bios_version', 'bios_date')},

@@ -60,6 +60,7 @@ in {
         selectedProfile = hardware.profile;
         selected = selected;
         configuredKernel = kernel;
+        installationMedium = cfg.installationMedium;
       });
     })
     (lib.mkIf active {
