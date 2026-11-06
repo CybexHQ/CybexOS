@@ -340,6 +340,8 @@ fn hardware_preflight_distinguishes_detection_and_blocks_unsupported_graphics() 
         hardware: serde_json::from_value(serde_json::json!({
             "nvidia": true, "nvidiaSelection": {"open": false, "closed": true},
             "graphicsDetail": "Driver selected for the detected IDs",
+            "support": {"profileId": "fixture-xps", "profileName": "Fixture XPS", "status": "experimental",
+                "summary": "Physical tests have not run.", "limitations": ["Built-in IPU7 camera is unsupported."]},
             "networkIssues": ["Network adapter 14e4:43a0 has no active driver"], "blockers": []
         })).unwrap(),
         ..State::default()
@@ -357,6 +359,13 @@ fn hardware_preflight_distinguishes_detection_and_blocks_unsupported_graphics() 
     assert!(!store.get_nvidia_open_available());
     assert!(store.get_nvidia_closed_available());
     assert!(store.get_can_start());
+    let support = store.get_checks().iter().find(|c| c.label == "Hardware").unwrap();
+    assert_eq!(support.state, 2, "profile detection is not a feature pass");
+    assert!(support.value.contains("fixture-xps"));
+    assert!(support.value.contains("experimental"));
+    assert!(support.detail.contains("IPU7 camera is unsupported"));
+    assert!(store.get_hardware_detail().contains("IPU7 camera is unsupported"));
+    assert!(store.get_hardware_identity().contains("Fixture XPS"));
 
     ready.hardware.insert("blockers".into(), serde_json::json!(["No packaged NVIDIA driver supports all detected GPUs"]));
     app.borrow_mut().apply_state(ready.clone());

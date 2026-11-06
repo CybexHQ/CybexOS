@@ -271,7 +271,7 @@ in pkgs.testers.runNixOSTest {
 
     # The system check the guide runs, in this session, and Ready's report of it.
     IDS = ["graphics", "drivers", "firmware-files", "services", "audio", "secure-boot", "firmware-updates",
-           "storage", "battery", "time", "desktop", "laptop"]
+           "storage", "battery", "time", "desktop", "laptop", "hardware-support"]
     report = json.loads(user("cybex doctor --json"))
     (out / "doctor.json").write_text(json.dumps(report, indent=2) + "\n")
     assert [check["id"] for check in report["checks"]] == IDS, report

@@ -9,6 +9,49 @@ from .common import Failure
 
 CATALOGUE = Path('/etc/cybexos/hardware-drivers.json')
 PCI_ADDRESS = re.compile(r'([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-7])')
+CAMERA_LIMIT = 'Built-in IPU7 camera is unsupported pending standard upstream support. Use a USB webcam.'
+
+
+def generic_support():
+    return {'profileId': None, 'profileName': 'Generic PC', 'status': 'generic',
+            'summary': 'No verified hardware profile. Compatibility needs testing on this computer.',
+            'limitations': [], 'sources': []}
+
+
+def hardware_support(sysroot=Path('/sys'), *, kernel=None, catalogue=None):
+    """Consume the profile catalogue without making it an installation gate.
+
+    Older/incomplete media and malformed catalogue results remain explicitly
+    unqualified. Driver preflight still runs independently of this information.
+    """
+    fallback = generic_support()
+    try:
+        from .hardware_profiles import support_for
+        value = support_for(Path(sysroot), kernel=kernel, catalogue=catalogue)
+        if (not isinstance(value, dict)
+                or not (value.get('profileId') is None or isinstance(value.get('profileId'), str) and value['profileId'])
+                or not isinstance(value.get('profileName'), str) or not value['profileName']
+                or value.get('status') not in ('experimental', 'generic', 'unsupported', 'qualified')
+                or not isinstance(value.get('summary'), str)
+                or not isinstance(value.get('limitations'), list)
+                or not all(isinstance(item, str) for item in value['limitations'])
+                or not isinstance(value.get('sources'), list)
+                or not all(isinstance(item, dict) for item in value['sources'])):
+            return fallback
+        # Copy lists: adding observed limitations must not mutate the catalogue.
+        return dict(value, limitations=list(value['limitations']), sources=list(value['sources']))
+    except (ImportError, OSError, ValueError, TypeError, KeyError):
+        return fallback
+
+
+def support_lines(hardware):
+    """Short terminal copy; JSON consumers keep the complete structured record."""
+    support = hardware.get('support') or generic_support()
+    identity = support['profileName']
+    if support.get('profileId'):
+        identity += ' (' + support['profileId'] + ')'
+    return [f"Hardware: {identity} · {support['status']}", support['summary'],
+            *support['limitations'], 'Detection does not verify that every feature works.']
 
 
 def text(path):
@@ -96,7 +139,8 @@ def nvidia_selection(devices, catalogue):
             'blockers': blockers}
 
 
-def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, catalogue=None, kernel_log=None):
+def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, catalogue=None, kernel_log=None,
+           profile_catalogue=None, kernel=None):
     sysroot = Path(sysroot)
     if catalogue is None:
         try:
@@ -164,11 +208,16 @@ def detect(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, catalogue=Non
         graphics_detail = 'NVIDIA driver selected automatically for the detected devices.'
     elif displays and any(not d['driver'] for d in displays):
         graphics_detail = 'A native display driver is not active. Basic graphics can run setup; the desktop still needs a working driver.'
-    return {'nvidia': selection['present'], 'nvidiaOpen': selection['recommendedOpen'], 'nvidiaSelection': selection,
+    support = hardware_support(sysroot, kernel=kernel, catalogue=profile_catalogue)
+    camera_detected = xps and acpi and any(d['vendor'] == '8086' and d['device'] == 'b05d' for d in pci)
+    if camera_detected and CAMERA_LIMIT not in support['limitations']:
+        support['limitations'].append(CAMERA_LIMIT)
+    return {'support': support,
+            'nvidia': selection['present'], 'nvidiaOpen': selection['recommendedOpen'], 'nvidiaSelection': selection,
             'nvidiaPrime': prime, 'xps': xps, 'sku': sku, 'panel': panel, 'zbookUltraG1a': zbook,
-            # The processed camera stack is reviewed for the XPS 14/16 only.
-            'camera': xps and sku in ('0DB9', '0DBA') and acpi
-                      and any(d['vendor'] == '8086' and d['device'] == 'b05d' for d in pci),
+            # Fresh installs use stock Nixpkgs kernels. Detection is not consent
+            # to build the experimental camera stack on this machine.
+            'camera': False, 'cameraDetected': camera_detected,
             'graphicsDevices': displays, 'networkDevices': network, 'networkIssues': issues,
             'firmwareRequests': firmware, 'firmwareLogAvailable': log_available,
             'blockers': selection['blockers'], 'graphicsDetail': graphics_detail}
@@ -183,7 +232,8 @@ def validate_hardware(hardware, nvidia_open):
                       'Use the automatically recommended driver. No disk has been erased.')
 
 
-def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/etc/cybexos'), **assessment_options):
+def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/etc/cybexos'),
+           machine_lock=Path('/etc/nixos/flake.lock'), **assessment_options):
     """Collect device facts without changing hardware, networks, disks or firmware.
 
     Omit serial numbers, UUIDs, MAC/IP addresses, SSIDs and raw kernel logs.
@@ -196,6 +246,16 @@ def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/et
     except (OSError, ValueError):
         release = {}
     release = {key: release[key] for key in ('version', 'revision', 'narHash', 'nixos') if key in release} if isinstance(release, dict) else {}
+    nixpkgs = {}
+    try:
+        # Read only the independently owned root input; never refresh the lock
+        # or include personal input URLs in a shareable inventory.
+        from .inputs import identity
+        locked = identity(json.loads(Path(machine_lock).read_text()), 'nixpkgs')
+        if isinstance(locked, dict):
+            nixpkgs = {key: locked[key] for key in ('rev', 'narHash') if isinstance(locked.get(key), str)}
+    except (OSError, ValueError, TypeError, KeyError, Failure):
+        pass
     cpu = {}
     for line in text(cpuinfo).splitlines():
         key, separator, value = line.partition(':')
@@ -227,7 +287,8 @@ def report(sysroot=Path('/sys'), cpuinfo=Path('/proc/cpuinfo'), *, etc=Path('/et
         except OSError:
             pass
     return {'schema': 'cybexos.hardware-inventory.v1', 'scope': 'Read-only inventory; no hardware qualification performed',
-            'release': release, 'kernel': os.uname().release, 'architecture': os.uname().machine,
+            'release': release, 'nixpkgs': nixpkgs, 'support': assessment['support'],
+            'kernel': os.uname().release, 'architecture': os.uname().machine,
             'system': {key: text(sysroot / 'class/dmi/id' / key) for key in
                        ('sys_vendor', 'product_name', 'product_sku', 'board_vendor', 'board_name', 'bios_vendor', 'bios_version', 'bios_date')},
             'firmware': {'uefi': (sysroot / 'firmware/efi').is_dir(), 'secureBoot': secure_boot},

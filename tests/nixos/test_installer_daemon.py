@@ -411,6 +411,17 @@ class DaemonTests(unittest.IsolatedAsyncioTestCase):
         if restarted.region_task:
             restarted.region_task.cancel()
 
+    async def test_support_identity_and_limits_reach_the_gui_without_a_feature_pass(self):
+        await self.setup_phase()
+        support = {'profileId': 'fixture-laptop', 'profileName': 'Fixture laptop', 'status': 'experimental',
+                   'summary': 'Physical tests have not run.', 'limitations': ['Built-in camera unavailable.'],
+                   'sources': [{'url': 'https://example.org/profile'}]}
+        self.service.handle_event({'event': 'ready', 'hardware': {'nvidia': False, 'support': support}})
+        self.service.update(message='Support fixture ready')
+        state = await self.until(lambda m: m['type'] == 'state' and m['message'] == 'Support fixture ready')
+        self.assertEqual(state['hardware']['support'], support)
+        self.assertNotIn('qualified', state['hardware']['support']['status'])
+
     async def test_broadcast_encodes_once_and_a_failed_client_does_not_block_others(self):
         await self.setup_phase()
         good, failed = Mock(), Mock()
