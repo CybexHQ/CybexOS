@@ -365,6 +365,28 @@ class CatalogueAndCheckTests(unittest.TestCase):
         self.assertTrue(everything['prebuilt'])
         self.assertEqual((everything['downloadBytes'], everything['compiles']), (0, []))
 
+    def test_multi_package_queue_attributes_kernel_build_only_to_its_dependent_app(self):
+        spotify, krita = (store('d', name + '.drv') for name in ('spotify', 'krita'))
+        wrapper, kernel = store('w', 'vendor-wrapper.drv'), store('k', 'linux-7.3.drv')
+        # GIMP is cached and absent from the plan. Krita has a local wrapper
+        # but no kernel dependency. Spotify's expected vendor build must not
+        # hide the kernel under its compiled wrapper dependency.
+        graph = {spotify: compile_step(wrapper), wrapper: compile_step(kernel),
+                 kernel: {**compile_step(), 'env': {'pname': 'linux', 'preferLocalBuild': '1'}},
+                 krita: {**compile_step(), 'env': {'preferLocalBuild': '1'}}}
+        run = Nix(allow_unfree=True,
+                  metadata=METADATA | {'spotify': METADATA['spotify'] | {'available': True}},
+                  build='these 4 derivations will be built:\n' + ''.join(f'  {path}\n' for path in graph),
+                  graph=graph)
+        result = software.check(['gimp', 'spotify', 'krita'], config=self.config, run=run)
+        self.assertFalse(result['prebuilt'])
+        self.assertEqual(result['compiles'], ['linux-7.3'])
+        for name in ('gimp', 'krita'):
+            self.assertEqual((result['packages'][name]['state'], result['packages'][name]['compiles']), ('prebuilt', []))
+        self.assertEqual((result['packages']['spotify']['state'], result['packages']['spotify']['compiles']),
+                         ('compiles', ['linux-7.3']))
+        self.assertEqual(run.count('nix', 'derivation', 'show'), 1)
+
     def test_check_validates_attributes_and_keeps_nix_diagnostics_private(self):
         for value in ([], ['hello; import /tmp/evil'], ['a..b'], ['../hello'], ['"x"'], ['a/${builtins.abort "x"}'],
                       ['hello', 'hello'], ['x' * 201], ['p%d' % index for index in range(65)], 'hello', [1]):

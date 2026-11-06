@@ -530,8 +530,11 @@ class Engine:
                     authorization.unlink(missing_ok=True)
                 return record
             except NotPrebuilt as error:
-                self.status(state='failed', phase='Waiting for NixOS to finish building this change', error=str(error),
-                            notPrebuilt=error.names, retry='Prepare again after NixOS has built these packages.')
+                self.status(state='failed', error=str(error), notPrebuilt=error.names,
+                            phase='Waiting for NixOS to finish building this change' if kind == 'update'
+                                else 'Staging failed; working system retained',
+                            retry='Prepare again after NixOS has built these packages.' if kind == 'update'
+                                else 'Correct the failure and prepare this change again.')
                 raise
             except BaseException as error:
                 self.status(state='failed', phase='Staging failed; working system retained', error=str(error),

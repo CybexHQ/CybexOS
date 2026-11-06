@@ -81,11 +81,12 @@ function indicator(hasUpdates, state, holdTarget) {
 }
 
 // The worker retains a prebuilt refusal as failed for its command result.
-// Present this specific, safe outcome as waiting, including after a restart.
+// Only source updates wait for cache outputs. Personal changes need review.
 function waitingPackages(deployment) {
     const value = deployment || {};
     const names = value.notPrebuilt;
-    return value.state === "failed" && (Array.isArray(names) || names instanceof Array) && names.length > 0
+    return value.state === "failed" && value.changeKind === "update"
+        && (Array.isArray(names) || names instanceof Array) && names.length > 0
         && names.every(name => typeof name === "string" && name.trim() !== "") ? names : [];
 }
 

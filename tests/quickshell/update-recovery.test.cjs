@@ -89,7 +89,7 @@ test("failed discovery, zero updates and completed history create no update badg
 });
 
 test("a package hold survives reload and suppresses only its exact update candidate", () => {
-    const held = {state: "failed", notPrebuilt: ["opencode-2.2.5"], inputs: {
+    const held = {state: "failed", changeKind: "update", notPrebuilt: ["opencode-2.2.5"], inputs: {
         nixpkgs: {rev: "nixpkgs-revision"}, cybexos: {rev: "cybexos-revision"}}};
     const sources = {upstream: {state: "available", available: "nixpkgs-revision"}, cybexos: {state: "current"}};
     const reloaded = JSON.parse(JSON.stringify(held));
@@ -109,6 +109,26 @@ test("a package hold survives reload and suppresses only its exact update candid
         assert.deepEqual(H.waitingPackages({...held, notPrebuilt}), []);
     for (const state of ["ready", "activating", "interrupted", "recovery-failed"])
         assert.deepEqual(H.waitingPackages({...held, state}), []);
+});
+
+test("local kernel refusals remain actionable problems after reload", () => {
+    const error = "The candidate would compile a Linux kernel (linux-image-7.3). Cybex OS requires stock prebuilt kernels.";
+    for (const changeKind of ["configuration", "region", "maintenance", "software", undefined]) {
+        const deployment = JSON.parse(JSON.stringify({state: "failed", changeKind,
+            notPrebuilt: ["linux-image-7.3"], error,
+            request: {id: "request", action: "stage", state: "failed", error},
+            inputs: {nixpkgs: {rev: "new revision"}}}));
+        const waitingForPackages = H.waitingPackages(deployment).length > 0;
+        assert.equal(waitingForPackages, false, changeKind);
+        assert.equal(H.holdTarget(deployment, available), "", changeKind);
+        assert.equal(H.page({...deployment, statusLoaded: true, sourcesLoaded: true,
+            hasUpdates: true, waitingForPackages}), "problem", changeKind);
+        assert.equal(H.problem({...deployment, statusLoaded: true}), "failed");
+    }
+    const update = {state: "failed", changeKind: "update", notPrebuilt: ["linux-7.3"]};
+    assert.equal(H.page({...update, statusLoaded: true,
+        waitingForPackages: H.waitingPackages(update).length > 0}), "waiting",
+        "an update whose stock kernel is not cached yet still waits");
 });
 
 test("a failed recovery blocks preparation and offers explicit restoration", () => {
