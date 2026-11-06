@@ -17,9 +17,10 @@ UNITS = {'B': 1, 'KiB': 1024, 'MiB': 1024 ** 2, 'GiB': 1024 ** 3, 'TiB': 1024 **
 
 
 def waiting_packages(status):
-    """A durable prebuilt refusal, distinct from a build or activation failure."""
+    """An update waiting for cache outputs, not a failed personal change."""
     names = status.get('notPrebuilt')
-    if (status.get('state') != 'failed' or not isinstance(names, list) or not names
+    if (status.get('state') != 'failed' or status.get('changeKind') != 'update'
+            or not isinstance(names, list) or not names
             or any(not isinstance(item, str) or not item.strip() for item in names)):
         return []
     return names
@@ -132,13 +133,15 @@ def kind(info):
 
 
 def kernel_build(info):
-    """Recognize Nixpkgs' kernel recipe, including renamed custom variants.
+    """Recognize Nixpkgs' kernel and image-rebuild recipes.
 
     External modules use the kernel as an input but do not install a kernel
     image and its in-tree modules. Keep their ordinary local-build allowance.
     """
     attrs = attributes(info)
-    return (attrs.get('pname') == 'linux'
+    # rebuildImage runs kbuild again from the kernel's dev output. It has no
+    # karch/modules_install attributes, but is still kernel compilation.
+    return (attrs.get('pname') in ('linux', 'linux-image')
             or (bool(attrs.get('karch')) and 'modules_install' in (attrs.get('installTargets') or [])))
 
 
@@ -201,8 +204,20 @@ def compiles(run, derivations, *, root=None, expected=(), kernel_only=False):
     """
     pending = set(derivations)
     graph = show(run, sorted(pending))
+    if root is not None:
+        # A Software queue shares one plan across several package roots.
+        # Retain all reachable inputs, even below expected or compiled nodes,
+        # so kernel builds cannot hide there or be blamed on unrelated apps.
+        reachable, frontier = set(), [root]
+        while frontier:
+            current = frontier.pop()
+            if current in reachable or current not in graph:
+                continue
+            reachable.add(current)
+            frontier.extend(graph[current]['inputDrvs'])
+        graph = {path: graph[path] for path in reachable}
     expected = set(expected)
-    # Inspect the entire pending plan before pruning expected ancestors. A
+    # Inspect the relevant pending plan before pruning expected ancestors. A
     # kernel needed by e.g. an expected external module still must be cached.
     kernels = {d for d, info in graph.items() if kernel_build(info)}
     expected -= kernels

@@ -28,6 +28,7 @@ VENDOR = store('v', 'spotify-1.2.drv')
 SOURCE = store('s', 'spotify.deb.drv')
 TOOL = store('t', 'patchelf-wrapper.drv')
 KERNEL = store('k', 'linux-7.3.drv')
+IMAGE = store('i', 'linux-image-7.3.drv')
 
 
 def node(*inputs, **env):
@@ -82,6 +83,33 @@ class Parsing(unittest.TestCase):
 
 
 class Classification(unittest.TestCase):
+    def test_kernel_image_rebuild_is_refused_even_below_expected_builds(self):
+        # Nixpkgs rebuild-image.nix uses the kernel dev build tree and only
+        # runs the image install target: no karch or modules_install marker.
+        attrs = {'pname': 'linux-image', 'src': store('d', 'linux-7.3-dev') + '/lib/modules/7.3/build',
+                 'installTargets': ['install'], 'preferLocalBuild': True}
+        for image in (node(**attrs), dict(node(), structuredAttrs=attrs),
+                      node(__json=json.dumps(attrs))):
+            with self.subTest(image=image):
+                graph = {ROOT: node(VENDOR), VENDOR: node(IMAGE, src='module'), IMAGE: image}
+                self.assertEqual(prebuilt.kind(image), 'compile')
+                for root in (None, ROOT):
+                    for kernel_only in (False, True):
+                        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=root,
+                            expected=[VENDOR, IMAGE], kernel_only=kernel_only), ['linux-image-7.3'])
+
+    def test_kernel_attribution_follows_each_root_without_pruning_compiled_dependencies(self):
+        graph = {ROOT: node(VENDOR), VENDOR: node(KERNEL, src='package'),
+                 KERNEL: node(pname='linux'), HELLO: node(preferLocalBuild='1')}
+        for root, expected in ((ROOT, ['linux-7.3']), (HELLO, []), (CONFIG, [])):
+            with self.subTest(root=root):
+                self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=root,
+                                                  kernel_only=True), expected)
+        # Ordinary classification still reports the package as well as its
+        # kernel dependency; expected builds cannot suppress that dependency.
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT), ['linux-7.3', 'spotify-1.2'])
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[VENDOR]), ['linux-7.3'])
+
     def test_kernel_cannot_hide_behind_expected_builds_or_local_flags(self):
         for env in ({'pname': 'linux', 'src': 'source'},
                     {'pname': 'linux', 'preferLocalBuild': '1'},
@@ -188,12 +216,12 @@ class EngineGuard(unittest.TestCase):
         self.assertIsNone(read(self.engine.status_path)['notPrebuilt'])
         self.assertTrue(record['reviewToken'])
 
-    def kernel_plan(self):
+    def kernel_plan(self, pname='linux'):
         self.plan([HELLO])
         original = self.engine.run
         def run(*args, **kwargs):
             if args[:3] == ('nix', 'derivation', 'show'):
-                return shown({ROOT: node(HELLO), HELLO: node(pname='linux', preferLocalBuild='1')})(*args)
+                return shown({ROOT: node(HELLO), HELLO: node(pname=pname, preferLocalBuild='1')})(*args)
             return original(*args, **kwargs)
         run.observer = None
         run.log = None
@@ -205,6 +233,7 @@ class EngineGuard(unittest.TestCase):
             self.engine.stage('upstream')
         builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
         self.assertEqual(builds, [])
+        self.assertEqual(prebuilt.waiting_packages(read(self.engine.status_path)), ['hello-2.12'])
 
     def test_personal_configuration_preview_also_refuses_kernel_compile(self):
         self.kernel_plan()
@@ -213,6 +242,22 @@ class EngineGuard(unittest.TestCase):
         builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
         self.assertEqual(builds, [])
         self.assertEqual(lifecycle.config_digest(self.config), self.sentinel)
+        status = read(self.engine.status_path)
+        self.assertEqual(status['changeKind'], 'configuration')
+        self.assertEqual(prebuilt.waiting_packages(status), [])
+        self.assertEqual(status['phase'], 'Staging failed; working system retained')
+        self.assertIn('would compile a Linux kernel', status['error'])
+        self.assertNotIn('after NixOS', status['retry'])
+
+    def test_personal_image_rebuild_is_refused_before_building_or_changing_locks(self):
+        self.kernel_plan(pname='linux-image')
+        locked = (self.config / 'flake.lock').read_bytes()
+        with self.assertRaisesRegex(NotPrebuilt, 'would compile a Linux kernel'):
+            self.engine.stage('local')
+        self.assertEqual((self.config / 'flake.lock').read_bytes(), locked)
+        self.assertEqual(lifecycle.config_digest(self.config), self.sentinel)
+        self.assertFalse(any(call[:2] == ('nix', 'build') and '--dry-run' not in call for call in self.runner.calls))
+        self.assertEqual(prebuilt.waiting_packages(read(self.engine.status_path)), [])
 
     def test_personal_configuration_previews_keep_other_package_build_choices(self):
         self.plan([])
@@ -222,7 +267,7 @@ class EngineGuard(unittest.TestCase):
 
 class Waiting(unittest.TestCase):
     def setUp(self):
-        self.status = {'state': 'failed', 'notPrebuilt': ['opencode-2.2.5'], 'inputs': {
+        self.status = {'state': 'failed', 'changeKind': 'update', 'notPrebuilt': ['opencode-2.2.5'], 'inputs': {
             'nixpkgs': {'rev': 'nixpkgs-revision'}, 'cybexos': {'rev': 'cybexos-revision'}}}
         self.sources = {'upstream': {'state': 'available', 'available': 'nixpkgs-revision'},
                         'cybexos': {'state': 'current'}}
@@ -243,6 +288,13 @@ class Waiting(unittest.TestCase):
         self.assertEqual(prebuilt.hold_target(self.status | {'inputs': {}}, self.sources), 'unknown')
         self.assertEqual(prebuilt.hold_target(self.status, {}), 'unknown')
         self.assertEqual(prebuilt.hold_target(self.status | {'notPrebuilt': []}, self.sources), '')
+
+    def test_personal_failures_never_become_update_holds(self):
+        for kind in ('configuration', 'region', 'maintenance', 'software', None):
+            status = self.status | {'changeKind': kind}
+            with self.subTest(kind=kind):
+                self.assertEqual(prebuilt.waiting_packages(status), [])
+                self.assertEqual(prebuilt.hold_target(status, self.sources), '')
 
 
 class PackagesOnly(unittest.TestCase):
