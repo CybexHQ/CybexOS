@@ -1,8 +1,11 @@
 # Matched laptops: Dell XPS 2026 and HP ZBook Ultra G1a
 
-Cybex OS runs these laptops on the stock Nixpkgs kernel (Linux 7.3,
-`linuxPackages_latest`), linux-firmware and Mesa. It never ships a patched
-kernel. Where an upstream fix has not reached that kernel, the matched profile
+Cybex OS profiles target non-Apple Intel/AMD x86_64 UEFI PCs using the stock
+Nixpkgs kernel (currently Linux 7.3, `linuxPackages_latest`), linux-firmware
+and Mesa. These profiles are experimental until the named features have
+physical qualification evidence. Cybex OS never ships a kernel fork, extra
+kernel patch or custom kernel configuration/rebuild for hardware support.
+Where an upstream fix has not reached that kernel, the matched profile
 uses a stock-kernel equivalent: a parameter, a module option, a load order or
 a userspace service. It also records what only a newer kernel can fix.
 
@@ -10,15 +13,30 @@ The installer detects each model and writes its profile into the new
 machine's `/etc/nixos/machine.nix`. Every match is exact: no other laptop
 receives these quirks.
 
-- **XPS:** `cybexos.hardware.xps = { enable = true; sku = "…"; panel = "…"; camera = …; }`.
+- **XPS:** `cybexos.hardware.xps = { enable = true; sku = "…"; panel = "…"; camera = false; }`.
 - **ZBook:** `cybexos.hardware.zbookUltraG1a.enable = true`.
 
 A machine installed before its model was recognised can add the same line
 itself. Nothing migrates it automatically.
 
+The built-in XPS camera is unsupported and is not selected for fresh installs.
+An external supported USB camera is an alternative. The optional legacy
+`camera = true` recipe remains a personal choice with its ABI guard intact;
+its presence or successful build does not establish capture support.
+
 None of this is physical qualification. The profiles are checked by unit tests,
 configuration parity and system builds. Each laptop still needs the physical
 checklist in [hardware support](hardware-support.md).
+
+The kernel policy compares the final kernel derivation with an unmodified
+import of the machine's selected Nixpkgs source. Matching version text alone
+is insufficient. It covers every enabled system and installation medium, including generic
+PCs without a selected profile. The ZFS extension in `nix/kernel-packages.nix`
+changes only the external module set; ordinary packaged NVIDIA and other
+external modules remain allowed. The updater also refuses a pending kernel
+compile, including personal configuration previews and attempts to exempt it
+through `cybexos.updates.expectedBuilds`. Other intentional personal package
+builds remain possible. Refusal preserves personal files and locks.
 
 ## Identification
 
@@ -45,7 +63,7 @@ the x86_64 image.
 | Storage | `intel_iommu=on`, so a DRAM-less SSD gets its host memory buffer (below). | The same. |
 | Media | intel-media-driver, VPL and the compute runtime. | The same. |
 | Microphone mute light | `platform::micmute` follows the default microphone (all laptops, below). | The same. |
-| Camera | Processed IPU7 stack, still blocked (below). | Not enabled; not reviewed for this model. |
+| Camera | Unsupported; optional legacy processed IPU7 recipe is blocked (below). | Unsupported; not reviewed for this model. |
 | Wi-Fi | Intel BE211 with the stock driver and firmware, plus the wireless regulatory database (all machines). | Intel BE213 (Wildcat Lake), the same. |
 
 ### Why each XPS quirk exists
@@ -110,10 +128,11 @@ the x86_64 image.
     has no driver. The ISYS sensor graph therefore never completes, and the
     OV08X40 colour sensor gets no subdevice.
 
-  Omarchy reverts that entry in its kernel. A stock-kernel fix needs an
-  out-of-tree HM1092 driver or an ACPI override built from this laptop's own
-  tables. Both, like extending the ABI signature, need real frames from
-  `xps-ipu7-camera-frame-check` on the laptop before they can ship.
+  Omarchy reverts that entry in its kernel. Cybex OS does not carry that
+  kernel patch. A future stock-kernel solution needs separate upstream and
+  physical review; no driver or ACPI override is currently shipped to solve
+  this. Extending an ABI signature requires compiled layout checks and real
+  frames from `xps-ipu7-camera-frame-check` on the exact laptop.
 
   Linux 7.4 also makes the ipu6 driver claim IPU7 by default, so revisit the
   camera stack when 7.4 arrives.
@@ -221,6 +240,42 @@ same identification:
 
 The installed profile is recorded in `/etc/cybexos/hardware-profile.json`.
 
+## Accepting a physical laptop result
+
+Record the exact DMI/SKU, panel, GPU and network IDs, BIOS/EC firmware, selected
+Nixpkgs and Cybex OS revisions/NAR identity, kernel derivation, and profile
+options. Upstream and Omarchy reports justify investigation; they do not count
+as Cybex OS physical evidence. Use the same source identity for the live medium,
+fresh installed configuration and staged updater candidate. A source check,
+system build or generic VM cannot replace these results.
+
+On an explicitly authorized test machine, verify fresh encrypted installation,
+first boot and password fallback; display brightness and external-display
+hotplug; speakers at safe volume, microphones and mute indication; keyboard,
+touchpad and haptics; Wi-Fi reconnect and Bluetooth peripherals; and power
+profiles, thermals and repeated suspend/resume on AC and battery. Exercise
+hybrid graphics/offload when present. Stage the real update, inspect doctor
+and the kernel journal, apply it through the normal trial boot, and verify
+rollback/recovery and preservation of personal configuration and machine locks.
+Keep the results per feature, including failures and untested variants.
+
+A result may accept the tested desktop, audio, input and networking features
+while declaring **built-in XPS camera unsupported**. That exclusion must remain
+visible in support metadata and release notes; it must not be converted to a
+capture success or hidden to obtain a pass. Secure Boot remains unsupported
+independently of the laptop profile; do not disable it for testing.
+
+Before a release touching the kernel/Nixpkgs pin, firmware, graphics, audio,
+sleep/power policy, NVIDIA or profile detection, evaluate
+`nix eval .#checks.x86_64-linux.kernel-policy.drvPath` and run the focused
+prebuilt/source checks. `nix build .#checks.x86_64-linux.kernel-policy` builds
+only the small evaluation report. Build affected system/external-module
+checks and repeat the affected physical feature tests through the staged
+updater. The official `xps-system` check uses the stock configuration with the
+camera off; optional camera package builds are separate and do not qualify it.
+See [hardware and security qualification](hardware-security.md) for release
+gates and evidence requirements.
+
 ## Sources
 
 - Omarchy, read on 2026-11-01:
@@ -228,6 +283,10 @@ The installed profile is recorded in `/etc/cybexos/hardware-profile.json`.
   - [omacom/omarchy-pkgs](https://github.com/omacom/omarchy-pkgs) at `9e1b0d6`, including the `linux-omarchy` 7.2.14 patch set;
   - the patch numbers named above.
 - Linux 7.3 source (`linux-7.3.tar.xz`, Nixpkgs `31ecbaca`) and the 7.3.1 changelog.
+- Kernel policy audit: the selected [Nixpkgs boot kernel module](https://github.com/NixOS/nixpkgs/blob/31ecbaca1bdefa45dffc409f0250bd8039ea0010/nixos/modules/system/boot/kernel.nix)
+  applies `boot.kernelPatches` and kernel feature overrides to the final kernel
+  recipe. Cybex OS checks that final derivation, rather than the initial
+  `boot.kernelPackages` selection or version string.
 - Code references: `drivers/media/i2c/cvs/core.c`, `sound/soc/codecs/cs35l56-shared.c`,
   `drivers/spi/spi-cs42l43.c`, `sound/soc/intel/boards/sof_sdw.c`,
   `drivers/platform/x86/amd/pmf/core.c`.

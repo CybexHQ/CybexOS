@@ -1,6 +1,7 @@
 # Hardware and security qualification
 
-The supported target is fresh x86_64 UEFI NixOS on the nixos-unstable branch.
+The target is fresh NixOS on non-Apple Intel/AMD x86_64 UEFI PCs, currently on
+the nixos-unstable branch until the 26.11 transition described in AGENTS.md.
 Current implementation status is developmental. This document distinguishes declarations from tested
 hardware support; no physical hardware was qualified during this implementation.
 
@@ -13,12 +14,12 @@ hardware support; no physical hardware was qualified during this implementation.
 | NVIDIA | NixOS packaged driver, explicit open-module choice, modesetting/power options | Representative supported GPUs, hybrid graphics/PRIME choices, suspend, signing with Secure Boot |
 | Dell XPS 2026 | Exact DMI/SKU 0DB9/0DBA (XPS 14/16) and 0E53/0E54 (XPS 13), panel EDID and sensor gates; latest Nixpkgs kernel, panel PSR/Panel Replay quirks, CVS-after-amplifier load order, haptics, speaker filter, adaptive thermald and Intel LPMd ([matched laptops](laptop-support.md)) | All four SKUs, panel variants, audio routing/limiter, repeated suspend/hotplug, fingerprints |
 | HP ZBook Ultra G1a | Exact vendor/board 8D01 match; stock amdgpu, ISP4 camera, CS35L54 audio and MT7925; PMF Smart PC off | Panels, audio, camera, s2idle resume, Wi-Fi/Bluetooth after sleep, BIOS settings |
-| XPS processed camera | Pinned Intel HAL/bins/icamerasrc and PSYS companion; native ISYS/core/CVS stay upstream; private-layout guard before PSYS load | Current kernel BTF/private ABI, HAL paths, v4l2 relay, actual processed frames, camera privacy and suspend/resume |
+| XPS processed camera | Unsupported; optional user-selected pinned Intel HAL/bins/icamerasrc and PSYS companion; native ISYS/core/CVS stay upstream; private-layout guard before PSYS load | A separately reviewed stock-kernel solution, current kernel BTF/private ABI, HAL paths, v4l2 relay, actual processed frames, camera privacy and suspend/resume |
 | Secure Boot | Native Lanzaboote option and runtime signing-key path; firmware verification is never disabled | Signed installation media, safe enrollment, key backup/rotation/revocation, NVIDIA/camera module signing and physical boot qualification |
 
 Secure Boot installation currently stops before erasure. It is not supported
-merely because Lanzaboote evaluates. Existing firmware verification must not be
-disabled to get the installer to boot. Keys belong in
+merely because Lanzaboote evaluates or a hardware profile matches. Existing
+firmware verification must not be disabled to get the installer to boot. Keys belong in
 `/var/lib/cybexos/secrets/secureboot` with root-only permissions, outside the
 store and source. Completing signed media, enrollment and module signing is a
 release blocker, not an optional post-release improvement.
@@ -53,8 +54,11 @@ structures, but the ninth could not be parsed and no processed frames were
 available. That probe does not authorize extending the signature. The managed
 ABI service fails closed and blocks camera initialization on this configuration;
 update health reports it without holding back updates. This is a concrete XPS camera release
-blocker, despite the complete XPS system building successfully. Do not disable
-the guard or omit the camera profile to qualify a machine that has that camera.
+blocker for any claim of processed camera support, despite the optional camera
+system building successfully. Do not disable the guard. The official stock XPS
+configuration leaves the camera off and declares it unsupported. Other named
+features can be physically accepted with that exclusion explicitly recorded;
+this does not qualify the camera or Secure Boot.
 
 The relay retains the `ov08x40-uf` sensor, 180-degree rotation and 1920x1080
 NV12 output. Initialization acquires CVS before probing the sensor; suspend
@@ -64,6 +68,36 @@ ACL processing. These declarations still require privacy and capture tests.
 
 Pinned vendor camera sources need requalification at every relevant kernel/HAL
 change and should be removed when Nixpkgs supplies the full processed stack.
+
+All enabled Cybex OS systems and installation media retain the exact `linuxPackages_latest` kernel from
+the selected machine Nixpkgs source, with no Cybex kernel patches, forks,
+custom configuration/rebuilds or package overlays. The evaluation check compares
+derivation identity, including the installer and its installed payload; equal
+version strings do not establish identity. ZFS's module-package-set extension
+and ordinary packaged external modules such as NVIDIA do not modify the kernel
+itself and keep their local-build allowance. A kernel missing from the cache
+must stop staging before compilation, even when listed as an expected build
+or marked local-only. Personal declarations and locks must not be rewritten to
+pass the check. This is a product policy check, not a sandbox for hostile Nix
+expressions or a replacement for module-signing trust.
+
+The flake's `kernel-policy` check reads every approved profile ID from
+`lifecycle/cybexos/hardware-profiles.json` and evaluates it with the full shared
+module, alongside the default system, installer/payload, existing exact
+XPS/ZBook profiles and NVIDIA choices. The runtime assertion applies even when no hardware profile is selected,
+including cached or locally present custom kernels. The `hardware-profiles` check tests
+individual settings, personal opt-outs and unchanged power/boot policy.
+
+Hardware-sensitive releases need focused source tests, kernel identity and
+installer parity evaluation, affected system/external-module builds, and the
+real staged-updater prebuilt check. Repeat physical tests for the affected
+display/GPU, audio, networking, sleep/power and authentication paths on each
+claimed model/variant. Record source identities, firmware, feature results and
+unsupported features using the [laptop acceptance checklist](laptop-support.md#accepting-a-physical-laptop-result).
+Detection and successful evaluation/builds only establish declarations; mark
+an untested profile experimental. A physical result can accept a listed set of
+features while excluding the XPS camera. It cannot remove separate security
+release blockers or claim whole-device support from partial evidence.
 
 The exact XPS profile enables adaptive thermald alongside Power Profiles
 Daemon. Intel LPMd 0.1.0 is a narrowly pinned native package because the selected

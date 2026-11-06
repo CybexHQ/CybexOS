@@ -57,6 +57,8 @@ Singleton {
         case "laptop":
             return problem ? I18n.tr("This laptop has a known hardware problem")
                 : I18n.tr("This laptop's hardware profile is not turned on");
+        case "hardware-support":
+            return check.summary;
         default:
             return check.summary;
         }

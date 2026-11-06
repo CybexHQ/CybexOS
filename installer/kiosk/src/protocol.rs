@@ -267,6 +267,23 @@ pub struct State {
 }
 
 impl State {
+    pub fn hardware_support(&self) -> (String, String) {
+        let support = self.hardware.get("support");
+        let field = |key| support.and_then(|s| s.get(key)).and_then(Value::as_str).unwrap_or("");
+        let name = if field("profileName").is_empty() { "Generic PC" } else { field("profileName") };
+        let status = if field("status").is_empty() { "generic" } else { field("status") };
+        let id = field("profileId");
+        let identity = if id.is_empty() { name.to_string() } else { format!("{name} ({id})") };
+        let mut detail = vec![if field("summary").is_empty() {
+            "Compatibility needs testing on this computer.".to_string()
+        } else { field("summary").to_string() }];
+        if let Some(limits) = support.and_then(|s| s.get("limitations")).and_then(Value::as_array) {
+            detail.extend(limits.iter().filter_map(Value::as_str).map(str::to_string));
+        }
+        detail.push("Detection does not verify that every feature works.".into());
+        (format!("{identity} · {status}"), detail.join("\n"))
+    }
+
     pub fn nvidia(&self) -> bool {
         self.hardware.get("nvidia").and_then(Value::as_bool).unwrap_or(false)
     }

@@ -191,7 +191,7 @@ def main():
     installer = commands.add_parser('install')
     installer.add_argument('--terminal', action='store_true', help='Open the live installer in a terminal')
     commands.add_parser('version')
-    commands.add_parser('hardware', help='Read-only hardware inventory and unfilled qualification checklist (JSON)')
+    commands.add_parser('hardware', help='Read-only hardware inventory, support status and unfilled qualification checklist (JSON)')
     software = commands.add_parser('software')
     software_sub = software.add_subparsers(dest='software_action', required=True)
     software_sub.add_parser('list')

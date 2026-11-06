@@ -91,7 +91,7 @@ component Panel inherits Rectangle {
     public function reset-focus() { content.focus(); }
 }
 
-component ListArea inherits Rectangle {
+export component ListArea inherits Rectangle {
     in property <length> content-height;
     out property <length> offset: flick.content-y;
     out property <bool> at-end: root.content-height + root.offset <= root.height + 2px;

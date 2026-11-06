@@ -392,6 +392,12 @@ impl App {
             detail: s(if graphics_blocker.is_empty() { graphics_detail } else { graphics_blocker }),
             state: if graphics_blocker.is_empty() { 2 } else { 4 },
         });
+        let (support_identity, support_detail) = state.hardware_support();
+        store.set_hardware_identity(s(&support_identity));
+        store.set_hardware_detail(s(&support_detail));
+        checks.push(Check {
+            label: s("Hardware"), value: s(support_identity), detail: s(support_detail), state: 2,
+        });
         let gib = state.memory as f64 / 1_073_741_824.0;
         checks.push(Check {
             label: s("Memory"),

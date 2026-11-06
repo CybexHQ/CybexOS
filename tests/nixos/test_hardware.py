@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -163,7 +164,7 @@ class HardwareAssessmentTests(unittest.TestCase):
             found = self.detect()
             self.assertTrue(found['xps'])
             self.assertEqual(found['sku'], sku)
-            # The processed camera stack is reviewed for the XPS 14/16 only.
+            # The stock installation leaves the built-in camera unavailable.
             self.assertFalse(found['camera'])
         (dmi / 'product_sku').write_text('0DB9')
         self.assertFalse(self.detect()['xps'])
@@ -199,12 +200,119 @@ class HardwareAssessmentTests(unittest.TestCase):
         (dmi / 'bios_version').write_text('1.23')
         efivars = self.root / 'firmware/efi/efivars'; efivars.mkdir(parents=True)
         (efivars / 'SecureBoot-test').write_bytes(b'\x07\0\0\0\x01')
-        report = hardware.report(self.root, self.cpu, etc=etc, catalogue=CATALOGUE, kernel_log='')
+        lock = etc / 'flake.lock'
+        lock.write_text(json.dumps({'root': 'machine', 'nodes': {
+            'machine': {'inputs': {'nixpkgs': 'upstream', 'private': 'secret'}},
+            'upstream': {'locked': {'rev': 'b' * 40, 'narHash': 'sha256-upstream', 'url': 'DO-NOT-INCLUDE'}},
+            'secret': {'locked': {'url': 'DO-NOT-INCLUDE'}}}}))
+        before = lock.read_bytes()
+        report = hardware.report(self.root, self.cpu, etc=etc, machine_lock=lock, catalogue=CATALOGUE, kernel_log='')
         self.assertEqual(report['release'], release)
         self.assertEqual(report['system']['bios_version'], '1.23')
         self.assertEqual(report['firmware'], {'uefi': True, 'secureBoot': True})
         self.assertEqual(set(report['qualification'].values()), {'not-run'})
         self.assertNotIn('DO-NOT-INCLUDE', json.dumps(report))
+        self.assertEqual(report['nixpkgs'], {'rev': 'b' * 40, 'narHash': 'sha256-upstream'})
+        self.assertEqual(report['support'], report['assessment']['support'])
+        self.assertEqual(lock.read_bytes(), before)
+
+    def test_support_contract_is_forwarded_without_qualifying_detection(self):
+        support = {'profileId': 'fixture-laptop', 'profileName': 'Fixture laptop', 'status': 'experimental',
+                   'summary': 'Physical qualification has not run.', 'limitations': ['Camera unavailable.'],
+                   'sources': [{'url': 'https://example.org/hardware'}]}
+        provider = SimpleNamespace(support_for=lambda *args, **kwargs: support)
+        injected = {'schema': 1, 'profiles': []}
+        with patch.dict(sys.modules, {'cybexos.hardware_profiles': provider}):
+            with patch.object(provider, 'support_for', return_value=support) as assess:
+                found = self.detect(profile_catalogue=injected, kernel='7.3-fixture')
+            assess.assert_called_once_with(self.root, kernel='7.3-fixture', catalogue=injected)
+        self.assertEqual(found['support'], support)
+        self.assertIn('fixture-laptop', '\n'.join(hardware.support_lines(found)))
+        self.assertEqual(found['blockers'], [])
+        hardware.validate_hardware(found, True)
+
+    def test_real_catalogue_distinguishes_available_configured_and_live_profiles(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        (dmi / 'sys_vendor').write_text('Framework')
+        (dmi / 'product_name').write_text('Laptop 13 (AMD Ryzen 7040Series)')
+        (self.root / 'firmware/efi').mkdir(parents=True)
+        etc = self.root / 'etc'; etc.mkdir()
+        metadata = etc / 'hardware-support.json'
+        profile = 'framework-13-amd-7040'
+        for selected, live, state in ((None, False, 'available'), (profile, False, 'configured'),
+                                      ('lenovo-thinkpad-t14-gen5-amd', False, 'mismatch'),
+                                      (None, True, 'live')):
+            with self.subTest(state=state):
+                metadata.write_text(json.dumps({'schema': 1, 'selectedProfile': selected,
+                                                'installationMedium': live, 'configuredKernel': '7.3.1'}))
+                before = metadata.read_bytes()
+                result = hardware.report(self.root, self.cpu, etc=etc, machine_lock=etc / 'missing',
+                                         catalogue=CATALOGUE, kernel_log='', kernel='7.3')
+                self.assertEqual(result['support']['profileId'], profile)
+                self.assertEqual(result['support']['status'], 'experimental')
+                self.assertEqual(result['configuration']['state'], state)
+                self.assertEqual(result['configuration']['configuredKernel'], '7.3.1')
+                self.assertEqual(result['kernel'], hardware.os.uname().release)
+                self.assertEqual(set(result['qualification'].values()), {'not-run'})
+                self.assertEqual(metadata.read_bytes(), before)
+                if state == 'available':
+                    self.assertIn('cybex update local', result['configuration']['guidance'])
+                    self.assertIn(profile, result['configuration']['guidance'])
+
+    def test_real_dell_catalogue_preserves_component_gates_and_recognizes_legacy_configuration(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        for name, value in {'sys_vendor': 'Dell Inc.', 'product_name': 'Dell XPS 14 DA14260',
+                            'product_sku': '0DB9'}.items():
+            (dmi / name).write_text(value)
+        self.cpu.write_text('Intel Core Ultra')
+        (self.root / 'firmware/efi').mkdir(parents=True)
+        (self.root / 'bus/acpi/devices/OVTI08F4:00').mkdir(parents=True)
+        self.pci('0000:00:05.0', '8086', 'b05d', '048000')
+        panel = self.root / 'class/drm/card1-eDP-1'; panel.mkdir(parents=True)
+        (panel / 'edid').write_bytes(bytes(8) + bytes.fromhex('30e4c607'))
+        etc = self.root / 'etc'; etc.mkdir()
+        (etc / 'hardware-support.json').write_text(json.dumps({'schema': 1, 'selectedProfile': None}))
+        for sku, state in (('0DB9', 'configured'), (None, 'available'), ('0DBA', 'available')):
+            (etc / 'hardware-profile.json').write_text(json.dumps({'schema': 1, 'xps': sku}))
+            result = hardware.report(self.root, self.cpu, etc=etc, machine_lock=etc / 'missing',
+                                     catalogue=CATALOGUE, kernel_log='', kernel='7.3')
+            self.assertEqual(result['configuration']['state'], state)
+            self.assertEqual(result['support']['profileId'], 'dell-xps-14-da14260')
+            self.assertEqual(result['assessment']['panel'], '30e4c607')
+            self.assertTrue(result['assessment']['xps'])
+            self.assertTrue(result['assessment']['cameraDetected'])
+            self.assertFalse(result['assessment']['camera'])
+            self.assertEqual(result['support']['limitations'].count(hardware.CAMERA_LIMIT), 1)
+
+    def test_absent_or_malformed_profile_information_remains_generic(self):
+        for value in (None, [], {}, {'profileId': 'oops', 'status': 'qualified'},
+                      dict(hardware.generic_support(), limitations='invalid')):
+            provider = SimpleNamespace(support_for=lambda *args, **kwargs: value)
+            with self.subTest(value=value), patch.dict(sys.modules, {'cybexos.hardware_profiles': provider}):
+                found = self.detect()
+                self.assertEqual(found['support'], hardware.generic_support())
+                hardware.validate_hardware(found, True)
+        with patch.dict(sys.modules, {'cybexos.hardware_profiles': None}):
+            self.assertEqual(self.detect()['support'], hardware.generic_support())
+        provider = SimpleNamespace(support_for=lambda *args, **kwargs: (_ for _ in ()).throw(ValueError('bad catalogue')))
+        with patch.dict(sys.modules, {'cybexos.hardware_profiles': provider}):
+            self.assertEqual(self.detect()['support']['status'], 'generic')
+
+    def test_camera_limitation_does_not_mutate_catalogue_or_enable_custom_stack(self):
+        dmi = self.root / 'class/dmi/id'; dmi.mkdir(parents=True)
+        for name, value in {'sys_vendor': 'Dell Inc.', 'product_name': 'XPS 14 DA14260', 'product_sku': '0DB9'}.items():
+            (dmi / name).write_text(value)
+        self.cpu.write_text('Intel Core Ultra')
+        (self.root / 'bus/acpi/devices/OVTI08F4:00').mkdir(parents=True)
+        self.pci('0000:00:05.0', '8086', 'b05d', '048000')
+        support = hardware.generic_support()
+        provider = SimpleNamespace(support_for=lambda *args, **kwargs: support)
+        with patch.dict(sys.modules, {'cybexos.hardware_profiles': provider}):
+            found = self.detect()
+        self.assertTrue(found['cameraDetected'])
+        self.assertFalse(found['camera'])
+        self.assertIn(hardware.CAMERA_LIMIT, found['support']['limitations'])
+        self.assertEqual(support['limitations'], [])
 
     def test_cli_hardware_is_read_only_and_available_in_live_environment(self):
         from cybexos import cli

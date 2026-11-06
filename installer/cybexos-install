@@ -22,7 +22,7 @@ from urllib.parse import urlencode
 from cybexos.common import CommandFailure, Failure, Runner, atomic, parse, read
 from cybexos.engine import copy_config
 from cybexos.credentials import validate_password
-from cybexos.hardware import detect, validate_hardware
+from cybexos.hardware import detect, support_lines, validate_hardware
 from cybexos.installer_network import ensure_internet, retry_download
 from cybexos.software import packages as software_packages
 from cybexos.trust import REPO, version
@@ -472,6 +472,8 @@ def interactive(release):
     catalogue = software_catalogue()
     hardware = detect()
     validate_hardware(hardware, hardware.get('nvidiaOpen') is not False)
+    for line in support_lines(hardware):
+        print('  ' + line)
     for issue in hardware.get('networkIssues', []):
         print('  ' + issue)
     plan = {'hostname': 'cybexos', 'timezone': 'UTC', 'locale': 'en_US.UTF-8', 'keyboard': 'us',
@@ -540,6 +542,8 @@ def interactive(release):
         plan['autoLogin'] = plan['encrypted'] and yes_no('Automatic desktop login after verified disk unlock?', plan['autoLogin'])
         validate(plan)
         print('\n5 of 5 · Review your installation\n')
+        for line in support_lines(hardware):
+            print('  ' + line)
         model = (disk.get('model') or '').strip()
         print(f"  Erase disk: {plan['disk']} · {disk['size'] // 1024**3} GiB" + (f' · {model}' if model else ''))
         print(f"  Disk identity: {plan['serial']}\n  Account: {plan['username']} on {plan['hostname']}")
@@ -574,9 +578,8 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
     check_platform(plan['secureBoot'])
     hardware = detect()
     validate_hardware(hardware, plan['nvidiaOpen'])
-    # A hardware stack is never silently omitted to permit an install.
-    if hardware['camera']:
-        print('Detected IPU7 camera: its complete native stack will be built; build failures stop installation.')
+    for line in support_lines(hardware):
+        print(line)
     if not isinstance(secrets, dict) or set(secrets) != {'password'}:
         raise Failure('Supply one password for login and disk encryption')
     validate_password(secrets['password'])
@@ -685,12 +688,15 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
             # release must not silently move a beta machine to stable.
             machine += f'    updates.channel = {nix(channel)};\n'
             machine += f'    hardware.nvidia = {str(hardware["nvidia"]).lower()}; hardware.nvidiaOpen = {str(plan["nvidiaOpen"]).lower()};\n'
+            support = hardware.get('support', {})
+            if support.get('profileId') and support.get('status') in ('experimental', 'qualified'):
+                machine += f'    hardware.profile = {nix(support["profileId"])};\n'
             if hardware['nvidiaPrime']['enable']:
                 prime = hardware['nvidiaPrime']
                 machine += '    hardware.nvidiaPrime = { enable = true; '
                 machine += ' '.join(f'{key} = {nix(prime[key])};' for key in ('intelBusId', 'amdgpuBusId', 'nvidiaBusId')) + ' };\n'
             if hardware['xps']:
-                machine += f'    hardware.xps = {{ enable = true; sku = {nix(hardware["sku"])}; panel = {nix(hardware["panel"])}; camera = {str(hardware["camera"]).lower()}; }};\n'
+                machine += f'    hardware.xps = {{ enable = true; sku = {nix(hardware["sku"])}; panel = {nix(hardware["panel"])}; camera = false; }};\n'
             if hardware.get('zbookUltraG1a'):
                 machine += '    hardware.zbookUltraG1a.enable = true;\n'
             for key, value in plan.get('features', {}).items():
@@ -750,6 +756,7 @@ def install(plan, secrets, source, revision, nar_hash, run=Runner(), *, channel)
             for path in (user_config.parent, user_config, input_preferences):
                 os.chown(path, int(passwd[2]), int(passwd[3]))
             atomic(target / 'var/lib/cybexos/installation.json', {'revision': revision, 'narHash': nar_hash, 'channel': channel, 'hardware': hardware,
+                   'nixpkgs': nixpkgs['locked'],
                    'username': plan['username'], 'encrypted': plan['encrypted'], 'sharedPassword': True, 'prebuilt': prebuilt})
             deployed = target / 'var/lib/cybexos/initial-deployed'
             copy_config(config, deployed)
