@@ -81,13 +81,12 @@ or marked local-only. Personal declarations and locks must not be rewritten to
 pass the check. This is a product policy check, not a sandbox for hostile Nix
 expressions or a replacement for module-signing trust.
 
-Catalogue integration must pass `approvedProfiles = [ "<approved-id>" ... ];`
-to `nix/tests/kernel-policy.nix` from the flake's `kernel-policy` check, using
-every approved ID in `lifecycle/cybexos/hardware-profiles.json`. The runtime
-assertion already applies to every non-null `cybexos.hardware.profile`.
-Until that check argument is populated, evaluation covers the default system,
-installer/payload, legacy exact XPS/ZBook profiles and NVIDIA choices, but does
-not exercise the new catalogue's individual profile mappings.
+The flake's `kernel-policy` check reads every approved profile ID from
+`lifecycle/cybexos/hardware-profiles.json` and evaluates it with the full shared
+module, alongside the default system, installer/payload, existing exact
+XPS/ZBook profiles and NVIDIA choices. The runtime assertion also applies to
+every non-null `cybexos.hardware.profile`. The `hardware-profiles` check tests
+individual settings, personal opt-outs and unchanged power/boot policy.
 
 Hardware-sensitive releases need focused source tests, kernel identity and
 installer parity evaluation, affected system/external-module builds, and the
