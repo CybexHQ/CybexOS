@@ -201,9 +201,29 @@ compares kernel derivation, kernel patches, overlays, external modules,
 bootloader and PPD/TLP/TuneD settings with the baseline. Building it produces
 only a text evidence derivation, not a kernel or system.
 
+Integration adds regression coverage for generic custom-kernel rejection, the
+existing `Dell XPS 14 DA14260` identity, real-catalogue detection through
+inventory, retained XPS component choices and camera exclusion, and detected
+versus configured profiles. Diagnostics distinguish the running kernel from
+configuration metadata and recognize existing XPS/ZBook declarations.
+
+The combined `nix develop -c tests/run` passed: 1,083 discovered Python tests,
+1,681 JavaScript tests (18 skipped), and the additional helper/runtime suites.
+`nix flake check --no-build` passed, including all profile/kernel-policy and
+installation-parity evaluations. `scripts/check-prebuilt` passed against the
+Git-filtered Nix source snapshot; a direct path evaluation encountered an
+unrelated unreadable ignored build directory in the working checkout. The
+audit found no unexpected Nixpkgs compilation and checked all eight pointer
+theme cache downloads.
+
+Nix builds passed for `desktop`, `updater`, `installer-ui`, the `kernel-policy`,
+`hardware-profiles` and `parity` reports, and complete generic `system` and
+`xps-system` configurations. The stock Linux 7.3 kernel was fetched from the
+NixOS cache; no kernel or experimental camera stack was compiled. These
+outputs were built without activating them or starting their services.
+
 No ISO, physical machine, installation VM, service restart, firmware update,
-suspend or staged updater run was performed for this work. Parent integration
-must run the repository checks and affected package builds. All models still
+suspend or staged updater run was performed for this work. All models still
 need the physical installation/device/sleep/update checklist in
 [hardware support](hardware-support.md). In particular, the XPS built-in camera
 is an accepted missing feature here, not evidence of full support.
