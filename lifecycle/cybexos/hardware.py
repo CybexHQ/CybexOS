@@ -270,7 +270,7 @@ def configured_support(assessment, etc):
             guidance = (f'To enable it, add cybexos.hardware.profile = "{detected}"; to your personal NixOS module, '
                         'then prepare and review the change with cybex update local through the normal staged updater.')
     elif not detected and configured:
-        state, summary = 'generic', 'No model-specific profile is configured.'
+        state, summary = 'generic', 'No approved catalogue profile matches this computer.'
     else:
         state, summary = 'unknown', 'Configured hardware profile information is unavailable.'
     return {'state': state, 'profileId': selected, 'detectedProfileId': detected,
