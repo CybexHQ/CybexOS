@@ -449,7 +449,7 @@ assert !xps.services.tlp.enable && !xps.services.auto-cpufreq.enable && !(xps.se
 assert lpmd != null && lpmd.version == "0.1.0";
 assert xps.environment.etc."intel_lpmd".source == "${lpmd}/etc/intel_lpmd";
 assert builtins.elem lpmd xps.services.dbus.packages && xps.users.groups ? power;
-assert xps.systemd.services.intel_lpmd.wantedBy == [ "multi-user.target" ];
+assert lib.all (c: c.systemd.services.intel_lpmd.wantedBy == [ "graphical.target" ]) [ xps xps13 ];
 assert xps.systemd.services.intel_lpmd.aliases == [ "org.freedesktop.intel_lpmd.service" ];
 assert xps.systemd.services.intel_lpmd.serviceConfig == { };
 # XPS 14/16: CVS must not autoload, or it takes the speaker amplifiers'

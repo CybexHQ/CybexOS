@@ -216,7 +216,9 @@ in {
     # exit status and restart limits. The alias serves its D-Bus activation.
     systemd.packages = [ lpmd ];
     systemd.services.intel_lpmd = {
-      wantedBy = [ "multi-user.target" ];
+      # PPD starts after multi-user.target. Pulling LPMd into that target
+      # while ordering it after PPD creates a cycle (also on shutdown).
+      wantedBy = [ "graphical.target" ];
       aliases = [ "org.freedesktop.intel_lpmd.service" ];
       after = [ "power-profiles-daemon.service" "upower.service" ];
     };
