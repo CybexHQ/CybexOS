@@ -70,6 +70,9 @@
             (builtins.fromJSON (builtins.readFile ./lifecycle/cybexos/hardware-profiles.json)).profiles);
         };
         hardware-profiles = import ./nix/tests/hardware-profiles.nix { inherit nixpkgs system; };
+        xps-power-ordering = import ./nix/tests/xps-power-ordering.nix {
+          inherit nixpkgs pkgs module system;
+        };
         lifecycle = pkgs.runCommand "cybexos-lifecycle-tests" {
           nativeBuildInputs = [
             (pkgs.python3.withPackages (p: [ p.websockets p.pygobject3 p.pillow p.dbus-python p.pexpect ]))

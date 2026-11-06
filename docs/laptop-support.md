@@ -68,6 +68,14 @@ the x86_64 image.
 
 ### Why each XPS quirk exists
 
+- **Power-service ordering.** LPMd starts with `graphical.target`, after
+  power-profiles-daemon and UPower. PPD starts after `multi-user.target`;
+  pulling LPMd into that earlier target while making it wait for PPD creates
+  an ordering cycle at startup and shutdown. The
+  `checks.x86_64-linux.xps-power-ordering` check verifies the packaged services
+  and generated LPMd override with systemd, and reproduces the old cycle as a
+  negative control. This checks the dependency graph, not physical power or
+  suspend behavior.
 - **XPS 14/16 speakers and the camera share a GPIO.** The camera's vision
   chip driver, `intel_cvs`, requests the speaker-ID pin (`INTC10BC:01` pin 20)
   as its wake line. It autoloads at boot before SOF has probed the
