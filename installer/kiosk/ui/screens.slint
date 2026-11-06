@@ -3,6 +3,7 @@ import { Icons } from "icons.slint";
 import { Store, Check, DiskRow, SummaryRow, StageRow, AppTile, ProfileCard } from "store.slint";
 import { Icon, SlotIcon, Kicker, Heading, Lead, Btn, LinkButton, Card, Field, Toggle, Row, Mark, Tag, Help, FieldLabel } from "widgets.slint";
 import { Wiz } from "wiz.slint";
+import { ListArea } from "sheets.slint";
 
 // ── shared pieces ────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ component Pick inherits Rectangle {
 component CheckLine inherits Rectangle {
     in property <Check> data;
     in property <bool> first;
-    height: root.data.detail == "" ? 54px : 66px;
+    height: root.data.label == "Hardware" ? max(66px, check-copy.preferred-height + 24px) : root.data.detail == "" ? 54px : 66px;
     if !root.first: Rectangle {
         y: 0;
         height: 1px;
@@ -118,7 +119,7 @@ component CheckLine inherits Rectangle {
         vertical-alignment: center;
         height: parent.height;
     }
-    VerticalLayout {
+    check-copy := VerticalLayout {
         x: 150px;
         width: parent.width - 150px;
         alignment: center;
@@ -127,13 +128,15 @@ component CheckLine inherits Rectangle {
             text: root.data.value;
             color: root.data.state == 4 ? Theme.red : root.data.state == 3 ? Theme.amber : Theme.ink;
             font-size: 15px;
-            overflow: elide;
+            overflow: root.data.label == "Hardware" ? clip : elide;
+            wrap: root.data.label == "Hardware" ? word-wrap : no-wrap;
         }
         if root.data.detail != "": Text {
             text: root.data.detail;
             color: Theme.faint;
             font-size: 13px;
-            overflow: elide;
+            overflow: root.data.label == "Hardware" ? clip : elide;
+            wrap: root.data.label == "Hardware" ? word-wrap : no-wrap;
         }
     }
 }
@@ -244,8 +247,13 @@ export component WelcomeScreen inherits Rectangle {
             x: 746px;
             y: 206px;
             width: 470px;
-            height: checks.preferred-height;
-            checks := VerticalLayout {
+            height: min(checks.preferred-height, 474px);
+            ListArea {
+              width: parent.width;
+              height: parent.height;
+              content-height: checks.preferred-height;
+              checks := VerticalLayout {
+                width: parent.width;
                 padding-left: 24px;
                 padding-right: 24px;
                 padding-top: 16px;
@@ -285,6 +293,7 @@ export component WelcomeScreen inherits Rectangle {
                         height: parent.height;
                     }
                 }
+              }
             }
         }
         Wiz {
@@ -1264,19 +1273,40 @@ export component ReviewScreen inherits Rectangle {
                 }
             }
         }
-        VerticalLayout {
+        ListArea {
             x: 64px;
             y: 270px;
-            width: 556px;
-            alignment: start;
-            for row in Store.summary-left: SummaryLine { data: row; }
-        }
-        VerticalLayout {
-            x: 660px;
-            y: 270px;
-            width: 556px;
-            alignment: start;
-            for row in Store.summary-right: SummaryLine { data: row; }
+            width: 1152px;
+            height: 360px;
+            content-height: review-body.preferred-height;
+            review-body := VerticalLayout {
+                width: parent.width;
+                spacing: 12px;
+                alignment: start;
+                Text {
+                    text: "Hardware: " + Store.hardware-identity;
+                    font-size: 16px;
+                    color: Theme.ink;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: Store.hardware-detail;
+                    font-size: 14px;
+                    color: Theme.fog;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    spacing: 40px;
+                    VerticalLayout {
+                        alignment: start;
+                        for row in Store.summary-left: SummaryLine { data: row; }
+                    }
+                    VerticalLayout {
+                        alignment: start;
+                        for row in Store.summary-right: SummaryLine { data: row; }
+                    }
+                }
+            }
         }
         if Store.review-error != "": Text {
             x: 64px;

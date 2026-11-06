@@ -397,9 +397,12 @@ class HardwareTests(unittest.TestCase):
             (dmi / key).write_text(value)
         (self.sys / 'bus/acpi/devices/OVTI08F4:00').mkdir(parents=True)
         self.pci('0000:00:05.0', '0x8086', '0x048000', '0xb05d')
-        self.assertTrue(installer.detect(self.sys, self.cpu)['camera'])
+        found = installer.detect(self.sys, self.cpu)
+        self.assertTrue(found['cameraDetected'])
+        self.assertFalse(found['camera'])
+        self.assertIn('Built-in IPU7 camera is unsupported', ' '.join(found['support']['limitations']))
         (dmi / 'product_sku').write_text('unreviewed')
-        self.assertFalse(installer.detect(self.sys, self.cpu)['camera'])
+        self.assertFalse(installer.detect(self.sys, self.cpu)['cameraDetected'])
 
 
 class DiskSafetyTests(unittest.TestCase):
@@ -778,6 +781,66 @@ class MatchedLaptopMachineTests(DiskSafetyTests):
         self.assertNotIn('hardware.xps', zbook)
         # Older detection results without the field install no profile.
         self.assertNotIn('zbookUltraG1a', self.machine(base))
+
+    def test_approved_profile_is_a_fresh_machine_choice_and_camera_stays_off(self):
+        base = {'camera': True, 'nvidia': False, 'nvidiaPrime': {'enable': False},
+                'xps': True, 'sku': '0DB9', 'panel': '',
+                'support': {'profileId': 'fixture-xps', 'profileName': 'Fixture XPS', 'status': 'experimental',
+                            'summary': 'Not physically qualified.', 'limitations': ['Camera unavailable.'], 'sources': []}}
+        machine = self.machine(base)
+        self.assertIn('hardware.profile = "fixture-xps";', machine)
+        self.assertIn('camera = false;', machine)
+        self.assertNotIn('camera = true;', machine)
+        for support in ({'profileId': None, 'status': 'generic'},
+                        {'profileId': 'out-of-scope', 'status': 'unsupported'}):
+            self.assertNotIn('hardware.profile =', self.machine(dict(base, support=dict(base['support'], **support))))
+
+    def test_support_is_shown_before_disk_work_and_recorded_with_nixpkgs(self):
+        support = {'profileId': 'fixture-laptop', 'profileName': 'Fixture laptop', 'status': 'experimental',
+                   'summary': 'Physical qualification has not run.', 'limitations': ['Built-in camera unavailable.'],
+                   'sources': []}
+        hardware = {'camera': False, 'nvidia': False, 'nvidiaPrime': {'enable': False}, 'xps': False,
+                    'support': support}
+        choice = plan(); choice.update(encrypted=False, autoLogin=False)
+        output, seen = io.StringIO(), {}
+        personal = '{ cybexos.hardware.xps.camera = true; services.example.enable = true; }\n'
+        preferences = '{"v":1,"keyboard":{"layouts":[{"layout":"de"}]}}'
+        def run(*args, **kwargs):
+            if args[0] == 'sgdisk':
+                self.assertIn('Fixture laptop (fixture-laptop) · experimental', output.getvalue())
+                self.assertIn('Built-in camera unavailable.', output.getvalue())
+            elif args[0] == 'nixos-generate-config':
+                config = Path(args[-1])
+                (config / 'hardware-configuration.nix').write_text('{}')
+                (config / 'local/personal.nix').write_text(personal)
+            elif args[:3] == ('nix', 'flake', 'lock'):
+                nix_lock(Path(str(args[-1]).removeprefix('path:')))
+            elif args[0] == 'nixos-install':
+                target = Path(args[2]); seen['target'] = target
+                (target / 'etc/passwd').write_text('tester:x:1000:100:Test:/home/tester:/bin/sh\n')
+                config = target / 'home/tester/.config/cybexos'
+                config.mkdir(parents=True)
+                (config / 'input.json').write_text(preferences)
+                seen['lock'] = (target / 'var/lib/cybexos/working/initial/flake.lock').read_bytes()
+            elif args[:3] == ('nix', 'flake', 'archive'):
+                target = seen['target']
+                seen['evidence'] = json.loads((target / 'var/lib/cybexos/installation.json').read_text())
+                deployed = target / 'var/lib/cybexos/initial-deployed'
+                self.assertEqual((deployed / 'flake.lock').read_bytes(), seen['lock'])
+                self.assertEqual((deployed / 'local/personal.nix').read_text(), personal)
+                self.assertEqual((target / 'home/tester/.config/cybexos/input.json').read_text(), preferences)
+                return '{}'
+            return 'unused-credential-hash'
+        with self.trusted_install_directory(), \
+                patch.dict(os.environ, {'CYBEXOS_UPDATER_SHARE': str(ROOT / 'templates')}), \
+                patch.object(installer, 'check_platform'), patch.object(installer, 'disk_guard'), \
+                patch.object(installer, 'detect', return_value=hardware), patch.object(installer.os, 'chown'), \
+                patch.object(installer, 'copy_initial_inputs'), contextlib.redirect_stdout(output):
+            installer.install(choice, {'password': 'qualification-password-123'}, f'path:{ROOT}', 'revision', 'nar', run, channel='beta')
+        self.assertEqual(seen['evidence']['hardware']['support'], support)
+        self.assertEqual(seen['evidence']['nixpkgs'], TESTED_NIXPKGS['locked'])
+        self.assertFalse(seen['target'].exists(), 'fixture workspace is removed')
+        self.assertNotIn('complete native stack will be built', output.getvalue())
 
 
 class SoftwareMachineTests(DiskSafetyTests):

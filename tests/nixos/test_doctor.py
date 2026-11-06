@@ -29,7 +29,7 @@ doctor = importlib.util.module_from_spec(spec)
 loader.exec_module(doctor)
 
 ORDER = ['graphics', 'drivers', 'firmware-files', 'services', 'audio', 'secure-boot', 'firmware-updates',
-         'storage', 'battery', 'time', 'desktop', 'laptop']
+         'storage', 'battery', 'time', 'desktop', 'laptop', 'hardware-support']
 HOST = 'fixture-private-host'
 PERSON = 'fixtureperson'
 MACHINE_ID = '0f1e2d3c4b5a69788796a5b4c3d2e1f0'
@@ -68,7 +68,7 @@ STUBS = {
     'timedatectl': 'stub timedatectl "$@"; cat "$FIXTURE/timedatectl"',
     'nmcli': 'stub nmcli "$@"; cat "$FIXTURE/connectivity"',
     'hyprctl': 'stub hyprctl "$@"; [[ $HYPRLAND_INSTANCE_SIGNATURE == "$SIGNATURE" ]] && cat "$FIXTURE/configerrors"',
-    'cybex': 'stub cybex "$@"; [[ $* == "shell status" ]] && cat "$FIXTURE/shell.json"',
+    'cybex': 'stub cybex "$@"; if [[ $* == "hardware" ]]; then cat "$FIXTURE/hardware.json"; elif [[ $* == "shell status" ]]; then cat "$FIXTURE/shell.json"; fi',
 }
 PRELUDE = textwrap.dedent('''\
     stub() {
@@ -103,6 +103,8 @@ class Fixture:
         (self.proc / 'uptime').write_text('3600.00 7200.00\n')
         self.disks = {'/': (500 * GIB, 200 * GIB, 1)}
         self.healthy()
+        self.write('hardware.json', json.dumps({'support': {'profileId': None, 'profileName': 'Generic PC',
+            'status': 'generic', 'summary': 'No matched profile.', 'limitations': [], 'sources': []}}))
 
     # ---- builders ------------------------------------------------------
 
@@ -267,12 +269,34 @@ class Contract(unittest.TestCase):
                          'Read-only checks of this computer. They do not qualify hardware or change anything.')
         json.dumps(report)
 
+    def test_support_status_and_known_limits_are_visible_in_text_and_json(self):
+        support = {'profileId': 'fixture-xps', 'profileName': 'Fixture XPS', 'status': 'experimental',
+                   'summary': 'Physical tests have not run.',
+                   'limitations': ['Built-in IPU7 camera is unsupported. Use a USB webcam.'], 'sources': []}
+        nixpkgs = {'rev': 'a' * 40, 'narHash': 'sha256-test'}
+        self.fixture.write('hardware.json', json.dumps({'support': support, 'nixpkgs': nixpkgs}))
+        report = self.fixture.report()
+        check = by_id(report)['hardware-support']
+        self.assertEqual(check['state'], 'info')
+        self.assertEqual(check['facts']['support'], support)
+        self.assertEqual(check['facts']['nixpkgs'], nixpkgs)
+        readable = doctor.text(report)
+        for expected in ('Fixture XPS', 'fixture-xps', 'experimental', 'IPU7 camera is unsupported',
+                         'Detection does not verify'):
+            self.assertIn(expected, readable)
+
+    def test_missing_support_information_is_unknown_and_does_not_hide_driver_checks(self):
+        self.fixture.write('hardware.json', '{malformed')
+        report = self.fixture.report()
+        self.assertEqual(by_id(report)['hardware-support']['state'], 'unknown')
+        self.assertEqual(by_id(report)['graphics']['state'], 'ok')
+
     def test_a_healthy_computer_is_ok_and_private(self):
         report = self.fixture.report()
         self.assertShape(report)
         checks = by_id(report)
         self.assertEqual({identifier: check['state'] for identifier, check in checks.items()},
-                         {identifier: 'ok' for identifier in ORDER}, json.dumps(report, indent=1))
+                         {identifier: 'info' if identifier == 'hardware-support' else 'ok' for identifier in ORDER}, json.dumps(report, indent=1))
         self.assertEqual(report['overall'], 'ok')
         self.assertEqual(report['counts']['ok'], 12)
         self.assertEqual(checks['graphics']['facts']['gpus'], [
@@ -731,7 +755,7 @@ class CommandLine(unittest.TestCase):
             lines = result.stdout.splitlines()
             self.assertEqual(lines[0], 'Cybex OS system check: 1 problem, 1 suggestion')
             rows = [line for line in lines if line and not line.startswith(' ')][1:-1]
-            self.assertEqual(len(rows), 12)
+            self.assertEqual(len(rows), len(ORDER))
             self.assertTrue(rows[0].startswith('Problem     Services: 1 service failed: [hostname]-backup.service'))
             self.assertTrue(rows[1].startswith('Suggestion  Firmware updates:'))
             self.assertIn('Note        Secure Boot: Secure Boot is off.', rows)

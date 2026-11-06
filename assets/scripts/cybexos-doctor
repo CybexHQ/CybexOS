@@ -36,6 +36,7 @@ CHECKS = (
     ('services', 'Services'), ('audio', 'Sound'), ('secure-boot', 'Secure Boot'),
     ('firmware-updates', 'Firmware updates'), ('storage', 'Storage'), ('battery', 'Battery'),
     ('time', 'Date and time'), ('desktop', 'Desktop'), ('laptop', 'Laptop model'),
+    ('hardware-support', 'Hardware support'),
 )
 TITLES = dict(CHECKS)
 STATES = ('problem', 'suggestion', 'ok', 'info', 'unknown')
@@ -831,11 +832,30 @@ def check_laptop():
     return finding(state, summary, detail, **facts)
 
 
+def check_hardware_support():
+    code, output, _ = run(['cybex', 'hardware'])
+    inventory = json_or_none(output) if code == 0 else None
+    support = inventory.get('support') if isinstance(inventory, dict) else None
+    if not isinstance(support, dict) or support.get('status') not in ('generic', 'experimental', 'unsupported', 'qualified'):
+        return finding('unknown', 'Hardware support information is unavailable.',
+                       'Detection does not verify that every feature works.')
+    name = support.get('profileName') or 'Generic PC'
+    identity = f" ({support['profileId']})" if support.get('profileId') else ''
+    limits = support.get('limitations', [])
+    limits = [item for item in limits if isinstance(item, str)] if isinstance(limits, list) else []
+    detail = ' '.join([support.get('summary', ''), *limits,
+                       'Detection does not verify that every feature works.'])
+    return finding('suggestion' if support['status'] == 'unsupported' else 'info',
+                   f"{name}{identity}: {support['status']}.", detail,
+                   support=support, release=inventory.get('release', {}), nixpkgs=inventory.get('nixpkgs', {}))
+
+
 def probes(scrub):
     return {'graphics': check_graphics, 'drivers': check_drivers, 'firmware-files': check_firmware_files,
             'services': check_services, 'audio': check_audio, 'secure-boot': check_secure_boot,
             'firmware-updates': check_firmware_updates, 'storage': check_storage, 'battery': check_battery,
-            'time': check_time, 'desktop': lambda: check_desktop(scrub), 'laptop': check_laptop}
+            'time': check_time, 'desktop': lambda: check_desktop(scrub), 'laptop': check_laptop,
+            'hardware-support': check_hardware_support}
 
 
 def collect(deadline=DEADLINE):
@@ -884,7 +904,7 @@ def text(report):
     rank = {'problem': 0, 'suggestion': 1}
     for check in sorted(report['checks'], key=lambda check: rank.get(check['state'], 2)):
         lines.append(f"{LABELS[check['state']]:<11} {check['title']}: {check['summary']}")
-        if check['state'] in rank and check['detail']:
+        if (check['state'] in rank or check['id'] == 'hardware-support') and check['detail']:
             lines += textwrap.wrap(check['detail'], 88, initial_indent=' ' * 12, subsequent_indent=' ' * 12)
     lines += ['', report['scope']]
     return '\n'.join(lines) + '\n'
