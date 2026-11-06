@@ -218,6 +218,7 @@ IPC = '''
                 notes: notes ? notes.text : null, back: !!shell.updateItem("updateBack"),
                 close: !!shell.updateItem("updateClose"),
                 failureText: failure ? failure.text : null,
+                newer: (shell.updateItem("updateNewerReleaseDetail") || {text: null}).text,
                 activity: activity ? activity.text : null, elapsed: elapsed ? elapsed.text : null,
                 progress: progress ? progress.Accessible.description : null,
                 buildLog: !!shell.updateItem("updateBuildLog"),
@@ -490,6 +491,29 @@ def main():
             shot('software-update-progress.png')
             session.status(state='idle')
             session.wait(lambda:session.state().get('page')=='available','preparation fixture reset')
+
+            # Preparing again for a newer release did not finish: the
+            # prepared update stays installable and the card says why,
+            # instead of a generic request failure.
+            session.fixture(sources={**sources, 'cybexos':{'state':'available','available':'1.0.2','installed':'1.0.0'}})
+            attempt = {'id':'d'*32,'state':'failed','action':'stage','error':'Release endpoint unreachable.',
+                       'createdAt':time.time()}
+            session.status(state='ready', transaction='a'*32, reviewToken='b'*64, scope='both', changeKind='update',
+                           installedVersion='1.0.0', availableVersion='1.0.1', highlights=HIGHLIGHTS,
+                           changes='hello: 1 → 2', request=attempt,
+                           packageChanges=[{'name':'hello','kind':'updated','before':'1','after':'2'}],
+                           replacement={'state':'failed','version':'1.0.2','scope':'both','requestId':'d'*32,
+                                        'error':'Release endpoint unreachable.'})
+            session.wait(lambda:session.state().get('page')=='ready' and session.state().get('newer'),'kept prepared update')
+            state = session.state()
+            assert state['newer'] == ('It could not be prepared: Release endpoint unreachable. '
+                                      'You can install the update below now.'), state
+            assert state['failure'] == '' and 'Release endpoint' not in state['error'], state
+            assert state['primary'] == {'label':'Install Update','enabled':True,'amber':False}, state
+            shot('software-update-kept-prepared.png')
+            session.fixture(sources=sources)
+            session.status(state='idle')
+            session.wait(lambda:session.state().get('page')=='available','kept prepared update reset')
 
             # Preparation shows the review people read first.
             session.fixture(reject=False)

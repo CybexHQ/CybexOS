@@ -73,6 +73,9 @@ Singleton {
     readonly property bool ready: deployment.state === "ready"
     // A Cybex OS release published after this update was prepared, or "".
     readonly property string newerRelease: sourcesLoaded ? Helpers.newerRelease(deployment, sources) : ""
+    // Preparing again (for that release, or newer packages) did not finish;
+    // the prepared update stays installable. Null otherwise.
+    readonly property var replacement: Helpers.replacement(deployment, newerRelease)
     readonly property bool rebootRecommended: ["awaiting-boot", "awaiting-login"].includes(deployment.state) || Helpers.firmwareRestart(deployment)
     readonly property string rebootRecommendation: deployment.state === "awaiting-login"
         ? "Confirm this boot after signing in. No further restart is needed."
@@ -85,8 +88,9 @@ Singleton {
     readonly property string channel: Helpers.channel(deployment)
     readonly property bool choosingChannel: channelChooser.busy
     // This request's refusal, or the latest worker request's durable failure.
+    // A failed preparation over a prepared update is the review's to show.
     readonly property string requestFailure: requestError
-        || ((deployment.request || {}).state === "failed"
+        || ((deployment.request || {}).state === "failed" && !Helpers.replacementRequest(deployment)
             && !(waitingPackages.length > 0 && deployment.request.action === "stage"
                 && deployment.request.id === deployment.requestId) ? deployment.request.error || "" : "")
     readonly property string page: Helpers.page({statusLoaded: statusLoaded, statusError: statusError,
@@ -99,7 +103,7 @@ Singleton {
     readonly property bool upstreamOnlyAvailable: deployment.state === "failed" && deployment.scope === "both"
         && sourcesLoaded && sources.upstream.state === "available"
     readonly property string error: [...new Set([requestError, statusError, checkError,
-        (deployment.request || {}).error || "", deployment.error || "",
+        Helpers.replacementRequest(deployment) ? "" : (deployment.request || {}).error || "", deployment.error || "",
         sources.error || "", sources.upstream.error || "", sources.cybexos.error || "",
         (sources.firmware || {}).error || "", (deployment.firmware || {}).error || ""].filter(value => value))].join("\n\n")
     readonly property string projectNotes: ready || rebootRecommended ? deployment.notes || "" : sources.cybexos.notes || ""
@@ -184,10 +188,14 @@ Singleton {
         if (!runActive && selectedScope !== "" && ["ready", "stale"].includes(deployment.state)
                 && selectedScope !== deployment.scope) request(["stage", selectedScope]);
     }
-    // Replace a prepared update with one that includes a newer Cybex OS release.
+    // Replace a prepared update with one that includes a newer Cybex OS
+    // release, or try an attempt that did not finish again.
     function prepareAgain() {
-        if (newerRelease !== "" && !runActive)
+        if (runActive) return;
+        if (newerRelease !== "")
             request(["stage", Helpers.scope(sources, [...new Set(selectedSources.concat(["cybexos"]))])]);
+        else if (replacement)
+            request(["stage", replacement.scope]);
     }
     // After a failed combined preview: keep the installed Cybex OS.
     function prepareUpstream() { if (upstreamOnlyAvailable && !runActive) request(["stage", "upstream"]); }
@@ -223,7 +231,8 @@ Singleton {
     function maybePrepare() {
         if (!preparationAllowed || !statusLoaded || !sourcesLoaded || Helpers.firmwareRestart(deployment)
                 || !Helpers.autoPrepare(hasUpdates, automatic, deployment.state, runActive,
-                    waitingPackages.length > 0 && deployment.changeKind === "update")) return;
+                    waitingPackages.length > 0 && deployment.changeKind === "update",
+                    Helpers.preparedUpdate(deployment))) return;
         const target = Helpers.targetKey(sources, installedIdentity);
         if (target === preparedTarget) return;
         preparedTarget = target;

@@ -129,11 +129,13 @@ Item {
             }
 
             // A Cybex OS release published after this update was prepared.
-            // Installing the prepared update stays possible; nothing is
-            // replaced until the person prepares again.
+            // Background preparation usually prepares again by itself, so
+            // the updates install together. Installing the prepared update
+            // stays possible; it is replaced only once the new one is ready,
+            // and an attempt that did not finish says why here.
             Rectangle {
                 objectName: "updateNewerRelease"
-                visible: root.service.newerRelease !== ""
+                visible: root.service.newerRelease !== "" || root.service.replacement !== null
                 width: parent.width
                 height: Math.max(newer.implicitHeight, prepareAgain.height) + Theme.scaled(24)
                 radius: Theme.chipRadius + 3
@@ -148,7 +150,8 @@ Item {
                     spacing: Theme.scaled(2)
                     Text {
                         width: parent.width
-                        text: I18n.format("Cybex OS %1 is available", [root.service.newerRelease])
+                        text: root.service.newerRelease !== "" ? I18n.format("Cybex OS %1 is available", [root.service.newerRelease])
+                            : I18n.tr("Newer NixOS packages are available")
                         color: Theme.textHi
                         font.family: Theme.fontMenu
                         font.pixelSize: Theme.typography.primary
@@ -157,12 +160,22 @@ Item {
                         textFormat: Text.PlainText
                     }
                     Text {
+                        objectName: "updateNewerReleaseDetail"
                         width: parent.width
-                        text: I18n.tr("It was released after this update was prepared. Prepare again to include it.")
+                        text: {
+                            const attempt = root.service.replacement;
+                            if (attempt && attempt.state === "waiting")
+                                return I18n.tr("It waits for NixOS to finish building packages it needs. You can install the update below now.");
+                            if (attempt)
+                                return I18n.format("It could not be prepared: %1 You can install the update below now.", [attempt.error]);
+                            return I18n.tr("It was released after this update was prepared. Prepare again to include it.");
+                        }
                         color: Theme.textDim
                         font.family: Theme.fontMenu
                         font.pixelSize: Theme.typography.secondary
                         wrapMode: Text.Wrap
+                        maximumLineCount: 4
+                        elide: Text.ElideRight
                         textFormat: Text.PlainText
                     }
                 }

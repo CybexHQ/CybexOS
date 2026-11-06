@@ -86,7 +86,9 @@ page then lists what people recognise first:
   components, and the review still works.
 - **Apps**: installed packages with a visible `.desktop` entry, by their own
   name and icon.
-- Release notes of a new Cybex OS version.
+- Release notes of a new Cybex OS version. One update installs the
+  channel's newest release, so it also brings every release this machine
+  skipped; their notes come along (see [combined updates](#combined-updates)).
 - A count of the remaining background components. Opening it shows programs
   without a window, the net size change, the exact `nix store diff-closures`
   output, the build log, update history, the source choice and **Discard
@@ -154,9 +156,46 @@ connections. It submits an ordinary supervised `stage` request only when the
 updater is idle or done and an update is available. It prepares each target
 (personal configuration digest plus available source identities) once:
 discarded or installed targets are not prepared again, and a failure of its own
-is retried for a new target or after a day. Ready, stale, restarting,
-recovering and failed changes belong to the person, so it leaves them alone.
-Installing a prepared update still requires authorization.
+is retried for a new target or after a day. A prepared update that a newer
+set would supersede is prepared again ([combined updates](#combined-updates)).
+Other ready, stale, restarting, recovering and failed changes belong to the
+person, so it leaves them alone. Installing a prepared update still requires
+authorization.
+
+### Combined updates
+
+Updates arrive together, not one restart each. Discovery offers only the
+channel's newest Cybex OS release, and one preparation combines it with the
+newest NixOS packages and available device firmware. A machine on 1.0.18
+with 1.0.19, 1.0.20 and 1.0.21 published installs 1.0.21 once.
+
+Its notes cover every release it includes. `cybex update check` and the
+prepared update carry `releases`, newest first, and `notes`, which are then
+the newest release's own notes, a line naming the releases it also includes,
+and each skipped release's notes under **From Cybex OS VERSION**, the shape
+`release/promote` gives stable notes. The oldest sections are left out when
+the whole would exceed 100,000 characters. A single release keeps its notes
+unchanged.
+
+A prepared update waiting for review is prepared again when something newer
+would replace it: at once for a newer Cybex OS release, and for newer NixOS
+packages alone only once it is three days old, since nixos-unstable moves
+every day or two and a review rebuilt for each snapshot would never settle.
+A preview background preparation made takes in every available source. One
+the person prepared keeps its sources: an update of NixOS packages alone is
+not given a release they left out. Personal Software, configuration and
+cleanup previews, and firmware-only updates, are never prepared again.
+
+The prepared update stays installable until the new one has built and passed
+its checks; only then does it replace it. While the new one prepares, Software
+Update shows its progress (one request runs at a time). When it does not
+finish, the status returns to the prepared update with a `replacement` record
+(`scope`, `version`, `state` `failed` or `waiting`, `error`, `notPrebuilt`,
+`requestId`), the request still fails with its error, and the review's
+**Cybex OS VERSION is available** card says why and that the update below can
+be installed now. Background preparation tries the same newer set again after
+a day, or straight away when the set changes. A worker killed mid-way is
+reported as interrupted, as any preparation is; prepare again.
 
 **Automatic confirmation** is `cybexos-update-confirm.service`. Twenty seconds
 after the signed-in shell sees a trial boot awaiting login, it starts the unit,

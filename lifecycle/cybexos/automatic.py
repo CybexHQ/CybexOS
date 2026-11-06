@@ -14,12 +14,22 @@ import time
 
 from .common import Failure, atomic, read
 from . import prebuilt
+from .trust import version
 
 POLICY = 'update-automatic.json'
 LAST_RUN = 'update-automatic-run.json'
 DEFAULTS = {'prepare': True, 'confirm': True}
 # A failed automatic preparation of the same target is retried at most daily.
 RETRY_SECONDS = 24 * 3600
+# A prepared update is prepared again for newer NixOS packages alone only
+# once it is this old: nixos-unstable moves every day or two, and a review
+# that is rebuilt for each snapshot never settles. A new Cybex OS release
+# replaces it straight away.
+OUTDATED_SECONDS = 3 * 24 * 3600
+# The requests background preparation submitted, newest last; their previews
+# may take in every available source, the person's own keep their sources.
+REMEMBERED = 8
+SOURCES = {'upstream': ('upstream',), 'cybexos': ('cybexos',), 'both': ('upstream', 'cybexos')}
 
 
 def policy(state=Path('/var/lib/cybexos')):
@@ -65,8 +75,43 @@ def target(config, discovery):
     return scope, identity
 
 
+def later(available, prepared):
+    try:
+        return version(available) > version(prepared)
+    except Failure:
+        return False
+
+
+def refresh(current, discovery, automatic, now):
+    """The discovery a prepared update is prepared again for, or None.
+
+    A newer Cybex OS release replaces the prepared update; newer NixOS
+    packages alone do once it is OUTDATED_SECONDS old. A preview the person
+    prepared keeps its sources (they may have left one out); one background
+    preparation made takes in every available source.
+    """
+    wanted = (('upstream', 'cybexos') if current.get('requestId') in automatic
+              else SOURCES.get(current.get('scope'), ()))
+    vendor, upstream = discovery.get('cybexos') or {}, discovery.get('upstream') or {}
+    release = ('cybexos' in wanted and vendor.get('state') == 'available'
+               and later(vendor.get('available'), current.get('availableVersion')))
+    prepared_at = current.get('finishedAt') or current.get('updatedAt') or now
+    packages = ('upstream' in wanted and upstream.get('state') == 'available'
+                and upstream.get('available') != ((current.get('inputs') or {}).get('nixpkgs') or {}).get('rev')
+                and now - prepared_at >= OUTDATED_SECONDS)
+    if not (release or packages):
+        return None
+    return discovery | {name: (discovery.get(name) or {}) | {'state': 'left-out'}
+                        for name in ('upstream', 'cybexos') if name not in wanted}
+
+
 def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=metered, now=time.time):
-    """Submit one preparation per available target; never repeat a reviewed one."""
+    """Submit one preparation per available target; never repeat a reviewed one.
+
+    A prepared update is prepared again when a newer release (or, after a
+    while, newer packages) would supersede it, so updates arrive together
+    instead of one restart each. It stays installable until the new one is.
+    """
     state = engine.state
     if not policy(state)['prepare']:
         return {'skipped': 'disabled'}
@@ -77,9 +122,11 @@ def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=me
     own_failure = (current.get('state') in ('failed', 'interrupted') and last.get('requestId')
                    and current.get('requestId') == last.get('requestId'))
     held = bool(prebuilt.waiting_packages(current)) and current.get('changeKind') == 'update'
+    prepared = (current.get('state') == 'ready' and current.get('changeKind') == 'update'
+                and current.get('scope') in SOURCES)
     # Anything else in progress, awaiting review/restart or needing attention
     # belongs to the person. Their own failures are dismissed in the app.
-    if current.get('state', 'idle') not in ('idle', 'done') and not own_failure and not held:
+    if current.get('state', 'idle') not in ('idle', 'done') and not own_failure and not held and not prepared:
         return {'skipped': current.get('state')}
     if (current.get('request') or {}).get('state') in ('queued', 'running', 'unknown'):
         return {'skipped': 'request'}
@@ -87,9 +134,19 @@ def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=me
         return {'skipped': 'metered'}
     discovery = (discover or engine.check)()
     configuration = config_digest(engine.working)
+    if prepared:
+        discovery = refresh(current, discovery, submitted(last), now())
+        if discovery is None:
+            return {'skipped': 'ready'}
     scope, identity = target(configuration, discovery)
     if not scope:
         return {'skipped': 'current'}
+    if prepared:
+        # Preparing again failed and left the prepared update in place:
+        # the same newer set is tried again at most daily.
+        if last.get('target') == identity and now() - last.get('at', 0) < RETRY_SECONDS:
+            return {'skipped': 'prepared'}
+        return submit(state, enqueue, last, scope, identity, now)
     # An unavailable package is safe to check again without dismissing the
     # result. Retry changed sources/configuration promptly, the same candidate
     # at most daily, including a hold first encountered by a manual request.
@@ -99,9 +156,20 @@ def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=me
             return {'skipped': 'waiting'}
     if last.get('target') == identity and not ((own_failure or held) and now() - last.get('at', 0) >= RETRY_SECONDS):
         return {'skipped': 'prepared'}
+    return submit(state, enqueue, last, scope, identity, now)
+
+
+def submitted(last):
+    """Requests background preparation submitted; a record from before the list names one."""
+    values = last.get('requests') if isinstance(last.get('requests'), list) else [last.get('requestId')]
+    return [value for value in values if isinstance(value, str) and value]
+
+
+def submit(state, enqueue, last, scope, identity, now):
     accepted = enqueue(state, 'stage', [scope])
+    requests = submitted(last)[-(REMEMBERED - 1):]
     atomic(state / LAST_RUN, {'target': identity, 'scope': scope, 'requestId': accepted['requestId'],
-                              'at': now()}, 0o644)
+                              'requests': requests + [accepted['requestId']], 'at': now()}, 0o644)
     return accepted | {'scope': scope}
 
 

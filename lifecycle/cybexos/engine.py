@@ -194,7 +194,8 @@ class Engine:
         previous = read(self.status_path, {})
         now = time.time()
         if 'transaction' in values and values['transaction'] != previous.get('transaction'):
-            previous = {'schema': 1, 'startedAt': now, 'phase': '', 'error': '', 'notes': '',
+            previous = {'schema': 1, 'startedAt': now, 'phase': '', 'error': '', 'notes': '', 'releases': [],
+                        'replacement': None,
                         'changes': '', 'packageChanges': [], 'highlights': None, 'reviewToken': None, 'inputs': {},
                         'recovery': '', 'retry': '', 'restart': '', 'requestId': None,
                         'workerUnit': None, 'software': None, 'firmware': None, 'notPrebuilt': None,
@@ -344,7 +345,8 @@ class Engine:
             candidate = self.channel()
             result['cybexos'] = {'state': 'available' if version(candidate['version']) > version(read(self.release)['version']) else 'current',
                                 'installed': read(self.release)['version'], 'available': candidate['version'],
-                                'revision': candidate['revision'], 'notes': candidate['notes']}
+                                'revision': candidate['revision'], 'notes': candidate['notes'],
+                                'releases': candidate.get('releases', [])}
         except AheadOfChannel as error:
             # Not an error: the next release on this channel will be offered.
             result['cybexos'] = {'state': 'ahead', 'installed': error.installed, 'available': error.newest}
@@ -395,6 +397,11 @@ class Engine:
             tx = self.tx(identifier)
             tx.mkdir(mode=0o700)
             kind = 'software' if software is not None else 'maintenance' if maintenance is not None else 'region' if region is not None else 'update' if scope != 'local' else 'configuration'
+            # Preparing an update again replaces the prepared one only once
+            # the new one is ready; until then that one stays installable.
+            previous = read(self.status_path, {})
+            replacing = kind == 'update' and scope != 'firmware' and self.replaceable(previous)
+            candidate = None
             self.status(transaction=identifier, state='discovering', scope=scope, error='', progress=None,
                         phase='Checking selected sources and preparing your configuration',
                         changeKind=kind, requestId=request_id, software=None)
@@ -523,6 +530,7 @@ class Engine:
                             reviewToken=record['reviewToken'], inputs=record['inputs'],
                             installedVersion=read(self.release)['version'], availableVersion=candidate['version'] if candidate else read(self.release)['version'],
                             notes=candidate['notes'] if candidate else '', software=selections,
+                            releases=candidate.get('releases', []) if candidate else [],
                             sessionRestarts=session, desktopRestart=review.session_notice(session),
                             restart='Reboot may be required; no reboot is automatic.')
                 # A failed preview must not spend explicit retry permission.
@@ -530,6 +538,9 @@ class Engine:
                     authorization.unlink(missing_ok=True)
                 return record
             except NotPrebuilt as error:
+                if replacing:
+                    self.keep_prepared(previous, scope, request_id, candidate, error, error.names)
+                    raise
                 self.status(state='failed', error=str(error), notPrebuilt=error.names,
                             phase='Waiting for NixOS to finish building this change' if kind == 'update'
                                 else 'Staging failed; working system retained',
@@ -537,11 +548,39 @@ class Engine:
                                 else 'Correct the failure and prepare this change again.')
                 raise
             except BaseException as error:
+                if replacing:
+                    self.keep_prepared(previous, scope, request_id, candidate, error)
+                    raise
                 self.status(state='failed', phase='Staging failed; working system retained', error=str(error),
                             retry='Stage upstream explicitly to retain the installed Cybex OS version.' if scope == 'both' else 'Correct the failure and stage again.')
                 raise
             finally:
                 self.run.log = None
+
+    def replaceable(self, status):
+        """A prepared, unapplied update of Nixpkgs and/or Cybex OS (operation lock held)."""
+        transaction = status.get('transaction')
+        if (status.get('state') != 'ready' or status.get('changeKind') != 'update'
+                or status.get('scope') not in ('upstream', 'cybexos', 'both')
+                or not isinstance(transaction, str) or self.pending_path.exists()):
+            return False
+        try:
+            return (read(self.tx(transaction) / 'deployment.json', {}) or {}).get('reviewToken') == status.get('reviewToken')
+        except Failure:
+            return False
+
+    def keep_prepared(self, previous, scope, request_id, candidate, error, names=None):
+        """Preparing again failed: the update it would have replaced stays ready.
+
+        The attempt is recorded beside it, so the review can say why the newer
+        set is not ready yet; the request still fails with its error. The
+        attempt's transaction and log stay for inspection.
+        """
+        now = time.time()
+        attempt = {'scope': scope, 'requestId': request_id, 'state': 'waiting' if names else 'failed',
+                   'version': candidate['version'] if candidate else None,
+                   'error': str(error) or 'Preparation stopped.', 'notPrebuilt': names, 'finishedAt': now}
+        atomic(self.status_path, previous | {'replacement': attempt, 'updatedAt': now}, 0o644)
 
     def require_prebuilt(self, config, *, kernel_only=False):
         """Refuse a candidate that would compile Nixpkgs packages here.

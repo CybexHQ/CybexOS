@@ -362,9 +362,42 @@ function targetKey(sources, installedIdentity) {
         ((sources || {}).firmware || {}).devices || []]);
 }
 
-function autoPrepare(hasUpdates, automatic, state, busy, waitingForPackages) {
+// A prepared update counts too: a newer release prepares it again, so the
+// updates arrive together (lifecycle/cybexos/automatic.py decides).
+function autoPrepare(hasUpdates, automatic, state, busy, waitingForPackages, preparedUpdate) {
     return hasUpdates && !!(automatic || {}).prepare && !busy
-        && (["idle", "done"].includes(state || "idle") || (state === "failed" && waitingForPackages === true));
+        && (["idle", "done"].includes(state || "idle") || (state === "failed" && waitingForPackages === true)
+            || (state === "ready" && preparedUpdate === true));
+}
+
+// A prepared update of NixOS packages and/or Cybex OS, which preparing
+// again replaces once the new one is ready.
+function preparedUpdate(deployment) {
+    const value = deployment || {};
+    return value.state === "ready" && value.changeKind === "update"
+        && ["upstream", "cybexos", "both"].includes(value.scope);
+}
+
+// Preparing a prepared update again did not finish, so it stays installable.
+// The attempt as the review shows it, or null: its own release when a newer
+// one is offered, or a packages-only attempt, never an older release's.
+function replacement(deployment, newer) {
+    const value = deployment || {};
+    const attempt = value.replacement;
+    if (!preparedUpdate(value) || !attempt || !["failed", "waiting"].includes(attempt.state))
+        return null;
+    const version = typeof attempt.version === "string" ? attempt.version : "";
+    if (newer ? version !== newer : version !== "" && version !== value.availableVersion)
+        return null;
+    return { state: attempt.state, error: String(attempt.error || ""), version: version,
+        scope: ["upstream", "cybexos", "both"].includes(attempt.scope) ? attempt.scope : value.scope };
+}
+
+// The failed request that prepared again; the review reports it instead.
+function replacementRequest(deployment) {
+    const value = deployment || {};
+    const attempt = value.replacement || {};
+    return !!attempt.requestId && attempt.requestId === (value.request || {}).id && preparedUpdate(value);
 }
 
 // Optional worker telemetry. Old workers and malformed counters retain a
@@ -419,6 +452,6 @@ if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
     overviewVisible, indicator, waitingPackages, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease,
-    summary, noteItems, sizeChange, targetKey, autoPrepare, PREPARATION_LABELS, preparation, elapsed, downloadSize,
+    summary, noteItems, sizeChange, targetKey, autoPrepare, preparedUpdate, replacement, replacementRequest, PREPARATION_LABELS, preparation, elapsed, downloadSize,
     clockFormat
 };
