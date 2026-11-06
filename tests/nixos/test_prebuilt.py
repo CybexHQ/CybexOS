@@ -27,6 +27,7 @@ HELLO = store('h', 'hello-2.12.drv')
 VENDOR = store('v', 'spotify-1.2.drv')
 SOURCE = store('s', 'spotify.deb.drv')
 TOOL = store('t', 'patchelf-wrapper.drv')
+KERNEL = store('k', 'linux-7.3.drv')
 
 
 def node(*inputs, **env):
@@ -81,6 +82,29 @@ class Parsing(unittest.TestCase):
 
 
 class Classification(unittest.TestCase):
+    def test_kernel_cannot_hide_behind_expected_builds_or_local_flags(self):
+        for env in ({'pname': 'linux', 'src': 'source'},
+                    {'pname': 'linux', 'preferLocalBuild': '1'},
+                    {'pname': 'linux', 'allowSubstitutes': ''},
+                    {'pname': 'renamed-kernel', 'karch': 'x86_64', 'installTargets': ['install', 'modules_install']}):
+            with self.subTest(env=env):
+                # Even an expected external module can depend on a kernel
+                # that the dry run would compile. Scan before pruning it.
+                graph = {ROOT: node(VENDOR), VENDOR: node(KERNEL, src='module'), KERNEL: node(**env)}
+                self.assertEqual(prebuilt.kind(graph[KERNEL]), 'compile')
+                for root in (None, ROOT):
+                    self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=root,
+                                                      expected=[VENDOR, KERNEL]), ['linux-7.3'])
+
+    def test_structured_kernel_is_protected_but_external_modules_stay_allowed(self):
+        kernel = dict(node(), structuredAttrs={'pname': 'linux', 'preferLocalBuild': True})
+        graph = {ROOT: node(KERNEL, VENDOR), KERNEL: kernel, VENDOR: node(src='nvidia-source')}
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT,
+                                          expected=[KERNEL, VENDOR]), ['linux-7.3'])
+        graph.pop(KERNEL)
+        graph[ROOT] = node(VENDOR)
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[VENDOR]), [])
+
     def test_versioned_nix_metadata_cannot_hide_an_uncached_dependency(self):
         # Captured installed Nix format: version 4 wraps the graph, uses
         # store basenames, moves inputDrvs to inputs.drvs, and moves a
@@ -164,7 +188,33 @@ class EngineGuard(unittest.TestCase):
         self.assertIsNone(read(self.engine.status_path)['notPrebuilt'])
         self.assertTrue(record['reviewToken'])
 
-    def test_personal_configuration_previews_are_not_checked(self):
+    def kernel_plan(self):
+        self.plan([HELLO])
+        original = self.engine.run
+        def run(*args, **kwargs):
+            if args[:3] == ('nix', 'derivation', 'show'):
+                return shown({ROOT: node(HELLO), HELLO: node(pname='linux', preferLocalBuild='1')})(*args)
+            return original(*args, **kwargs)
+        run.observer = None
+        run.log = None
+        self.engine.run = run
+
+    def test_kernel_build_is_refused_before_any_build_even_when_expected(self):
+        self.kernel_plan()
+        with self.assertRaises(NotPrebuilt):
+            self.engine.stage('upstream')
+        builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
+        self.assertEqual(builds, [])
+
+    def test_personal_configuration_preview_also_refuses_kernel_compile(self):
+        self.kernel_plan()
+        with self.assertRaisesRegex(NotPrebuilt, 'would compile a Linux kernel'):
+            self.engine.stage('local')
+        builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
+        self.assertEqual(builds, [])
+        self.assertEqual(lifecycle.config_digest(self.config), self.sentinel)
+
+    def test_personal_configuration_previews_keep_other_package_build_choices(self):
         self.plan([])
         self.engine.stage('local')
         self.assertEqual(read(self.engine.status_path)['state'], 'ready')

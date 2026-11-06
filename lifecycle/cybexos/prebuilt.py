@@ -120,11 +120,26 @@ def kind(info):
     if any(isinstance(output, dict) and 'hash' in output for output in (info.get('outputs') or {}).values()):
         return 'fetch'
     attrs = attributes(info)
+    # A Linux build is never configuration or an intentionally local helper,
+    # even if an override adds those flags or removes its source attribute.
+    if kernel_build(info):
+        return 'compile'
     if attrs.get('preferLocalBuild') in (True, '1') or attrs.get('allowSubstitutes') in (False, ''):
         return 'trivial'
     if not any(attrs.get(key) for key in ('src', 'srcs')):
         return 'configuration'
     return 'compile'
+
+
+def kernel_build(info):
+    """Recognize Nixpkgs' kernel recipe, including renamed custom variants.
+
+    External modules use the kernel as an input but do not install a kernel
+    image and its in-tree modules. Keep their ordinary local-build allowance.
+    """
+    attrs = attributes(info)
+    return (attrs.get('pname') == 'linux'
+            or (bool(attrs.get('karch')) and 'modules_install' in (attrs.get('installTargets') or [])))
 
 
 def derivation_graph(data):
@@ -173,7 +188,7 @@ def show(run, derivations):
     return graph
 
 
-def compiles(run, derivations, *, root=None, expected=()):
+def compiles(run, derivations, *, root=None, expected=(), kernel_only=False):
     """Names of real builds that are not expected local builds.
 
     Starting from `root` (when given), descend through trivial and
@@ -181,13 +196,21 @@ def compiles(run, derivations, *, root=None, expected=()):
     expected derivation (Cybex OS's own packages, unfree vendor downloads) or
     a compiled one is covered by it. Without a root every unexpected compile
     counts.
+    `kernel_only` retains personal package build choices on local previews,
+    while still refusing a kernel compile before any build starts.
     """
     pending = set(derivations)
     graph = show(run, sorted(pending))
     expected = set(expected)
-    found = []
+    # Inspect the entire pending plan before pruning expected ancestors. A
+    # kernel needed by e.g. an expected external module still must be cached.
+    kernels = {d for d, info in graph.items() if kernel_build(info)}
+    expected -= kernels
+    found = [name(d) for d in kernels]
+    if kernel_only:
+        return sorted(set(found))
     if root is None:
-        return sorted({name(d) for d, info in graph.items() if d not in expected and kind(info) == 'compile'})
+        return sorted(set(found) | {name(d) for d, info in graph.items() if d not in expected and kind(info) == 'compile'})
     seen, frontier = set(), [root]
     while frontier:
         current = frontier.pop()
