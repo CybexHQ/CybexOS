@@ -27,9 +27,15 @@ UPSTREAM_LOOKUP_TIMEOUT = 'Nix metadata lookup timed out. Check network access a
 
 class NotPrebuilt(Failure):
     """A candidate would compile Nixpkgs packages NixOS has not built yet."""
-    def __init__(self, names):
+    def __init__(self, names, *, kernel=False):
         self.names = list(names)
         shown = ', '.join(self.names[:5]) + (f' and {len(self.names) - 5} more' if len(self.names) > 5 else '')
+        if kernel:
+            super().__init__(f'The candidate would compile a Linux kernel ({shown}). '
+                             'Cybex OS requires stock prebuilt kernels. No build was started; '
+                             'personal declarations and machine locks were kept. '
+                             'Use an unmodified cached Nixpkgs kernel before retrying.')
+            return
         super().__init__(f"NixOS hasn't finished building {len(self.names)} "
                          f"package{'s' if len(self.names) != 1 else ''} in this change yet ({shown}). "
                          'Nothing was changed. Cybex OS installs prebuilt packages only; '
@@ -464,6 +470,10 @@ class Engine:
                     self.status(phase='Checking that every package is prebuilt')
                     self.require_prebuilt(config)
                     self.status(phase='Downloading inputs and building the complete system')
+                else:
+                    self.status(phase='Checking that the Linux kernel is prebuilt')
+                    self.require_prebuilt(config, kernel_only=True)
+                    self.status(phase='Downloading inputs and building the complete system')
                 if region is not None:
                     from .configuration import verify_region
                     verify_region(config, region, self.run)
@@ -530,24 +540,28 @@ class Engine:
             finally:
                 self.run.log = None
 
-    def require_prebuilt(self, config):
+    def require_prebuilt(self, config, *, kernel_only=False):
         """Refuse a candidate that would compile Nixpkgs packages here.
 
         A dry run against this computer's store and configured caches; nothing
         is built. Configuration, fixed-output downloads and the system's
         expected local builds (Cybex OS's own packages, unfree vendor
         downloads, kernel modules, `cybexos.updates.expectedBuilds`) are fine.
+        Personal previews allow other package builds, but never a kernel build.
         """
         build = f'path:{config}#nixosConfigurations.cybexos.config.system.build'
-        root = self.nix('eval', '--raw', '--no-update-lock-file', build + '.toplevel.drvPath').strip()
-        expected = parse(self.nix('eval', '--json', '--no-update-lock-file', build + '.cybexosExpectedBuilds'))
-        if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root) or not isinstance(expected, list)
-                or any(not isinstance(item, str) for item in expected)):
-            raise Failure('The candidate system has no valid build plan.')
+        root, expected = None, []
+        if not kernel_only:
+            root = self.nix('eval', '--raw', '--no-update-lock-file', build + '.toplevel.drvPath').strip()
+            expected = parse(self.nix('eval', '--json', '--no-update-lock-file', build + '.cybexosExpectedBuilds'))
+            if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root) or not isinstance(expected, list)
+                    or any(not isinstance(item, str) for item in expected)):
+                raise Failure('The candidate system has no valid build plan.')
         plan = prebuilt.dry_run(self.run, build + '.toplevel', options=('--no-update-lock-file',))
-        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected) if plan['build'] else []
+        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected,
+                                 kernel_only=kernel_only) if plan['build'] else []
         if found:
-            raise NotPrebuilt(found)
+            raise NotPrebuilt(found, kernel=kernel_only)
 
     def git_metadata_record(self, root):
         key = hashlib.sha256(str(Path(root).resolve()).encode()).hexdigest()

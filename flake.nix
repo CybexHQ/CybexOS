@@ -63,6 +63,11 @@
           inherit nixpkgs pkgs module system inputSources inputNarHashes;
           installer = self.nixosConfigurations.installer.config;
         };
+        kernel-policy = import ./nix/tests/kernel-policy.nix {
+          inherit nixpkgs pkgs module system;
+          installer = self.nixosConfigurations.installer.config;
+          # Catalogue integration: pass approvedProfiles = [ <every approved ID> ];
+        };
         lifecycle = pkgs.runCommand "cybexos-lifecycle-tests" {
           nativeBuildInputs = [
             (pkgs.python3.withPackages (p: [ p.websockets p.pygobject3 p.pillow p.dbus-python p.pexpect ]))
@@ -120,13 +125,13 @@
               cybexos.hardware = { nvidia = true; nvidiaOpen = open; };
             } ];
           }).config; in config.boot.extraModulePackages ++ [ config.hardware.nvidia.package ]) [ true false ]);
-        # Build the complete matched hardware profile: generic product builds
-        # cannot detect camera-module, LPMd or hardware-unit packaging failures.
+        # Build the supported stock configuration. The optional legacy camera
+        # recipe remains available separately; processed capture is unsupported.
         # This remains a source/build check, never physical qualification.
         xps-system = (nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [ module ./nix/tests/machine.nix {
-            cybexos.hardware.xps = { enable = true; sku = "0DB9"; camera = true; };
+            cybexos.hardware.xps = { enable = true; sku = "0DB9"; camera = false; };
           } ];
         }).config.system.build.toplevel;
         vm = import ./nix/tests/lifecycle.nix {
