@@ -1,11 +1,9 @@
-# Cybex OS 1.0.20
+# Cybex OS 1.0.21
 
-Experimental hardware profiles now cover Framework 13 AMD 7040 and ThinkPad T14 Gen 5 AMD, alongside the existing Dell XPS and HP ZBook targets. Fresh installations select reviewed profiles by exact model identity. Existing machines keep their settings and receive guidance when a profile is available.
+Local configuration changes now stop before rebuilding a Linux kernel image, closing an additional path covered by the stock-kernel policy. Personal declarations and machine-owned locks remain unchanged when a change is refused.
 
-The installer and System Check show hardware support status and known limitations. Hardware inventory distinguishes detected profiles from configured settings and reports the running and configured kernel versions separately. A profile match does not mean every device has been physically tested.
+Software now identifies which queued app requires a kernel build. Other apps in the same queue are no longer incorrectly marked as requiring that build.
 
-Every Cybex OS configuration now requires the unmodified stock Nixpkgs kernel. Updates refuse custom kernels and pending kernel compilation while preserving personal configuration and machine-owned locks. Ordinary packaged external modules, including NVIDIA drivers, remain allowed.
+A refused personal change now shows the failure and asks you to correct it. It no longer appears as “Waiting for NixOS packages”; that message remains available for source updates waiting for cached packages.
 
-Fresh XPS installations leave the unsupported built-in camera off and recommend a USB webcam. Existing explicit camera settings remain unchanged; camera capture is still unqualified.
-
-This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package/system builds.
+This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
