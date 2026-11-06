@@ -30,8 +30,8 @@ checklist in [hardware support](hardware-support.md).
 
 The kernel policy compares the final kernel derivation with an unmodified
 import of the machine's selected Nixpkgs source. Matching version text alone
-is insufficient. It covers exact XPS/ZBook options and every non-null
-`cybexos.hardware.profile`. The ZFS extension in `nix/kernel-packages.nix`
+is insufficient. It covers every enabled system and installation medium, including generic
+PCs without a selected profile. The ZFS extension in `nix/kernel-packages.nix`
 changes only the external module set; ordinary packaged NVIDIA and other
 external modules remain allowed. The updater also refuses a pending kernel
 compile, including personal configuration previews and attempts to exempt it

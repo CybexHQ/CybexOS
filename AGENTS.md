@@ -84,7 +84,7 @@ for it. An ISO follows the ISO rules below.
   the tree still follows `nixos-unstable`; moving to 26.11 is the next branch
   change.
 - Hardware support targets non-Apple Intel/AMD x86_64 UEFI PCs only. Every
-  Cybex-supplied hardware profile must retain the exact, unmodified selected
+  enabled Cybex OS system and installation medium must retain the exact, unmodified selected
   Nixpkgs `linuxPackages_latest` kernel derivation. Never obtain hardware
   support through a kernel fork, patch, custom kernel configuration/rebuild,
   alternate package set or package overlay. Stock prebuilt kernels only;

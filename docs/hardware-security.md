@@ -69,7 +69,7 @@ ACL processing. These declarations still require privacy and capture tests.
 Pinned vendor camera sources need requalification at every relevant kernel/HAL
 change and should be removed when Nixpkgs supplies the full processed stack.
 
-Cybex-supplied profiles retain the exact `linuxPackages_latest` kernel from
+All enabled Cybex OS systems and installation media retain the exact `linuxPackages_latest` kernel from
 the selected machine Nixpkgs source, with no Cybex kernel patches, forks,
 custom configuration/rebuilds or package overlays. The evaluation check compares
 derivation identity, including the installer and its installed payload; equal
@@ -84,8 +84,8 @@ expressions or a replacement for module-signing trust.
 The flake's `kernel-policy` check reads every approved profile ID from
 `lifecycle/cybexos/hardware-profiles.json` and evaluates it with the full shared
 module, alongside the default system, installer/payload, existing exact
-XPS/ZBook profiles and NVIDIA choices. The runtime assertion also applies to
-every non-null `cybexos.hardware.profile`. The `hardware-profiles` check tests
+XPS/ZBook profiles and NVIDIA choices. The runtime assertion applies even when no hardware profile is selected,
+including cached or locally present custom kernels. The `hardware-profiles` check tests
 individual settings, personal opt-outs and unchanged power/boot policy.
 
 Hardware-sensitive releases need focused source tests, kernel identity and

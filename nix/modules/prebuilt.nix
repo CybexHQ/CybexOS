@@ -16,8 +16,6 @@ let
     config = { };
     overlays = [ ];
   }).linuxPackages_latest.kernel;
-  suppliedProfile = cfg.hardware.xps.enable || cfg.hardware.zbookUltraG1a.enable
-    || (lib.attrByPath [ "hardware" "profile" ] null cfg != null);
   source = toString ../.. + "/";
   unfree = package: !(lib.all (license: license.free or true) (lib.toList (package.meta.license or [])));
   ours = package: lib.hasPrefix source (package.meta.position or "")
@@ -40,10 +38,10 @@ in {
       This never exempts the Linux kernel from the prebuilt requirement.
     '';
   };
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf (cfg.enable || cfg.installationMedium) {
     assertions = [ {
-      assertion = !suppliedProfile || kernel.drvPath == stockKernel.drvPath;
-      message = "Cybex OS hardware profiles require the unmodified selected Nixpkgs linuxPackages_latest kernel. Kernel patches, custom configuration and package overlays are unsupported; no kernel compilation was started. Personal declarations were not changed.";
+      assertion = kernel.drvPath == stockKernel.drvPath;
+      message = "Cybex OS requires the unmodified selected Nixpkgs linuxPackages_latest kernel. Kernel patches, custom configuration and package overlays are unsupported; no kernel compilation was started. Personal declarations were not changed.";
     } ];
     system.build.cybexosExpectedBuilds = lib.unique
       (map (package: builtins.unsafeDiscardStringContext package.drvPath)
