@@ -1,20 +1,35 @@
-{ lib, brave, fetchurl,
+{ lib, callPackage,
   # Keep the former shortcut flags in the package, so desktop-entry launches,
   # private actions and the selected-browser helper retain camera/IME support.
   commandLineArgs ? "--enable-features=TouchpadOverscrollHistoryNavigation,PipeWireCamera,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --enable-wayland-ime --restore-last-session --hide-crash-restore-bubble"
 }:
-# Reuse the machine Nixpkgs Chromium wrapper, libraries and sandbox policy,
-# with Brave's own desktop and executable names. Nixpkgs (nixos-unstable) now
-# packages brave-origin under Origin's names; adopt it together with the
-# browser defaults and the 1Password host check. Review on every vendor release.
-(brave.override { inherit commandLineArgs; }).overrideAttrs (old: {
+# Nixpkgs no longer packages Brave (NixOS/nixpkgs#582838), so Cybex OS keeps
+# its recipe (make-brave.nix) and builds the official Origin Debian asset with
+# the machine Nixpkgs' libraries. It keeps Brave's desktop and executable
+# names, which the browser defaults and the 1Password host check expect.
+# Follow every Brave stable release: Cybex OS is the browser's only maintainer.
+let
+  version = "1.99.55";
+  brave = callPackage (import ./make-brave.nix {
+    pname = "brave";
+    inherit version;
+    archives.x86_64-linux = {
+      url = "https://github.com/brave/brave-browser/releases/download/v${version}/brave-origin_${version}_amd64.deb";
+      hash = "sha256-YxmkjQ/8IF+FW4wkI/cKy19jtoghTxG7W2EL0xeT/Gs=";
+    };
+    flavor = "browser";
+    optStem = "brave";
+    fileStem = "brave-browser";
+    appIdStem = "com.brave.Browser";
+    darwinStem = "Brave Browser";
+    changelogFile = "CHANGELOG_DESKTOP_ORIGIN.md";
+    homepage = "https://brave.com/origin/";
+    innerBinary = "brave";
+  }) { inherit commandLineArgs; };
+in
+brave.overrideAttrs (old: {
   pname = "brave-origin";
-  version = "1.97.59";
-  src = fetchurl {
-    url = "https://github.com/brave/brave-browser/releases/download/v1.97.59/brave-origin_1.97.59_amd64.deb";
-    sha256 = "a20f953d7a12330bf6b7feaff05744cb83fcfd1fdbf7b621e39dec368775b287";
-  };
-  # Normalize upstream's edition-specific paths for the Nixpkgs recipe.
+  # Normalize upstream's edition-specific paths for the recipe's names.
   postPatch = (old.postPatch or "") + ''
     mv opt/brave.com/brave-origin opt/brave.com/brave
     mv opt/brave.com/brave/brave-origin opt/brave.com/brave/brave-browser

@@ -168,11 +168,16 @@ repository enrollment. Preserve the Chromium sandbox and exact-executable
 AppArmor user-namespace allowance when updating it. Replace the recipe with a
 maintained native Nixpkgs Linux package after runtime qualification.
 
-Brave Origin reuses the selected Nixpkgs Chromium wrapper/libraries and pins the
-official Origin Debian asset. Nixpkgs now has a maintained `brave-origin`
-package with different desktop and executable names; adopt it only together
-with the browser defaults and `checks.x86_64-linux.browser-1password`. Review
-both exact proprietary package pins on every vendor release.
+Nixpkgs removed `brave` and `brave-origin` on 2026-11-03
+([NixOS/nixpkgs#582838](https://github.com/NixOS/nixpkgs/pull/582838)):
+browsers there need a committer among their maintainers. Cybex OS keeps the
+last Nixpkgs recipe in `nix/packages/brave/make-brave.nix` and pins the
+official Origin Debian asset in `nix/packages/brave/default.nix`, built
+against the machine Nixpkgs' libraries. Cybex OS is now the browser's only
+maintainer: follow every Brave stable release (`Release vX.Y.Z` on
+`brave/brave-browser`), checking the asset against its published `.sha256`,
+and keep the recipe evaluating when Nixpkgs renames its inputs. Review both
+exact proprietary package pins on every vendor release.
 They remain part of the explicit proprietary-application choice and require
 installed runtime, security and redistribution qualification.
 

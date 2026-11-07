@@ -31,7 +31,7 @@ in {
       gsettings-desktop-schemas adwaita-icon-theme adw-gtk3 glib
       # The agent CLIs are part of every installation. Claude Code is unfree.
       codex
-    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave-origin.nix {}) spotify chatgptLinux claude-code ]
+    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) spotify chatgptLinux claude-code ]
       ++ lib.optionals cfg.features.assistant [ assistant ]
       ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
       ++ lib.optionals cfg.features.podman [ distrobox podman-compose ]
