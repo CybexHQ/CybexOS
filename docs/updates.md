@@ -337,6 +337,32 @@ holds first encountered manually. Other manual failures and personal Software
 changes still need the person's attention. Personal configuration previews
 (`local`) are not checked.
 
+### When Nixpkgs drops something Cybex OS uses
+
+Nixpkgs sometimes removes or renames a package or option (Brave, on
+2026-11-03). The candidate system then stops evaluating, and an update with a
+new Nixpkgs revision cannot be prepared until Cybex OS no longer depends on it.
+When evaluation of such an update fails, preparation evaluates the same
+candidate again with the installed Nixpkgs (`lifecycle/cybexos/
+compatibility.py`). If that succeeds, the new Nixpkgs is the cause, and Nix's
+error names the module that used what is gone:
+
+- **A Cybex OS module.** The status keeps `incompatible` (origin `cybexos`,
+  the file and Nixpkgs' message) and the phase "Waiting for a Cybex OS release
+  that supports the new Nixpkgs". Software Update shows **Waiting for a Cybex
+  OS update** with that message. This is a hold like the package wait above:
+  background preparation retries it after a day, or at once when a new Cybex
+  OS release or Nixpkgs revision appears, and an already prepared update stays
+  installable.
+- **A personal module** (in `/etc/nixos` or a personal input). The error names
+  the file but not its message, which stays in the private log; status files
+  are readable by every user. The person updates that file.
+- **No module named.** Treated as a hold, like a Cybex OS module.
+
+When the installed Nixpkgs fails as well, the failure is an ordinary one. The
+nixpkgs-canary workflow catches these changes before machines receive them
+([releasing](releasing.md#nixpkgs-canary)).
+
 Two kinds of change become the default generation once activation and its
 health checks pass, without a trial boot or restart:
 

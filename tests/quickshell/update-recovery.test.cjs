@@ -111,6 +111,33 @@ test("a package hold survives reload and suppresses only its exact update candid
         assert.deepEqual(H.waitingPackages({...held, state}), []);
 });
 
+test("a Nixpkgs that no longer works with Cybex OS holds the update like a package wait", () => {
+    const details = {origin: "cybexos", file: "nix/modules/applications.nix",
+        message: "brave has been removed from nixpkgs"};
+    const held = JSON.parse(JSON.stringify({state: "failed", changeKind: "update", incompatible: details,
+        inputs: {nixpkgs: {rev: "nixpkgs-revision"}, cybexos: {rev: "cybexos-revision"}}}));
+    const sources = {upstream: {state: "available", available: "nixpkgs-revision"}, cybexos: {state: "current"}};
+    assert.deepEqual(H.incompatible(held), details);
+    assert.equal(H.held(held), true);
+    assert.deepEqual(H.waitingPackages(held), []);
+    assert.equal(H.holdTarget(held, sources), "same");
+    assert.equal(H.page({...held, statusLoaded: true, sourcesLoaded: true, hasUpdates: true,
+        waitingForPackages: H.held(held), holdTarget: "same"}), "waiting");
+    // A release that may support it is shown and prepared again.
+    const release = {...sources, cybexos: {state: "available", revision: "new-cybexos"}};
+    assert.equal(H.holdTarget(held, release), "changed");
+    assert.equal(H.autoPrepare(true, {prepare: true}, "failed", false, H.held(held), false), true);
+    // A personal module that needs changing is the person's to fix.
+    const personal = {...held, incompatible: {origin: "personal", file: "local/browser.nix"}};
+    assert.equal(H.incompatible(personal), null);
+    assert.equal(H.held(personal), false);
+    assert.equal(H.holdTarget(personal, sources), "");
+    for (const value of [null, "cybexos", {}, {origin: "other"}])
+        assert.equal(H.held({...held, incompatible: value}), false);
+    for (const changeKind of ["configuration", "software", undefined])
+        assert.equal(H.held({...held, changeKind}), false, changeKind);
+});
+
 test("local kernel refusals remain actionable problems after reload", () => {
     const error = "The candidate would compile a Linux kernel (linux-image-7.3). Cybex OS requires stock prebuilt kernels.";
     for (const changeKind of ["configuration", "region", "maintenance", "software", undefined]) {

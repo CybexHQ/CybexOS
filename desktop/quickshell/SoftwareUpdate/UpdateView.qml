@@ -110,6 +110,13 @@ Item {
             return { tone: "accent", busy: false, title: I18n.tr("Updates are available"),
                 body: availableBody() };
         case "waiting":
+            if (service.incompatible)
+                return { tone: "warn", busy: false, title: I18n.tr("Waiting for a Cybex OS update"),
+                    body: I18n.tr("The new NixOS packages no longer work with this version of Cybex OS. Your current system is unchanged.")
+                        + (service.incompatible.message ? "\n" + I18n.format("NixOS: %1", [service.incompatible.message]) : "")
+                        + "\n" + (service.automatic.prepare
+                            ? I18n.tr("Cybex OS prepares the update again once a release supports these packages.")
+                            : I18n.tr("Check again after the next Cybex OS release. Your current system keeps working.")) };
             return { tone: "warn", busy: false, title: I18n.tr("Waiting for NixOS packages"),
                 body: I18n.tr("Some packages for this update aren't available from NixOS yet. Your current system is unchanged.")
                     + "\n" + I18n.format("Waiting for: %1", [service.waitingPackages.join(", ")])

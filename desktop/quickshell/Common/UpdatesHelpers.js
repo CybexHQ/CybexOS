@@ -90,10 +90,26 @@ function waitingPackages(deployment) {
         && names.every(name => typeof name === "string" && name.trim() !== "") ? names : [];
 }
 
+// A Nixpkgs that no longer works with this Cybex OS (lifecycle/cybexos/
+// compatibility.py): the update waits for a supporting release. Its details
+// (origin, file, Nixpkgs' message) are safe to show. A personal module that
+// needs changing is an ordinary failure, not a hold. Null otherwise.
+function incompatible(deployment) {
+    const value = deployment || {};
+    const details = value.incompatible;
+    return value.state === "failed" && value.changeKind === "update" && !!details
+        && typeof details === "object" && ["cybexos", "unknown"].includes(details.origin) ? details : null;
+}
+
+// Waiting for NixOS's cache or for a Cybex OS release, not for the person.
+function held(deployment) {
+    return waitingPackages(deployment).length > 0 || incompatible(deployment) !== null;
+}
+
 // Same rules as lifecycle/cybexos/prebuilt.py: unknown identities never hide
 // a notification, and a new source or firmware candidate remains discoverable.
 function holdTarget(deployment, sources) {
-    if (!waitingPackages(deployment).length) return "";
+    if (!held(deployment)) return "";
     const available = sources || {};
     if ((available.firmware || {}).state === "available") return "changed";
     const selected = deployment.inputs || {};
@@ -450,7 +466,7 @@ function clockFormat(clock24) {
 
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
-    overviewVisible, indicator, waitingPackages, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
+    overviewVisible, indicator, waitingPackages, incompatible, held, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease,
     summary, noteItems, sizeChange, targetKey, autoPrepare, preparedUpdate, replacement, replacementRequest, PREPARATION_LABELS, preparation, elapsed, downloadSize,
     clockFormat
