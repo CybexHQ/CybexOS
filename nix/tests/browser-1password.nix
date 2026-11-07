@@ -121,7 +121,10 @@ in pkgs.testers.runNixOSTest {
     machine.start()
     machine.wait_for_unit("display-manager.service")
     uid = machine.succeed("id -u tester").strip()
-    session = f"XDG_RUNTIME_DIR=/run/user/{uid} HOME=/home/tester DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus"
+    # The software-rendered shell can take more than the interactive 2 s
+    # IPC limit to open the full-screen guide; allow it a minute here.
+    session = (f"XDG_RUNTIME_DIR=/run/user/{uid} HOME=/home/tester DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus"
+               " CYBEXOS_IPC_TIMEOUT=60")
 
     def user(command):
         return machine.succeed(f"runuser -u tester -- env {session} {command}")

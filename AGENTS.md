@@ -62,6 +62,14 @@ for it. An ISO follows the ISO rules below.
   Publishing with `--stable` and promoting each need the owner's explicit
   decision.
 - Never fix stable from a maintenance branch: fix forward on `main`.
+- The vendor-updates workflow publishes to beta on its own: a verified Brave
+  Origin update (owner's decision, 2026-11-07; see
+  [docs/releasing.md](docs/releasing.md#automatic-vendor-updates)). It pushes
+  `Update … to …` and `Prepare Cybex OS X.Y.Z release` commits to `main` as
+  github-actions[bot], so fetch before branching and before choosing a version.
+  Don't widen what it updates or publishes without the owner.
+- An open `nixpkgs-canary` issue means machines' next Nixpkgs update will fail
+  to evaluate: fix it on `main` and release it before the channel moves on.
 
 ## NixOS installation and lifecycle contract
 
@@ -123,7 +131,8 @@ for it. An ISO follows the ISO rules below.
   qualification. Test ISO/source parity and use the exact same source identity
   for release artifacts and qualification. Record what was actually exercised.
 - Do not modify the running workstation, partition existing systems, publish
-  releases other than a direct instruction's beta release, or reboot the
+  releases other than a direct instruction's beta release (or the
+  vendor-updates workflow's), or reboot the
   host without explicit authorization. Use isolated
   build/test environments and preserve unrelated work.
 
@@ -148,7 +157,7 @@ for it. An ISO follows the ISO rules below.
   version (`1.0.0` from 2026-10-31, after `1.0.0-beta.34`). Each new ISO takes
   the next version. Before freezing its source, increment the patch number in
   `VERSION` (for example `1.0.0` to `1.0.1`) past the highest version in
-  `VERSION` and `/data/pxe/iso`, so the boot menu, release metadata and file
+  `VERSION`, the `v*` tags and `/data/pxe/iso`, so the boot menu, release metadata and file
   name agree. `VERSION` is the only file to change; test fixtures pin their
   own versions. Change the major or minor number only by a deliberate release
   decision. Serve the build's ISO as `cybexos-<VERSION>.iso` with

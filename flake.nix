@@ -45,6 +45,8 @@
         xps-camera = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).sensor;
         xps-psys = (pkgs.callPackage ./nix/packages/ipu7.nix { inherit (pkgs.linuxPackages_latest) kernel kernelModuleMakeFlags; }).psys;
         t3-code = pkgs.callPackage ./nix/packages/t3-code.nix {};
+        # Built by the vendor-updates workflow before it releases a Brave update.
+        brave-origin = pkgs.callPackage ./nix/packages/brave {};
         titlebars = pkgs.callPackage ./nix/packages/titlebars.nix {};
         iso = self.nixosConfigurations.installer.config.system.build.isoImage;
         default = desktop;

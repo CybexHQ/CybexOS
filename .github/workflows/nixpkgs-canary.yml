@@ -1,0 +1,69 @@
+name: Nixpkgs canary
+
+# Early warning for Nixpkgs changes that would break machines' next update:
+# evaluates main and the newest beta and stable releases against the
+# nixos-unstable channel head, Nixpkgs master (days ahead of the channel) and
+# the next stable branch once it exists (scripts/nixpkgs-canary). A failure or
+# a new evaluation warning keeps a "nixpkgs-canary" issue open. Evaluation
+# only: nothing is built, released or changed.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nixpkgs-canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # actions/checkout v4.4.0, as in the repository's other workflows.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+      # cachix/install-nix-action, as in the repository's other workflows.
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
+
+      - name: Evaluate against upcoming Nixpkgs
+        id: canary
+        run: |
+          set +e
+          python3 -I -B scripts/nixpkgs-canary --report "$RUNNER_TEMP/canary"
+          status=$?
+          cat "$RUNNER_TEMP/canary/report.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null
+          echo "result=$(cat "$RUNNER_TEMP/canary/status" 2>/dev/null || echo failed)" >> "$GITHUB_OUTPUT"
+          exit $status
+
+      - name: Report the result
+        if: always()
+        run: |
+          result="${{ steps.canary.outputs.result }}"
+          if [ "$result" = ok ]; then
+            python3 -I -B scripts/github-issue close --label nixpkgs-canary \
+              --comment "Every source evaluates against the upcoming Nixpkgs again."
+            exit 0
+          fi
+          {
+            if [ "$result" = warnings ]; then
+              echo "Cybex OS still evaluates against the upcoming Nixpkgs, with new evaluation warnings. They usually announce a removal or rename; fix it before it becomes an error."
+            else
+              echo "Cybex OS no longer evaluates against an upcoming Nixpkgs revision. Machines that take that revision would fail to prepare updates until a Cybex OS release fixes it."
+            fi
+            echo
+            cat "$RUNNER_TEMP/canary/report.md" 2>/dev/null || echo "The canary did not finish."
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/issue.md"
+          title="Nixpkgs canary: Cybex OS fails to evaluate with upcoming Nixpkgs"
+          [ "$result" = warnings ] && title="Nixpkgs canary: new evaluation warnings"
+          python3 -I -B scripts/github-issue open --label nixpkgs-canary --title "$title" --body-file "$RUNNER_TEMP/issue.md"

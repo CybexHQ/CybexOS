@@ -26,6 +26,20 @@ def waiting_packages(status):
     return names
 
 
+def incompatible(status):
+    """An update waiting for a Cybex OS release that supports its Nixpkgs."""
+    value = status.get('incompatible')
+    if (status.get('state') != 'failed' or status.get('changeKind') != 'update' or not isinstance(value, dict)
+            or value.get('origin') not in ('cybexos', 'unknown')):
+        return None
+    return value
+
+
+def held(status):
+    """Waiting for NixOS's cache or for a Cybex OS release, not for the person."""
+    return bool(waiting_packages(status)) or incompatible(status) is not None
+
+
 def hold_target(status, sources):
     """Whether discovery names the held candidate, a changed one, or is unknown.
 
@@ -33,7 +47,7 @@ def hold_target(status, sources):
     early automatic retry. Older status records without identities remain
     waiting, without guessing which revisions they checked.
     """
-    if not waiting_packages(status):
+    if not held(status):
         return ''
     if (sources.get('firmware') or {}).get('state') == 'available':
         return 'changed'

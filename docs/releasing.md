@@ -118,6 +118,48 @@ Development commits may be pushed directly to `main`. To publish a release:
    ([combined updates](updates.md#combined-updates)), so a beta release's
    notes need cover only that release.
 
+### Automatic vendor updates
+
+Packages Nixpkgs maintains update with each machine's Nixpkgs. The vendor
+downloads Cybex OS pins itself only move when this repository does, so
+`scripts/vendor-pins` lists them and compares each with its upstream release.
+The **vendor-updates** workflow (`.github/workflows/vendor-updates.yml`) runs it
+daily on a GitHub-hosted runner:
+
+- **Brave Origin** is updated automatically. When Brave publishes a newer
+  stable release, the workflow rewrites `nix/packages/brave/release.json`
+  (accepting the package only when GitHub's digest and Brave's published
+  `.sha256` agree), builds the package, runs `nix flake check --no-build`,
+  `tests/run` and `checks.x86_64-linux.browser-1password`, then
+  `release/automatic`: it commits the pin, takes the next patch version past
+  `VERSION` and the tags, writes the release notes, pushes `main` and runs
+  `release/publish`. The release reaches beta only; promoting it stays a
+  person's decision. A failed run releases nothing and keeps a
+  `vendor-updates` issue open.
+- **T3 Code, Intel LPMd and Omawrite** are reported, not updated: each needs a
+  review beyond its checksum (T3 Code's connected-widget bar API, for
+  example). While one is behind upstream, a `vendor-pins-behind` issue lists it.
+- The XPS IPU7 camera recipe is never compared or updated automatically.
+
+Run it with **Run workflow** to publish an available update at once, or with
+`rehearse` to run every check with the current pins without publishing.
+`scripts/vendor-pins status` shows the same comparison locally.
+
+### Nixpkgs canary
+
+Machines follow `nixos-unstable` themselves, so a Nixpkgs change that breaks
+Cybex OS reaches them without a Cybex OS release. The **nixpkgs-canary**
+workflow (`scripts/nixpkgs-canary`) evaluates `main` and the newest beta and
+stable releases daily against the channel head, Nixpkgs master (which leads
+the channel by days) and the next stable branch once it exists. It evaluates
+the `product`, `system`, `xps-system` and `nvidia-evaluation` checks without
+building anything. An evaluation failure, or a new evaluation warning (usually
+the notice before a removal), keeps a `nixpkgs-canary` issue open with the
+error and the module that caused it; the issue closes once every source
+evaluates again. Fix it on `main` and release before the channel moves on.
+Machines that receive the change first wait for that release
+([updates](updates.md#when-nixpkgs-drops-something-cybex-os-uses)).
+
 Fix forward on `main`: there are no maintenance branches. When stable needs a
 fix while beta carries changes that are not ready, revert those on `main` or
 publish the fix as the next version and promote it at once. A fix built on an
@@ -161,23 +203,21 @@ client the connected widget was reviewed with; Nixpkgs' `t3code` is the 0.1.2
 release. Replace that source recipe with the maintained Nixpkgs package after
 product runtime qualification; its successful wrapper build is not desktop
 validation.
-Nixpkgs now also packages ChatGPT for x86_64 Linux; it is not adopted yet. The
-Linux recipe pins OpenAI's versioned Debian pool object and SHA-256, reviewed against the signed
-OpenAI repository metadata; it executes no distribution maintainer scripts or
-repository enrollment. Preserve the Chromium sandbox and exact-executable
-AppArmor user-namespace allowance when updating it. Replace the recipe with a
-maintained native Nixpkgs Linux package after runtime qualification.
+ChatGPT is Nixpkgs' maintained `chatgpt` package, so it updates with the
+machine Nixpkgs rather than with a Cybex OS release. Cybex OS adds only the
+exact-executable AppArmor user-namespace allowance for its Chromium sandbox
+(`lib/chatgpt/ChatGPT`) and the package's cache cleanup rule; keep both if
+Nixpkgs moves the executable.
 
 Nixpkgs removed `brave` and `brave-origin` on 2026-11-03
 ([NixOS/nixpkgs#582838](https://github.com/NixOS/nixpkgs/pull/582838)):
 browsers there need a committer among their maintainers. Cybex OS keeps the
 last Nixpkgs recipe in `nix/packages/brave/make-brave.nix` and pins the
-official Origin Debian asset in `nix/packages/brave/default.nix`, built
+official Origin Debian asset in `nix/packages/brave/release.json`, built
 against the machine Nixpkgs' libraries. Cybex OS is now the browser's only
-maintainer: follow every Brave stable release (`Release vX.Y.Z` on
-`brave/brave-browser`), checking the asset against its published `.sha256`,
-and keep the recipe evaluating when Nixpkgs renames its inputs. Review both
-exact proprietary package pins on every vendor release.
+maintainer: the vendor-updates workflow follows every Brave stable release
+([automatic vendor updates](#automatic-vendor-updates)), and the Nixpkgs
+canary shows when the recipe needs changing for a Nixpkgs rename.
 They remain part of the explicit proprietary-application choice and require
 installed runtime, security and redistribution qualification.
 

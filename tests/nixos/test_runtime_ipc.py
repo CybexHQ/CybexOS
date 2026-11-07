@@ -36,6 +36,9 @@ ShellRoot {
         target: "shell"
         function ping(): string { return "pong" }
         function rescanPlugins(): string { return "rescanned" }
+        // Blocks the shell for 3 s, as opening a full-screen view can in a
+        // software-rendered VM.
+        function slow(): string { const end = Date.now() + 3000; while (Date.now() < end) {} return "slow" }
     }
 }
 ''')
@@ -56,9 +59,36 @@ ShellRoot {
         self.environment.pop('DISPLAY', None)
         self.environment.pop('WAYLAND_DISPLAY', None)
 
-    def run_command(self, *arguments):
-        return subprocess.run(list(map(str, arguments)), env=self.environment,
-                              capture_output=True, text=True, timeout=5)
+    def run_command(self, *arguments, environment=None, timeout=5):
+        return subprocess.run(list(map(str, arguments)), env=self.environment | (environment or {}),
+                              capture_output=True, text=True, timeout=timeout)
+
+    def start_fixture(self, log):
+        process = subprocess.Popen([str(self.command), 'exec', 'quickshell'],
+                                   env=self.environment, stdout=log, stderr=subprocess.STDOUT)
+        self.addCleanup(self.stop_fixture, process)
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            result = self.run_command(self.command, 'ipc', 'shell', 'ping')
+            if result.returncode == 0 and result.stdout.strip() == 'pong':
+                return process
+            if process.poll() is not None:
+                log.seek(0)
+                self.fail('Headless fixture exited: ' + log.read())
+            time.sleep(.1)
+        log.seek(0)
+        self.fail('Headless fixture IPC unavailable: ' + log.read())
+
+    @staticmethod
+    def stop_fixture(process):
+        # Terminate only this test's own minimal fixture process.
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
 
     def test_immutable_runtime_alias_resolves_to_one_canonical_identity(self):
         result = self.run_command(self.command, 'path', 'quickshell')
@@ -101,6 +131,26 @@ ShellRoot {
                         process.kill()
                         process.wait(timeout=5)
                 self.assertIsNotNone(process.poll())
+
+    @unittest.skipUnless(QS, 'Quickshell required for the real headless IPC regression')
+    def test_ipc_limit_is_two_seconds_unless_a_check_lengthens_it(self):
+        with tempfile.TemporaryFile(mode='w+') as log:
+            self.start_fixture(log)
+            # The default stops a call to a busy shell after 2 s.
+            started = time.monotonic()
+            result = self.run_command(self.command, 'ipc', 'shell', 'slow', timeout=10)
+            self.assertEqual(result.returncode, 124, result)
+            self.assertLess(time.monotonic() - started, 4)
+            # Values outside 1-120 whole seconds keep the default.
+            for value in ('0', '121', '5s', '05', '-3', ''):
+                time.sleep(3)  # let the shell finish the previous call
+                result = self.run_command(self.command, 'ipc', 'shell', 'slow',
+                                          environment={'CYBEXOS_IPC_TIMEOUT': value}, timeout=10)
+                self.assertEqual(result.returncode, 124, (value, result))
+            time.sleep(3)
+            result = self.run_command(self.command, 'ipc', 'shell', 'slow',
+                                      environment={'CYBEXOS_IPC_TIMEOUT': '10'}, timeout=15)
+            self.assertEqual((result.returncode, result.stdout.strip()), (0, 'slow'), result)
 
 
 if __name__ == '__main__':

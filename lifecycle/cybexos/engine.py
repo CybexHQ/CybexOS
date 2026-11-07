@@ -1,5 +1,6 @@
 """Serialized staged NixOS deployments with durable recovery boundaries."""
 import hashlib
+import json
 import configparser
 import os
 from pathlib import Path
@@ -14,7 +15,7 @@ from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse
 from . import inputs
 from .trust import REPO, AheadOfChannel, Fetcher, NoPublishedRelease, discover, validate_source, version
 from . import channel as channels
-from . import review, firmware, prebuilt
+from . import compatibility, review, firmware, prebuilt
 from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
@@ -40,6 +41,22 @@ class NotPrebuilt(Failure):
                          f"package{'s' if len(self.names) != 1 else ''} in this change yet ({shown}). "
                          'Nothing was changed. Cybex OS installs prebuilt packages only; '
                          'try again after NixOS has built them.')
+
+
+class IncompatibleNixpkgs(Failure):
+    """The candidate Nixpkgs no longer evaluates with this configuration.
+
+    Confirmed by evaluating the same candidate with the installed Nixpkgs.
+    `details` (origin, file, message) is safe to publish; see compatibility.
+    """
+    def __init__(self, details, version):
+        self.details = details
+        super().__init__(compatibility.describe(details, version))
+
+    @property
+    def held(self):
+        """Waiting for a Cybex OS release, rather than for the person."""
+        return self.details['origin'] != 'personal'
 
 
 def upstream_discovery_error(output):
@@ -199,6 +216,7 @@ class Engine:
                         'changes': '', 'packageChanges': [], 'highlights': None, 'reviewToken': None, 'inputs': {},
                         'recovery': '', 'retry': '', 'restart': '', 'requestId': None,
                         'workerUnit': None, 'software': None, 'firmware': None, 'notPrebuilt': None,
+                        'incompatible': None,
                         'sessionRestarts': [], 'desktopRestart': ''}
         if (values.get('state', previous.get('state')) != previous.get('state')
                 or values.get('phase', previous.get('phase')) != previous.get('phase')):
@@ -475,7 +493,17 @@ class Engine:
                 self.archive(config, tx)
                 if kind in ('update', 'software'):
                     self.status(phase='Checking that every package is prebuilt')
-                    self.require_prebuilt(config)
+                    try:
+                        self.require_prebuilt(config)
+                    except CommandFailure as error:
+                        if kind != 'update' or scope not in ('upstream', 'both'):
+                            raise
+                        self.status(phase='Checking whether the new Nixpkgs is the cause')
+                        held = self.incompatibility(error, old, new, config, tx,
+                                                    candidate['version'] if candidate else read(self.release)['version'])
+                        if held:
+                            raise held from error
+                        raise
                     self.status(phase='Downloading inputs and building the complete system')
                 else:
                     self.status(phase='Checking that the Linux kernel is prebuilt')
@@ -537,6 +565,17 @@ class Engine:
                 for authorization in retry_authorizations:
                     authorization.unlink(missing_ok=True)
                 return record
+            except IncompatibleNixpkgs as error:
+                if replacing:
+                    self.keep_prepared(previous, scope, request_id, candidate, error,
+                                       incompatible=error.details, waiting=error.held)
+                    raise
+                self.status(state='failed', error=str(error), incompatible=error.details,
+                            phase='Waiting for a Cybex OS release that supports the new Nixpkgs' if error.held
+                                else 'Staging failed; working system retained',
+                            retry='Cybex OS prepares the update again when a newer release or Nixpkgs arrives.'
+                                if error.held else 'Update the named file in your configuration, then prepare again.')
+                raise
             except NotPrebuilt as error:
                 if replacing:
                     self.keep_prepared(previous, scope, request_id, candidate, error, error.names)
@@ -569,7 +608,7 @@ class Engine:
         except Failure:
             return False
 
-    def keep_prepared(self, previous, scope, request_id, candidate, error, names=None):
+    def keep_prepared(self, previous, scope, request_id, candidate, error, names=None, incompatible=None, waiting=False):
         """Preparing again failed: the update it would have replaced stays ready.
 
         The attempt is recorded beside it, so the review can say why the newer
@@ -577,10 +616,40 @@ class Engine:
         attempt's transaction and log stay for inspection.
         """
         now = time.time()
-        attempt = {'scope': scope, 'requestId': request_id, 'state': 'waiting' if names else 'failed',
+        attempt = {'scope': scope, 'requestId': request_id, 'state': 'waiting' if names or waiting else 'failed',
                    'version': candidate['version'] if candidate else None,
-                   'error': str(error) or 'Preparation stopped.', 'notPrebuilt': names, 'finishedAt': now}
+                   'error': str(error) or 'Preparation stopped.', 'notPrebuilt': names,
+                   'incompatible': incompatible, 'finishedAt': now}
         atomic(self.status_path, previous | {'replacement': attempt, 'updatedAt': now}, 0o644)
+
+    def incompatibility(self, error, old, new, config, tx, version):
+        """An IncompatibleNixpkgs if the new Nixpkgs alone stops evaluation, else None.
+
+        Evaluates the same candidate (configuration and Cybex OS) with the
+        installed Nixpkgs. Only when that succeeds is Nixpkgs the cause.
+        """
+        found = compatibility.evaluation_error(getattr(error, 'output', ''))
+        if not found:
+            return None
+        upstream, installed = inputs.root_inputs(new)['nixpkgs'], inputs.root_inputs(old)['nixpkgs']
+        if new['nodes'][upstream] == old['nodes'][installed]:
+            return None
+        probe = tx / 'nixpkgs-probe'
+        copy_config(config, probe)
+        lock = parse(json.dumps(new))
+        lock['nodes'][upstream] = old['nodes'][installed]
+        atomic(probe / 'flake.lock', lock)
+        try:
+            self.nix('eval', '--raw', '--no-update-lock-file',
+                     f'path:{probe}#nixosConfigurations.cybexos.config.system.build.toplevel.drvPath')
+        except CommandFailure:
+            return None
+        finally:
+            shutil.rmtree(probe, ignore_errors=True)
+        details = compatibility.origin(found[1], read(tx / 'archive.json', {}))
+        if details['origin'] == 'cybexos' and found[0]:
+            details['message'] = compatibility.public(found[0])
+        return IncompatibleNixpkgs(details, version)
 
     def require_prebuilt(self, config, *, kernel_only=False):
         """Refuse a candidate that would compile Nixpkgs packages here.

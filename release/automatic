@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Release a verified vendor-pin update to beta, as the vendor-updates workflow
+# does once scripts/vendor-pins has rewritten a pin and its checks passed.
+#
+#   release/automatic CHANGE.json [--dry-run]
+#
+# CHANGE.json is `scripts/vendor-pins update NAME` output. This commits the
+# pin, takes the next patch version past VERSION and every v* tag, writes
+# release/notes.md for it, pushes main and runs release/publish (beta only;
+# promotion to stable stays a person's decision). When another session moves
+# main or takes the version first, it rebases onto main and takes the next one.
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+fail() { echo "release/automatic: $*" >&2; exit 1; }
+change=${1:-}
+[[ -f $change ]] || fail 'usage: release/automatic CHANGE.json [--dry-run]'
+dry_run=0
+[[ ${2:-} == --dry-run ]] && dry_run=1
+
+field() { python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$change" "$1"; }
+title=$(field title) to=$(field to) file=$(field file) notes=$(field notes)
+[[ $file == nix/packages/* && -f $file ]] || fail "unexpected pin file $file"
+[[ $(git rev-parse --abbrev-ref HEAD) == main ]] || fail 'run from main'
+[[ -z $(git status --porcelain -- . ":(exclude)$file") ]] || fail "only $file may be changed"
+
+git add -- "$file"
+git commit --quiet -m "Update $title to $to" -m "Upstream's stable release, checked against its published checksum by scripts/vendor-pins and verified by the vendor-updates workflow."
+
+next_version() {
+    # The highest final version among VERSION and the tags, plus one patch.
+    { cat VERSION; git tag --list 'v*' | sed 's/^v//'; } | python3 -I -c '
+import re, sys
+versions = [tuple(map(int, m.groups())) for m in
+            (re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", line.strip()) for line in sys.stdin) if m]
+major, minor, patch = max(versions)
+print(f"{major}.{minor}.{patch + 1}")'
+}
+
+for attempt in 1 2 3; do
+    git fetch --quiet --tags origin main
+    git rebase --quiet origin/main || { git rebase --abort; fail 'the pin commit no longer applies to main'; }
+    version=$(next_version)
+    printf '%s\n' "$version" > VERSION
+    cat > release/notes.md <<EOF
+# Cybex OS $version
+
+$notes
+
+This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
+EOF
+    git add VERSION release/notes.md
+    git commit --quiet -m "Prepare Cybex OS $version release"
+    if ((dry_run)); then
+        echo "Would push $(git rev-parse HEAD) to main and publish $version to beta:"
+        cat release/notes.md
+        exit 0
+    fi
+    if git push --quiet origin HEAD:main; then
+        if release/publish "$version"; then
+            exit 0
+        fi
+        # Another session published this version between push and tag.
+        git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null \
+            || fail "publishing $version failed"
+        fail "v$version was taken after main was pushed; publish the next version by hand"
+    fi
+    # main moved: drop the release commit and rebase the pin onto it.
+    git reset --quiet --hard HEAD~1
+done
+fail 'main kept moving; try again later'

@@ -1,0 +1,150 @@
+name: Vendor updates
+
+# Keeps the vendor downloads Cybex OS pins itself current (scripts/vendor-pins).
+# Daily: when Brave Origin has a newer stable release, update the pin, build
+# it, run the source tests and its 1Password browser check, then release it to
+# the beta channel (release/automatic). Promotion to stable stays a person's
+# decision. Pins that need review are listed in a "vendor-pins-behind" issue;
+# a failed run opens a "vendor-updates" issue.
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Release a verified update to beta
+        type: boolean
+        default: true
+      rehearse:
+        description: Run every check with the current pins even when nothing is behind (never publishes)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: vendor-updates
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      # actions/checkout v4.4.0, as in the repository's other workflows.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compare pins with upstream
+        id: pins
+        run: |
+          python3 -I -B scripts/vendor-pins status --json > "$RUNNER_TEMP/status.json"
+          python3 -I -B scripts/vendor-pins status --markdown > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          python3 -I - "$RUNNER_TEMP/status.json" >> "$GITHUB_OUTPUT" <<'EOF'
+          import json, sys
+          rows = json.load(open(sys.argv[1]))
+          auto = [row for row in rows if row['mode'] == 'auto']
+          behind = [row for row in auto if row['behind']]
+          print('name=' + (behind[0]['name'] if behind else ''))
+          print('rehearsal=' + (auto[0]['name'] if auto else ''))
+          print('review=' + ('yes' if any(row['behind'] for row in rows if row['mode'] == 'report') else ''))
+          EOF
+
+      - name: Update the pin
+        if: steps.pins.outputs.name != ''
+        run: python3 -I -B scripts/vendor-pins update "${{ steps.pins.outputs.name }}" | tee "$RUNNER_TEMP/change.json"
+
+      - name: Select the checks
+        id: plan
+        if: steps.pins.outputs.name != '' || inputs.rehearse
+        run: |
+          python3 -I - "$RUNNER_TEMP/status.json" "${{ steps.pins.outputs.name || steps.pins.outputs.rehearsal }}" >> "$GITHUB_OUTPUT" <<'EOF'
+          import json, sys
+          row = next(row for row in json.load(open(sys.argv[1])) if row['name'] == sys.argv[2])
+          print('checks=' + ' '.join('.#' + check for check in row['checks']))
+          EOF
+
+      - name: Free disk space for the VM check
+        if: steps.plan.outputs.checks != ''
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - name: Allow KVM for the VM check
+        if: steps.plan.outputs.checks != ''
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # cachix/install-nix-action, as in the repository's other workflows.
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
+        if: steps.plan.outputs.checks != ''
+        with:
+          extra_nix_config: |
+            system-features = nixos-test benchmark big-parallel kvm
+
+      - name: Source checks
+        if: steps.plan.outputs.checks != ''
+        run: |
+          # The installer's Cargo.lock comes from a generated source path,
+          # which --no-build cannot create; evaluating it once creates it.
+          nix eval --raw .#packages.x86_64-linux.installer-ui.drvPath > /dev/null
+          nix flake check --no-build
+          nix develop -c tests/run
+
+      - name: Package checks
+        if: steps.plan.outputs.checks != ''
+        run: nix build --no-link -L ${{ steps.plan.outputs.checks }}
+
+      - name: Release to beta
+        if: steps.pins.outputs.name != '' && (github.event_name == 'schedule' || inputs.publish)
+        run: |
+          # The checks may leave untracked files; this checkout is disposable.
+          git clean -ffdxq
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          release/automatic "$RUNNER_TEMP/change.json"
+
+      - name: Report pins that need review
+        if: always() && steps.pins.outcome == 'success'
+        run: |
+          if [ -n "${{ steps.pins.outputs.review }}" ]; then
+            {
+              echo "These vendor packages are pinned in Cybex OS and behind upstream. They are not updated automatically:"
+              echo
+              cat "$RUNNER_TEMP/report.md"
+              echo
+              echo "Updated by the [vendor-updates workflow]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/vendor-updates.yml); see \`scripts/vendor-pins\`."
+            } > "$RUNNER_TEMP/review.md"
+            python3 -I -B scripts/github-issue open --label vendor-pins-behind \
+              --title "Pinned vendor packages behind upstream" --body-file "$RUNNER_TEMP/review.md"
+          else
+            python3 -I -B scripts/github-issue close --label vendor-pins-behind --comment "Every pinned vendor package is current."
+          fi
+
+      - name: Report the result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = success ]; then
+            python3 -I -B scripts/github-issue close --label vendor-updates --comment "The vendor-updates workflow passes again."
+            exit 0
+          fi
+          {
+            echo "The vendor-updates workflow failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            if [ -f "$RUNNER_TEMP/change.json" ]; then
+              echo "Attempted update:"; echo; echo '```json'; cat "$RUNNER_TEMP/change.json"; echo '```'; echo
+            fi
+            echo "Nothing was released. Beta and stable machines keep the current pins."
+          } > "$RUNNER_TEMP/failure.md"
+          python3 -I -B scripts/github-issue open --label vendor-updates \
+            --title "Vendor update failed" --body-file "$RUNNER_TEMP/failure.md"

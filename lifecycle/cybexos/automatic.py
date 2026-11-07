@@ -121,7 +121,7 @@ def prepare(engine, enqueue, status, config_digest, discover=None, is_metered=me
     last = read(state / LAST_RUN, {}) or {}
     own_failure = (current.get('state') in ('failed', 'interrupted') and last.get('requestId')
                    and current.get('requestId') == last.get('requestId'))
-    held = bool(prebuilt.waiting_packages(current)) and current.get('changeKind') == 'update'
+    held = prebuilt.held(current) and current.get('changeKind') == 'update'
     prepared = (current.get('state') == 'ready' and current.get('changeKind') == 'update'
                 and current.get('scope') in SOURCES)
     # Anything else in progress, awaiting review/restart or needing attention

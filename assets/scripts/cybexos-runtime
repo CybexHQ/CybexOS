@@ -361,8 +361,13 @@ exec_runtime() {
 # matched by config path, which must be the one exec_runtime selected, the
 # development checkout included. The timeout keeps a hung shell from
 # stranding one client per key press; with no shell running, qs fails at once.
+# CYBEXOS_IPC_TIMEOUT (whole seconds, 1-120) lengthens it for VM checks,
+# where a software-rendered shell can take longer to open a full-screen view.
 ipc_call() {
-  local selected
+  local selected limit=2
+  if [[ ${CYBEXOS_IPC_TIMEOUT:-} =~ ^[1-9][0-9]{0,2}$ ]] && ((CYBEXOS_IPC_TIMEOUT <= 120)); then
+    limit=$CYBEXOS_IPC_TIMEOUT
+  fi
   selected=$(runtime_path quickshell)
   if [[ -f $selected/scripts/shell-recovery.py ]]; then
     selected=$(python3 "$selected/scripts/shell-recovery.py" path "$selected")
@@ -370,7 +375,7 @@ ipc_call() {
   # --any-display: a caller started by systemd (a reminder timer) need not
   # carry the session's display. The -- keeps function names that shadow qs
   # subcommands (e.g. show) positional.
-  exec timeout --kill-after=1s 2s \
+  exec timeout --kill-after=1s "${limit}s" \
     qs ipc --any-display -p "$selected" call -- "$@"
 }
 

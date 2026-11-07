@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Evaluate Cybex OS against Nixpkgs revisions machines will receive next.
+
+Installed machines follow nixos-unstable themselves, so a Nixpkgs change that
+removes or renames something Cybex OS uses breaks their next update (as
+Brave's removal did on 2026-11-03). Changes reach Nixpkgs master days before
+the channel. This evaluates main and the newest beta and stable releases
+against the channel head and master, plus the next stable branch once it
+exists, and reports errors and new evaluation warnings.
+
+  scripts/nixpkgs-canary [--sources main,beta,stable,TAG...] [--report DIR]
+
+Evaluation only: nothing is built. Exit status 1 means an evaluation failed.
+The nixpkgs-canary workflow runs it daily and keeps a GitHub issue open while
+it fails. Locally it needs git, gh (for the release tags) and Nix.
+"""
+import argparse
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
+# Machine configurations a release ships: the default VM/installation set,
+# the full default application selection (with Brave Origin, ChatGPT, Steam),
+# the XPS stack and the NVIDIA driver.
+TARGETS = ['product', 'system', 'xps-system', 'nvidia-evaluation']
+# The stable branch that follows the current one. NixOS 26.11 is planned for
+# 2026-11-23; once it exists, Cybex OS moves to it (CLAUDE.md).
+NEXT_STABLE = 'nixos-26.11'
+ANSI = re.compile(r'\x1b\[[0-9;]*m')
+NOISE = ('warning: Git tree', "warning: unknown setting", 'warning: ignoring untrusted',
+         'warning: Nix search path entry', 'warning: not writing modified lock file')
+
+
+def run(*args, cwd=None):
+    return subprocess.run(list(args), cwd=cwd, text=True, capture_output=True)
+
+
+def sources(wanted):
+    """name -> git revision; releases resolved from GitHub's release list."""
+    result = {}
+    if 'main' in wanted:
+        result['main'] = run('git', 'rev-parse', 'HEAD', cwd=ROOT).stdout.strip()
+    if {'beta', 'stable'} & set(wanted):
+        listing = run('gh', 'release', 'list', '--repo', 'CybexHQ/CybexOS', '--limit', '30',
+                      '--json', 'tagName,isPrerelease,isLatest,publishedAt')
+        if listing.returncode:
+            raise SystemExit('nixpkgs-canary: cannot list releases: ' + listing.stderr.strip())
+        releases = sorted(json.loads(listing.stdout), key=lambda r: r['publishedAt'], reverse=True)
+        for name, pick in (('beta', lambda r: True), ('stable', lambda r: r['isLatest'])):
+            found = next((r['tagName'] for r in releases if pick(r)), None)
+            if name in wanted and found:
+                run('git', 'fetch', '--quiet', 'origin', 'tag', found, cwd=ROOT)
+                result[name] = found
+    # Anything else names a revision or tag directly (v1.0.23, a commit).
+    for name in wanted:
+        if name not in ('main', 'beta', 'stable'):
+            run('git', 'fetch', '--quiet', 'origin', 'tag', name, cwd=ROOT)
+            result[name] = name
+    return result
+
+
+def nixpkgs(ref):
+    """The current revision of a Nixpkgs branch, or None if it does not exist."""
+    meta = run(*NIX, 'flake', 'metadata', '--json', '--refresh', f'github:NixOS/nixpkgs/{ref}')
+    if meta.returncode:
+        return None
+    locked = json.loads(meta.stdout)['locked']
+    return {'ref': ref, 'rev': locked['rev'], 'date': locked.get('lastModified')}
+
+
+def located(trace, source):
+    """The module that used what failed: `while evaluating definitions from` lines."""
+    found = []
+    for path in re.findall(r"definitions from `/nix/store/[^/]+-source/([^']+)'", trace):
+        owner = 'Cybex OS' if (source / path).exists() else 'Nixpkgs'
+        found.append(f'{owner}: {path}')
+    return found[-1] if found else ''
+
+
+def evaluate(source, target, rev=None):
+    """drvPath of checks.<target>; errors and warnings from its evaluation."""
+    args = [*NIX, 'eval', '--raw', f'git+file://{source}#checks.x86_64-linux.{target}.drvPath']
+    if rev:
+        args += ['--override-input', 'nixpkgs', f'github:NixOS/nixpkgs/{rev}']
+    result = run(*args)
+    text = ANSI.sub('', result.stderr)
+    warnings = sorted({line.strip() for line in text.splitlines()
+                       if re.match(r'\s*(evaluation warning:|trace: warning:|warning:)', line)
+                       and not line.strip().startswith(NOISE)})
+    outcome = {'ok': result.returncode == 0, 'warnings': warnings}
+    if result.returncode:
+        errors = re.findall(r'(?m)^\s*error:\s*(.+(?:\n(?!\s*(?:…|error:)).+)*)', text)
+        outcome['error'] = (errors[-1].strip() if errors else text.strip()[-600:])[:1200]
+        outcome['location'] = located(text, source)
+    return outcome
+
+
+def check(name, revision, branches, workspace):
+    """One source against its own lock (baseline) and each candidate."""
+    source = Path(workspace) / name
+    if revision == run('git', 'rev-parse', 'HEAD', cwd=ROOT).stdout.strip() and name == 'main':
+        source = ROOT
+    else:
+        subprocess.run(['git', 'worktree', 'add', '--quiet', '--detach', str(source), revision],
+                       cwd=ROOT, check=True)
+    results = []
+    try:
+        for target in TARGETS:
+            baseline = evaluate(source, target)
+            for branch in branches:
+                outcome = evaluate(source, target, branch['rev'])
+                outcome['new_warnings'] = sorted(set(outcome['warnings']) - set(baseline['warnings']))
+                results.append({'source': name, 'revision': revision, 'target': target,
+                                 'nixpkgs': branch, 'baseline_ok': baseline['ok']} | outcome)
+                state = 'ok' if outcome['ok'] else 'FAILED'
+                print(f"{name} {target} vs {branch['ref']} {branch['rev'][:12]}: {state}", flush=True)
+    finally:
+        if source != ROOT:
+            subprocess.run(['git', 'worktree', 'remove', '--force', str(source)], cwd=ROOT)
+    return results
+
+
+def markdown(results, branches):
+    heads = ', '.join(f"`{b['ref']}` {b['rev'][:12]}" for b in branches)
+    lines = [f'Evaluated against {heads}.', '']
+    failed = [r for r in results if not r['ok']]
+    for r in failed:
+        where = f" ({r['location']})" if r.get('location') else ''
+        own = '' if r['baseline_ok'] else ' It also fails with its own locked Nixpkgs.'
+        lines += [f"- **{r['source']}** (`{r['revision'][:12]}`) `{r['target']}` fails with "
+                  f"`{r['nixpkgs']['ref']}`{where}:{own}", '', '  ```', *('  ' + line for line in r['error'].splitlines()),
+                  '  ```']
+    warned = {}
+    for r in results:
+        for warning in r['new_warnings']:
+            warned.setdefault(warning, set()).add(f"{r['source']} with {r['nixpkgs']['ref']}")
+    if warned:
+        lines += ['', 'New evaluation warnings (often a removal or rename that is coming):', '']
+        lines += [f"- `{w[:300]}` ({', '.join(sorted(where))})" for w, where in sorted(warned.items())]
+    if not failed and not warned:
+        lines.append('Every source evaluates without new warnings.')
+    return '\n'.join(lines) + '\n'
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--sources', default='main,beta,stable')
+    parser.add_argument('--report', type=Path, help='write report.json and report.md here')
+    options = parser.parse_args(argv)
+    branches = [b for b in (nixpkgs(ref) for ref in ('nixos-unstable', 'master', NEXT_STABLE)) if b]
+    if len(branches) < 2:
+        raise SystemExit('nixpkgs-canary: cannot resolve the Nixpkgs channel and master')
+    seen, results = set(), []
+    with tempfile.TemporaryDirectory(prefix='nixpkgs-canary.') as workspace:
+        for name, revision in sources(options.sources.split(',')).items():
+            commit = run('git', 'rev-parse', revision + '^{commit}', cwd=ROOT).stdout.strip()
+            if commit in seen:
+                continue
+            seen.add(commit)
+            results += check(name, revision, branches, workspace)
+    report = markdown(results, branches)
+    print(report)
+    if options.report:
+        options.report.mkdir(parents=True, exist_ok=True)
+        (options.report / 'report.json').write_text(json.dumps(results, indent=2) + '\n')
+        (options.report / 'report.md').write_text(report)
+    failed = any(not r['ok'] for r in results)
+    warned = any(r['new_warnings'] for r in results)
+    if options.report:
+        (options.report / 'status').write_text('failed\n' if failed else 'warnings\n' if warned else 'ok\n')
+    return 1 if failed else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

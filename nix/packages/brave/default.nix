@@ -7,16 +7,15 @@
 # its recipe (make-brave.nix) and builds the official Origin Debian asset with
 # the machine Nixpkgs' libraries. It keeps Brave's desktop and executable
 # names, which the browser defaults and the 1Password host check expect.
-# Follow every Brave stable release: Cybex OS is the browser's only maintainer.
+# Cybex OS is the browser's only maintainer: release.json follows every Brave
+# stable release, updated by scripts/vendor-pins (the vendor-updates workflow).
 let
-  version = "1.99.55";
+  release = lib.importJSON ./release.json;
+  inherit (release) version;
   brave = callPackage (import ./make-brave.nix {
     pname = "brave";
     inherit version;
-    archives.x86_64-linux = {
-      url = "https://github.com/brave/brave-browser/releases/download/v${version}/brave-origin_${version}_amd64.deb";
-      hash = "sha256-YxmkjQ/8IF+FW4wkI/cKy19jtoghTxG7W2EL0xeT/Gs=";
-    };
+    archives.x86_64-linux = { inherit (release) url hash; };
     flavor = "browser";
     optStem = "brave";
     fileStem = "brave-browser";
