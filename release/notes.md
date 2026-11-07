@@ -1,5 +1,5 @@
-# Cybex OS 1.0.23
+# Cybex OS 1.0.24
 
-Dell XPS models that use Intel LPMd now start their power-management services in a consistent order. This removes the dependency loop that made systemd drop a service job during startup or shutdown.
+Brave Origin keeps installing and updating after NixOS removed Brave from its packages on 3 November. Cybex OS now maintains the browser's package itself, so Nixpkgs updates no longer fail once a machine follows a Nixpkgs revision without Brave. Brave Origin also moves to 1.99.55 (Chromium 157), Brave's current stable release.
 
 This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
