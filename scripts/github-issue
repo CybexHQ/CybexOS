@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Keep one GitHub issue per automated check, through the gh CLI.
+
+  scripts/github-issue open  --label LABEL --title TITLE --body-file FILE
+  scripts/github-issue close --label LABEL [--comment TEXT]
+
+`open` updates the open issue with LABEL (or creates one) so repeated failures
+do not pile up; `close` closes it once the check passes again. The repository
+is GITHUB_REPOSITORY, else CybexHQ/CybexOS.
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+
+REPO = os.environ.get('GITHUB_REPOSITORY') or 'CybexHQ/CybexOS'
+
+
+def gh(*args, capture=True):
+    result = subprocess.run(['gh', *args, '--repo', REPO], check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+    return result.stdout if capture else ''
+
+
+def current(label):
+    issues = json.loads(gh('issue', 'list', '--state', 'open', '--label', label, '--json', 'number', '--limit', '5'))
+    return issues[0]['number'] if issues else None
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('action', choices=('open', 'close'))
+    parser.add_argument('--label', required=True)
+    parser.add_argument('--title')
+    parser.add_argument('--body-file')
+    parser.add_argument('--comment', default='The check passes again.')
+    options = parser.parse_args(argv)
+    number = current(options.label) if options.action == 'close' else None
+    if options.action == 'close':
+        if number:
+            gh('issue', 'close', str(number), '--comment', options.comment, capture=False)
+        return 0
+    if not options.title or not options.body_file:
+        parser.error('open needs --title and --body-file')
+    gh('label', 'create', options.label, '--force', '--color', 'd93f0b',
+       '--description', 'Opened and closed by an automated check')
+    number = current(options.label)
+    if number:
+        gh('issue', 'edit', str(number), '--title', options.title, '--body-file', options.body_file, capture=False)
+    else:
+        gh('issue', 'create', '--title', options.title, '--label', options.label,
+           '--body-file', options.body_file, capture=False)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

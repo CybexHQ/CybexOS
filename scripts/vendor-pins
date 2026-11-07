@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Vendor downloads Cybex OS pins itself, compared with their upstream releases.
+
+Packages Nixpkgs maintains update with each machine's Nixpkgs. The ones below
+are pinned in this repository, so they only move when it does:
+
+  auto    the vendor-updates workflow updates the pin, verifies and releases
+          it to beta (Brave Origin: its stable releases carry security fixes).
+  report  shown in the workflow's report when upstream is ahead, for a person
+          to review; updating them needs more than a checksum (T3 Code's bar
+          API, for example).
+
+The XPS IPU7 camera recipe is deliberately absent: its fail-closed ABI guard
+moves only with a reviewed kernel/camera stack, never automatically.
+
+  scripts/vendor-pins status [--json | --markdown]
+  scripts/vendor-pins update NAME     rewrite an auto pin to upstream's latest
+                                      release; prints the change as JSON
+"""
+import base64
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import urllib.error
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+API = 'https://api.github.com'
+
+
+def github(path):
+    request = urllib.request.Request(API + path, headers={
+        'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'cybexos-vendor-pins'})
+    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    if token:
+        request.add_header('Authorization', 'Bearer ' + token)
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.load(response)
+
+
+def fetch_text(url):
+    request = urllib.request.Request(url, headers={'User-Agent': 'cybexos-vendor-pins'})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return response.read(65536).decode()
+
+
+def version_key(version):
+    return tuple(int(part) for part in re.findall(r'\d+', version))
+
+
+def nix_version(path):
+    """The single `version = "..."` declaration in a recipe."""
+    found = re.findall(r'(?<![\w-])version = "([^"]+)";', (ROOT / path).read_text())
+    if len(found) != 1:
+        raise SystemExit(f'vendor-pins: expected one version declaration in {path}')
+    return found[0]
+
+
+class Brave:
+    name = 'brave-origin'
+    title = 'Brave Origin'
+    mode = 'auto'
+    file = 'nix/packages/brave/release.json'
+    # What the workflow must pass before it releases an update.
+    checks = ['packages.x86_64-linux.brave-origin', 'checks.x86_64-linux.browser-1password']
+
+    def pinned(self):
+        return json.loads((ROOT / self.file).read_text())['version']
+
+    def latest(self):
+        """Newest stable release ("Release vX.Y.Z", not nightly or beta)."""
+        releases = [r for r in github('/repos/brave/brave-browser/releases?per_page=100')
+                    if not r.get('prerelease') and not r.get('draft')
+                    and re.fullmatch(r'Release v\d+\.\d+\.\d+ .*', (r.get('name') or '').strip(), re.S)]
+        if not releases:
+            raise SystemExit('vendor-pins: no Brave stable release among the newest 100')
+        newest = max(releases, key=lambda r: version_key(r['tag_name']))
+        chromium = re.search(r'\(Chromium ([\d.]+)\)', newest['name'])
+        return {'version': newest['tag_name'].removeprefix('v'), 'release': newest,
+                'chromium': chromium[1] if chromium else None}
+
+    def update(self, latest):
+        version, release = latest['version'], latest['release']
+        if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+            raise SystemExit(f'vendor-pins: unexpected Brave version {version!r}')
+        asset_name = f'brave-origin_{version}_amd64.deb'
+        assets = {asset['name']: asset for asset in release.get('assets', [])}
+        if asset_name not in assets or asset_name + '.sha256' not in assets:
+            raise SystemExit(f'vendor-pins: Brave {version} has no {asset_name} with a checksum')
+        asset = assets[asset_name]
+        # Two independent statements of the same digest: GitHub's, computed at
+        # upload, and the checksum file Brave publishes beside the package.
+        digest = (asset.get('digest') or '').removeprefix('sha256:')
+        published = fetch_text(assets[asset_name + '.sha256']['browser_download_url']).split()
+        if not re.fullmatch('[0-9a-f]{64}', digest) or not published or published[0] != digest:
+            raise SystemExit(f'vendor-pins: {asset_name} checksums disagree or are missing')
+        url = f'https://github.com/brave/brave-browser/releases/download/v{version}/{asset_name}'
+        if asset.get('browser_download_url') != url:
+            raise SystemExit(f'vendor-pins: unexpected download location for {asset_name}')
+        record = {'version': version, 'chromium': latest['chromium'], 'url': url,
+                  'hash': 'sha256-' + base64.b64encode(bytes.fromhex(digest)).decode()}
+        (ROOT / self.file).write_text(json.dumps(record, indent=2) + '\n')
+        chromium = f" (Chromium {latest['chromium']})" if latest['chromium'] else ''
+        return {'notes': f"Brave Origin moves to {version}{chromium}, Brave's current stable release, "
+                         'with the security fixes it carries.'}
+
+
+class GitHubRelease:
+    """A report-only pin compared with a repository's latest release."""
+    mode = 'report'
+    checks = []
+
+    def __init__(self, name, title, repository, file, reason):
+        self.name, self.title, self.repository, self.file, self.reason = name, title, repository, file, reason
+
+    def pinned(self):
+        return nix_version(self.file)
+
+    def latest(self):
+        release = github(f'/repos/{self.repository}/releases/latest')
+        return {'version': release['tag_name'].removeprefix('v'), 'release': release}
+
+
+PINS = [
+    Brave(),
+    GitHubRelease('t3-code', 'T3 Code', 'pingdotgg/t3code', 'nix/packages/t3-code.nix',
+                  'review its connected-widget bar API with the release'),
+    GitHubRelease('intel-lpmd', 'Intel LPMd', 'intel/intel-lpmd', 'nix/packages/intel-lpmd.nix',
+                  'check the XPS power-service ordering with it'),
+    GitHubRelease('omawrite', 'Omawrite', 'omacom/omawrite', 'nix/packages/omawrite.nix',
+                  'check its Qt build with the machine Nixpkgs'),
+]
+
+
+def base_version(version):
+    """`0.1.2-nightly.20261022.3512` compares as 0.1.2 against releases."""
+    return version_key(version.split('-', 1)[0])
+
+
+def status():
+    rows = []
+    for pin in PINS:
+        row = {'name': pin.name, 'title': pin.title, 'mode': pin.mode, 'file': pin.file,
+               'checks': pin.checks, 'reason': getattr(pin, 'reason', '')}
+        try:
+            row['pinned'] = pin.pinned()
+            latest = pin.latest()
+            row['latest'] = latest['version']
+            row['published'] = (latest['release'].get('published_at') or '')[:10]
+            row['behind'] = base_version(row['latest']) > base_version(row['pinned'])
+        except (urllib.error.URLError, KeyError, ValueError, TimeoutError) as error:
+            row.update(latest=None, behind=False, error=f'{type(error).__name__}: {error}')
+        rows.append(row)
+    return rows
+
+
+def markdown(rows):
+    """The report: pins behind upstream, then any that could not be checked."""
+    lines = ['| Package | Pinned | Upstream | Released | Update |', '| --- | --- | --- | --- | --- |']
+    for row in rows:
+        if not row['behind']:
+            continue
+        action = 'automatic, to beta' if row['mode'] == 'auto' else 'by hand: ' + row['reason']
+        lines.append(f"| {row['title']} (`{row['file']}`) | {row['pinned']} | {row['latest']} "
+                     f"| {row['published']} | {action} |")
+    text = '\n'.join(lines) if len(lines) > 2 else 'Every pinned vendor package is current.'
+    failed = [row for row in rows if row.get('error')]
+    if failed:
+        text += '\n\nCould not check: ' + '; '.join(f"{row['title']} ({row['error']})" for row in failed)
+    return text
+
+
+def main(argv):
+    if len(argv) >= 1 and argv[0] == 'status':
+        rows = status()
+        if argv[1:] == ['--json']:
+            json.dump(rows, sys.stdout, indent=2)
+            print()
+        elif argv[1:] == ['--markdown']:
+            print(markdown(rows))
+        elif not argv[1:]:
+            for row in rows:
+                state = row.get('error') or ('behind' if row['behind'] else 'current')
+                print(f"{row['name']:<14} {row['mode']:<7} {row.get('pinned')} -> {row.get('latest')}  {state}")
+        else:
+            raise SystemExit(__doc__)
+        return 0
+    if len(argv) == 2 and argv[0] == 'update':
+        pin = next((pin for pin in PINS if pin.name == argv[1]), None)
+        if pin is None or pin.mode != 'auto':
+            raise SystemExit(f'vendor-pins: {argv[1]} is not an automatically updated pin')
+        before, latest = pin.pinned(), pin.latest()
+        if version_key(latest['version']) <= version_key(before):
+            raise SystemExit(f'vendor-pins: {pin.title} {before} is already current')
+        change = pin.update(latest)
+        json.dump({'name': pin.name, 'title': pin.title, 'from': before, 'to': latest['version'],
+                   'file': pin.file, 'checks': pin.checks} | change, sys.stdout, indent=2)
+        print()
+        return 0
+    raise SystemExit(__doc__)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
