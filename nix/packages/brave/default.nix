@@ -1,7 +1,7 @@
 { lib, callPackage,
   # Keep the former shortcut flags in the package, so desktop-entry launches,
   # private actions and the selected-browser helper retain camera/IME support.
-  commandLineArgs ? "--enable-features=TouchpadOverscrollHistoryNavigation,PipeWireCamera,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --enable-wayland-ime --restore-last-session --hide-crash-restore-bubble"
+  commandLineArgs ? "--ozone-platform=wayland --enable-features=TouchpadOverscrollHistoryNavigation,PipeWireCamera,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --enable-wayland-ime --restore-last-session --hide-crash-restore-bubble"
 }:
 # Nixpkgs no longer packages Brave (NixOS/nixpkgs#582838), so Cybex OS keeps
 # its recipe (make-brave.nix) and builds the official Origin Debian asset with

@@ -1,10 +1,11 @@
 { config, options, lib, pkgs, modulesPath, ... }:
 let
   cfg = config.cybexos;
+  waylandApps = import ../packages/wayland-apps.nix { inherit pkgs; };
   selected = map (name: {
     attribute = name;
     package = lib.attrByPath (lib.splitString "." name)
-      (throw "Software package ${name} is unavailable in the machine's locked Nixpkgs") pkgs;
+      (throw "Software package ${name} is unavailable in the machine's locked Nixpkgs") (pkgs // waylandApps);
   }) cfg.software.packages;
   # Who declared each systemPackages entry, from its definition's file:
   # Software's own selections (this module), Cybex OS's vendor modules (this

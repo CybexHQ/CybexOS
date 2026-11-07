@@ -2,7 +2,7 @@
 # exact and immutable: a nightly AppImage (Nixpkgs' t3code is the 0.1.2
 # release, with another desktop entry). Review its release and bar API together.
 # Replace with Nixpkgs' t3code once it carries an equivalent client.
-{ lib, appimageTools, fetchurl, makeDesktopItem }:
+{ lib, appimageTools, fetchurl, makeDesktopItem, makeWrapper }:
 let
   pname = "t3code-desktop";
   version = "0.1.2-nightly.20261022.3512";
@@ -23,7 +23,9 @@ let
   };
 in appimageTools.wrapType2 {
   inherit pname version src;
+  nativeBuildInputs = [ makeWrapper ];
   extraInstallCommands = ''
+    wrapProgram "$out/bin/${pname}" --add-flags --ozone-platform=wayland
     mkdir -p $out/share/applications $out/share/icons/hicolor/512x512/apps
     cp ${desktop}/share/applications/* $out/share/applications/
     icon=$(find ${contents} -name '*.png' -not -path '*/node_modules/*' | head -1)

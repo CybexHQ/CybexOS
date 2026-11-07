@@ -2,11 +2,12 @@
 let
   cfg = config.cybexos;
   # Nixpkgs' ChatGPT (maintained there, updated with the machine Nixpkgs).
-  # Its executable is lib/chatgpt/ChatGPT, behind a launcher that adds the
-  # Wayland flags when NIXOS_OZONE_WL is set, as the desktop sets it.
+  # Keep the AppArmor rule pointed at the original executable; the Wayland
+  # wrapper below delegates to this package without changing its resources.
   chatgpt = pkgs.chatgpt;
   assistant = pkgs.callPackage ../packages/assistant.nix {};
   libreswanPlugin = pkgs.callPackage ../packages/networkmanager-libreswan.nix {};
+  waylandApps = import ../packages/wayland-apps.nix { inherit pkgs; };
 in {
   options.cybexos.browser.bravePolicies = lib.mkOption {
     type = lib.types.attrsOf lib.types.anything;
@@ -34,7 +35,7 @@ in {
       gsettings-desktop-schemas adwaita-icon-theme adw-gtk3 glib
       # The agent CLIs are part of every installation. Claude Code is unfree.
       codex
-    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) spotify chatgpt claude-code ]
+    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) waylandApps.spotify waylandApps.chatgpt claude-code ]
       ++ lib.optionals cfg.features.assistant [ assistant ]
       ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
       ++ lib.optionals cfg.features.podman [ distrobox podman-compose ]
@@ -68,6 +69,7 @@ in {
     systemd.user.tmpfiles.rules = lib.mkIf cfg.features.proprietary [ "e %C/chatgpt/bundled-plugins-v2 - - - 0" ];
     programs._1password-gui = {
       enable = lib.mkDefault cfg.features.proprietary;
+      package = lib.mkDefault waylandApps._1password-gui;
       polkitPolicyOwners = [ cfg.primaryUser ];
     };
     programs.steam = { enable = lib.mkDefault cfg.features.steam; remotePlay.openFirewall = false; dedicatedServer.openFirewall = false; };
@@ -164,6 +166,8 @@ in {
     # Expected local builds (nix/modules/prebuilt.nix): the plugin's helper-path
     # fix, and Steam's FHS runtime, whose free wrapper carries the unfree client.
     cybexos.updates.expectedBuilds = [ libreswanPlugin ]
+      # AppArmor references the original unfree download, outside its launcher.
+      ++ lib.optional cfg.features.proprietary chatgpt
       ++ lib.optional config.programs.steam.enable config.programs.steam.package.run;
     services.libreswan.enable = lib.mkDefault true;
     environment.etc."cybexos/emoji-test.txt".source = "${pkgs.unicode-emoji}/share/unicode/emoji/emoji-test.txt";

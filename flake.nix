@@ -160,7 +160,8 @@
         # Wiz on the disk unlock screen, the lock screen and in kitty.
         plymouth-unlock = import ./nix/tests/plymouth-unlock.nix { inherit pkgs; inherit (self.packages.${system}) plymouth; };
         lock-terminal = import ./nix/tests/lock-terminal.nix { inherit pkgs module; };
-        # Spotify on a 2x display, through XWayland and natively: sharpness and the chosen pointer.
+        # Spotify on a 2x display: the product wrapper selects native Wayland
+        # without session hints; compare sharpness and pointer with explicit X11.
         wayland-scale = import ./nix/tests/wayland-scale.nix {
           inherit module;
           pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
