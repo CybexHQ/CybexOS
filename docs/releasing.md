@@ -161,12 +161,11 @@ client the connected widget was reviewed with; Nixpkgs' `t3code` is the 0.1.2
 release. Replace that source recipe with the maintained Nixpkgs package after
 product runtime qualification; its successful wrapper build is not desktop
 validation.
-Nixpkgs now also packages ChatGPT for x86_64 Linux; it is not adopted yet. The
-Linux recipe pins OpenAI's versioned Debian pool object and SHA-256, reviewed against the signed
-OpenAI repository metadata; it executes no distribution maintainer scripts or
-repository enrollment. Preserve the Chromium sandbox and exact-executable
-AppArmor user-namespace allowance when updating it. Replace the recipe with a
-maintained native Nixpkgs Linux package after runtime qualification.
+ChatGPT is Nixpkgs' maintained `chatgpt` package, so it updates with the
+machine Nixpkgs rather than with a Cybex OS release. Cybex OS adds only the
+exact-executable AppArmor user-namespace allowance for its Chromium sandbox
+(`lib/chatgpt/ChatGPT`) and the package's cache cleanup rule; keep both if
+Nixpkgs moves the executable.
 
 Nixpkgs removed `brave` and `brave-origin` on 2026-11-03
 ([NixOS/nixpkgs#582838](https://github.com/NixOS/nixpkgs/pull/582838)):

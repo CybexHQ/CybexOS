@@ -88,10 +88,9 @@ tests and failures; inspect that evidence before using a particular image.
 external-monitor lid handling, Voxtype and the required offline dictation model
 have native declarations. Their installed interactions still require testing.
 
-The native Linux ChatGPT derivation builds with strict ELF dependency checks;
-its version command and bundled Codex/Node commands ran in the isolated build
-container. This does not qualify interactive sign-in, Chromium sandbox startup,
-remote control or application use on NixOS. The official upstream distributions
+ChatGPT is Nixpkgs' `chatgpt` package; its build runs the application's
+version check. This does not qualify interactive sign-in, Chromium sandbox
+startup, remote control or application use on NixOS. The official upstream distributions
 do not include NixOS in their formal preview support list.
 
 The desktop package also checks its actual wrapped Python and GI dependencies

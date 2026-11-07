@@ -1,7 +1,10 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.cybexos;
-  chatgptLinux = pkgs.callPackage ../packages/chatgpt.nix {};
+  # Nixpkgs' ChatGPT (maintained there, updated with the machine Nixpkgs).
+  # Its executable is lib/chatgpt/ChatGPT, behind a launcher that adds the
+  # Wayland flags when NIXOS_OZONE_WL is set, as the desktop sets it.
+  chatgpt = pkgs.chatgpt;
   assistant = pkgs.callPackage ../packages/assistant.nix {};
   libreswanPlugin = pkgs.callPackage ../packages/networkmanager-libreswan.nix {};
 in {
@@ -31,7 +34,7 @@ in {
       gsettings-desktop-schemas adwaita-icon-theme adw-gtk3 glib
       # The agent CLIs are part of every installation. Claude Code is unfree.
       codex
-    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) spotify chatgptLinux claude-code ]
+    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) spotify chatgpt claude-code ]
       ++ lib.optionals cfg.features.assistant [ assistant ]
       ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
       ++ lib.optionals cfg.features.podman [ distrobox podman-compose ]
@@ -51,9 +54,18 @@ in {
     # Match upstream's exact-executable user-namespace exception for Chromium's
     # sandbox; do not turn off sandboxing or weaken unrelated AppArmor policy.
     security.apparmor.policies.chatgpt = lib.mkIf cfg.features.proprietary {
-      profile = chatgptLinux.appArmorProfile;
+      profile = ''
+        abi <abi/4.0>,
+        include <tunables/global>
+        profile chatgpt "${chatgpt}/lib/chatgpt/ChatGPT" flags=(unconfined) {
+          userns,
+          include if exists <local/chatgpt>
+        }
+      '';
       state = "enforce";
     };
+    # The package's own rule: drop bundled-plugin copies of replaced versions.
+    systemd.user.tmpfiles.rules = lib.mkIf cfg.features.proprietary [ "e %C/chatgpt/bundled-plugins-v2 - - - 0" ];
     programs._1password-gui = {
       enable = lib.mkDefault cfg.features.proprietary;
       polkitPolicyOwners = [ cfg.primaryUser ];
