@@ -1,5 +1,5 @@
 # Spotify on a 2× display: through XWayland as before, then natively on
-# Wayland as the session now starts it (NIXOS_OZONE_WL, nix/modules/desktop.nix).
+# Wayland through the product's executable wrapper, even without NIXOS_OZONE_WL.
 #
 # Both runs start after Settings has chosen Bibata Modern Ice, a white arrow,
 # in place of the installation's black Bibata Modern Classic. Each must show
@@ -20,6 +20,7 @@
 { pkgs, module }:
 let
   python = pkgs.python3.withPackages (p: [ p.pillow ]);
+  spotifyWayland = (import ../packages/wayland-apps.nix { inherit pkgs; }).spotify;
   # Sharpness inside a window, and the share of light pixels in the pointer.
   measure = pkgs.writeText "cybexos-wayland-scale-measure.py" ''
     import json, sys
@@ -56,7 +57,7 @@ in pkgs.testers.runNixOSTest {
   nodes.machine = { lib, ... }: {
     imports = [ module ];
     cybexos = { enable = true; primaryUser = "tester"; features = { proprietary = false; steam = false; docker = false; }; };
-    environment.systemPackages = [ pkgs.spotify ];
+    environment.systemPackages = [ spotifyWayland ];
     networking.hostName = "machine";
     users.users.tester.initialPassword = "qualification-only";
     services.displayManager.autoLogin = { enable = true; user = "tester"; };
@@ -190,8 +191,8 @@ in pkgs.testers.runNixOSTest {
         return results[name]
 
     # Through XWayland, as Spotify ran before this session's switch.
-    x11 = run("xwayland", "env -u NIXOS_OZONE_WL spotify", True)
-    wayland = run("wayland", "spotify", False)
+    x11 = run("xwayland", "env -u NIXOS_OZONE_WL ${pkgs.spotify}/bin/spotify --ozone-platform=x11", True)
+    wayland = run("wayland", "env -u NIXOS_OZONE_WL spotify", False)
     (out / "wayland-scale-results.json").write_text(json.dumps(results, indent=2) + "\n")
 
     assert x11["sharpness"]["between"] > 2000 and wayland["sharpness"]["between"] > 2000, results
