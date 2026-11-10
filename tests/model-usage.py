@@ -11,6 +11,7 @@ import os
 import json
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import tempfile
 
@@ -53,6 +54,31 @@ if (!accepted("cliproxyKeyFile", "~/.config/key") || !accepted("costKeeperUrl", 
 """
 
 
+def quickshell(path: Path, seconds: int, env: dict) -> tuple[int, str]:
+    """Run a Quickshell harness for at most `seconds`; its exit status and output.
+
+    `timeout` alone waited forever on a CI VM: a Quickshell that doesn't
+    exit on SIGTERM, or a helper it started that keeps the output pipes
+    open, held this test up for hours. The whole process group is killed
+    instead, and the harness fails with what it printed.
+    """
+    process = subprocess.Popen(["qs", "-p", str(path), "--no-color"], env=env, text=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        output, _ = process.communicate(timeout=seconds)
+        return process.returncode, output
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        output, _ = process.communicate()
+        raise SystemExit(f"Quickshell ({path.name}) didn't finish within {seconds} seconds:\n{output}")
+    finally:
+        # Helpers it started (the fake live and request scripts) end with it.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def main() -> None:
     subprocess.run(["node", "-e", SETTINGS_CHECK, str(HELPERS), str(TESTS / "manifest.json")],
                    check=True)
@@ -87,13 +113,12 @@ def main() -> None:
             harness.mkdir()
             shutil.copyfile(package / "tests/qml/live-shell.qml", harness / "shell.qml")
             marker = harness / "events.jsonl"
-            result = subprocess.run(["timeout", "10", "qs", "-p", str(harness), "--no-color"],
-                env={**env, "QT_QPA_PLATFORM": "offscreen", "QT_LOGGING_RULES": "qml.debug=true",
-                     "MODEL_USAGE_REPO_URL": package.as_uri(),
-                     "MODEL_USAGE_FAKE_LIVE": str(package / "tests/fake_live.py"),
-                     "MODEL_USAGE_LIVE_MARKER": str(marker)}, capture_output=True, text=True)
-            output = result.stdout + result.stderr
-            if result.returncode or any(error in output for error in
+            code, output = quickshell(harness, 10, {
+                **env, "QT_QPA_PLATFORM": "offscreen", "QT_LOGGING_RULES": "qml.debug=true",
+                "MODEL_USAGE_REPO_URL": package.as_uri(),
+                "MODEL_USAGE_FAKE_LIVE": str(package / "tests/fake_live.py"),
+                "MODEL_USAGE_LIVE_MARKER": str(marker)})
+            if code or any(error in output for error in
                     ("Error:", "ReferenceError", "TypeError", "invalid context", "LIVE TEST FAILED")):
                 raise SystemExit(output)
             rows = [json.loads(line) for line in marker.read_text().splitlines()]
@@ -105,12 +130,11 @@ def main() -> None:
             shared = Path(temporary) / "shared"
             shutil.copytree(ROOT / 'tests/fixtures/model-usage-shared', shared)
             requests = shared / 'requests.jsonl'
-            result = subprocess.run(["timeout", "12", "qs", "-p", str(shared), "--no-color"],
-                env={**env, "QT_QPA_PLATFORM": "offscreen", "MODEL_USAGE_REPO_URL": package.as_uri(),
-                     "MODEL_USAGE_FAKE_REQUEST": str(shared / 'request.py'),
-                     "MODEL_USAGE_REQUEST_MARKER": str(requests)}, capture_output=True, text=True)
-            output = result.stdout + result.stderr
-            if result.returncode or any(error in output for error in
+            code, output = quickshell(shared, 12, {
+                **env, "QT_QPA_PLATFORM": "offscreen", "MODEL_USAGE_REPO_URL": package.as_uri(),
+                "MODEL_USAGE_FAKE_REQUEST": str(shared / 'request.py'),
+                "MODEL_USAGE_REQUEST_MARKER": str(requests)})
+            if code or any(error in output for error in
                     ("Error:", "ReferenceError", "TypeError", "invalid context", "TEST FAILED")):
                 raise SystemExit(output)
             rows = [json.loads(line) for line in requests.read_text().splitlines()]
