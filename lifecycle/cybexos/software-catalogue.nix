@@ -8,9 +8,13 @@
 # catalogue, or the apps Software is about to install), plus whether this
 # machine allows unfree packages. `derivations` adds each derivation path,
 # for the prebuilt check; instantiating them costs more, so only on request.
+# Cybex OS's own optional packages (Brave Origin) resolve by name first and
+# are marked `own`: like unfree vendor apps, they build on the computer.
 { machine, attributes ? null, derivations ? false }:
 let
-  pkgs = (builtins.getFlake machine).nixosConfigurations.cybexos.pkgs;
+  system = (builtins.getFlake machine).nixosConfigurations.cybexos;
+  pkgs = system.pkgs;
+  own = system.config.cybexos.software.optionalPackages or { };
   lib = pkgs.lib;
   visit = depth: prefix: value:
     let attempt = builtins.tryEval (builtins.deepSeq result result);
@@ -30,7 +34,7 @@ let
   free = value: lib.all (license: license.free or true) (lib.toList (value.meta.license or [ ]));
   describe = attribute:
     let
-      found = builtins.tryEval (lib.attrByPath (lib.splitString "." attribute) null pkgs);
+      found = builtins.tryEval (own.${attribute} or (lib.attrByPath (lib.splitString "." attribute) null pkgs));
       value = found.value;
       exists = found.success && builtins.tryEval (lib.isDerivation value) == { success = true; value = true; };
       # meta.available is false for unfree packages this machine does not
@@ -42,6 +46,7 @@ let
         unfree = !(free value);
         available = value.meta.available or true;
         broken = value.meta.broken or false;
+        own = own ? ${attribute};
       };
       drv = builtins.tryEval (builtins.unsafeDiscardStringContext value.drvPath);
     in { inherit attribute exists; }

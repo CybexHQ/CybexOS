@@ -10,7 +10,10 @@ subcategory, plus the profiles, featured apps and display-name overrides.
 - resolves every attribute in the repository's locked Nixpkgs and keeps only
   apps NixOS has prebuilt in cache.nixos.org, or unfree vendor downloads that
   NixOS never caches. Missing, broken and not-yet-built packages are dropped
-  and listed, so a later run picks them up once NixOS has built them;
+  and listed, so a later run picks them up once NixOS has built them. Cybex
+  OS's own optional packages (`nix/packages/optional.nix`, such as
+  `brave-origin`) resolve first; the generator builds them here, since they
+  unpack their maker's download like a vendor app;
 - adds Flathub AppStream metadata: name, summary, description (Flatpak
   packaging notes removed), developer, licence, brand colours, screenshot URLs
   and installs over the last 30 days, which ranks **Popular**;
@@ -40,13 +43,16 @@ order the picker shows them. Every option names its exact desktop entry
 (`desktop`), the one `cybexos-apps set` makes the default, and a short
 `summary`. It also has one of:
 
-- `included`: Cybex OS installs it (Brave, Firefox, Kitty and the other
-  defaults). Software offers it only where it is installed.
+- `included`: Cybex OS installs it (Google Chrome with proprietary apps,
+  Firefox, Kitty and the other defaults). Software offers it only where it is
+  installed.
 - `web`: a Cybex OS mail handler in `desktop/` that opens a web mail service
   in the browser, drawn with a `glyph`.
 - `attribute`: the Nixpkgs package to install. The generator keeps the option
   only while NixOS has prebuilt it (or it is an unfree vendor download), and
-  checks that the package really installs `desktop`.
+  checks that the package really installs `desktop`. It can also name one of
+  Cybex OS's own optional packages: Brave Origin is `brave-origin`, which
+  Software offers as a download from its maker.
 - `flathub`: the Flathub app installed for the account when NixOS has no
   prebuilt package (or none at all). Its desktop entry is the Flathub ID plus
   `.desktop`.
@@ -71,8 +77,9 @@ An option with the same id as a catalogue app uses that app's icon, name and
 page. Any other option needs an icon. It takes Flathub's icon (from its
 `flathub` or `appstream` ID), or, for an app Flathub doesn't carry, the
 package's own `icon` file from cache.nixos.org (a hicolor `share/icons`
-path). Ghostty, Alacritty, foot and Thunar use theirs this way. These icons
-belong to their projects too.
+path). Ghostty, Alacritty, foot and Thunar use theirs this way, and Brave
+Origin its own from the package built here. These icons belong to their
+projects too.
 
 ## What a profile includes
 

@@ -283,13 +283,13 @@ test("Flathub actions follow the change in flight, what is installed and policy"
 // ---- default apps ------------------------------------------------------------
 
 const browserRole = { id: "browser", options: [
-    { id: "brave", name: "Brave", desktop: "brave-browser.desktop", included: true, perks: ["1password", "webapps"] },
+    { id: "chrome", name: "Google Chrome", desktop: "google-chrome.desktop", included: true, perks: ["1password", "webapps"] },
     { id: "firefox", name: "Firefox", desktop: "firefox.desktop", included: true, perks: ["1password", "-webapps"] },
     { id: "librewolf", name: "LibreWolf", desktop: "librewolf.desktop", attribute: "librewolf", free: true,
       downloadBytes: 128e6, unavailable: "", perks: ["-1password", "-webapps"] },
-    { id: "chrome", name: "Google Chrome", desktop: "google-chrome.desktop", attribute: "google-chrome", free: false,
-      unavailable: "unfree" },
-    { id: "vivaldi", name: "Vivaldi", desktop: "vivaldi-stable.desktop", attribute: "vivaldi", free: false, unavailable: "" },
+    { id: "brave", name: "Brave", desktop: "brave-browser.desktop", attribute: "brave-origin", free: false, unavailable: "",
+      perks: ["1password", "webapps"] },
+    { id: "vivaldi", name: "Vivaldi", desktop: "vivaldi-stable.desktop", attribute: "vivaldi", free: false, unavailable: "unfree" },
     { id: "zen", name: "Zen Browser", desktop: "app.zen_browser.zen.desktop", attribute: null,
       flathub: "app.zen_browser.zen", flathubDesktop: "app.zen_browser.zen.desktop", perks: ["sandbox"] },
     { id: "thunderbird", name: "Thunderbird", desktop: "thunderbird.desktop", attribute: "thunderbird", unavailable: "missing",
@@ -301,13 +301,13 @@ test("a job's options say how each would arrive, and hide what this computer can
     assert.deepEqual(rows.map(row => [row.option.id, row.source, row.desktop]), [
         ["firefox", "installed", "firefox.desktop"],
         ["librewolf", "nixos", "librewolf.desktop"],
-        ["vivaldi", "vendor", "vivaldi-stable.desktop"],
+        ["brave", "vendor", "brave-browser.desktop"],
         ["zen", "flathub", "app.zen_browser.zen.desktop"],
         ["thunderbird", "flathub", "org.mozilla.Thunderbird.desktop"]],
-        "Brave isn't here (proprietary apps off) and Chrome can't be installed: both are hidden");
+        "Chrome isn't here (proprietary apps off) and Vivaldi can't be installed: both are hidden");
     assert.equal(rows[0].ready, true);
     const off = H.roleChoices(browserRole, present, { flathubOn: false, flathubInstalled: [] });
-    assert.deepEqual(off.map(row => row.option.id), ["firefox", "librewolf", "vivaldi"], "Flathub turned off");
+    assert.deepEqual(off.map(row => row.option.id), ["firefox", "librewolf", "brave"], "Flathub turned off");
     const fromFlathub = H.roleOption(browserRole.options[6], () => false,
         { flathubInstalled: [{ id: "org.mozilla.Thunderbird", installation: "user" }] });
     assert.deepEqual([fromFlathub.source, fromFlathub.desktop, fromFlathub.ready],
@@ -317,10 +317,10 @@ test("a job's options say how each would arrive, and hide what this computer can
 });
 
 test("a job's card names the app doing it, who chose it, and one on its way", () => {
-    const status = { effective: "brave-browser.desktop", system: "brave-browser.desktop", personal: false, pending: "",
-        choices: [{ value: "brave-browser.desktop", label: "Brave" }, { value: "epiphany.desktop", label: "Web" }] };
+    const status = { effective: "google-chrome.desktop", system: "google-chrome.desktop", personal: false, pending: "",
+        choices: [{ value: "google-chrome.desktop", label: "Google Chrome" }, { value: "epiphany.desktop", label: "Web" }] };
     assert.deepEqual(H.roleCard(browserRole, status).who, "system");
-    assert.equal(H.roleCard(browserRole, status).name, "Brave");
+    assert.equal(H.roleCard(browserRole, status).name, "Google Chrome");
     const mine = Object.assign({}, status, { effective: "firefox.desktop", personal: true });
     assert.deepEqual([H.roleCard(browserRole, mine).who, H.roleCard(browserRole, mine).name], ["you", "Firefox"]);
     const same = Object.assign({}, status, { personal: true });

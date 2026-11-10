@@ -4120,9 +4120,9 @@
    "id": "browser",
    "options": [
     {
-     "id": "brave",
-     "name": "Brave",
-     "desktop": "brave-browser.desktop",
+     "id": "chrome",
+     "name": "Google Chrome",
+     "desktop": "google-chrome.desktop",
      "perks": [
       "1password",
       "webapps"
@@ -4130,8 +4130,8 @@
      "included": true,
      "web": false,
      "glyph": "",
-     "icon": false,
-     "summary": "Brave Origin: fast and private, and blocks ads and trackers."
+     "icon": true,
+     "summary": "Google’s browser, synced with your Google account."
     },
     {
      "id": "firefox",
@@ -4146,6 +4146,21 @@
      "glyph": "",
      "icon": true,
      "summary": "Mozilla’s browser, with its own independent engine."
+    },
+    {
+     "id": "brave",
+     "name": "Brave",
+     "desktop": "brave-browser.desktop",
+     "perks": [
+      "1password",
+      "webapps"
+     ],
+     "attribute": "brave-origin",
+     "free": false,
+     "downloadBytes": null,
+     "icon": true,
+     "app": false,
+     "summary": "Brave Origin: fast and private, and blocks ads and trackers."
     },
     {
      "id": "librewolf",
@@ -4191,21 +4206,6 @@
      "icon": true,
      "app": true,
      "summary": "Tabs, panels and notes, arranged however you like."
-    },
-    {
-     "id": "chrome",
-     "name": "Google Chrome",
-     "desktop": "google-chrome.desktop",
-     "perks": [
-      "webapps",
-      "-1password"
-     ],
-     "attribute": "google-chrome",
-     "free": false,
-     "downloadBytes": null,
-     "icon": true,
-     "app": true,
-     "summary": "Google’s browser, synced with your Google account."
     },
     {
      "id": "zen",

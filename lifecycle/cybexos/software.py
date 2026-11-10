@@ -148,6 +148,7 @@ def evaluate(run, config, attributes, *, derivations=False):
             'unfree': meta.get('unfree') is True,
             'available': meta.get('exists') is True and meta.get('available') is not False,
             'broken': meta.get('broken') is True,
+            'own': meta.get('own') is True,
             'drvPath': drv if isinstance(drv, str) and STORE_PATH.fullmatch(drv) and drv.endswith('.drv') else None,
         }
     return {'allowUnfree': data['allowUnfree'], 'packages': rows}
@@ -295,7 +296,8 @@ def check(attributes, *, config='/etc/nixos', run=None):
     A dry run of the machine's own packages (the same universe as search)
     against its store and configured caches; nothing is built. Unfree vendor
     packages are never in the NixOS cache: unpacking their download is
-    expected, and so is anything needed only to build them.
+    expected, and so is anything needed only to build them. Cybex OS's own
+    optional packages (Brave Origin) unpack their maker's download the same way.
     """
     wanted = attributes_to_check(attributes)
     config = Path(config).resolve()
@@ -306,16 +308,19 @@ def check(attributes, *, config='/etc/nixos', run=None):
         info = meta['packages'].get(attribute)
         reason = unavailable(info, meta['allowUnfree']) or ('' if info['drvPath'] else 'unsupported')
         row = {'state': 'unavailable' if reason else 'checking', 'reason': reason, 'compiles': [],
-               'vendor': bool(info and info['unfree']), 'version': info['version'] if info else ''}
+               'vendor': bool(info and (info['unfree'] or info.get('own'))), 'version': info['version'] if info else ''}
         result[attribute] = row
         if not reason:
             roots[attribute] = info['drvPath']
     plan = {'build': [], 'fetch': [], 'downloadBytes': 0}
     if roots:
-        machine = 'path:' + str(config) + '#nixosConfigurations.cybexos.pkgs.'
+        machine = 'path:' + str(config) + '#nixosConfigurations.cybexos.'
+        own = {attribute for attribute in roots if meta['packages'][attribute].get('own')}
+        installables = [machine + ('config.cybexos.software.optionalPackages.' if attribute in own else 'pkgs.') + attribute
+                        for attribute in roots]
         try:
             # The lock is never refreshed.
-            plan = prebuilt.dry_run(run, *[machine + attribute for attribute in roots], options=('--no-update-lock-file',))
+            plan = prebuilt.dry_run(run, *installables, options=('--no-update-lock-file',))
             shared = Remembered(run)
             expected = [root for attribute, root in roots.items() if result[attribute]['vendor']]
             for attribute, root in roots.items():
