@@ -103,6 +103,10 @@ in {
     # voxtype unit does not start on one without (nix/modules/desktop.nix).
     dictationPackage = mkOption { type = types.package; default = (pkgs.voxtype.override { vulkanSupport = true; onnxSupport = true; }).overrideAttrs (old: {
       patches = (old.patches or [ ]) ++ [ ../packages/voxtype-dictation.patch ];
+      # Nixpkgs' Rust builds link native crates to system libraries instead of
+      # bundled copies: this build's onig_sys (RUSTONIG_SYSTEM_LIBONIG) and
+      # libsqlite3-sys (LIBSQLITE3_SYS_USE_PKG_CONFIG) need theirs.
+      buildInputs = (old.buildInputs or [ ]) ++ [ pkgs.oniguruma pkgs.sqlite ];
       env = (old.env or { }) // { GGML_SSE42 = "ON"; GGML_AVX = "ON"; GGML_AVX2 = "ON"; GGML_FMA = "ON"; GGML_F16C = "ON"; GGML_BMI2 = "ON"; };
     }); description = "Nixpkgs Voxtype with Vulkan acceleration, ONNX Runtime engines, an AVX2 CPU path and Cybex OS dictation fixes"; };
   };

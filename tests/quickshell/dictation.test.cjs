@@ -137,6 +137,9 @@ test("the seeded Voxtype configuration streams, detects silence and keeps the mo
     assert.match(options, /patches = \(old\.patches or \[ \]\) \+\+ \[ \.\.\/packages\/voxtype-dictation\.patch \]/);
     // ONNX Runtime from Nixpkgs runs Parakeet, which the patch streams.
     assert.match(options, /pkgs\.voxtype\.override \{ vulkanSupport = true; onnxSupport = true; \}/);
+    // Nixpkgs' Rust builds link onig_sys and libsqlite3-sys to system
+    // libraries; this build (unlike NixOS's cached one) compiles both.
+    assert.match(options, /buildInputs = \(old\.buildInputs or \[ \]\) \+\+ \[ pkgs\.oniguruma pkgs\.sqlite \]/);
     const patch = fs.readFileSync(path.join(repo, "nix/packages/voxtype-dictation.patch"), "utf8");
     assert.match(patch, /\+fn parakeet_streams_by_window\(model: &str\) -> bool \{/);
     assert.match(patch, /\+fn write_recording\(transcript: &std::path::Path, samples: &\[f32\], sample_rate: u32\) \{/);

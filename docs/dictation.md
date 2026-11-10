@@ -223,7 +223,11 @@ of the 8-bit ONNX export of NVIDIA's
 into `~/.local/share/voxtype/models/parakeet-tdt-0.6b-v3-int8/`
 (670,480,039 bytes in all; each file's length and SHA-256 are pinned in the
 helper). ONNX Runtime comes from Nixpkgs with the Voxtype build
-(`onnxSupport`).
+(`onnxSupport`). NixOS caches only the Voxtype without it, so this one builds
+on the computer. Since nixos-unstable `f4a03c00`, Nixpkgs' Rust builds link
+native crates to system libraries instead of bundled copies, so the build
+adds the two its crates need: Oniguruma (`onig_sys`) and SQLite
+(`libsqlite3-sys`).
 
 Each download checks the free space first and writes each file to a hidden
 `.part` file that is renamed into place only when its length and SHA-256
