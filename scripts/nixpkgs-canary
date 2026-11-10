@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate Cybex OS against Nixpkgs revisions machines will receive next.
+"""Check Cybex OS against Nixpkgs revisions machines will receive next.
 
 Installed machines follow nixos-unstable themselves, so a Nixpkgs change that
 removes or renames something Cybex OS uses breaks their next update (as
@@ -8,11 +8,19 @@ the channel. This evaluates main and the newest beta and stable releases
 against the channel head and master, plus the next stable branch once it
 exists, and reports errors and new evaluation warnings.
 
-  scripts/nixpkgs-canary [--sources main,beta,stable,TAG...] [--report DIR]
+With --build it also builds each source's expected local builds (Cybex OS's
+own packages and the unfree vendor downloads machines compile themselves)
+against the channel head. NixOS's cache has everything else, so these are
+what can still fail on a machine (Voxtype on 2026-11-10). Each source's own
+scripts/check-prebuilt names the packages its machines' updater holds back
+until NixOS builds them: a build that fails there means machines wait, and
+any other failure is one they would hit.
 
-Evaluation only: nothing is built. Exit status 1 means an evaluation failed.
-The nixpkgs-canary workflow runs it daily and keeps a GitHub issue open while
-it fails. Locally it needs git, gh (for the release tags) and Nix.
+  scripts/nixpkgs-canary [--sources main,beta,stable,TAG...] [--build] [--report DIR]
+
+Exit status 1 means an evaluation or a build failed. The nixpkgs-canary
+workflow runs it daily with --build and keeps a GitHub issue open while it
+fails. Locally it needs git, gh (for the release tags) and Nix.
 """
 import argparse
 import json
@@ -31,6 +39,25 @@ TARGETS = ['product', 'system', 'xps-system', 'nvidia-evaluation']
 # The stable branch that follows the current one. NixOS 26.11 is planned for
 # 2026-11-23; once it exists, Cybex OS moves to it (CLAUDE.md).
 NEXT_STABLE = 'nixos-26.11'
+# The full default application selection (the `product` check), evaluated as
+# scripts/check-prebuilt evaluates it.
+EXPECTED = '''
+  let
+    flake = builtins.getFlake (toString %(root)s);
+    system = flake.inputs.nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [ flake.nixosModules.default (%(root)s + "/nix/tests/machine.nix") ({ lib, ... }: {
+        cybexos.features = { proprietary = lib.mkForce true; steam = lib.mkForce true; docker = lib.mkForce true; };
+      }) ];
+    };
+  in system.config.system.build.cybexosExpectedBuilds
+'''
+# A derivation whose own builder failed, in Nix's older and newer wording.
+FAILED = re.compile(r"Cannot build '(/nix/store/[^']+\.drv)'\.\s+Reason: (?!\d+ dependenc)"
+                    r"|builder for '(/nix/store/[^']+\.drv)' failed"
+                    r"|hash mismatch in fixed-output derivation '(/nix/store/[^']+\.drv)'")
+UNBUILT = re.compile(r"Cannot build '(/nix/store/[^']+\.drv)'|builder for '(/nix/store/[^']+\.drv)' failed"
+                     r"|dependencies of derivation '(/nix/store/[^']+\.drv)' failed")
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
 NOISE = ('warning: Git tree', "warning: unknown setting", 'warning: ignoring untrusted',
          'warning: Nix search path entry', 'warning: not writing modified lock file')
@@ -125,7 +152,84 @@ def check(name, revision, branches, workspace):
     return results
 
 
-def markdown(results, branches):
+def tail(text, lines=25):
+    return '\n'.join(ANSI.sub('', text).strip().splitlines()[-lines:])
+
+
+def derivation(path):
+    """`/nix/store/<hash>-codex-0.167.0.drv` -> `codex-0.167.0`."""
+    base = path.rsplit('/', 1)[-1].split('-', 1)[-1]
+    return base[:-4] if base.endswith('.drv') else base
+
+
+def build(name, revision, branch, workspace):
+    """A source's expected local builds against one Nixpkgs revision."""
+    source = Path(workspace) / (name + '-build')
+    subprocess.run(['git', 'worktree', 'add', '--quiet', '--detach', str(source), revision], cwd=ROOT, check=True)
+    result = {'source': name, 'revision': revision, 'nixpkgs': branch, 'ok': False,
+              'expected': 0, 'built': 0, 'held': [], 'failed': []}
+    try:
+        # Machines resolve Cybex OS against their own Nixpkgs the same way.
+        step = run(*NIX, 'flake', 'lock', '--override-input', 'nixpkgs', f"github:NixOS/nixpkgs/{branch['rev']}",
+                   cwd=source)
+        if step.returncode:
+            return result | {'error': tail(step.stderr)}
+        step = run(sys.executable, '-I', '-B', str(source / 'scripts/check-prebuilt'), cwd=source)
+        held = [line.strip() for line in step.stdout.splitlines()
+                if line.strip() and not line.startswith('pointer theme: ')]
+        if step.returncode not in (0, 1) or (step.returncode and not step.stdout.strip()):
+            return result | {'error': tail(step.stderr)}
+        step = run(*NIX, 'eval', '--impure', '--json', '--expr', EXPECTED % {'root': json.dumps(str(source))}, cwd=source)
+        if step.returncode:
+            return result | {'error': tail(step.stderr)}
+        expected = json.loads(step.stdout)
+        print(f"{name}: building {len(expected)} expected local builds against {branch['ref']} {branch['rev'][:12]}",
+              flush=True)
+        step = run(*NIX, 'build', '--no-link', '--keep-going', *(path + '^*' for path in expected), cwd=source)
+        text = ANSI.sub('', step.stderr)
+        failed = sorted({next(filter(None, match.groups())) for match in FAILED.finditer(text)})
+        unbuilt = {next(filter(None, match.groups())) for match in UNBUILT.finditer(text)} & set(expected)
+        result |= {'expected': len(expected), 'built': len(expected) - len(unbuilt), 'held': held}
+        for path in failed:
+            waits = derivation(path) in held
+            log = '' if waits else tail(run(*NIX, 'log', path).stdout)
+            result['failed'].append({'derivation': path, 'name': derivation(path), 'held': waits, 'log': log})
+        if step.returncode and not failed:
+            return result | {'error': tail(text)}
+        result['ok'] = all(item['held'] for item in result['failed'])
+        return result
+    finally:
+        subprocess.run(['git', 'worktree', 'remove', '--force', str(source)], cwd=ROOT)
+
+
+def markdown_builds(builds):
+    if not builds:
+        return []
+    branch = builds[0]['nixpkgs']
+    lines = ['', f"Built the product system's expected local builds against `{branch['ref']}` {branch['rev'][:12]}:", '']
+    for b in builds:
+        head = f"- **{b['source']}** (`{b['revision'][:12]}`): "
+        if b.get('skipped'):
+            lines.append(head + 'not built; it does not evaluate (above).')
+            continue
+        if b.get('error'):
+            lines += [head + 'the build check itself failed:', '', '  ```', *('  ' + line for line in b['error'].splitlines()),
+                      '  ```']
+            continue
+        lines.append(head + f"{b['built']} of {b['expected']} built.")
+        waiting = sorted({item['name'] for item in b['failed'] if item['held']})
+        if waiting:
+            lines.append(f"  NixOS hasn't built {', '.join(f'`{n}`' for n in waiting)}; machines on this release hold "
+                         'the NixOS update back until it has.')
+        for item in b['failed']:
+            if item['held']:
+                continue
+            lines += [f"  `{item['name']}` fails to build, and machines on this release would try to build it when "
+                      'they take this Nixpkgs:', '', '  ```', *('  ' + line for line in item['log'].splitlines()), '  ```']
+    return lines
+
+
+def markdown(results, branches, builds=()):
     heads = ', '.join(f"`{b['ref']}` {b['rev'][:12]}" for b in branches)
     lines = [f'Evaluated against {heads}.', '']
     failed = [r for r in results if not r['ok']]
@@ -144,32 +248,44 @@ def markdown(results, branches):
         lines += [f"- `{w[:300]}` ({', '.join(sorted(where))})" for w, where in sorted(warned.items())]
     if not failed and not warned:
         lines.append('Every source evaluates without new warnings.')
+    lines += markdown_builds(builds)
     return '\n'.join(lines) + '\n'
 
 
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--sources', default='main,beta,stable')
+    parser.add_argument('--build', action='store_true',
+                        help="also build each source's expected local builds against the channel head")
     parser.add_argument('--report', type=Path, help='write report.json and report.md here')
     options = parser.parse_args(argv)
     branches = [b for b in (nixpkgs(ref) for ref in ('nixos-unstable', 'master', NEXT_STABLE)) if b]
     if len(branches) < 2:
         raise SystemExit('nixpkgs-canary: cannot resolve the Nixpkgs channel and master')
-    seen, results = set(), []
+    seen, results, builds = set(), [], []
     with tempfile.TemporaryDirectory(prefix='nixpkgs-canary.') as workspace:
         for name, revision in sources(options.sources.split(',')).items():
             commit = run('git', 'rev-parse', revision + '^{commit}', cwd=ROOT).stdout.strip()
             if commit in seen:
                 continue
             seen.add(commit)
-            results += check(name, revision, branches, workspace)
-    report = markdown(results, branches)
+            evaluated = check(name, revision, branches, workspace)
+            results += evaluated
+            # Only the channel is in NixOS's cache; master would compile everything.
+            channel = next((b for b in branches if b['ref'] == 'nixos-unstable'), None)
+            if options.build and channel:
+                if any(r['target'] == 'product' and r['nixpkgs']['ref'] == channel['ref'] and not r['ok']
+                       for r in evaluated):
+                    builds.append({'source': name, 'revision': revision, 'nixpkgs': channel, 'ok': True, 'skipped': True})
+                else:
+                    builds.append(build(name, revision, channel, workspace))
+    report = markdown(results, branches, builds)
     print(report)
     if options.report:
         options.report.mkdir(parents=True, exist_ok=True)
-        (options.report / 'report.json').write_text(json.dumps(results, indent=2) + '\n')
+        (options.report / 'report.json').write_text(json.dumps({'evaluations': results, 'builds': builds}, indent=2) + '\n')
         (options.report / 'report.md').write_text(report)
-    failed = any(not r['ok'] for r in results)
+    failed = any(not r['ok'] for r in results) or any(not b['ok'] for b in builds)
     warned = any(r['new_warnings'] for r in results)
     if options.report:
         (options.report / 'status').write_text('failed\n' if failed else 'warnings\n' if warned else 'ok\n')

@@ -174,15 +174,29 @@ with the current pins without publishing.
 
 Machines follow `nixos-unstable` themselves, so a Nixpkgs change that breaks
 Cybex OS reaches them without a Cybex OS release. The **nixpkgs-canary**
-workflow (`scripts/nixpkgs-canary`) evaluates `main` and the newest beta and
-stable releases daily against the channel head, Nixpkgs master (which leads
-the channel by days) and the next stable branch once it exists. It evaluates
-the `product`, `system`, `xps-system` and `nvidia-evaluation` checks without
-building anything. An evaluation failure, or a new evaluation warning (usually
-the notice before a removal), keeps a `nixpkgs-canary` issue open with the
-error and the module that caused it; the issue closes once every source
-evaluates again. Fix it on `main` and release before the channel moves on.
-Machines that receive the change first wait for that release
+workflow (`scripts/nixpkgs-canary --build`) evaluates `main` and the newest
+beta and stable releases daily against the channel head, Nixpkgs master
+(which leads the channel by days) and the next stable branch once it exists.
+It evaluates the `product`, `system`, `xps-system` and `nvidia-evaluation`
+checks.
+
+It then builds each source's expected local builds for the `product` system
+(Cybex OS's own packages and the unfree vendor downloads machines compile
+themselves) against the channel head, the only branch NixOS's cache covers.
+Evaluation misses a build that only fails: on 2026-11-10 the channel's new
+Rust build settings broke Cybex OS's Voxtype build on every machine that
+took it. The source's own `scripts/check-prebuilt` names what its machines'
+updater holds back until NixOS has built it. A build failure there is
+reported as a wait; any other failure is one machines on that release would
+hit, such as the codex ChatGPT needed that day, which updaters then still
+let through.
+
+An evaluation failure, a build failure machines would hit, or a new evaluation
+warning (usually the notice before a removal) keeps a `nixpkgs-canary` issue
+open with the error, the module that caused it or the failing build's log;
+the issue closes once every source evaluates and builds again. Fix it on
+`main` and release before the channel moves on. Machines that receive the
+change first wait for that release
 ([updates](updates.md#when-nixpkgs-drops-something-cybex-os-uses)).
 
 Fix forward on `main`: there are no maintenance branches. When stable needs a
