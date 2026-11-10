@@ -1252,9 +1252,11 @@ def qualify_lifecycle(vm, encrypted, checks=None):
     if discovery['upstream']['state'] not in ('current', 'available'):
         raise RuntimeError('Cannot qualify independent upstream discovery: ' + json.dumps(discovery))
     vendor = discovery['cybexos']
-    if not ((vendor['state'] == 'unpublished' and not vendor.get('error'))
+    # Nothing from the release channel to install: no release yet, or this
+    # source's version is that channel's newest release or past it.
+    if not ((vendor['state'] in ('unpublished', 'current', 'ahead') and not vendor.get('error'))
             or (vendor['state'] == 'unavailable' and vendor.get('error'))):
-        raise RuntimeError('This development test requires an unpublished or accurately unavailable vendor channel: ' + json.dumps(discovery))
+        raise RuntimeError('This development test requires a release channel with nothing to install: ' + json.dumps(discovery))
     before = json.loads(vm.command('''python3 - <<'QA'
 from pathlib import Path
 import hashlib, json

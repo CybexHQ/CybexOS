@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -166,7 +167,8 @@ class PromoteTests(unittest.TestCase):
         self.git('remote', 'add', 'origin', str(self.origin))
         self.listing = []
         tools = base / 'bin'; tools.mkdir()
-        (tools / 'gh').write_text(FAKE_GH)
+        # A Nix build sandbox has no /usr/bin/env.
+        (tools / 'gh').write_text(FAKE_GH.replace('#!/usr/bin/env python3', f'#!{sys.executable}', 1))
         (tools / 'gh').chmod(0o755)
         self.environment = {key: value for key, value in os.environ.items() if key not in ('VISUAL', 'EDITOR')}
         self.environment |= {'PATH': f'{tools}:{os.environ["PATH"]}', 'GH_LOG': str(self.log),
