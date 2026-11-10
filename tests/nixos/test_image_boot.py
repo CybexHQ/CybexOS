@@ -112,6 +112,23 @@ class KeyboardShortcutsRuntimeTests(unittest.TestCase):
         self.assertIn("SHORTCUT_REMAP = 'SUPER + ALT + B'", source)
 
 
+class UpstreamHoldTests(unittest.TestCase):
+    HELD = {'state': 'failed', 'changeKind': 'update', 'scope': 'upstream', 'notPrebuilt': ['codex-0.167.0', 'tectonic-0.17.0']}
+
+    def test_packages_nixos_has_not_built_or_a_newer_release_are_a_hold(self):
+        self.assertEqual(qualification.upstream_hold(self.HELD), {'notPrebuilt': ['codex-0.167.0', 'tectonic-0.17.0']})
+        incompatible = {'origin': 'cybexos', 'file': 'nix/modules/applications.nix', 'message': 'gone'}
+        self.assertEqual(qualification.upstream_hold(self.HELD | {'notPrebuilt': None, 'incompatible': incompatible}),
+                         {'incompatible': incompatible})
+
+    def test_any_other_failure_is_not(self):
+        for change in ({'notPrebuilt': None}, {'notPrebuilt': []}, {'notPrebuilt': ['']}, {'state': 'ready'},
+                       {'scope': 'both'}, {'changeKind': 'software'},
+                       {'notPrebuilt': None, 'incompatible': {'origin': 'personal', 'file': 'local/x.nix'}}):
+            with self.subTest(change=change):
+                self.assertIsNone(qualification.upstream_hold(self.HELD | change))
+
+
 class BootMenuIdentityTests(unittest.TestCase):
     profiles = [
         {'kernel': '/boot/kernel-a', 'initrd': '/boot/initrd-a', 'system': '/nix/store/system-a'},

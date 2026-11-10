@@ -1089,6 +1089,24 @@ exit 1'''.replace('TIMEOUT', str(timeout)).replace('EXPECTED', '|'.join(expected
     return vm.command(script, timeout=timeout + 30)
 
 
+def upstream_hold(status):
+    """What a held NixOS package update waits for, or None for any other failure.
+
+    The same rules as lifecycle/cybexos/prebuilt.py `held`: packages NixOS
+    hasn't built (or that fail to build), or a Nixpkgs that needs a newer
+    Cybex OS release. A personal configuration is never a hold.
+    """
+    if status.get('state') != 'failed' or status.get('changeKind') != 'update' or status.get('scope') != 'upstream':
+        return None
+    names = status.get('notPrebuilt')
+    if isinstance(names, list) and names and all(isinstance(name, str) and name.strip() for name in names):
+        return {'notPrebuilt': names}
+    details = status.get('incompatible')
+    if isinstance(details, dict) and details.get('origin') in ('cybexos', 'unknown'):
+        return {'incompatible': details}
+    return None
+
+
 def stage_request(vm, scope='local'):
     previous = json.loads(vm.command('cybex update status').strip()).get('transaction')
     vm.command('cybex update stage ' + shlex.quote(scope))
@@ -1274,14 +1292,23 @@ QA
     vm.command('systemctl start cybexos-update-auto.service', timeout=900)
     # The unit's own result line; systemd adds its lifecycle messages around it.
     automatic = json.loads(vm.command("journalctl -b -u cybexos-update-auto.service -o cat --no-pager | grep '^{' | tail -n 1").strip())
+    held = None
     if discovery['upstream']['state'] == 'available':
         if automatic.get('scope') != 'upstream' or not automatic.get('accepted'):
             raise RuntimeError('Background preparation did not request the available upstream update: ' + json.dumps(automatic))
-        wait_state(vm, ('ready',), previous=previous)
+        wait_state(vm, ('ready', 'failed'), previous=previous)
         vm.command('cybex update status > /run/qa-status.json')
         import base64
         upstream = json.loads(base64.b64decode(vm.command('base64 -w0 /run/qa-status.json').strip()))
-        if 'nixos' not in [row['id'] for row in upstream['highlights']['components']]:
+        if upstream['state'] == 'failed':
+            # The channel's newest Nixpkgs may not be installable yet: NixOS
+            # hasn't built a package this system needs (codex and tectonic on
+            # 2026-11-10), or it needs a newer Cybex OS. The updater must then
+            # hold it, change nothing, and say why; any other failure fails.
+            held = upstream_hold(upstream)
+            if not held:
+                raise RuntimeError('Background preparation of the available upstream update failed: ' + json.dumps(upstream))
+        elif 'nixos' not in [row['id'] for row in upstream['highlights']['components']]:
             raise RuntimeError('The readable review omits the changed NixOS build: ' + json.dumps(upstream['highlights']))
     else:
         if automatic != {'skipped': 'current'}:
@@ -1289,7 +1316,7 @@ QA
         upstream = stage(vm, 'upstream')
     vm.command('cybex update automatic prepare off')
     checks['automaticPreparation'] = {'result': 'passed', 'outcome': automatic,
-                                      'highlights': upstream.get('highlights')}
+                                      'highlights': upstream.get('highlights'), 'held': held}
     if upstream['inputs']['cybexos'] != before['cybexos']:
         raise RuntimeError('Upstream staging changed the installed Cybex OS identity')
     after_hash = vm.command("sha256sum /etc/nixos/flake.lock | cut -d ' ' -f 1").strip()
@@ -1298,8 +1325,9 @@ QA
     checks['upstreamWithUnavailableVendor'] = {
         'result': 'passed', 'discovery': discovery, 'transaction': upstream['transaction'],
         'upstreamBefore': before['nixpkgs'], 'upstreamAfter': upstream['inputs']['nixpkgs'],
-        'upstreamChanged': before['nixpkgs'] != upstream['inputs']['nixpkgs'], 'applied': False,
-        'scope': 'actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification'}
+        'upstreamChanged': before['nixpkgs'] != upstream['inputs']['nixpkgs'], 'applied': False, 'held': held,
+        'scope': ('actual independent discovery and the updater holding a Nixpkgs it cannot install yet; nothing built or applied'
+                  if held else 'actual independent discovery and complete upstream worker build/validation; candidate remains unapplied; unchanged identity is not changed-package update qualification')}
     checks['kernelUpdateAndRollback'] = qualify_kernel_update(vm, encrypted)
     edit_import(vm, 'qualification.nix', PERSONAL_MODULE)
     vm.command('''python3 - <<'QA'
