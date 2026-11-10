@@ -15,7 +15,7 @@
     "cybexos-doctor",
     "cybexos-backup",
     "cybexos-theme",
-    "color-picker", "screenshot-stitch"
+    "color-picker"
   ],
   "essentialPaths": [
     ".config/cybexos/shell.json", ".config/fastfetch", ".config/fish",

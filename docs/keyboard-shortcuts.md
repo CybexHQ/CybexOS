@@ -155,24 +155,49 @@ pruned or cleared.
 
 | Keys | Action |
 | --- | --- |
-| `Print`, `` Super+` `` | Screenshot: drag out a region, or click a window to capture exactly that window |
-| `Shift+Print` | Screenshot of the focused screen |
+| `Print`, `` Super+` `` | Screenshot: drag out a region, click a window for just that window, or click outside every window for the whole screen |
+| `Shift+Print` | Screenshot of the focused screen, saved and copied at once |
 | `Alt+Print`, `` Super+Alt+` `` | Scrolling screenshot |
 | `` Super+Shift+` `` | Start or stop a screen recording |
 | `` Super+Ctrl+Shift+` `` | Start or stop a screen recording with the webcam |
 | `Super+Shift+O` | Copy the text, or the QR code or barcode, in a region |
 | `Super+Print`, `Super+Shift+C` | Pick a colour |
 
-Screenshots are saved in `~/Pictures/Screenshots` and copied to the
-clipboard; click the notification to edit one in Satty.
+Screenshots are taken by [Omasnap](https://github.com/omacom/omasnap), the
+screenshot tool Omarchy uses. It opens on the focused screen and captures it
+before you choose, so nothing moves under the pointer. Pressing the shortcut
+again closes it. Its controls follow the desktop's colours. While choosing:
 
-For a scrolling screenshot, select the area to capture, then scroll its
-content down at a normal pace. Press `Enter`, `Escape` or the shortcut again
-to finish, or click the red indicator in the menubar. The frames are joined
-where they overlap into one tall image; a header or footer that stays in
-place appears once. A capture stops by itself after 90 seconds or 24,000
-pixels. Scrolling back up adds nothing, and a part scrolled past too quickly
-to overlap is joined with a gap, which the notification mentions.
+| Key | Action |
+| --- | --- |
+| `Tab` | Cycle the region's shape: free, square, 3:4, 16:9 |
+| `S` | Switch to a scrolling capture |
+| `R` | Use the last region again |
+| `Ctrl+A` | Select the whole screen |
+| `Super+Arrow`, `Enter` | Move between windows, and capture the highlighted one |
+| `E` | Open the editor after the capture |
+| `Space` | Show or hide your recent captures at the right edge; click one to edit it again |
+| `?` | Show or hide the list of keys |
+| `Escape` | Cancel |
+
+Each screenshot is saved in `~/Pictures/Screenshots` and copied to the
+clipboard. A preview stays in the corner of the screen for a few seconds:
+drag it into an app to attach the image, or hover it to copy it again, pin it
+on top of your windows or edit it. `Shift+Print` shows a notification instead;
+click it to edit the screenshot.
+
+The editor keeps every arrow, shape, text and highlight movable after you
+draw it. It also redacts, crops, cuts a band out of an image, reads text
+(OCR) and adds a background. `Enter` copies and saves the result, `Ctrl+C`
+only copies it and `Ctrl+S` only saves it. To annotate an image you already
+have, run `omasnap FILE`, or `omasnap --clipboard` for the image on the
+clipboard. Settings, such as the folder screenshots are saved in, go in
+`~/.config/omasnap/omasnap.conf`; see Omasnap's README.
+
+For a scrolling screenshot, drag out the area, then choose how it scrolls:
+**Scroll** captures while you scroll the content yourself, and **Auto**
+scrolls it for you until the page stops moving. Click **Done** or press
+`Enter` to finish, and the frames are joined into one tall image.
 
 A webcam recording shows a round camera preview in a corner of the recorded
 area, and the recording includes it. Drag the preview to move it to another

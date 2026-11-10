@@ -18,7 +18,7 @@ from websockets.sync.client import connect
 # developer shell supplying missing tools. These are executable dependencies of
 # preserved capture, clipboard, network, audio, night-light and assistant flows.
 required_commands = (
-    'satty', 'wayfreeze', 'tesseract', 'zbarimg', 'qrencode', 'hyprpicker', 'hyprsunset',
+    'omasnap', 'wayfreeze', 'tesseract', 'zbarimg', 'qrencode', 'hyprpicker', 'hyprsunset',
     'magick', 'matugen', 'notify-send', 'wtype', 'pactl', 'wpctl', 'wl-copy', 'wl-paste', 'cliphist',
     'grim', 'slurp', 'wf-recorder', 'ffmpeg', 'vainfo', 'jq', 'pgrep', 'find', 'grep', 'sed', 'awk',
     'xdg-open', 'curl', 'node', 'iw', 'ip', 'brightnessctl', 'playerctl', 'nmcli',
@@ -37,6 +37,12 @@ png = subprocess.check_output(['magick', '-size', '2x2', 'xc:red', 'png:-'])
 assert Image.open(io.BytesIO(png)).size == (2, 2)
 qr = subprocess.check_output(['qrencode', '-t', 'ASCII', '-m', '2', '-o', '-'], input=b'Cybex OS dependency check')
 assert b'##' in qr and len(qr.splitlines()) > 10
+# Screenshots: Omasnap starts, and its notifications have their adapter.
+omasnap = subprocess.run(['omasnap', '--version'], env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'},
+                         capture_output=True, text=True, timeout=60)
+assert omasnap.returncode == 0 and omasnap.stdout.split()[:1] == ['omasnap'], omasnap
+notifier = Path(shutil.which('omasnap')).resolve().parents[1] / 'libexec/omasnap/omarchy-notification-send'
+assert os.access(notifier, os.X_OK), notifier
 assert subprocess.check_output(['node', '-p', 'JSON.stringify({runtime:"ok"})'], text=True).strip() == '{"runtime":"ok"}'
 # Exercise the exact palette command and the shell's parser, in the wrapped
 # package environment: a developer's PATH must not hide a missing generator
