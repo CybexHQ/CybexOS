@@ -323,8 +323,12 @@ def check(attributes, *, config='/etc/nixos', run=None):
             plan = prebuilt.dry_run(run, *installables, options=('--no-update-lock-file',))
             shared = Remembered(run)
             expected = [root for attribute, root in roots.items() if result[attribute]['vendor']]
+            # An unfree download builds here; the Nixpkgs packages it needs don't.
+            vendor = [root for attribute, root in roots.items()
+                      if meta['packages'][attribute]['unfree'] and not meta['packages'][attribute].get('own')]
             for attribute, root in roots.items():
-                found = prebuilt.compiles(shared, plan['build'], root=root, expected=expected) if plan['build'] else []
+                found = prebuilt.compiles(shared, plan['build'], root=root, expected=expected,
+                                          vendor=vendor) if plan['build'] else []
                 result[attribute] |= {'state': 'compiles' if found else 'prebuilt', 'compiles': found}
         except CommandFailure:
             raise Failure("Software couldn't check NixOS's package cache. Check your internet connection and try again.") from None

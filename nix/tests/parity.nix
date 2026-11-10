@@ -129,6 +129,10 @@ let
       cybexos.autoLogin = true;
     } ];
   }).config;
+  proprietary = nixpkgs.lib.nixosSystem {
+    inherit system;
+    modules = [ module ./machine.nix ({ lib, ... }: { cybexos.features.proprietary = lib.mkForce true; }) ];
+  };
   # The same machine at a later release that changes the desktop and the
   # updater but not how the computer starts or logs in.
   nextRelease = (nixpkgs.lib.nixosSystem {
@@ -383,6 +387,14 @@ assert builtins.any (lib.hasSuffix "-cybexos-encryption-check-1/bin/cybexos-veri
 # the expected list alone; without it a Nixpkgs update waits for NixOS forever.
 assert builtins.any (lib.hasSuffix "-cybexos-encryption-check-1.drv")
   encrypted.system.build.cybexosExpectedBuilds;
+# Unfree downloads build locally, but the Nixpkgs packages they need must be
+# cached: ChatGPT is a vendor build, Cybex OS's own packages are not.
+assert let drv = package: builtins.unsafeDiscardStringContext package.drvPath;
+    builds = proprietary.config.system.build; in
+  builtins.elem (drv proprietary.pkgs.chatgpt) builds.cybexosVendorBuilds
+  && builtins.elem (drv proprietary.config.cybexos.desktopPackage) builds.cybexosExpectedBuilds
+  && !(builtins.elem (drv proprietary.config.cybexos.desktopPackage) builds.cybexosVendorBuilds)
+  && builtins.all (path: builtins.elem path builds.cybexosExpectedBuilds) builds.cybexosVendorBuilds;
 # A release that changes the desktop and the updater, but not the boot splash,
 # the encryption check or the session script, starts and logs in exactly as
 # before, so the updater installs it without a test boot.

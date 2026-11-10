@@ -205,14 +205,22 @@ def show(run, derivations):
     return graph
 
 
-def compiles(run, derivations, *, root=None, expected=(), kernel_only=False):
+def compiles(run, derivations, *, root=None, expected=(), vendor=(), kernel_only=False):
     """Names of real builds that are not expected local builds.
 
     Starting from `root` (when given), descend through trivial and
     configuration derivations only: anything needed solely to build an
-    expected derivation (Cybex OS's own packages, unfree vendor downloads) or
-    a compiled one is covered by it. Without a root every unexpected compile
+    expected derivation (Cybex OS's own packages, kernel modules) or a
+    compiled one is covered by it. Without a root every unexpected compile
     counts.
+
+    `vendor` names the expected builds that are unfree vendor downloads. They
+    build here because NixOS never caches them, but their inputs are ordinary
+    Nixpkgs packages that NixOS does build, so the walk continues into them.
+    A vendor wrapper without a source of its own (a Wayland launcher, Steam's
+    FHS environment) carries its vendor download: the first packages compiled
+    below it are that download, and their inputs are checked in turn.
+
     `kernel_only` retains personal package build choices on local previews,
     while still refusing a kernel compile before any build starts.
     """
@@ -240,21 +248,29 @@ def compiles(run, derivations, *, root=None, expected=(), kernel_only=False):
         return sorted(set(found))
     if root is None:
         return sorted(set(found) | {name(d) for d, info in graph.items() if d not in expected and kind(info) == 'compile'})
-    seen, frontier = set(), [root]
+    vendor = set(vendor) & expected
+    # (derivation, below a vendor wrapper): a package reached both ways is
+    # checked both ways.
+    seen, frontier = set(), [(root, False)]
     while frontier:
-        current = frontier.pop()
-        if current in seen or current not in graph:
+        current, wrapped = frontier.pop()
+        if (current, wrapped) in seen or current not in graph:
             continue
-        seen.add(current)
-        if current in expected:
-            continue
+        seen.add((current, wrapped))
         sort = kind(graph[current])
-        if sort == 'compile':
+        if current in vendor:
+            wrapped = sort in ('trivial', 'configuration')
+        elif current in expected:
+            continue
+        elif sort == 'compile' and wrapped:
+            wrapped = False
+        elif sort == 'compile':
             found.append(name(current))
             continue
-        if sort in ('trivial', 'configuration'):
-            for child in graph[current].get('inputDrvs') or {}:
-                child = child if child.startswith('/nix/store/') else '/nix/store/' + child
-                if child in pending:
-                    frontier.append(child)
+        elif sort not in ('trivial', 'configuration'):
+            continue
+        for child in graph[current].get('inputDrvs') or {}:
+            child = child if child.startswith('/nix/store/') else '/nix/store/' + child
+            if child in pending:
+                frontier.append((child, wrapped))
     return sorted(set(found))

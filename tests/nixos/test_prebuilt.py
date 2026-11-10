@@ -29,6 +29,9 @@ SOURCE = store('s', 'spotify.deb.drv')
 TOOL = store('t', 'patchelf-wrapper.drv')
 KERNEL = store('k', 'linux-7.3.drv')
 IMAGE = store('i', 'linux-image-7.3.drv')
+WRAPPER = store('l', 'chatgpt-wayland-26.1.drv')
+APP = store('a', 'chatgpt-26.1.drv')
+CODEX = store('q', 'codex-0.167.0.drv')
 
 
 def node(*inputs, **env):
@@ -164,6 +167,37 @@ class Classification(unittest.TestCase):
         found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR])
         self.assertEqual(found, ['hello-2.12'])
 
+    def test_vendor_downloads_still_need_their_nixpkgs_inputs_prebuilt(self):
+        # NixOS never caches the unfree download, but it does build what the
+        # download needs; on 2026-11-10 ChatGPT needed a codex NixOS had failed to build.
+        found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR], vendor=[VENDOR])
+        self.assertEqual(found, ['hello-2.12', 'patchelf-wrapper'])
+
+    def test_a_vendor_wrapper_carries_its_download_but_not_the_downloads_inputs(self):
+        graph = {
+            ROOT: node(CONFIG, WRAPPER, preferLocalBuild='1'),
+            CONFIG: node(),
+            WRAPPER: node(APP),                                  # a launcher: no source of its own
+            APP: node(SOURCE, CODEX, src=store('y', 'chatgpt.deb')),
+            SOURCE: GRAPH[SOURCE],
+            CODEX: node(src=store('x', 'codex.tar.gz')),
+        }
+        for expected in ([WRAPPER], [WRAPPER, APP]):
+            with self.subTest(expected=expected):
+                self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=expected,
+                                                   vendor=expected), ['codex-0.167.0'])
+        # A release without a vendor list: the wrapper covers everything below it.
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER]), [])
+        # Cybex OS's own packages and kernel modules still cover what only they need.
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER, APP],
+                                           vendor=[WRAPPER]), [])
+
+    def test_a_download_outside_its_wrapper_is_still_reported(self):
+        graph = {ROOT: node(CONFIG, WRAPPER, preferLocalBuild='1'), CONFIG: node(APP), WRAPPER: node(APP),
+                 APP: node(src=store('y', 'chatgpt.deb'))}
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER],
+                                           vendor=[WRAPPER]), ['chatgpt-26.1'])
+
     def test_unexpected_vendor_package_is_reported_once_without_its_inputs(self):
         found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT)
         self.assertEqual(found, ['hello-2.12', 'spotify-1.2'])
@@ -175,20 +209,24 @@ class Classification(unittest.TestCase):
 class EngineGuard(unittest.TestCase):
     setUp = lifecycle.EngineTests.setUp
 
-    def plan(self, expected):
+    def plan(self, expected, vendor=(), graph=None):
+        graph = graph or {ROOT: node(HELLO, preferLocalBuild='1'), HELLO: GRAPH[HELLO]}
         original = self.engine.run
         def run(*args, **kwargs):
             args = tuple(map(str, args))
             if args[:2] == ('nix', 'build') and '--dry-run' in args:
                 self.assertTrue(kwargs.get('diagnostics'))
                 self.assertIn('--no-update-lock-file', args)
-                return 'these 2 derivations will be built:\n' + ''.join(f'  {d}\n' for d in (ROOT, HELLO))
+                return f'these {len(graph)} derivations will be built:\n' + ''.join(f'  {d}\n' for d in graph)
             if args[:3] == ('nix', 'eval', '--raw'):
                 return ROOT
-            if args[:3] == ('nix', 'eval', '--json') and any(a.endswith('.cybexosExpectedBuilds') for a in args):
-                return json.dumps(expected)
+            if args[:3] == ('nix', 'eval', '--json') and '--apply' in args:
+                apply = args.index('--apply')
+                self.assertTrue(args[apply - 1].endswith('#nixosConfigurations.cybexos.config.system.build'))
+                self.assertIn('build.cybexosVendorBuilds or [ ]', args[apply + 1], 'an older release has no vendor list')
+                return json.dumps({'expected': expected, 'vendor': vendor})
             if args[:3] == ('nix', 'derivation', 'show'):
-                return shown({ROOT: node(HELLO, preferLocalBuild='1'), HELLO: GRAPH[HELLO]})(*args)
+                return shown(graph)(*args)
             return original(*args, **kwargs)
         run.observer = None
         run.log = None
@@ -215,6 +253,19 @@ class EngineGuard(unittest.TestCase):
         self.assertEqual(read(self.engine.status_path)['state'], 'ready')
         self.assertIsNone(read(self.engine.status_path)['notPrebuilt'])
         self.assertTrue(record['reviewToken'])
+
+    def test_vendor_download_waits_for_the_nixpkgs_packages_it_needs(self):
+        self.plan([VENDOR], [VENDOR], {ROOT: node(VENDOR, preferLocalBuild='1'), VENDOR: GRAPH[VENDOR], TOOL: GRAPH[TOOL]})
+        with self.assertRaises(NotPrebuilt) as raised:
+            self.engine.stage('upstream')
+        self.assertEqual(raised.exception.names, ['patchelf-wrapper'])
+        builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
+        self.assertEqual(builds, [], 'the full build never starts')
+
+    def test_malformed_vendor_list_is_no_build_plan(self):
+        self.plan([VENDOR], {VENDOR: True})
+        with self.assertRaisesRegex(Failure, 'no valid build plan'):
+            self.engine.stage('upstream')
 
     def kernel_plan(self, pname='linux'):
         self.plan([HELLO])
