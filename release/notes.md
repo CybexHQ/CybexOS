@@ -1,11 +1,13 @@
-# Cybex OS 1.0.28
+# Cybex OS 1.0.29
 
-Screenshots now use Omasnap, the screenshot tool Omarchy uses. Press Print or Super+` and drag out an area, click a window, or click outside every window for the whole screen. The screen holds still while you choose, the size shows beside the pointer, and Tab, R and Ctrl+A give you fixed shapes, your last area and the whole screen. Press the shortcut again to close it.
+Google Chrome is now the web browser when proprietary applications are installed, in place of Brave Origin. Sign in to Chrome with your Google account and your bookmarks, passwords and history sync. Chrome keeps saved passwords in your keyring and opens straight to a window, without a first-run dialog.
 
-Every screenshot is still saved in ~/Pictures/Screenshots and copied to the clipboard. A preview now stays in the corner for a few seconds: drag it into an app to attach it, or hover it to copy it again, pin it on top of your windows or edit it. Shift+Print still saves the whole screen at once, with a notification you can click to edit it.
+The welcome guide's Connect step has a new Google account card, next to 1Password and the assistant. It opens Chrome's sign-in and shows a tick with your address once you are signed in.
 
-The new editor replaces Satty. Arrows, shapes, text and highlights stay movable after you draw them, and it can redact, crop, cut out a band, read text and add a background. Its buttons and outlines follow your desktop's colours. To edit an image you already have, run `omasnap FILE`.
+Chrome adds the Claude and ChatGPT extensions on its own, so Claude Code and ChatGPT can work in your browser once you sign in to them. You can switch either off in Chrome's extensions. 1Password's extension comes along as before.
 
-Scrolling screenshots (Alt+Print) can now scroll the page for you, and you finish them with Done or Enter. The red menubar indicator no longer appears for them.
+Brave Origin is now an optional install. Choose it in Software's browser picker. On a computer that had it, its bookmarks and settings are still there when you add it back. A browser no longer makes itself the default when it starts: the one you pick in Software stays your default.
+
+Codex and Claude Code now come straight from OpenAI's and Anthropic's own releases. New versions reach beta computers within about a day of their release, and no longer wait for NixOS to build them. Codex and Claude Code no longer update themselves either: Software Update brings their new versions, like the rest of the system.
 
 This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
