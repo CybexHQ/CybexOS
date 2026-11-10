@@ -3,7 +3,9 @@
 # staged updater checks a candidate's build plan and holds back a NixOS
 # package update until NixOS has finished building it (lifecycle/cybexos/
 # prebuilt.py). Cybex OS's own packages, unfree vendor downloads (never cached
-# by NixOS) and out-of-tree kernel modules are expected local builds.
+# by NixOS) and out-of-tree kernel modules are expected local builds. A vendor
+# download's own inputs are ordinary Nixpkgs packages, which NixOS does build:
+# those must still come prebuilt (cybexosVendorBuilds).
 { config, lib, pkgs, ... }:
 let
   cfg = config.cybexos;
@@ -23,10 +25,19 @@ let
   candidates = config.environment.systemPackages ++ config.fonts.packages
     ++ config.boot.plymouth.themePackages ++ config.networking.networkmanager.plugins
     ++ lib.toList config.hardware.firmware ++ config.services.udev.packages ++ config.systemd.packages;
+  drivers = config.boot.extraModulePackages
+    ++ lib.optional (lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package;
   expected = builtins.filter (package: lib.isDerivation package && (unfree package || ours package)) candidates
-    ++ config.boot.extraModulePackages
-    ++ lib.optional (lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package
-    ++ cfg.updates.expectedBuilds;
+    ++ drivers ++ cfg.updates.expectedBuilds;
+  # The unfree vendor downloads among them. They build here, but their inputs
+  # are ordinary Nixpkgs packages that must come prebuilt: on 2026-11-10 the
+  # channel's ChatGPT needed a codex and a tectonic NixOS had failed to build.
+  vendor = builtins.filter (package: lib.isDerivation package && unfree package && !(ours package)
+      && !(lib.elem package.drvPath (map (driver: driver.drvPath) drivers)))
+    (candidates ++ cfg.updates.expectedBuilds);
+  paths = packages: lib.unique
+    (map (package: builtins.unsafeDiscardStringContext package.drvPath)
+      (builtins.filter (package: package.drvPath != kernel.drvPath) packages));
 in {
   options.cybexos.updates.expectedBuilds = lib.mkOption {
     type = lib.types.listOf lib.types.package;
@@ -43,8 +54,7 @@ in {
       assertion = kernel.drvPath == stockKernel.drvPath;
       message = "Cybex OS requires the unmodified selected Nixpkgs linuxPackages_latest kernel. Kernel patches, custom configuration and package overlays are unsupported; no kernel compilation was started. Personal declarations were not changed.";
     } ];
-    system.build.cybexosExpectedBuilds = lib.unique
-      (map (package: builtins.unsafeDiscardStringContext package.drvPath)
-        (builtins.filter (package: package.drvPath != kernel.drvPath) expected));
+    system.build.cybexosExpectedBuilds = paths expected;
+    system.build.cybexosVendorBuilds = paths vendor;
   };
 }

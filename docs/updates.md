@@ -442,9 +442,15 @@ computer by design:
   Wiz drives: Cybex OS packages the vendors' own release builds and keeps
   them current itself ([vendor updates](releasing.md#automatic-vendor-updates)),
   so they do not wait for NixOS's build farm and do not update themselves;
-- unfree vendor downloads, which NixOS never caches: Brave Origin,
-  1Password, Spotify, ChatGPT, Steam and NVIDIA's userspace,
-  with NVIDIA's 32-bit EGL platform libraries for Steam;
+- unfree vendor downloads, which NixOS never caches: Google Chrome,
+  1Password, Spotify, ChatGPT, Steam, Brave Origin from Software and NVIDIA's
+  userspace, with NVIDIA's 32-bit EGL platform libraries for Steam. The
+  Nixpkgs packages a download needs are ordinary NixOS builds and must come
+  prebuilt (`system.build.cybexosVendorBuilds`): on 2026-11-10 the channel's
+  ChatGPT needed a codex and a tectonic that NixOS had failed to build, so
+  the update waits for them instead of compiling them. A wrapper without a
+  source of its own (a Wayland launcher, Steam's environment) carries its
+  download, whose inputs are checked the same way;
 - out-of-tree kernel modules (NVIDIA, the XPS camera, the medium's ZFS);
 - the machine's own configuration: initrd, PAM, setuid wrappers, dconf.
 

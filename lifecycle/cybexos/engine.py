@@ -658,19 +658,25 @@ class Engine:
         A dry run against this computer's store and configured caches; nothing
         is built. Configuration, fixed-output downloads and the system's
         expected local builds (Cybex OS's own packages, unfree vendor
-        downloads, kernel modules, `cybexos.updates.expectedBuilds`) are fine.
+        downloads, kernel modules, `cybexos.updates.expectedBuilds`) are fine;
+        the Nixpkgs packages a vendor download needs must come prebuilt.
         Personal previews allow other package builds, but never a kernel build.
         """
         build = f'path:{config}#nixosConfigurations.cybexos.config.system.build'
-        root, expected = None, []
+        root, expected, vendor = None, [], []
         if not kernel_only:
             root = self.nix('eval', '--raw', '--no-update-lock-file', build + '.toplevel.drvPath').strip()
-            expected = parse(self.nix('eval', '--json', '--no-update-lock-file', build + '.cybexosExpectedBuilds'))
-            if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root) or not isinstance(expected, list)
-                    or any(not isinstance(item, str) for item in expected)):
+            # Older releases have no vendor list; their vendor downloads keep
+            # covering their inputs.
+            builds = parse(self.nix('eval', '--json', '--no-update-lock-file', build, '--apply',
+                                    'build: { expected = build.cybexosExpectedBuilds; vendor = build.cybexosVendorBuilds or [ ]; }'))
+            expected, vendor = (builds.get('expected'), builds.get('vendor')) if isinstance(builds, dict) else (None, None)
+            if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root)
+                    or any(not isinstance(items, list) or any(not isinstance(item, str) for item in items)
+                           for items in (expected, vendor))):
                 raise Failure('The candidate system has no valid build plan.')
         plan = prebuilt.dry_run(self.run, build + '.toplevel', options=('--no-update-lock-file',))
-        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected,
+        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected, vendor=vendor,
                                  kernel_only=kernel_only) if plan['build'] else []
         if found:
             raise NotPrebuilt(found, kernel=kernel_only)

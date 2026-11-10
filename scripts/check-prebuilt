@@ -3,12 +3,15 @@
 
 Walks the system's derivation graph from its root, asking cache.nixos.org for
 each output, independent of what this computer's store already holds. A
-cached output covers its whole subtree. Configuration files (local-only by
-design), fixed-output downloads and the system's expected local builds
-(`system.build.cybexosExpectedBuilds`: Cybex OS's own packages, unfree vendor
-downloads, kernel modules) are allowed. Anything else is a Nixpkgs package
-that NixOS has not prebuilt, or a configuration that changed one; the command
-lists those and exits 1.
+cached output covers its whole subtree. What remains is a fresh machine's
+build plan, judged as the updater judges it (`prebuilt.compiles`):
+configuration files (local-only by design), fixed-output downloads and the
+system's expected local builds (`system.build.cybexosExpectedBuilds`: Cybex
+OS's own packages, unfree vendor downloads, kernel modules) are allowed, and
+the Nixpkgs packages a vendor download needs must be cached
+(`system.build.cybexosVendorBuilds`). Anything else is a Nixpkgs package that
+NixOS has not prebuilt, or a configuration that changed one; the command lists
+those and exits 1.
 
 Settings' pointer themes are downloaded later, on demand, from the same cache
 (`system.build.cybexosPointerDownloads`); a path it does not hold is listed as
@@ -35,7 +38,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'lifecycle'))
-from cybexos.prebuilt import derivation_graph, kind, name  # noqa: E402
+from cybexos.prebuilt import compiles, derivation_graph, kind, name  # noqa: E402
 
 NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
 
@@ -62,6 +65,7 @@ def evaluate(nvidia, packages):
         };
       in { root = system.config.system.build.toplevel.drvPath;
            expected = system.config.system.build.cybexosExpectedBuilds;
+           vendor = system.config.system.build.cybexosVendorBuilds;
            pointers = system.config.system.build.cybexosPointerDownloads; }
     ''' % {'root': json.dumps(str(ROOT)), 'nvidia': 'true' if nvidia else 'false',
            'packages': json.dumps(json.dumps(packages))}
@@ -79,29 +83,32 @@ def cached(path):
         raise
 
 
-def walk(root, expected):
+def walk(root, expected, vendor):
     graph = derivation_graph(json.loads(nix('derivation', 'show', '-r', root)))
-    expected, seen, frontier, found, configured, local = set(expected), set(), [root], set(), set(), 0
+    seen, frontier, missing = set(), [root], set()
     with ThreadPoolExecutor(32) as pool:
         while frontier:
-            batch = [d for d in dict.fromkeys(frontier) if d not in seen and d not in expected]
+            batch = [d for d in dict.fromkeys(frontier) if d not in seen]
             seen.update(batch)
             outputs = [next((o['path'] for o in graph[d]['outputs'].values() if 'path' in o), None) for d in batch]
             present = list(pool.map(lambda path: path is not None and cached(path), outputs))
             frontier = []
             for drv, hit in zip(batch, present):
-                if hit:
-                    continue
-                local += 1
-                sort = kind(graph[drv])
-                if sort == 'configuration':
-                    configured.add(name(drv))
-                if sort == 'compile':
-                    found.add(name(drv))
-                elif sort in ('trivial', 'configuration'):
-                    frontier.extend(k if k.startswith('/nix/store/') else '/nix/store/' + k
-                                    for k in graph[drv].get('inputDrvs') or {})
-    return sorted(found), sorted(configured), local
+                if not hit:
+                    missing.add(drv)
+                    frontier.extend(graph[drv].get('inputDrvs') or {})
+    plan = {drv: graph[drv] for drv in missing}
+    found = compiles(lambda *arguments, **options: json.dumps({d: plan[d] for d in arguments[3:]}),
+                     sorted(missing), root=root, expected=expected, vendor=vendor)
+    # Configuration a package of Cybex OS's own needs is part of that build.
+    covered, frontier = set(), [d for d in expected if d in missing and d not in vendor]
+    while frontier:
+        drv = frontier.pop()
+        if drv not in covered:
+            covered.add(drv)
+            frontier.extend(d for d in graph[drv].get('inputDrvs') or {} if d in missing)
+    configured = sorted({name(d) for d in missing - covered if kind(graph[d]) == 'configuration'})
+    return found, configured, len(missing)
 
 
 def main():
@@ -115,7 +122,7 @@ def main():
         apps = {app['id']: app for app in catalogue['apps']}
         packages = sorted({apps[i]['attribute'] for p in catalogue['profiles'] for i in p['apps']})
     info = evaluate(arguments.nvidia, packages)
-    found, configured, local = walk(info['root'], info['expected'])
+    found, configured, local = walk(info['root'], info['expected'], info['vendor'])
     print(f'{local} derivations build locally; {len(info["expected"])} expected local builds allowed.', file=sys.stderr)
     if configured:
         print(f'{len(configured)} configuration builds: ' + ', '.join(configured), file=sys.stderr)

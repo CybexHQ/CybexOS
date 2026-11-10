@@ -388,8 +388,8 @@ class CatalogueAndCheckTests(unittest.TestCase):
         spotify, krita = (store('d', name + '.drv') for name in ('spotify', 'krita'))
         wrapper, kernel = store('w', 'vendor-wrapper.drv'), store('k', 'linux-7.3.drv')
         # GIMP is cached and absent from the plan. Krita has a local wrapper
-        # but no kernel dependency. Spotify's expected vendor build must not
-        # hide the kernel under its compiled wrapper dependency.
+        # but no kernel dependency. Spotify's expected vendor build hides
+        # neither the kernel nor the compiled Nixpkgs dependency above it.
         graph = {spotify: compile_step(wrapper), wrapper: compile_step(kernel),
                  kernel: {**compile_step(), 'env': {'pname': 'linux', 'preferLocalBuild': '1'}},
                  krita: {**compile_step(), 'env': {'preferLocalBuild': '1'}}}
@@ -399,11 +399,11 @@ class CatalogueAndCheckTests(unittest.TestCase):
                   graph=graph)
         result = software.check(['gimp', 'spotify', 'krita'], config=self.config, run=run)
         self.assertFalse(result['prebuilt'])
-        self.assertEqual(result['compiles'], ['linux-7.3'])
+        self.assertEqual(result['compiles'], ['linux-7.3', 'vendor-wrapper'])
         for name in ('gimp', 'krita'):
             self.assertEqual((result['packages'][name]['state'], result['packages'][name]['compiles']), ('prebuilt', []))
         self.assertEqual((result['packages']['spotify']['state'], result['packages']['spotify']['compiles']),
-                         ('compiles', ['linux-7.3']))
+                         ('compiles', ['linux-7.3', 'vendor-wrapper']))
         self.assertEqual(run.count('nix', 'derivation', 'show'), 1)
 
     def test_check_validates_attributes_and_keeps_nix_diagnostics_private(self):
