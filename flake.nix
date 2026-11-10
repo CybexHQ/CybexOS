@@ -149,6 +149,8 @@
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
         firmware = import ./nix/tests/firmware.nix { inherit pkgs module; };
         hyprland-pointer = import ./nix/tests/hyprland-pointer.nix { inherit pkgs module; };
+        # Print, Shift+Print and Alt+Print through Omasnap in a real Hyprland session.
+        screenshots = import ./nix/tests/screenshots.nix { inherit pkgs module; };
         # Omasnap's own headless suite, which machines skip when they build it.
         omasnap = (pkgs.callPackage ./nix/packages/omasnap.nix {}).tests.smoke;
         # Installing apps leaves the shell and the assistant running; their own changes still reach them.
