@@ -538,10 +538,13 @@ print('Bibata desktop/session cursor, local discovery, firewall, and saved widge
 QA_DEFAULTS''', timeout=60)
 
     def proprietary_applications(self, expected):
-        """Proprietary applications are on by default: 1Password is installed,
-        the open guide's Connect step offers it, and Software adds every unfree
-        catalogue app as a vendor download that compiles nothing. Without them
-        (the minimal selection) neither 1Password nor those apps are offered."""
+        """Proprietary applications are on by default: Google Chrome is the
+        browser, with its policy (1Password kept installed, the Claude and
+        ChatGPT extensions added), 1Password is installed, the open guide's
+        Connect step offers it, and Software adds every unfree catalogue app
+        as a vendor download that compiles nothing. Without them (the minimal
+        selection) Firefox is the browser and neither 1Password nor those apps
+        are offered."""
         # The guide finds 1Password among the desktop entries once they load.
         deadline = time.monotonic() + 30
         while True:
@@ -556,22 +559,35 @@ user_env = ['runuser', '-u', 'cybexqa', '--', 'env', 'HOME=/home/cybexqa', 'XDG_
             'XDG_DATA_DIRS=/run/current-system/sw/share']
 defaults = json.loads(subprocess.check_output(user_env + ['cybexos-apps', 'effective-defaults'], text=True))
 xdg_browser = subprocess.check_output(user_env + ['xdg-settings', 'get', 'default-web-browser'], text=True).strip()
-policies = json.loads(pathlib.Path('/etc/brave/policies/managed/cybexos.json').read_text()) if 'brave-browser.desktop' in entries else {}
+policy = pathlib.Path('/etc/opt/chrome/policies/managed/cybexos.json')
+policies = json.loads(policy.read_text()) if policy.exists() else {}
 catalogue = json.loads(pathlib.Path('/run/current-system/sw/share/cybexos/software/catalogue.json').read_text())
 unfree = sorted(app['attribute'] for app in catalogue['apps'] if not app['free'])
 check = json.loads(subprocess.check_output(['runuser', '-u', 'cybexqa', '--', 'env', 'HOME=/home/cybexqa',
                                             'cybex', 'software', 'check', *unfree], text=True))
-print(json.dumps({'defaultBrowser': defaults['browser'], 'xdgBrowser': xdg_browser, 'browserPolicy': policies.get('DefaultBrowserSettingEnabled'), 'onePassword': any(re.fullmatch(r'(com\.onepassword\.onepassword|1password)\.desktop', name, re.I) for name in entries),
+print(json.dumps({'defaultBrowser': defaults['browser'], 'xdgBrowser': xdg_browser, 'chrome': 'google-chrome.desktop' in entries,
+                  'browserPolicy': policies.get('DefaultBrowserSettingEnabled'),
+                  'forced': policies.get('ExtensionInstallForcelist', []),
+                  'extensions': {key: value.get('installation_mode') for key, value in policies.get('ExtensionSettings', {}).items()},
+                  'onePassword': any(re.fullmatch(r'(com\.onepassword\.onepassword|1password)\.desktop', name, re.I) for name in entries),
                   'packages': {attribute: {key: row[key] for key in ('state', 'reason', 'vendor')}
                                for attribute, row in check['packages'].items()}}))
 QA_PROPRIETARY''', timeout=900).strip().splitlines()[-1])
         card = welcome['connect']['password']
         problems = []
-        browser = 'brave-browser.desktop' if expected else 'firefox.desktop'
+        browser = 'google-chrome.desktop' if expected else 'firefox.desktop'
         if found['defaultBrowser'] != browser or found['xdgBrowser'] != browser:
             problems.append('default browser is ' + found['defaultBrowser'] + ' (xdg-settings: ' + found['xdgBrowser'] + ')')
-        if expected and found['browserPolicy'] is not True:
-            problems.append('Brave default-browser policy is missing')
+        if found['chrome'] != expected:
+            problems.append('Google Chrome is ' + ('missing' if expected else 'installed'))
+        # Software and Settings own the default; browsers must not take it on start.
+        if expected and found['browserPolicy'] is not False:
+            problems.append('Chrome default-browser policy is ' + json.dumps(found['browserPolicy']))
+        # 1Password stays installed; Claude in Chrome and ChatGPT arrive and can be turned off.
+        agents = {'fcoeoabgfenejglbffodgkkbkcdhcgfn': 'normal_installed', 'hehggadaopoacecdllhhajmbjkdcmajg': 'normal_installed'}
+        if expected and (not any(entry.startswith('aeblfdkhhhdcdjpifhhbdiojplfjncoa;') for entry in found['forced'])
+                         or found['extensions'] != agents):
+            problems.append('Chrome extension policy is ' + json.dumps({'forced': found['forced'], 'extensions': found['extensions']}))
         if found['onePassword'] != expected:
             problems.append('1Password is ' + ('missing' if expected else 'installed'))
         if (card != 'unavailable') != expected or (expected and 'connect' not in welcome['steps']):

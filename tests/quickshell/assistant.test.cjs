@@ -263,9 +263,12 @@ test("the installation feature carries the service, the agents and the menubar",
     assert.match(desktop, /path = \[ sessionPath \];[^}]*restartIfChanged = false;\s*serviceConfig = \{\s*ExecStart = "\$\{assistant\}/);
     const applications = repo("nix/modules/applications.nix");
     // The agentic OS always carries an agent CLI: Codex everywhere, and Claude
-    // Code whenever unfree packages are allowed (it is unfree).
-    assert.match(applications, /# The agent CLIs are part of every installation\. Claude Code is unfree\.\s*codex\s*\]/);
-    assert.match(applications, /lib\.optionals cfg\.features\.proprietary \[[^\]]*claude-code \]/,
+    // Code whenever unfree packages are allowed (it is unfree). Both are the
+    // makers' own release builds that Cybex OS pins (nix/packages).
+    assert.match(applications, /codexCli = pkgs\.callPackage \.\.\/packages\/codex \{\};/);
+    assert.match(applications, /claudeCode = pkgs\.callPackage \.\.\/packages\/claude-code \{\};/);
+    assert.match(applications, /# The agent CLIs are part of every installation\. Claude Code is unfree\.\s*codexCli\s*\]/);
+    assert.match(applications, /lib\.optionals cfg\.features\.proprietary \[[^\]]*claudeCode \]/,
         "Claude Code is unfree: it still needs the proprietary feature");
     assert.match(applications, /lib\.optionals cfg\.features\.assistant \[ assistant \]/);
     // The installer offers no switch for it: every installation includes it.
