@@ -4,7 +4,9 @@ import "../Common"
 // The shared section mark, in the shape Settings/SectionHeader.qml draws and
 // the T3 and GitHub inboxes draw inline: an uppercase micro label and a
 // hairline running from it to the panel edge. It is what separates one group
-// from the next now that nothing is a filled, bordered card.
+// from the next now that nothing is a filled, bordered card. The label is set
+// in the shell's mono label face (Theme.fontLabel), as the installer sets its
+// kickers.
 Item {
     id: root
 
@@ -28,7 +30,7 @@ Item {
         width: Math.min(implicitWidth, Math.max(0, root.width - 2
             - (root.detail === "" ? 0 : detailText.width + Theme.iconTextSpacing)))
         elide: Text.ElideRight
-        font.family: Theme.fontMenu
+        font.family: Theme.fontLabel
         font.pixelSize: Theme.typography.section
         font.weight: Theme.weightSemibold
         font.letterSpacing: 1

@@ -14,8 +14,13 @@ import QtQuick
 // boundary and knob in the per-pack switchOff* tokens, which carry the 3:1
 // edge a faint track alone missed; on is the accent track. Keyboard focus is
 // a separate ring around the track, never a tint on it, so focus cannot be
-// misread as a state. A disabled switch fades itself; whatever explains why
-// sits outside it and stays at full contrast.
+// misread as a state. A disabled switch draws in Theme.textDisabled, dimmed
+// but still about 3:1, and keeps its knob where its state puts it; whatever
+// explains why sits outside it and stays at full contrast.
+//
+// Size: every track is at least 24 px tall, and the pointer target reaches
+// Theme.switchHitMin (32 px) both ways around it even when the layout box is
+// shorter, so a settings row keeps its rhythm.
 Item {
     id: root
 
@@ -27,9 +32,12 @@ Item {
     readonly property int trackWidth: metrics.track.width
     readonly property int trackHeight: metrics.track.height
 
+    // The ring stands 1 px clear of the track.
+    readonly property int ringWidth: trackWidth + (Theme.focusRingWidth + 1) * 2
+    readonly property int ringHeight: trackHeight + (Theme.focusRingWidth + 1) * 2
+
     width: metrics.box.width
     height: metrics.box.height
-    opacity: enabled ? 1 : 0.45
     activeFocusOnTab: true
     Accessible.role: Accessible.CheckBox
     Accessible.checked: checked
@@ -49,12 +57,13 @@ Item {
         }
     }
 
-    // The ring stands 1 px clear of the track and stays inside the hit box,
-    // where no clipping parent can cut it.
+    // The ring stays inside the pointer target, which is never smaller than
+    // it; a settings row's box may be a pixel shorter, and the ring may reach
+    // into the row spacing there.
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(root.width, root.trackWidth + (Theme.focusRingWidth + 1) * 2)
-        height: Math.min(root.height, root.trackHeight + (Theme.focusRingWidth + 1) * 2)
+        width: root.ringWidth
+        height: root.ringHeight
         radius: height / 2
         color: "transparent"
         visible: border.width > 0
@@ -68,9 +77,10 @@ Item {
         width: root.trackWidth
         height: root.trackHeight
         radius: height / 2
-        color: root.checked ? Theme.accent : Theme.switchOffTrack
+        color: root.checked ? (root.enabled ? Theme.accent : Theme.textDisabled)
+            : Theme.switchOffTrack
         border.width: root.checked ? 0 : 1
-        border.color: Theme.switchOffBorder
+        border.color: root.enabled ? Theme.switchOffBorder : Theme.textDisabled
 
         StateLayer {
             id: toggleState
@@ -79,8 +89,8 @@ Item {
             hovered: toggleMouse.containsMouse
             pressed: toggleMouse.pressed
             tint: root.checked ? Theme.accentFg : Theme.textHi
-            pressPoint: Qt.point(toggleMouse.mouseX - track.x,
-                toggleMouse.mouseY - track.y)
+            pressPoint: Qt.point(toggleMouse.mouseX + toggleMouse.x - track.x,
+                toggleMouse.mouseY + toggleMouse.y - track.y)
         }
     }
 
@@ -98,7 +108,8 @@ Item {
         width: toggleMouse.pressed ? pressedSize : restingSize
         height: width
         radius: height / 2
-        color: root.checked ? Theme.accentFg : Theme.switchOffKnob
+        color: root.checked ? (root.enabled ? Theme.accentFg : Theme.background)
+            : root.enabled ? Theme.switchOffKnob : Theme.textDisabled
 
         Behavior on x {
             NumberAnimation {
@@ -121,9 +132,12 @@ Item {
         }
     }
 
+    // Invisible padding: at least switchHitMin both ways, centred on the box.
     MouseArea {
         id: toggleMouse
-        anchors.fill: parent
+        anchors.centerIn: parent
+        width: Math.max(root.width, root.ringWidth, Theme.switchHitMin)
+        height: Math.max(root.height, root.ringHeight, Theme.switchHitMin)
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {

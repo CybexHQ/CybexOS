@@ -1,6 +1,8 @@
 // Workspace geometry and direction selection without Hyprland or Qt state.
 
-var CELL_WIDTH = 22;
+// One workspace's pointer cell: at least 32 px wide, the shell's target floor
+// (docs/shell-states.md), since the 2026-11 review measured the old 22.
+var CELL_WIDTH = 32;
 var LEADING_MS = 120;
 var TRAILING_MS = 300;
 
@@ -40,9 +42,9 @@ function indicatorBounds(ids, focusedId) {
     var index = (Array.isArray(ids) || ids instanceof Array) ? ids.indexOf(focusedId) : -1;
     if (index < 0)
         return null;
-    // The classic current-workspace chip is wider than its fixed pointer cell.
-    // The pager's 5px side padding absorbs the two-pixel overhang at either end.
-    return { left: index * CELL_WIDTH - 2, right: index * CELL_WIDTH + 24 };
+    // The current-workspace chip sits 2 px inside its cell on either side, so
+    // neighbouring hover fills never touch it.
+    return { left: index * CELL_WIDTH + 2, right: (index + 1) * CELL_WIDTH - 2 };
 }
 
 function edgeDurations(previousId, nextId, animate) {

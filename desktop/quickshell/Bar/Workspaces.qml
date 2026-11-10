@@ -8,6 +8,11 @@ import "../Common/WorkspaceHelpers.js" as WorkspaceHelpers
 // The screenshot's hybrid workspace strip: occupied workspaces are numbers,
 // empty slots are dots, and the current workspace is a wider accent chip. Dot
 // mode remains available, and the current chip keeps its directional motion.
+//
+// Since the 2026-11 review every pip is at least 8 px and every cell 32 px
+// wide (WorkspaceMotion.CELL_WIDTH). Occupied and empty differ in shape as
+// well as tone: an occupied dot is filled, an empty one a dimmer ring. The
+// current workspace in the dots style is a wider 20 × 8 accent pill.
 Rectangle {
     id: root
 
@@ -64,9 +69,11 @@ Rectangle {
         }
     }
 
-    // The dots style marks the current workspace with an 18 × 6 accent pill
+    // The dots style marks the current workspace with a 20 × 8 accent pill
     // centred in its cell; numbers keep the wider chip around the label.
-    readonly property real dotPillInset: (WorkspaceMotion.CELL_WIDTH + 4 - 18) / 2
+    readonly property int dotSize: 8
+    readonly property int dotPillWidth: 20
+    readonly property real dotPillInset: (WorkspaceMotion.CELL_WIDTH - 4 - dotPillWidth) / 2
 
     function settleIndicator(animate) {
         const cell = WorkspaceMotion.indicatorBounds(visibleIds, focusedId);
@@ -155,7 +162,7 @@ Rectangle {
             x: leftEdge
             y: (parent.height - height) / 2
             width: Math.max(1, rightEdge - leftEdge)
-            height: root.numbered ? Theme.chipInnerHeight : 6
+            height: root.numbered ? Theme.chipInnerHeight : root.dotSize
             radius: root.numbered ? Theme.chipRadius : height / 2
             color: Theme.barWsCurrent
             z: 1
@@ -210,6 +217,10 @@ Rectangle {
                     : showNumber
                         ? (workspaceState.over ? Theme.barChip : "transparent")
                         : exists ? Theme.barWsOccupied : Theme.barWsEmpty
+                // An empty place is a ring, an occupied one a filled dot. On
+                // the current chip (numbers style) the dot takes its ink.
+                readonly property bool hollow: !exists && !urgent && !showNumber
+                    && !(focused && !root.numbered)
 
                 x: index * WorkspaceMotion.CELL_WIDTH
                 width: WorkspaceMotion.CELL_WIDTH
@@ -230,11 +241,12 @@ Rectangle {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: slot.showNumber ? Theme.chipInnerHeight
-                        : root.numbered ? 4 : 6
+                    width: slot.showNumber ? Theme.chipInnerHeight : root.dotSize
                     height: slot.showNumber ? Theme.chipInnerHeight : width
                     radius: slot.showNumber ? Theme.chipRadius : width / 2
-                    color: slot.restingTone
+                    color: slot.hollow ? "transparent" : slot.restingTone
+                    border.width: slot.hollow ? 1.5 : 0
+                    border.color: slot.focused ? Theme.barWsCurrentFg : Theme.barWsEmpty
 
                     Behavior on color {
                         ColorAnimation { duration: Theme.reducedMotion ? 0 : 200 }
@@ -307,7 +319,8 @@ Rectangle {
         id: layoutChip
         visible: root.activeWorkspace !== null && DesktopWorkspaces.canSetLayout(root.activeWorkspace)
         x: pips.x + pips.width + 4
-        width: 24
+        // A full pointer cell, like the workspaces beside it.
+        width: WorkspaceMotion.CELL_WIDTH
         height: parent.height
         Accessible.role: Accessible.Button
         Accessible.name: I18n.tr("Cycle workspace layout") + ": " + DesktopWorkspaces.layoutLabel(root.activeLayout, root.activeWorkspace ? root.activeWorkspace.nativeLayout : "")

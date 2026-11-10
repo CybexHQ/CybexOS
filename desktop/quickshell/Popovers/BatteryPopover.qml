@@ -376,7 +376,6 @@ Surface {
                 anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: !BatteryHealth.busy
-                opacity: enabled ? 1 : 0.5
                 checked: BatteryHealth.enabled
                 accessibleName: "Preserve battery health"
                 onToggled: value => BatteryHealth.setEnabled(value)

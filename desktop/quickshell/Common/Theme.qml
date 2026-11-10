@@ -82,15 +82,20 @@ Singleton {
         : themePaletteActive ? themeColors.surfaceRaised
         : dark ? darkMenuBg : lightMenuBg
     // The least favorable opaque backdrop for copy. In dark mode that is the
-    // highest (lightest) container. In light mode it is the base with a
-    // hovered chip on it: the darkest thing copy is drawn over. Calibrating
-    // the shared copy colors here keeps one semantic ladder safe on every
-    // panel, menu, and group surface. A theme's surfaces can be spaced far
-    // wider than these, so a themed shell takes its worst one instead.
+    // lightest thing copy sits on: a resting card (`tile`, darkCardAlpha) on
+    // the raised panel surface, or the highest container of a wallpaper
+    // palette, whose cards are never lighter than it. In light mode it is the
+    // base with a hovered chip on it: the darkest thing copy is drawn over.
+    // Calibrating the shared copy colors here keeps one semantic ladder at
+    // 4.5:1 on every panel, card, menu and group surface. A theme's surfaces
+    // can be spaced far wider than these, so a themed shell takes its worst
+    // one instead.
+    readonly property real darkCardAlpha: SettingsHelpers.DARK_CARD_ALPHA
     readonly property color copyReferenceBg: themePaletteActive
-        ? SettingsHelpers.themeReference(Settings.themePalette, chipHoverAlpha)
+        ? SettingsHelpers.themeReference(Settings.themePalette, chipHoverAlpha, darkCardAlpha)
         : dark
-        ? (paletteActive ? Common.Palette.surfaceContainerHigh : popBg)
+        ? (paletteActive ? Common.Palette.surfaceContainerHigh
+            : SettingsHelpers.mixHex(popBg.toString(), "#ffffff", darkCardAlpha))
         : SettingsHelpers.mixHex(background.toString(),
             lightInk.toString(),
             chipHoverAlpha)
@@ -156,6 +161,9 @@ Singleton {
     readonly property color barTextLow: barPalette.textLow
     readonly property color barTextDim: barPalette.textDim
     readonly property color barTextFaint: barPalette.textFaint
+    // A bar mark for something unavailable (no network, adapter off): about
+    // 3:1 against the bar, never the fade that used to drop it below 2:1.
+    readonly property color barTextDisabled: barPalette.textDisabled
     // Bright, cool resting ink shared by generic and product bar marks.
     readonly property color barIcon: barPalette.icon
     // The screenshot's workspace strip is the bar's clearest accent: a pale
@@ -165,10 +173,11 @@ Singleton {
     readonly property color barWsCurrentFg: barAccentFg
     readonly property color barWsCurrentGlow: barAccentGlow
     readonly property color barWsOccupied: barTextLow
-    // Empty dots sit a step above barDotDim (2026-11): still decorative, but
-    // the row of places reads at a glance.
+    // Empty places are drawn as 1.5 px rings (2026-11), so they sit a step
+    // above barDotDim: still quieter than an occupied dot, which is filled,
+    // but the row of places reads at a glance.
     readonly property color barWsEmpty: barLightForeground
-        ? Qt.rgba(1, 1, 1, 0.44) : Qt.rgba(0, 0, 0, 0.38)
+        ? Qt.rgba(1, 1, 1, 0.52) : Qt.rgba(0, 0, 0, 0.46)
     readonly property color barDotDim: barLightForeground
         ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(0, 0, 0, 0.26)
     readonly property color barStroke: barLightForeground
@@ -253,7 +262,7 @@ Singleton {
         ? (paletteActive
             ? Qt.rgba(Common.Palette.surfaceContainerHigh.r, Common.Palette.surfaceContainerHigh.g,
                 Common.Palette.surfaceContainerHigh.b, 0.62)
-            : Qt.rgba(1, 1, 1, 0.09))
+            : Qt.rgba(1, 1, 1, darkCardAlpha))
         : Qt.rgba(lightInk.r, lightInk.g, lightInk.b, tileAlpha)
     // The chosen option of a settings segmented control, raised out of its
     // chip-filled track: lighter than the track in dark mode, near white in
@@ -305,24 +314,28 @@ Singleton {
         textFaint.b, stateTokens.switchOffTrackAlpha)
     readonly property color switchOffBorder: textMid
     readonly property color switchOffKnob: textMid
-    // Empty workspace dots: decorative, but a step above dotDim so the row of
-    // places still reads. Only the dots workspace style uses it.
+    // Empty workspace places in the shell's own palette (previews of the bar
+    // draw barWsEmpty): a step above dotDim so the row of places still reads.
     readonly property color wsEmpty: dark
         ? Qt.rgba(245 / 255, 244 / 255, 251 / 255, 0.42)
         : Qt.rgba(28 / 255, 26 / 255, 46 / 255, 0.36)
 
     // ---- text -------------------------------------------------------------
     // The design's --txt3 lands at 3.2:1 over the panel reference, below the
-    // 4.5:1 floor this shell holds itself to. The low three steps are lifted
-    // to the lightest value that clears AA and are verified by
+    // 4.5:1 floor this shell holds itself to. The low steps are lifted to the
+    // lightest value that clears AA on a card (copyReferenceBg), not just on
+    // the bare panel: the 2026-11 review found card copy at 3.4:1. They keep
+    // their spacing (7, 5.7, 5 and 4.6:1 there) and are verified by
     // tests/quickshell/typography.test.cjs; `dotDim` is the one decorative
     // token and must never carry copy.
     readonly property color darkTextHi: "#f2f0ea"
-    readonly property color darkTextMid: "#b3afa4"
-    readonly property color darkTextLow: "#a29e93"
-    readonly property color darkTextDim: "#97938a"
-    readonly property color darkTextFaint: "#8e8a7f"
+    readonly property color darkTextMid: "#c3c0b7"
+    readonly property color darkTextLow: "#b1ada4"
+    readonly property color darkTextDim: "#a5a29a"
+    readonly property color darkTextFaint: "#9f9b92"
     readonly property color darkIcon: "#c8c5bb"
+    // Disabled content, about 3:1 on the same reference (textDisabled).
+    readonly property color darkTextDisabled: "#7d7b77"
 
     // The light ladder is held against `lightBackground` under a hovered
     // chip, the darkest surface copy sits on, rather than a lighter panel.
@@ -332,6 +345,7 @@ Singleton {
     readonly property color lightTextDim: "#535168"
     readonly property color lightTextFaint: "#57556c"
     readonly property color lightIcon: "#37354c"
+    readonly property color lightTextDisabled: "#74727e"
 
     // A theme's own ladder keeps its colours wherever they read and lifts
     // the rest to the same floors (SettingsHelpers.themeTextPalette).
@@ -353,6 +367,13 @@ Singleton {
         : dark ? darkTextFaint : lightTextFaint
     readonly property color icon: textPalette ? textPalette.icon
         : dark ? darkIcon : lightIcon
+    // Disabled content (docs/shell-states.md): a disabled control's label,
+    // glyph, boundary and knob. Dimmed so it reads as unavailable, but about
+    // 3:1 over copyReferenceBg so it stays readable. One token rather than an
+    // opacity fade, whose result depends on whatever it fades. The reason a
+    // control is disabled is copy, and keeps its own step of the ladder.
+    readonly property color textDisabled: textPalette ? textPalette.textDisabled
+        : dark ? darkTextDisabled : lightTextDisabled
     // Decorative only — empty workspace pips and inactive rails.
     readonly property color dotDim: dark
         ? Qt.rgba(245 / 255, 244 / 255, 251 / 255, 0.30)
@@ -470,13 +491,18 @@ Singleton {
         "#a992e0", copyReferenceBg.toString(), 4.5)
 
     // ---- typography --------------------------------------------------------
-    // One face for the whole shell. `fontMenu` is settings-driven — the family
-    // strings live in SettingsHelpers.FONT_CHOICES so the picker and this token
-    // agree — and every surface draws through it: the bar, the panels hanging
-    // off it, the launcher, the toasts and the overlays. `fontSans` is the
-    // shipped default that `fontMenu` falls back to, and nothing draws it
-    // directly; a view that named it would be opting out of the setting.
-    readonly property string fontSans: "JetBrainsMono Nerd Font"
+    // One pairing for the whole shell, the installer's and the welcome guide's
+    // (docs/shell-typography.md): a sans for headings, body copy and buttons,
+    // and a monospace for labels, keycaps, versions and data. `fontMenu` is
+    // the sans. It is settings-driven — the family strings live in
+    // SettingsHelpers.FONT_CHOICES so the picker and this token agree — and
+    // every surface draws its copy through it: the bar, the panels hanging off
+    // it, the launcher, the toasts and the overlays. Space Grotesk is the
+    // default since the 2026-11 review; JetBrains Mono stays a choice for
+    // anyone who wants the all-monospace shell. `fontSans` is the shipped
+    // default that `fontMenu` falls back to, and nothing draws it directly; a
+    // view that named it would be opting out of the setting.
+    readonly property string fontSans: "Space Grotesk"
     readonly property string fontMenu: {
         const choice = Settings.fontChoices.find(f => f.id === Settings.font);
         return choice ? choice.family : fontSans;
@@ -486,10 +512,17 @@ Singleton {
     // the operating system's logo (Common/ControlIconHelpers.js). Every
     // installation has this face, and the terminal prompt draws the same one.
     readonly property string fontNerdIcons: "JetBrainsMono Nerd Font"
-    // Numeric readings — the clock, percentages, meters, resets. The
-    // edge-drawer redesign sets these in Geist Mono against Figtree UI copy,
-    // so a reading is recognisably an instrument value rather than prose.
-    readonly property string fontNumeric: Settings.font === "mono" ? fontMono : "Geist Mono"
+    // Numeric readings — the clock, percentages, meters, resets — versions,
+    // tables of values and code. A reading set in a monospace is recognisably
+    // an instrument value rather than prose. Space Grotesk pairs with
+    // JetBrains Mono as it does in the installer; the edge-drawer redesign set
+    // Geist Mono against Figtree, and the other sans choices keep that.
+    readonly property string fontNumeric: Settings.font === "mono" || Settings.font === "grotesk"
+        ? fontMono : "Geist Mono"
+    // Uppercase section labels and kickers ("TOP PROCESSES", a settings
+    // group's heading): the installer's mono kickers, in the same face as the
+    // data they introduce.
+    readonly property string fontLabel: fontNumeric
     // Bundled Tabler icons. Sym owns name resolution, font loading and the
     // consistent outline rendering; views must not draw icon codepoints directly.
     readonly property string fontIcon: "Cybex OS Tabler Outline"
@@ -508,9 +541,12 @@ Singleton {
     readonly property int fontHero: typography.displayLarge
     // Monospaced faces set wider than they are tall, so a measure that reads
     // comfortably at 1.45 in the proportional faces runs together in JetBrains
-    // Mono. The step is per-face rather than global: raising it for everyone
-    // would loosen prose that is already correct.
-    readonly property real proseLineHeight: Settings.font === "mono" ? 1.55 : 1.45
+    // Mono. Space Grotesk's large x-height and tight default leading want a
+    // half step more than the others. The step is per-face rather than
+    // global: raising it for everyone would loosen prose that is already
+    // correct.
+    readonly property real proseLineHeight: Settings.font === "mono" ? 1.55
+        : Settings.font === "grotesk" ? 1.5 : 1.45
 
     // Standard font weights match Omarchy's regular copy and bold headings.
     readonly property int weightRegular: 400
@@ -599,10 +635,27 @@ Singleton {
     // does not drag every thread row up with it.
     readonly property color surfaceBorderBase: Settings.surfaceBorderMode === "custom"
         ? Settings.surfaceBorderColor : Settings.surfaceBorderMode === "subtle" ? stroke : accent
-    readonly property color surfaceBorderColor: Qt.rgba(surfaceBorderBase.r, surfaceBorderBase.g,
-        surfaceBorderBase.b, surfaceBorderBase.a * (Settings.highContrast ? 1 : Settings.surfaceBorderOpacity / 100))
+    // Light mode's edges (2026-11 review). A pale popover, launcher, toast or
+    // bar tooltip over a pale window dissolves into it, and a compositor
+    // shadow is not guaranteed, so with no border chosen light mode draws a
+    // 1 px ink edge around every floating surface. Dark mode keeps its
+    // borderless look, and a border the user chose replaces the edge.
+    readonly property color surfaceEdge: Qt.rgba(lightInk.r, lightInk.g, lightInk.b, 0.18)
+    readonly property bool surfaceEdgeShown: !dark && !Settings.highContrast
+        && Settings.surfaceBorderWidth === 0
+    readonly property color surfaceBorderColor: surfaceEdgeShown ? surfaceEdge
+        : Qt.rgba(surfaceBorderBase.r, surfaceBorderBase.g, surfaceBorderBase.b,
+            surfaceBorderBase.a * (Settings.highContrast ? 1 : Settings.surfaceBorderOpacity / 100))
     readonly property int surfaceBorderWidth: Settings.highContrast
-        ? Math.max(2, Settings.surfaceBorderWidth) : Settings.surfaceBorderWidth
+        ? Math.max(2, Settings.surfaceBorderWidth)
+        : surfaceEdgeShown ? 1 : Settings.surfaceBorderWidth
+    // The same edge for a card inside a window (an app tile, a summary card):
+    // in light mode its chip fill alone is a 1.1:1 step that washes out.
+    // Dark mode draws no card edge. Use as `border.width: Theme.cardEdgeWidth`
+    // with `border.color: Theme.cardEdge`.
+    readonly property int cardEdgeWidth: dark ? 0 : 1
+    readonly property color cardEdge: dark ? "transparent"
+        : Qt.rgba(lightInk.r, lightInk.g, lightInk.b, 0.14)
     readonly property int panelRadius: Settings.surfaceCornerRadius
     readonly property int panelPadding: scaled(14)
     readonly property int sectionHeaderHeight: scaled(22)
@@ -642,20 +695,25 @@ Singleton {
     readonly property int settingsMarkInset: scaled(18)
     readonly property int settingsNarrowWidth: scaled(520, typeScale)
 
-    // Switch geometry per surface, for Common/Toggle.qml: `box` is the hit
-    // area, `track` the pill drawn centred inside it. The knob always sits
-    // 4px inside the track height, so it follows from `track` alone.
+    // Switch geometry per surface, for Common/Toggle.qml: `box` is the space
+    // the switch takes in its layout, `track` the pill drawn centred inside
+    // it. The knob always sits 4px inside the track height, so it follows
+    // from `track` alone. Every track is at least 24 px tall (the 2026-11
+    // review measured 32 × 18) at the old 1.7:1 proportions, and the pointer
+    // target reaches at least switchHitMin in both directions even where the
+    // box is shorter (Toggle extends it invisibly).
+    readonly property int switchHitMin: 32
     readonly property var switchPopover: ({
-        box: Qt.size(44, 34),
-        track: Qt.size(36, 21)
+        box: Qt.size(48, 34),
+        track: Qt.size(42, 24)
     })
     readonly property var switchRow: ({
-        box: Qt.size(40, root.settingsControlHeight),
-        track: Qt.size(36, 21)
+        box: Qt.size(48, root.settingsControlHeight),
+        track: Qt.size(42, 24)
     })
     readonly property var switchCompact: ({
-        box: Qt.size(36, root.settingsControlHeight),
-        track: Qt.size(32, 19)
+        box: Qt.size(46, root.settingsControlHeight),
+        track: Qt.size(40, 24)
     })
 
     // ---- motion ------------------------------------------------------------

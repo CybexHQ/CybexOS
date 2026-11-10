@@ -59,7 +59,7 @@ ACCENT_SOURCES = ('fixed', 'wallpaper')
 # SettingsHelpers.BAR_COLOR_CHOICES without `custom`: a colour is custom.
 BAR_PRESETS = ('default', 'macos', 'black', 'graphite', 'slate', 'white')
 # SettingsHelpers.FONT_IDS.
-FONTS = ('figtree', 'google', 'urbanist', 'plex', 'inter', 'mono')
+FONTS = ('grotesk', 'figtree', 'google', 'urbanist', 'plex', 'inter', 'mono')
 # The explicit colours a theme may set, all optional. Theme.qml derives the
 # rest and still applies its contrast floors to every text colour.
 PALETTE_KEYS = ('background', 'surface', 'surfaceRaised', 'text', 'textMuted', 'textDim',
@@ -94,7 +94,7 @@ APPEARANCE_DEFAULTS = {
     'themeMode': 'dark',
     'paletteMode': 'wallpaper',
     'accent': '#60a5fa',
-    'font': 'mono',
+    'font': 'grotesk',
     'barColorMode': 'default',
     'barCustomHue': 230,
     'barCustomSaturation': 14,

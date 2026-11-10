@@ -195,15 +195,20 @@ test("the dropdown previews each theme in its own colours", () => {
 // ---- contrast ------------------------------------------------------------------
 
 // Theme.qml holds a themed ladder against themeReference(): in dark mode the
-// lightest surface, in light mode the darkest under a hovered chip of the
-// theme's ink. Every plain surface must read as well.
+// lightest of a resting card on a panel and the raised surface, in light mode
+// the darkest surface under a hovered chip of the theme's ink. Every plain
+// surface, and in dark mode every card on one, must read as well.
 const CHIP_HOVER = Number(read("Common/Theme.qml")
     .match(/readonly property real chipHoverAlpha:\s*([\d.]+)/)[1]);
 
 function backdrops(palette) {
     const s = H.themeSurfaces(palette);
-    const reference = H.themeReference(palette, CHIP_HOVER);
-    return { reference, all: [reference, s.background, s.surface, s.surfaceRaised] };
+    const reference = H.themeReference(palette, CHIP_HOVER, H.DARK_CARD_ALPHA);
+    const plain = [s.background, s.surface, s.surfaceRaised];
+    // Cards rest on the two panel surfaces; the raised one carries menus.
+    const cards = s.mode === "dark"
+        ? [s.background, s.surface].map(surface => H.mixHex(surface, "#ffffff", H.DARK_CARD_ALPHA)) : [];
+    return { reference, all: [reference, ...plain, ...cards] };
 }
 
 function checkLadder(palette, label) {

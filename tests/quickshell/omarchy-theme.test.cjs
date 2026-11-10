@@ -13,7 +13,7 @@ const values = (p, colors = palette, session) => theme.values(p, colors, metrics
 
 test("Omarchy adapter maps the default font, geometry and supplied palette border", () => {
     const p = prefs();
-    assert.equal(p.font, "mono");
+    assert.equal(p.font, "grotesk");
     assert.equal(p.surfaceCornerRadius, 16);
     const v = values(p);
     assert.equal(v["font.base-size"], "14");

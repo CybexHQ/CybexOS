@@ -176,6 +176,12 @@ test("menubar icons keep bright system ink and shared monochrome brands", () => 
     assert.match(controlGlyph, /color: root\.highlighted \? root\.hoverColor : root\.idleColor/);
     assert.match(control,
         /highlighted:\s*controlButton\.held \|\| controlButton\.hovered/);
+    // The one bar target that rests on a chip (2026-11 review): the Cybex X
+    // at the far right read as a window's close button. It takes the status
+    // group's resting fill, and an accent edge while its drawer is open.
+    assert.match(control, /restFill: Theme\.barChip/);
+    assert.match(control, /border\.width: held \? 1 : 0\s+border\.color: Theme\.barAccent/);
+    assert.match(control, /tooltip: I18n\.tr\("Control Center"\)/);
     assert.doesNotMatch(updates, /idleColor:|rebootRecommended/,
         "the available-update icon uses the shared system ink");
     // Without a cover the chip shows the player's mark in the shared ink.
@@ -192,8 +198,11 @@ test("menubar icons keep bright system ink and shared monochrome brands", () => 
         "tray icons must not hold an offscreen layer at rest");
     assert.match(volume, /idleColor:\s*Audio\.muted \? Theme\.barRedText : Theme\.barIcon/);
     assert.match(volume, /color:\s*chip\.fg/);
-    assert.match(wifi, /color:\s*chip\.fg/);
-    assert.match(bluetooth, /color:\s*chip\.fg/);
+    // Offline and unconnected marks are dimmed in the readable disabled ink
+    // (about 3:1) rather than faded to 35 %, which fell below 2:1.
+    assert.match(wifi, /color: EthernetState\.connected \|\| WifiState\.connected\s+\? chip\.fg : Theme\.barTextDisabled/);
+    assert.match(bluetooth, /color: BluetoothState\.connected \? chip\.fg : Theme\.barTextDisabled/);
+    assert.doesNotMatch(wifi + bluetooth, /opacity:/);
     assert.match(battery, /Battery\.pluggedIn \? Theme\.barAccent : Theme\.barIcon/);
     assert.match(battery, /color:\s*chip\.fg/);
     assert.match(github, /BarBrandIcon\s*\{[\s\S]{0,180}?name:\s*"github"/);
