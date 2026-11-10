@@ -9,10 +9,17 @@ import ".."
 
 // The drawer's Sound tab: the default output and its level, every output
 // device as a row, the microphone with its live level, and per-application
-// streams.
+// streams. Without an output it says why in the drawer's one empty-state
+// pattern (DrawerEmptyState): the sound service is not running, or it has
+// no speakers or headphones to play on.
 Column {
     id: root
     property bool showSettingsAction: true
+
+    // "" while there is an output to show; otherwise why there is none.
+    readonly property string emptyKind: !Pipewire.ready ? "service"
+        : !Audio.ready ? "device" : ""
+    readonly property bool serviceDown: !Pipewire.ready
 
     readonly property var nodeValues: Pipewire.nodes ? Pipewire.nodes.values : []
     readonly property var sinkCandidates: AudioHelpers.outputDevices(
@@ -70,8 +77,21 @@ Column {
         }
     }
 
+    DrawerEmptyState {
+        visible: root.emptyKind !== ""
+        glyph: root.serviceDown ? "volume_off" : "headphones"
+        title: root.emptyKind === "service" ? I18n.tr("Sound service isn't running")
+            : I18n.tr("No speakers or headphones")
+        detail: root.emptyKind === "service"
+            ? I18n.tr("Apps can't play sound until it starts.")
+            : I18n.tr("Connect speakers or headphones to hear sound.")
+        actionText: root.showSettingsAction ? I18n.tr("Sound settings") : ""
+        onAction: Settings.showPanel("sound", Popouts.hostScreenName)
+    }
+
     // ---- output header ---------------------------------------------------
     Item {
+        visible: root.emptyKind === ""
         width: parent.width
         height: 40
 
@@ -85,7 +105,7 @@ Column {
 
             Text {
                 width: parent.width
-                text: Audio.ready ? Audio.outputName : "No output device"
+                text: Audio.outputName
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.title
                 font.weight: Theme.weightSemibold
@@ -95,13 +115,13 @@ Column {
 
             Text {
                 width: parent.width
-                // Without an output there is no level to report; the
-                // slider below fades rather than claiming 0 %.
-                text: (!Audio.ready ? I18n.tr("Volume unavailable")
-                        : Audio.muted ? "Muted" : "Output " + Audio.volume + "%")
+                // Shown only with an output (emptyKind), so there is always
+                // a real level to report.
+                text: (Audio.muted ? I18n.tr("Muted")
+                        : I18n.format("Volume %1%", [Audio.volume]))
                     + (Audio.sourceReady
-                        ? " · mic " + (Audio.sourceMuted
-                            ? "muted" : Audio.sourceVolume + "%")
+                        ? " · " + (Audio.sourceMuted ? I18n.tr("Microphone muted")
+                            : I18n.format("Microphone %1%", [Audio.sourceVolume]))
                         : "")
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
@@ -127,6 +147,7 @@ Column {
     }
 
     DrawerSliderRow {
+        visible: root.emptyKind === ""
         glyph: Audio.muted || Audio.volume === 0 ? "volume_off"
             : Audio.volume < 50 ? "volume_down" : "volume_up"
         value: Audio.level
@@ -138,6 +159,7 @@ Column {
 
     // ---- output devices --------------------------------------------------
     Column {
+        visible: root.emptyKind === ""
         width: parent.width
         spacing: 2
 
@@ -434,9 +456,9 @@ Column {
         }
     }
 
+    // The empty state carries its own way to Settings.
     DrawerFooter {
-        visible: root.showSettingsAction
-        info: "PipeWire"
+        visible: root.showSettingsAction && root.emptyKind === ""
         actionText: I18n.tr("Sound settings")
         onActionClicked: {
             Settings.showPanel("sound");

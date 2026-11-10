@@ -4,6 +4,7 @@ import Quickshell
 import "../../Common"
 import "../../Common/ProcessListHelpers.js" as ProcessListHelpers
 import "../../Common/SysInfoHelpers.js" as SysInfoHelpers
+import "DrawerFormat.js" as DrawerFormat
 import ".."
 
 // Overview's Top processes: the busiest processes by CPU or by memory, read
@@ -13,6 +14,10 @@ import ".."
 // that names the process and its PID; a process that ignores the request is
 // offered a force quit. The full picture is one click away in the system
 // monitor.
+//
+// A row names the process as people know it: a Nix wrapper's
+// ".firefox-wrapped", cut to ".firefox-wrappe" by the kernel, reads
+// "firefox" (DrawerFormat.processLabel).
 //
 // The × stays out of sight until the row is hovered, holds keyboard focus,
 // or is the row the confirmation is about, so a list of numbers does not
@@ -160,7 +165,7 @@ Column {
         visible: !ProcessList.loaded || ProcessList.error !== ""
         width: parent.width
         leftPadding: Theme.scaled(8)
-        text: ProcessList.error !== "" ? ProcessList.error : "Reading processes…"
+        text: ProcessList.error !== "" ? ProcessList.error : I18n.tr("Reading processes…")
         font.family: Theme.fontMenu
         font.pixelSize: Theme.typography.secondary
         color: ProcessList.error !== "" ? Theme.redText : Theme.textFaint
@@ -178,6 +183,7 @@ Column {
             readonly property var row: ProcessList.rows[index] ?? null
             readonly property bool endable: row !== null && ProcessList.canEnd(row)
             readonly property bool byMemory: ProcessList.mode === "memory"
+            readonly property string label: row ? DrawerFormat.processLabel(row.name) : ""
             // Bound to the PID and start time the confirmation captured, not
             // to this slot's rank, which changes with every sample.
             readonly property bool selected: row !== null && root.subject !== null
@@ -191,7 +197,7 @@ Column {
             color: revealed ? Theme.chip : "transparent"
 
             Accessible.role: Accessible.StaticText
-            Accessible.name: row ? row.name + ", CPU " + ProcessListHelpers.formatCpu(row.cpu)
+            Accessible.name: row ? label + ", CPU " + ProcessListHelpers.formatCpu(row.cpu)
                 + ", memory " + SysInfoHelpers.formatIecBytes(row.memory) : ""
 
             HoverHandler {
@@ -204,7 +210,7 @@ Column {
                 anchors.right: cpuText.left
                 anchors.rightMargin: Theme.controlSpacing
                 anchors.verticalCenter: parent.verticalCenter
-                text: slot.row ? slot.row.name : ""
+                text: slot.label
                 elide: Text.ElideRight
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.primary
@@ -254,7 +260,7 @@ Column {
                 glyph: "close"
                 glyphSize: Theme.iconSmall
                 tint: Theme.textMid
-                accessibleName: slot.row ? "End " + slot.row.name : "End process"
+                accessibleName: slot.row ? I18n.format("End %1", [slot.label]) : I18n.tr("End process")
                 onClicked: ProcessList.requestEnd(slot.row)
             }
         }

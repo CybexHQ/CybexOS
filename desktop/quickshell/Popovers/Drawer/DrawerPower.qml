@@ -6,9 +6,18 @@ import "../../Common"
 import "../../Common/BatteryViewHelpers.js" as BatteryView
 
 // The drawer's Power tab: the charge reading and its meter, the power
-// profile, battery preservation and stay-awake.
+// profile, battery preservation and stay-awake. Without a battery to read it
+// says why in the drawer's one empty-state pattern (DrawerEmptyState) —
+// this computer has none, or the power service is not running — and keeps
+// the power mode and Stay awake below it, which work either way.
 Column {
     id: root
+
+    // UPower answers for the display device once it is running.
+    readonly property bool serviceReady: displayDevice !== null && displayDevice.ready === true
+    // "" while there is a battery to show; otherwise why there is not.
+    readonly property string emptyKind: !serviceReady ? "service"
+        : !Battery.isLaptop ? "battery" : ""
 
     readonly property var displayDevice: Battery.device
     readonly property int level: Math.round(Battery.percent)
@@ -56,8 +65,19 @@ Column {
         }
     }
 
+    DrawerEmptyState {
+        visible: root.emptyKind !== ""
+        glyph: root.serviceReady ? "plug" : "battery_alert"
+        title: root.emptyKind === "service" ? I18n.tr("Power service isn't running")
+            : I18n.tr("No battery")
+        detail: root.emptyKind === "service"
+            ? I18n.tr("Battery level can't be read until it starts.")
+            : I18n.tr("This computer runs on mains power.")
+    }
+
     // ---- charge ----------------------------------------------------------
     Item {
+        visible: root.emptyKind === ""
         width: parent.width
         height: 56
 
@@ -69,18 +89,7 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 5
 
-            // A machine without a battery says so instead of "--%".
-            Text {
-                visible: !Battery.isLaptop
-                text: I18n.tr("No battery found")
-                font.family: Theme.fontMenu
-                font.pixelSize: Theme.typography.title
-                font.weight: Theme.weightSemibold
-                color: Theme.textHi
-            }
-
             Row {
-                visible: Battery.isLaptop
                 spacing: 2
 
                 Text {
@@ -104,7 +113,7 @@ Column {
             }
 
             Text {
-                text: Battery.isLaptop ? root.statusLine : I18n.tr("On external power")
+                text: root.statusLine
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textFaint
@@ -116,8 +125,7 @@ Column {
             anchors.right: parent.right
             anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            name: !Battery.isLaptop ? "power"
-                : Battery.charging ? "battery_charging_full"
+            name: Battery.charging ? "battery_charging_full"
                 : root.critical ? "battery_alert"
                 : root.level >= 95 ? "battery_full"
                 : root.level >= 80 ? "battery_6_bar"
@@ -131,7 +139,7 @@ Column {
     }
 
     Rectangle {
-        visible: Battery.isLaptop
+        visible: root.emptyKind === ""
         width: parent.width - 8
         x: 4
         height: 8
@@ -165,7 +173,7 @@ Column {
                     ? [
                         { profile: PowerProfile.PowerSaver, glyph: "eco", label: I18n.tr("Saver") },
                         { profile: PowerProfile.Balanced, glyph: "balance", label: I18n.tr("Balanced") },
-                        { profile: PowerProfile.Performance, glyph: "speed", label: I18n.tr("Perf") }
+                        { profile: PowerProfile.Performance, glyph: "speed", label: I18n.tr("Performance") }
                     ]
                     : [
                         { profile: PowerProfile.PowerSaver, glyph: "eco", label: I18n.tr("Saver") },
@@ -230,7 +238,7 @@ Column {
         spacing: 2
 
         Item {
-            visible: BatteryHealth.supported || !BatteryHealth.known
+            visible: Battery.isLaptop && (BatteryHealth.supported || !BatteryHealth.known)
             width: parent.width
             height: 40
 
@@ -296,9 +304,10 @@ Column {
             }
         }
 
+        // Grows with its subtitle, which wraps at a larger text size.
         Item {
             width: parent.width
-            height: 40
+            height: Math.max(40, awakeCopy.implicitHeight + Theme.scaled(8))
 
             Sym {
                 id: awakeMark
@@ -311,6 +320,7 @@ Column {
             }
 
             Column {
+                id: awakeCopy
                 anchors.left: awakeMark.right
                 anchors.leftMargin: 12
                 anchors.right: awakeToggle.left
@@ -328,16 +338,21 @@ Column {
                     elide: Text.ElideRight
                 }
 
+                // What it means for the screen, in plain words.
                 Text {
                     width: parent.width
-                    text: SysInfo.idleInhibitError !== ""
-                        ? SysInfo.idleInhibitError
-                        : "Idle inhibit " + SysInfo.idleInhibitStatus.toLowerCase()
+                    text: SysInfo.idleInhibitError !== "" ? SysInfo.idleInhibitError
+                        : !SysInfo.idleInhibited ? I18n.tr("The screen can sleep when idle")
+                        : SysInfo.idleInhibitMode === "always" ? I18n.tr("Keeping the screen on")
+                        : SysInfo.idleInhibitMode === "unplugged"
+                        ? I18n.tr("Keeping the screen on until unplugged")
+                        : I18n.format("Keeping the screen on for %1 min",
+                            [Math.max(1, Math.ceil(SysInfo.idleInhibitRemainingSecs / 60))])
                     font.family: Theme.fontMenu
                     font.pixelSize: Theme.typography.metadata
                     color: SysInfo.idleInhibitError !== ""
-                        ? Theme.redText : Theme.textFaint
-                    elide: Text.ElideRight
+                        ? Theme.redText : Theme.textMid
+                    wrapMode: Text.Wrap
                 }
             }
 
@@ -362,7 +377,7 @@ Column {
                 parts.push(root.cycleCountText + " cycles");
             return parts.join(" · ");
         }
-        actionText: I18n.tr("Idle settings")
+        actionText: I18n.tr("Power settings")
         onActionClicked: Settings.showSetting("power", "idleLockMins",
             Popouts.hostScreenName)
     }

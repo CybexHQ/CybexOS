@@ -360,7 +360,7 @@ test("the tab strip's selected state and unread count follow the shared vocabula
     const tabs = read("Popovers/Drawer/DrawerTabs.qml");
     assert.match(tabs, /color:\s*on \? Theme\.selectedFill : "transparent"/);
     assert.match(tabs, /height:\s*Theme\.selectedEdgeWidth[\s\S]{0,60}?color:\s*Theme\.selectedMark/);
-    assert.match(tabs, /color:\s*segment\.on \? Theme\.accentText : Theme\.textFaint/);
+    assert.match(tabs, /color:\s*segment\.on \? Theme\.accentText : Theme\.textMid/);
     assert.match(tabs, /hovered:\s*segmentMouse\.containsMouse && !segment\.on/, "hover stays the neutral chip");
     const badge = tabs.slice(tabs.indexOf("id: countBadge"));
     assert.match(badge, /z:\s*2/);
@@ -381,4 +381,54 @@ test("the drawer list keeps Focus as a labelled switch on the shared state", () 
     assert.match(centre, /function dismiss\(card\)[\s\S]*?Qt\.callLater\(\(\) => root\.focusCardAt\(index\)\)/,
         "focus returns to the neighbouring card after a keyboard dismiss");
     assert.match(centre, /property bool fresh:\s*modelData\.arrived > root\.shownAt/);
+});
+
+// ---- the welcome guide -------------------------------------------------------
+
+test("the full-screen guide sends ordinary toasts on its output to the centre", () => {
+    const guide = { shown: true, screen: "one" };
+    assert.equal(P.guideRoute(guide, "one", false), "centre");
+    assert.equal(P.guideRoute(guide, "one", true), "toast", "a critical one still shows");
+    assert.equal(P.guideRoute(guide, "two", false), "toast", "other outputs keep their toasts");
+    assert.equal(P.guideRoute({ shown: false, screen: "one" }, "one", false), "toast",
+        "a guide stepped aside covers nothing");
+    assert.equal(P.guideRoute({ shown: true, screen: "" }, "", false), "toast");
+    assert.equal(P.guideRoute(null, "one", false), "toast");
+    // The drawer rule is untouched by it.
+    assert.equal(P.drawerRoute(drawer(), "one", "top-right", false), "strip");
+});
+
+test("a toast over the guide clears its top bar, or its footer at the bottom", () => {
+    // 1920×1080 at zoom 1.35: the canvas fills the height; the top bar is
+    // 72 design px and the footer 88.
+    assert.equal(P.guideInset(1080, 1.35, true), Math.ceil(72 * 1.35));
+    assert.equal(P.guideInset(1080, 1.35, false), Math.ceil(88 * 1.35));
+    // A taller screen letterboxes the canvas; the inset includes the margin.
+    assert.equal(P.guideInset(1200, 1.25, true), 100 + Math.ceil(72 * 1.25));
+    assert.equal(P.guideInset(0, 0, true), 72, "a missing zoom counts as 1");
+});
+
+test("the toast overlay applies the guide rule and draws an edge over dark windows", () => {
+    const toasts = read("NotificationToasts.qml");
+    assert.match(toasts, /shown: Welcome\.open && !Welcome\.aside,\s*screen: Welcome\.screenName/);
+    assert.match(toasts, /NotifPolicy\.guideRoute\(toasts\.guide, entry\.screenName,\s*entry\.urgency === NotificationUrgency\.Critical\) === "centre"/);
+    // Never drawn, then retired into history with an unread mark.
+    assert.match(toasts, /entry\.screenName === root\.modelData\.screen\.name\s*&& !toasts\.underGuide\(entry\)/);
+    assert.match(toasts, /Notifs\.hideToast\(entry, false\);\s*Notifs\.unreadKeys = NotifPolicy\.markKey\(Notifs\.unreadKeys, entry\.key\);/);
+    assert.match(toasts, /margins\.top: root\.onTop\s*\? \(root\.guideCovers \? root\.guideInset/);
+    assert.match(toasts, /NotifPolicy\.guideInset\([\s\S]*?Guide\.Kiosk\.zoom, root\.onTop\)/);
+    // A hairline at least, and the person's panel border when they set one.
+    assert.match(toasts, /border\.width: Math\.max\(1, Theme\.surfaceBorderWidth\)/);
+    assert.match(toasts, /Theme\.surfaceBorderWidth > 0 \? Theme\.surfaceBorderColor : Theme\.stroke/);
+});
+
+test("notification close and group buttons answer to a 32 px target", () => {
+    const card = read("Common/NotifCard.qml");
+    const button = read("Common/NotifButton.qml");
+    assert.match(card, /readonly property real hitInset: Math\.min\(0,\s*\(target - Theme\.inlineActionHeight\) \/ 2\)/);
+    for (const id of ["closeMouse", "disclosureMouse"])
+        assert.match(card, new RegExp(`id: ${id}\\s*anchors\\.fill: parent\\s*anchors\\.leftMargin:[^\\n]*\\s*anchors\\.rightMargin:[^\\n]*\\s*anchors\\.topMargin: trailing\\.hitInset\\s*anchors\\.bottomMargin: trailing\\.hitInset`), id);
+    assert.match(button, /hitInsetY: Math\.min\(0, \(height - Theme\.inlineActionHeight\) \/ 2\)/);
+    // The monogram well is the shared coloured tile.
+    assert.match(read("Common/NotifIcon.qml"), /Monogram\.tile\(entry\.displayAppName \|\| entry\.appName \|\| "", Theme\.dark\)/);
 });

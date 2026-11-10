@@ -16,6 +16,13 @@ const processes = read("DrawerProcesses.qml");
 const sound = read("DrawerSound.qml");
 const sliderRow = read("DrawerSliderRow.qml");
 const drawerTile = read("DrawerTile.qml");
+const tabs = read("DrawerTabs.qml");
+const menu = read("DrawerMenu.qml");
+const emptyState = read("DrawerEmptyState.qml");
+const network = read("DrawerNetwork.qml");
+const bluetooth = read("DrawerBluetooth.qml");
+const viewState = read("DrawerViewState.qml");
+const qmldir = fs.readFileSync(path.join(shellDir, "Popovers", "Drawer", "qmldir"), "utf8");
 const drawerSettings = untranslated(fs.readFileSync(
     path.join(shellDir, "Settings", "DrawerPage.qml"), "utf8"));
 
@@ -67,7 +74,7 @@ test("the summary is one identity line, the machine, and three two-line meters",
     assert.doesNotMatch(hero, /SysInfo\.host\b/,
         "the summary must not expose the hostname");
 
-    for (const label of ["CPU", "MEMORY", "DISK /"])
+    for (const label of ["CPU", "MEMORY", "DISK"])
         assert.ok(hero.includes(`label: "${label}"`), `${label} meter is missing`);
     assert.match(hero, /BlockMeter\s*\{/);
     assert.doesNotMatch(hero, /required property string detail\b/,
@@ -85,7 +92,7 @@ test("the summary is one identity line, the machine, and three two-line meters",
         "healthy metric rows must stay flat and warning-only rows may tint");
 });
 
-test("memory reads in GiB, storage in decimal units, details behind Details", () => {
+test("memory reads in GiB, storage in decimal units, details behind Show details", () => {
     const memory = hero.slice(hero.indexOf("memoryReading:"), hero.indexOf("diskReading:"));
     const disk = hero.slice(hero.indexOf("diskReading:"), hero.indexOf("swapDetail:"));
     assert.match(memory, /formatIecBytes\(SysInfo\.memUsedBytes\)/);
@@ -100,10 +107,35 @@ test("memory reads in GiB, storage in decimal units, details behind Details", ()
     const details = hero.slice(hero.indexOf("readonly property var details:"),
         hero.indexOf("// The installed release"));
     for (const fact of ["SysInfo.cpuModel", "SysInfo.kernelRelease", "SysInfo.rootFsType"])
-        assert.ok(details.includes(fact), `${fact} belongs in Details`);
-    assert.match(hero, /property bool detailsOpen: false/);
+        assert.ok(details.includes(fact), `${fact} belongs in the details`);
     assert.match(hero, /visible: root\.detailsOpen && root\.details\.length > 0/);
     assert.match(hero, /Accessible\.name: root\.detailsOpen \? "Hide details" : "Show details"/);
+});
+
+test("diagnostics wait behind one Show details, kept for the session", () => {
+    // 2026-11 UI council: meters, facts and processes collapse behind the
+    // system summary; the everyday controls lead.
+    assert.match(viewState, /pragma Singleton/);
+    assert.match(viewState, /property bool overviewDetails: false/);
+    assert.match(qmldir, /^singleton DrawerViewState DrawerViewState\.qml$/m);
+    assert.match(hero, /readonly property bool detailsOpen: DrawerViewState\.overviewDetails/);
+    assert.match(hero, /DrawerViewState\.overviewDetails = !DrawerViewState\.overviewDetails/);
+    const meters = hero.slice(hero.indexOf("visible: root.detailsOpen\n"), hero.indexOf("label: \"CPU\""));
+    assert.ok(meters.length > 0 && meters.length < 200, "the meters are part of the details");
+    assert.match(overview,
+        /DrawerProcesses \{\s*visible: Settings\.drawerOverview\.processes === true\s*&& DrawerViewState\.overviewDetails/,
+        "top processes are part of the details, and stop sampling while collapsed");
+    // Collapsed, one plain line says how busy the machine is.
+    assert.match(hero, /visible: !root\.detailsOpen && root\.summaryShown\.length > 0/);
+    assert.match(hero, /model: \["cpu", "memory", "disk"\]/, "a fixed model: a sample updates readings in place");
+    for (const key of ["CPU %1%", "Memory %1%", "Disk %1%", "Disk %1% · %2 free"])
+        assert.ok(hero.includes(`"${key}"`), `summary reading ${key}`);
+    assert.match(hero, /entry\.severity >= 2 \? Theme\.redText[\s\S]{0,80}?entry\.severity === 1 \? Theme\.amber : Theme\.textMid/);
+    // The disclosure is a 32 px target in plain words.
+    const toggle = hero.slice(hero.indexOf("id: detailsToggle"));
+    assert.match(toggle, /height: Math\.max\(Theme\.inlineActionHeight/);
+    assert.match(toggle, /root\.detailsOpen \? "Hide details" : "Show details"/);
+    assert.doesNotMatch(hero, /"DISK \/"|Disk slash/, "no mount-point jargon");
 });
 
 test("unknown readings stay explicit and each metric has one accessible summary", () => {
@@ -146,8 +178,9 @@ test("a slider without its device fades and says why, with a way to fix it", () 
     assert.match(sliderRow, /LinkText\s*\{[\s\S]{0,200}?onClicked:\s*root\.recovery\(\)/);
     assert.match(overview, /ready:\s*Audio\.ready[\s\S]{0,200}?reason:\s*"No output device"[\s\S]{0,80}?recoveryText:\s*"Sound settings"/);
     assert.match(overview, /onRecovery:\s*Settings\.showPanel\("sound"/);
-    assert.match(sound, /!Audio\.ready \? "Volume unavailable"/,
-        "Sound's header must not report a 0 % output that does not exist");
+    assert.match(sound, /readonly property string emptyKind: !Pipewire\.ready \? "service"\s*: !Audio\.ready \? "device" : ""/,
+        "Sound says why there is no output instead of reporting a 0 % one");
+    assert.match(sound, /\/\/ ---- output header[\s\S]{0,80}?visible: root\.emptyKind === ""/);
 });
 
 test("drawer scrolls only its body between pinned tabs and a pinned session row", () => {
@@ -181,17 +214,40 @@ test("drawer scrolls only its body between pinned tabs and a pinned session row"
     assert.match(drawer, /onSessionConfirmRequested:[\s\S]{0,120}?sessionFooter\.ask\(action, origin, version\)/);
 });
 
-test("the session row names every action and confirms the ones that end the session", () => {
-    for (const [glyph, name] of [["lock", "Lock"], ["sleep", "Suspend"], ["logout", "Log out"],
-        ["restart_alt", "Restart"], ["power_settings_new", "Shut down"],
-        ["photo_camera", "Screenshot"], ["keyboard", "Keyboard shortcuts"], ["settings", "Settings"]])
-        assert.match(footer, new RegExp(`glyph: "${glyph}"\\s*accessibleName: "${name}"`),
-            `${name} needs its glyph and an accessible name (the tooltip reads it)`);
+test("the session row labels Lock, groups the rest, and confirms what ends the session", () => {
+    // 2026-11 UI council: three labelled buttons instead of eight bare icons.
+    const buttons = [...footer.matchAll(/SessionButton \{\s*id: (\w+)\s*(?:glyph: "(\w+)"\s*)?label: "([^"]+)"/g)]
+        .map(match => [match[1], match[2] || "", match[3]]);
+    assert.deepEqual(buttons, [["lockButton", "lock", "Lock"], ["powerButton", "power_settings_new", "Power"],
+        ["moreButton", "", "More"]]);
     assert.match(footer, /onClicked: \{ Popouts\.close\(\); Session\.lock\(\); \}/);
-    assert.match(footer, /onClicked: \{ Popouts\.close\(\); Session\.suspend\(\); \}/);
-    for (const action of ["logout", "reboot", "shutdown"])
-        assert.match(footer, new RegExp(`onClicked: root\\.ask\\("${action}"`),
-            `${action} must ask before it acts`);
+    assert.match(footer, /menu: powerMenu[\s\S]{0,160}?onClicked: powerMenu\.toggle\(\)/);
+    assert.match(footer, /menu: moreMenu[\s\S]{0,160}?onClicked: moreMenu\.toggle\(\)/);
+    const entries = name => [...footer.slice(footer.indexOf(`id: ${name}`)).split("onChosen")[0]
+        .matchAll(/\{ id: "(\w+)", glyph: "(\w+)", label: "([^"]+)" \}/g)].map(match => match.slice(1));
+    assert.deepEqual(entries("powerMenu"), [["sleep", "sleep", "Sleep"], ["reboot", "restart_alt", "Restart…"],
+        ["shutdown", "power_settings_new", "Shut down…"], ["logout", "logout", "Log out…"]]);
+    assert.deepEqual(entries("moreMenu"), [["settings", "settings", "Settings"],
+        ["shortcuts", "keyboard", "Keyboard shortcuts"], ["screenshot", "photo_camera", "Screenshot"]]);
+    const run = footer.slice(footer.indexOf("function run(action)"), footer.indexOf("component SessionButton"));
+    assert.match(run, /"sleep"\) \{\s*Popouts\.close\(\);\s*Session\.suspend\(\);/, "Sleep acts at once");
+    assert.match(run, /action === "reboot" \|\| action === "shutdown" \|\| action === "logout"\) \{\s*ask\(action, powerButton\);/,
+        "ending the session asks first, and Cancel returns to Power");
+    assert.match(run, /Session\.toggleKeys\(\)/);
+    assert.match(run, /Settings\.showPanel\(undefined, Popouts\.hostScreenName\)/);
+    assert.match(run, /"screenshot region"/);
+    // Buttons: secondary tier, 32 px, named; menus: keyboard, Escape, focus.
+    const button = footer.slice(footer.indexOf("component SessionButton"));
+    assert.match(button, /height: Math\.max\(Theme\.inlineActionHeight/);
+    assert.match(button, /Accessible\.role: menu !== null \? Accessible\.ButtonMenu : Accessible\.Button/);
+    assert.match(menu, /closePolicy: Controls\.Popup\.CloseOnEscape \| Controls\.Popup\.CloseOnPressOutsideParent/);
+    assert.match(menu, /Qt\.Key_Down\) root\.focusEntry\(index \+ 1\)/);
+    assert.match(menu, /Qt\.Key_Escape\) root\.dismiss\(\)/);
+    assert.match(menu, /function dismiss\(\) \{\s*close\(\);\s*if \(opener && opener\.visible\)\s*opener\.forceActiveFocus\(\);/);
+    assert.match(menu, /height: Math\.max\(Theme\.inlineActionHeight/);
+    assert.match(drawer, /if \(sessionFooter\.menuOpen\) \{\s*sessionFooter\.dismissMenu\(\);\s*return true;/,
+        "Escape closes an open menu before the drawer");
+
     const confirm = footer.slice(footer.indexOf("function confirm()"), footer.indexOf("function reset()"));
     assert.match(confirm, /Session\.logout\(\)/);
     assert.match(confirm, /Session\.shutdown\(\)/);
@@ -201,7 +257,60 @@ test("the session row names every action and confirms the ones that end the sess
         "Return answers with the default; Cancel's own press cancels");
     assert.match(footer, /function onOpenChanged\(\) \{\s*if \(!Popouts\.open\)\s*root\.reset\(\);/,
         "closing the drawer drops a pending question");
+    assert.match(footer, /function reset\(\) \{[\s\S]{0,80}?closeMenus\(\);/, "and an open menu");
     assert.match(footer, /Math\.max\(Theme\.scaled\(52\)/);
+});
+
+test("every tab is labelled, and the strip wraps rather than cutting a label", () => {
+    for (const [tab, glyph, label] of [["overview", "dashboard", "Overview"], ["sound", "volume_down", "Sound"],
+        ["network", "wifi", "Network"], ["bluetooth", "bluetooth", "Bluetooth"], ["power", "battery_5_bar", "Power"],
+        ["notifications", "notifications", "Alerts"]])
+        assert.match(tabs, new RegExp(`${tab}: \\{ glyph: "${glyph}", label: "${label}"`));
+    assert.match(tabs, /name: "Notifications"/, "the tooltip and description keep the full name");
+    assert.doesNotMatch(tabs, /showLabel|restingWidth|elide/, "no tab hides or elides its label");
+    assert.match(tabs, /layout: DrawerFormat\.tabLayout\(/);
+    assert.match(tabs, /columns: root\.layout\.stacked \? 1 : 2/);
+    assert.match(tabs, /wrapMode: Text\.Wrap/);
+});
+
+test("Sound, Network, Bluetooth and Power share one empty-state pattern", () => {
+    assert.match(qmldir, /^DrawerEmptyState DrawerEmptyState\.qml$/m);
+    for (const prop of ["glyph", "title", "detail", "actionText"])
+        assert.match(emptyState, new RegExp(`property string ${prop}:`));
+    assert.match(emptyState, /signal action\(\)/);
+    assert.match(emptyState, /visible: root\.actionText !== ""/, "at most one action, none when there is nothing to do");
+    assert.equal((emptyState.match(/wrapMode: Text\.Wrap/g) || []).length, 2, "cause and detail wrap");
+    for (const [name, source] of [["Sound", sound], ["Network", network], ["Bluetooth", bluetooth], ["Power", power]]) {
+        assert.match(source, /DrawerEmptyState \{\s*visible: root\.emptyKind !== ""/, `${name} uses the pattern`);
+        assert.match(source, /readonly property string emptyKind:/, `${name} names its empty states`);
+    }
+    // Missing hardware, turned off and a service that is not running read differently.
+    assert.match(sound, /"Sound service isn't running"/);
+    assert.match(sound, /"No speakers or headphones"/);
+    assert.match(network, /QsNetworking\.Networking\.backend === QsNetworking\.NetworkBackendType\.None/);
+    for (const title of ["Network service isn't running", "No network adapter found", "No cable connected",
+        "Wi-Fi is blocked", "Wi-Fi is off"])
+        assert.ok(network.includes(`"${title}"`), title);
+    assert.match(network, /if \(root\.emptyKind === "off"\)\s*WifiState\.setEnabled\(true\)/);
+    for (const title of ["Bluetooth service isn't running", "No Bluetooth adapter found", "Bluetooth is blocked",
+        "Bluetooth is off"])
+        assert.ok(bluetooth.includes(`"${title}"`), title);
+    assert.match(bluetooth, /\/sys\/class\/bluetooth\/hci\*/, "an unseen controller is told apart from a stopped service");
+    assert.match(bluetooth, /onAction: BluetoothState\.setEnabled\(true\)/);
+    assert.match(power, /"Power service isn't running"/);
+    assert.match(power, /"No battery"/);
+    // No duplicate messages, no jargon, nothing shown for what is not there.
+    assert.doesNotMatch(bluetooth, /"Bluetooth unavailable"|"No Bluetooth adapter"/);
+    assert.doesNotMatch(sound, /info: "PipeWire"/);
+    assert.doesNotMatch(power, /Idle inhibit|"Perf"/);
+    assert.match(network, /visible: !Tailscale\.missing\s*width: parent\.width\s*height: 40/,
+        "no Tailscale row when it is not installed");
+    assert.match(network, /id: wifiToggle\s*visible: root\.wifiPresent/, "no Wi-Fi switch without an adapter");
+    assert.match(network, /enabled: !root\.wifiBlocked/);
+    assert.match(bluetooth, /DrawerEmptyState \{[\s\S]*?\n    Item \{\s*visible: root\.emptyKind === ""/,
+        "no Bluetooth switch without an adapter: the header goes with the empty state");
+    assert.match(power, /visible: Battery\.isLaptop && \(BatteryHealth\.supported \|\| !BatteryHealth\.known\)/,
+        "battery health only where there is a battery");
 });
 
 test("a pending update offers one action; restarting goes through the session row", () => {

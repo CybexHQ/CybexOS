@@ -5,9 +5,13 @@ import "../../Common"
 import ".."
 
 // The drawer's pinned session row (2026-11 UI review): outside the scrolling
-// body, the same on every tab. Lock and Suspend act at once. Log out,
-// Restart and Shut down, and Overview's "Restart…" for a staged update, turn
-// the row into one question first, so a stray click never ends the session.
+// body, the same on every tab. Three labelled buttons (2026-11 UI council:
+// eight bare icons asked people to recognise them): Lock, which acts at
+// once; Power, a menu of Sleep, Restart…, Shut down… and Log out…; and More,
+// a menu of Settings, Keyboard shortcuts and Screenshot. Sleep acts at once.
+// Log out, Restart and Shut down, and Overview's "Restart…" for a staged
+// update, turn the row into one question first, so a stray click never ends
+// the session.
 //
 // The question behaves like a small dialog: focus lands on Cancel, Return
 // answers with the default (the red button), Space presses whichever button
@@ -28,8 +32,9 @@ Item {
     property real bottomInset: 0
 
     readonly property bool confirming: pending !== ""
+    readonly property bool menuOpen: powerMenu.opened || moreMenu.opened
     readonly property real zoneHeight: Math.max(Theme.scaled(52),
-        (confirming ? confirmRow.implicitHeight : Theme.inlineActionHeight)
+        (confirming ? confirmRow.implicitHeight : lockButton.height)
             + Theme.scaled(20))
     readonly property string question: pending === "logout"
         ? I18n.tr("Log out? Unsaved work may be lost.")
@@ -88,6 +93,152 @@ Item {
     function reset() {
         pending = "";
         returnFocus = null;
+        closeMenus();
+    }
+
+    function closeMenus() {
+        powerMenu.close();
+        moreMenu.close();
+    }
+
+    // Escape with a menu open closes the menu, not the drawer
+    // (DrawerPopover.handleEscape).
+    function dismissMenu() {
+        const opener = powerMenu.opened ? powerButton : moreButton;
+        closeMenus();
+        opener.forceActiveFocus();
+    }
+
+    function run(action) {
+        if (action === "sleep") {
+            Popouts.close();
+            Session.suspend();
+        } else if (action === "reboot" || action === "shutdown" || action === "logout") {
+            ask(action, powerButton);
+        } else if (action === "settings") {
+            Settings.showPanel(undefined, Popouts.hostScreenName);
+        } else if (action === "shortcuts") {
+            Session.toggleKeys();
+        } else if (action === "screenshot") {
+            Popouts.close();
+            Quickshell.execDetached(["sh", "-c", "screenshot region"]);
+        }
+    }
+
+    // A secondary-tier button (docs/shell-states.md: chip and hairline,
+    // 32 px high): a glyph, its label, and a chevron when it opens a menu.
+    component SessionButton: Rectangle {
+        id: button
+
+        property string glyph: ""
+        property string label: ""
+        property DrawerMenu menu: null
+        property string accessibleName: label
+        property string accessibleDescription: ""
+        readonly property bool menuOpen: menu !== null && menu.opened
+        signal clicked()
+
+        width: buttonRow.implicitWidth + Theme.scaled(10) * 2
+        height: Math.max(Theme.inlineActionHeight, buttonLabel.implicitHeight + Theme.scaled(10))
+        radius: Theme.chipRadius
+        color: menuOpen ? Theme.chipHover : Theme.chip
+        border.width: Theme.focusWidth(activeFocus) || 1
+        border.color: Theme.focusWidth(activeFocus) > 0 ? Theme.focusRing : Theme.hairline
+        activeFocusOnTab: visible && enabled
+        Accessible.role: menu !== null ? Accessible.ButtonMenu : Accessible.Button
+        Accessible.name: accessibleName
+        Accessible.description: accessibleDescription
+        Accessible.onPressAction: button.clicked()
+
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                    || event.key === Qt.Key_Space
+                    || (button.menu !== null && !button.menuOpen
+                        && (event.key === Qt.Key_Up || event.key === Qt.Key_Down))) {
+                button.clicked();
+                event.accepted = true;
+            }
+        }
+
+        StateLayer {
+            anchors.fill: parent
+            radius: parent.radius
+            hovered: buttonMouse.containsMouse
+            pressed: buttonMouse.pressed
+            tint: Theme.textHi
+            pressPoint: Qt.point(buttonMouse.mouseX, buttonMouse.mouseY)
+        }
+
+        Row {
+            id: buttonRow
+            anchors.centerIn: parent
+            spacing: Theme.iconTextSpacing
+
+            Sym {
+                visible: button.glyph !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                name: button.glyph
+                size: Theme.iconMedium
+                color: buttonMouse.containsMouse ? Theme.textHi : Theme.textMid
+            }
+
+            Text {
+                id: buttonLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: button.label
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.control
+                font.weight: Theme.weightMedium
+                color: Theme.textHi
+                Accessible.ignored: true
+            }
+
+            // The menu opens upward, over the body.
+            Sym {
+                visible: button.menu !== null
+                anchors.verticalCenter: parent.verticalCenter
+                name: button.menuOpen ? "expand_more" : "expand_less"
+                size: Theme.iconSmall
+                color: Theme.textMid
+            }
+        }
+
+        MouseArea {
+            id: buttonMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                button.forceActiveFocus();
+                button.clicked();
+            }
+        }
+    }
+
+    DrawerMenu {
+        id: powerMenu
+        opener: powerButton
+        accessibleName: I18n.tr("Power")
+        entries: [
+            { id: "sleep", glyph: "sleep", label: I18n.tr("Sleep") },
+            { id: "reboot", glyph: "restart_alt", label: I18n.tr("Restart…") },
+            { id: "shutdown", glyph: "power_settings_new", label: I18n.tr("Shut down…") },
+            { id: "logout", glyph: "logout", label: I18n.tr("Log out…") }
+        ]
+        onChosen: id => root.run(id)
+    }
+
+    DrawerMenu {
+        id: moreMenu
+        opener: moreButton
+        alignEnd: true
+        accessibleName: I18n.tr("More")
+        entries: [
+            { id: "settings", glyph: "settings", label: I18n.tr("Settings") },
+            { id: "shortcuts", glyph: "keyboard", label: I18n.tr("Keyboard shortcuts") },
+            { id: "screenshot", glyph: "photo_camera", label: I18n.tr("Screenshot") }
+        ]
+        onChosen: id => root.run(id)
     }
 
     onVisibleChanged: {
@@ -118,44 +269,30 @@ Item {
         anchors.top: parent.top
         height: root.zoneHeight
 
+        // Lock acts at once. Power holds the four ways to end or pause the
+        // session, More the rest of the old icon row; every control names
+        // itself on screen (2026-11 UI council).
         Row {
             id: sessionActions
             visible: !root.confirming
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.scaled(2)
+            spacing: Theme.controlSpacing
 
-            DrawerIconButton {
+            SessionButton {
+                id: lockButton
                 glyph: "lock"
-                accessibleName: I18n.tr("Lock")
+                label: I18n.tr("Lock")
                 onClicked: { Popouts.close(); Session.lock(); }
             }
 
-            DrawerIconButton {
-                glyph: "sleep"
-                accessibleName: I18n.tr("Suspend")
-                onClicked: { Popouts.close(); Session.suspend(); }
-            }
-
-            DrawerIconButton {
-                id: logoutButton
-                glyph: "logout"
-                accessibleName: I18n.tr("Log out")
-                onClicked: root.ask("logout", logoutButton)
-            }
-
-            DrawerIconButton {
-                id: rebootButton
-                glyph: "restart_alt"
-                accessibleName: I18n.tr("Restart")
-                onClicked: root.ask("reboot", rebootButton)
-            }
-
-            DrawerIconButton {
-                id: shutdownButton
+            SessionButton {
+                id: powerButton
                 glyph: "power_settings_new"
-                accessibleName: I18n.tr("Shut down")
-                onClicked: root.ask("shutdown", shutdownButton)
+                label: I18n.tr("Power")
+                menu: powerMenu
+                accessibleDescription: I18n.tr("Sleep, restart, shut down or log out")
+                onClicked: powerMenu.toggle()
             }
         }
 
@@ -163,30 +300,14 @@ Item {
             visible: !root.confirming
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.scaled(2)
+            spacing: Theme.controlSpacing
 
-            DrawerIconButton {
-                glyph: "photo_camera"
-                accessibleName: I18n.tr("Screenshot")
-                onClicked: {
-                    Popouts.close();
-                    Quickshell.execDetached(["sh", "-c", "screenshot region"]);
-                }
-            }
-
-            DrawerIconButton {
-                glyph: "keyboard"
-                accessibleName: I18n.tr("Keyboard shortcuts")
-                onClicked: Session.toggleKeys()
-            }
-
-            DrawerIconButton {
-                glyph: "settings"
-                accessibleName: I18n.tr("Settings")
-                onClicked: {
-                    const screen = Popouts.hostScreenName;
-                    Settings.showPanel(undefined, screen);
-                }
+            SessionButton {
+                id: moreButton
+                label: I18n.tr("More")
+                menu: moreMenu
+                accessibleDescription: I18n.tr("Settings, keyboard shortcuts and screenshot")
+                onClicked: moreMenu.toggle()
             }
         }
 

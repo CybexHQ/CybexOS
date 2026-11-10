@@ -8,7 +8,10 @@ import ".."
 // The drawer's Overview tab, everyday controls first (2026-11 UI review):
 // quick toggles, the two sliders, now playing, a pending update, the system
 // summary, then the top processes. That order is also what stays above the
-// fold on a 1280×720 laptop. The person's drawerOverview choices still hide
+// fold on a 1280×720 laptop. The diagnostics — usage meters, system facts
+// and top processes — wait behind the summary's "Show details" (2026-11 UI
+// council), collapsed until someone opens them and then kept so for the
+// session (DrawerViewState). The person's drawerOverview choices still hide
 // any optional section; the system summary is always there. Session actions
 // live in the drawer's pinned row (DrawerSessionFooter), not here.
 // Everything here is a summary — each row's own tab or panel carries the
@@ -425,9 +428,11 @@ Column {
     }
 
     // ---- top processes -------------------------------------------------
-    // Hidden, it reads nothing: its sampler is claimed by visibility.
+    // Part of the summary's details. Hidden, it reads nothing: its sampler
+    // is claimed by visibility.
     DrawerProcesses {
         visible: Settings.drawerOverview.processes === true
+            && DrawerViewState.overviewDetails
         width: parent.width
         maxRows: DrawerFormat.processRows(root.bodyHeightBudget, Theme.scaled(640))
     }

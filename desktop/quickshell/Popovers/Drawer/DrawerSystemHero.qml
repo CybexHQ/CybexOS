@@ -11,17 +11,21 @@ import ".."
 // opening the Cybex OS button always answers both.
 //
 // One identity line ("Cybex OS 1.0.17 · NixOS 26.11", as Settings Home
-// writes it) and the machine with its uptime; then CPU, memory and disk as
-// two-line meters, a label and its full reading over a segmented meter, so
-// the reading never has to be cut short. Storage is decimal and memory
-// binary (docs/shell-states.md). Kernel, processor, filesystem and swap size
-// wait behind Details.
+// writes it), the machine with its uptime, and one plain line of how busy it
+// is ("CPU 6% · Memory 34% · Disk 62%"), a reading turning amber or red when
+// it needs attention. Everything else waits behind "Show details" (2026-11
+// UI council: diagnostics took most of the Overview): CPU, memory and disk
+// as two-line meters, a label and its full reading over a segmented meter,
+// so the reading never has to be cut short; the model, processor, kernel,
+// filesystem and swap; and, below this card, the top processes. Storage is
+// decimal and memory binary (docs/shell-states.md).
 Rectangle {
     id: root
 
-    // View state, not a setting: Details stays as it was left while the
-    // shell runs.
-    property bool detailsOpen: false
+    // View state, not a setting: the details stay as they were left while
+    // the shell runs (DrawerViewState), and DrawerOverview shows the top
+    // processes by the same switch.
+    readonly property bool detailsOpen: DrawerViewState.overviewDetails
     property string releaseVersion: ""
 
     width: parent ? parent.width : 0
@@ -77,7 +81,45 @@ Rectangle {
         : I18n.format("%1 used of %2", [SysInfoHelpers.formatIecBytes(SysInfo.swapUsedBytes),
             SysInfoHelpers.formatIecBytes(SysInfo.swapTotalBytes)])
 
-    // What Details lists; a fact the system did not report is left out.
+    // How serious each reading is: 0 fine, 1 worth a look, 2 act now. The
+    // meters tint their rows and the summary colours its readings by it.
+    readonly property int cpuSeverity: !SysInfo.cpuTempKnown ? 0
+        : SysInfo.cpuTemp >= 80 ? 2 : SysInfo.cpuTemp >= 65 ? 1 : 0
+    readonly property int memorySeverity: !SysInfo.memKnown ? 0
+        : SysInfo.memUsage >= 95 ? 2 : SysInfo.memUsage >= 85 ? 1 : 0
+    readonly property int diskSeverity: !SysInfo.rootFsKnown ? 0
+        : SysInfo.rootFsUsage >= 90 ? 2 : SysInfo.rootFsUsage >= 80 ? 1 : 0
+
+    // The collapsed card's one line: each known reading, in plain words.
+    // Keyed rather than listed, so a new sample updates the readings in
+    // place instead of rebuilding them.
+    readonly property var summary: ({
+        cpu: SysInfo.cpuUsageKnown ? {
+            text: cpuSeverity > 0
+                ? I18n.format("CPU %1% · %2 °C", [Math.round(SysInfo.cpuUsage), SysInfo.cpuTemp])
+                : I18n.format("CPU %1%", [Math.round(SysInfo.cpuUsage)]),
+            severity: cpuSeverity
+        } : null,
+        memory: SysInfo.memKnown ? {
+            text: I18n.format("Memory %1%", [Math.round(SysInfo.memUsage)]),
+            severity: memorySeverity
+        } : null,
+        disk: SysInfo.rootFsKnown ? {
+            text: diskSeverity > 0
+                ? I18n.format("Disk %1% · %2 free", [Math.round(SysInfo.rootFsUsage),
+                    SysInfoHelpers.formatStorageBytes(SysInfo.rootFsAvailableBytes)])
+                : I18n.format("Disk %1%", [Math.round(SysInfo.rootFsUsage)]),
+            severity: diskSeverity
+        } : null
+    })
+    readonly property var summaryShown: ["cpu", "memory", "disk"]
+        .filter(key => summary[key] !== null)
+
+    function toggleDetails() {
+        DrawerViewState.overviewDetails = !DrawerViewState.overviewDetails;
+    }
+
+    // What the details list; a fact the system did not report is left out.
     readonly property var details: [
         { label: I18n.tr("Model"), value: root.fullModel !== root.machineModel ? root.fullModel : "" },
         { label: I18n.tr("Processor"), value: SysInfo.cpuModel },
@@ -276,10 +318,58 @@ Rectangle {
                     font.features: Theme.tabularNumberFeatures
                     color: Theme.textMid
                 }
+
+                // Wraps reading by reading at a larger text size; a reading
+                // that needs attention takes the status colour.
+                Flow {
+                    id: summaryLine
+                    visible: !root.detailsOpen && root.summaryShown.length > 0
+                    width: parent.width
+                    spacing: Theme.iconTextSpacing
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: root.summaryShown.map(key => root.summary[key].text).join(", ")
+
+                    Repeater {
+                        model: ["cpu", "memory", "disk"]
+
+                        delegate: Row {
+                            id: reading
+
+                            required property string modelData
+                            readonly property var entry: root.summary[modelData]
+
+                            visible: entry !== null
+                            spacing: Theme.iconTextSpacing
+
+                            Text {
+                                visible: root.summaryShown.indexOf(reading.modelData) > 0
+                                text: "·"
+                                font.family: Theme.fontMenu
+                                font.pixelSize: Theme.typography.secondary
+                                color: Theme.textMid
+                                Accessible.ignored: true
+                            }
+
+                            Text {
+                                text: reading.entry ? reading.entry.text : ""
+                                font.family: Theme.fontNumeric
+                                font.pixelSize: Theme.typography.secondary
+                                font.weight: reading.entry && reading.entry.severity > 0
+                                    ? Theme.weightSemibold : Theme.weightMedium
+                                font.features: Theme.tabularNumberFeatures
+                                color: !reading.entry ? Theme.textMid
+                                    : reading.entry.severity >= 2 ? Theme.redText
+                                    : reading.entry.severity === 1 ? Theme.amber : Theme.textMid
+                                Accessible.ignored: true
+                            }
+                        }
+                    }
+                }
             }
         }
 
         Column {
+            visible: root.detailsOpen
             width: parent.width
             spacing: 0
 
@@ -292,9 +382,7 @@ Rectangle {
                 status: SysInfo.cpuTempKnown ? SysInfo.cpuTemp + " °C" : ""
                 statusColor: SysInfo.cpuTemp >= 80 ? Theme.redText
                     : SysInfo.cpuTemp >= 65 ? Theme.amber : Theme.textHi
-                severity: !SysInfo.cpuTempKnown ? 0
-                    : SysInfo.cpuTemp >= 80 ? 2
-                    : SysInfo.cpuTemp >= 65 ? 1 : 0
+                severity: root.cpuSeverity
                 accessibleName: "CPU, " + (SysInfo.cpuUsageKnown
                     ? Math.round(SysInfo.cpuUsage) + " percent utilization"
                     : "utilization unavailable") + ", "
@@ -313,9 +401,7 @@ Rectangle {
                 meterColor: !SysInfo.memKnown ? Theme.accent
                     : SysInfo.memUsage >= 95 ? Theme.red
                     : SysInfo.memUsage >= 85 ? Theme.amber : Theme.accent
-                severity: !SysInfo.memKnown ? 0
-                    : SysInfo.memUsage >= 95 ? 2
-                    : SysInfo.memUsage >= 85 ? 1 : 0
+                severity: root.memorySeverity
                 accessibleName: "Memory, " + (SysInfo.memKnown
                     ? Math.round(SysInfo.memUsage) + " percent, "
                         + SysInfoHelpers.formatIecBytes(SysInfo.memUsedBytes)
@@ -330,17 +416,15 @@ Rectangle {
             }
 
             MetricRow {
-                label: I18n.tr("DISK /")
+                label: I18n.tr("DISK")
                 known: SysInfo.rootFsKnown
                 percent: SysInfo.rootFsUsage
                 reading: root.diskReading
                 meterColor: !SysInfo.rootFsKnown ? Theme.accent
                     : SysInfo.rootFsUsage >= 90 ? Theme.red
                     : SysInfo.rootFsUsage >= 80 ? Theme.amber : Theme.accent
-                severity: !SysInfo.rootFsKnown ? 0
-                    : SysInfo.rootFsUsage >= 90 ? 2
-                    : SysInfo.rootFsUsage >= 80 ? 1 : 0
-                accessibleName: "Disk slash, " + (SysInfo.rootFsKnown
+                severity: root.diskSeverity
+                accessibleName: "Disk, " + (SysInfo.rootFsKnown
                     ? Math.round(SysInfo.rootFsUsage) + " percent, "
                         + SysInfoHelpers.formatStorageBytes(SysInfo.rootFsUsedBytes)
                             + " used of "
@@ -350,72 +434,6 @@ Rectangle {
                     : "unavailable" + (SysInfo.rootFsError !== ""
                         ? ", " + SysInfo.rootFsError : ""))
                 accessibleDescription: SysInfo.rootFsError
-            }
-        }
-
-        // ---- details -----------------------------------------------------
-        Rectangle {
-            id: detailsToggle
-            visible: root.details.length > 0
-            x: -Theme.scaled(6)
-            width: detailsRow.implicitWidth + Theme.scaled(12)
-            height: Math.max(Theme.scaled(24), detailsRow.implicitHeight + Theme.scaled(6))
-            radius: Theme.chipRadius
-            color: "transparent"
-            border.width: Theme.focusWidth(activeFocus)
-            border.color: Theme.focusRing
-            activeFocusOnTab: visible
-            Accessible.role: Accessible.Button
-            Accessible.name: root.detailsOpen ? I18n.tr("Hide details") : I18n.tr("Show details")
-            Accessible.onPressAction: root.detailsOpen = !root.detailsOpen
-
-            Keys.onPressed: event => {
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-                        || event.key === Qt.Key_Space) {
-                    root.detailsOpen = !root.detailsOpen;
-                    event.accepted = true;
-                }
-            }
-
-            StateLayer {
-                anchors.fill: parent
-                radius: parent.radius
-                hovered: detailsMouse.containsMouse
-                pressed: detailsMouse.pressed
-                pressPoint: Qt.point(detailsMouse.mouseX, detailsMouse.mouseY)
-            }
-
-            Row {
-                id: detailsRow
-                anchors.centerIn: parent
-                spacing: Theme.scaled(4)
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.tr("Details")
-                    font.family: Theme.fontMenu
-                    font.pixelSize: Theme.typography.metadata
-                    font.weight: Theme.weightMedium
-                    color: Theme.accentText
-                }
-
-                Sym {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: root.detailsOpen ? "expand_less" : "expand_more"
-                    size: Theme.iconSmall
-                    color: Theme.accentText
-                }
-            }
-
-            MouseArea {
-                id: detailsMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    detailsToggle.forceActiveFocus();
-                    root.detailsOpen = !root.detailsOpen;
-                }
             }
         }
 
@@ -472,6 +490,76 @@ Rectangle {
                         color: Theme.textHi
                         Accessible.ignored: true
                     }
+                }
+            }
+        }
+
+        // ---- details -----------------------------------------------------
+        // Tertiary tier (docs/shell-states.md): text with a chevron in a
+        // 32 px hit box, at the card's foot whether it is open or not.
+        Rectangle {
+            id: detailsToggle
+            objectName: "overviewDetailsToggle"
+            x: -Theme.scaled(6)
+            width: detailsRow.implicitWidth + Theme.scaled(12)
+            height: Math.max(Theme.inlineActionHeight, detailsRow.implicitHeight + Theme.scaled(8))
+            radius: Theme.chipRadius
+            color: "transparent"
+            border.width: Theme.focusWidth(activeFocus)
+            border.color: Theme.focusRing
+            activeFocusOnTab: visible
+            Accessible.role: Accessible.Button
+            Accessible.name: root.detailsOpen ? I18n.tr("Hide details") : I18n.tr("Show details")
+            Accessible.description: I18n.tr("Usage meters, system facts and top processes")
+            Accessible.onPressAction: root.toggleDetails()
+
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                        || event.key === Qt.Key_Space) {
+                    root.toggleDetails();
+                    event.accepted = true;
+                }
+            }
+
+            StateLayer {
+                anchors.fill: parent
+                radius: parent.radius
+                hovered: detailsMouse.containsMouse
+                pressed: detailsMouse.pressed
+                pressPoint: Qt.point(detailsMouse.mouseX, detailsMouse.mouseY)
+            }
+
+            Row {
+                id: detailsRow
+                anchors.centerIn: parent
+                spacing: Theme.scaled(4)
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.detailsOpen ? I18n.tr("Hide details") : I18n.tr("Show details")
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.control
+                    font.weight: Theme.weightMedium
+                    color: Theme.accentText
+                    Accessible.ignored: true
+                }
+
+                Sym {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: root.detailsOpen ? "expand_less" : "expand_more"
+                    size: Theme.iconSmall
+                    color: Theme.accentText
+                }
+            }
+
+            MouseArea {
+                id: detailsMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    detailsToggle.forceActiveFocus();
+                    root.toggleDetails();
                 }
             }
         }
