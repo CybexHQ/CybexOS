@@ -95,3 +95,19 @@ test("invalid or injection-shaped origins are rejected before SQLite lookup", t 
         assert.equal(result.stdout, "", origin);
     }
 });
+
+test("browser profiles are searched with Google Chrome, the default browser, first", () => {
+    const result = spawnSync("python3", ["-I", "-B", "-c", String.raw`
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("notification_icon", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps([str(root) for root in module.config_roots()]))
+`, helper], { encoding: "utf8", env: { ...Object.fromEntries(Object.entries(process.env)
+        .filter(([key]) => key !== "QUICKSHELL_NOTIFICATION_ICON_CONFIG_ROOTS")), XDG_CONFIG_HOME: "/config" } });
+    assert.equal(result.status, 0, result.stderr);
+    const roots = JSON.parse(result.stdout);
+    assert.equal(roots[0], "/config/google-chrome");
+    assert.ok(roots.includes("/config/BraveSoftware/Brave-Origin"), roots);
+    assert.ok(roots.includes("/config/BraveSoftware/Brave-Browser"), roots);
+});

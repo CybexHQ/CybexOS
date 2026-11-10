@@ -198,12 +198,13 @@ without Apply, and the next login starts with it.
   `Xcursor.size` into the X resources, which plain Xlib applications read and
   whose change makes Chromium reload its pointers, and gives the X root window
   the new arrow (`xsetroot`).
-- **Wayland first.** Spotify, Brave, 1Password, ChatGPT and T3 Code explicitly
-  select `--ozone-platform=wayland` in their executable launchers, so desktop
-  entries, shortcuts, URL handlers and terminal launches use the same backend.
-  Software uses the same Spotify, 1Password and ChatGPT wrappers. The machine's
-  original packages remain intact. `NIXOS_OZONE_WL=1` also asks Nixpkgs wrappers
-  for other Chromium/Electron apps (VS Code, Discord, Obsidian) to prefer
+- **Wayland first.** Spotify, 1Password, ChatGPT and T3 Code, and Brave Origin
+  when you install it from Software, explicitly select `--ozone-platform=wayland`
+  in their executable launchers, so desktop entries, shortcuts, URL handlers and
+  terminal launches use the same backend. Software uses the same Spotify,
+  1Password and ChatGPT wrappers. The machine's original packages remain intact.
+  `NIXOS_OZONE_WL=1` also asks Nixpkgs wrappers for other Chromium/Electron apps
+  (Google Chrome, the default browser, VS Code, Discord, Obsidian) to prefer
   Wayland; it is not a guarantee for every downloaded or third-party app.
   Firefox and Qt use the session's native Wayland settings; GTK apps select
   Wayland in the Wayland session. XWayland remains available for X11-only

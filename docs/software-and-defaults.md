@@ -16,18 +16,23 @@ Cybex OS installs prebuilt packages. Free apps come from NixOS's binary cache
 computer. Unfree vendor apps (Spotify, Discord, Slack, Zoom, Obsidian,
 VS Code, Chrome and others) are never in the NixOS cache: Nix unpacks the
 vendor's own download, so they are labelled **From the maker**. They are
-unavailable while proprietary apps are turned off for the machine. Everyday
+unavailable while proprietary apps are turned off for the machine. Brave
+Origin is Cybex OS's own package of Brave's download (`brave-origin`, from
+`nix/packages/optional.nix`): it is built the same way and labelled the same.
+Everyday
 surfaces say this in plain words ("ready to use") rather than "prebuilt" or
 "nothing to compile"; an app page explains its source in one line under its
 heading, and a Flathub app's page does the same for Flathub.
 
 Before anything is staged, `cybex software check ATTR…` dry-runs the machine's
 own packages (`path:/etc/nixos#nixosConfigurations.cybexos.pkgs.ATTR`, the same
-package universe search uses) against its store and configured caches. Nothing
-is built. A free package NixOS has not built yet (a new release still in
+package universe search uses; Cybex OS's own optional packages under
+`…cybexos.config.cybexos.software.optionalPackages.ATTR`) against its store
+and configured caches. Nothing is built. A free package NixOS has not built yet (a new release still in
 NixOS's build queue, or a personal override) would compile, so Software blocks
 it calmly: "NixOS hasn't finished building this yet. Try again after the next
-update." Anything needed only to unpack an unfree vendor download is expected.
+update." Anything needed only to unpack an unfree vendor download, or Brave
+Origin's, is expected.
 The check reports the exact download; the catalogue's figure (the compressed
 download beyond the default installation) is an estimate until then.
 
@@ -227,7 +232,38 @@ browser?".
 
 The curated lists live in `desktop/software/sources.json` (see
 `desktop/software/README.md`). The catalogue generator keeps an option only
-while NixOS has it prebuilt, or Flathub has it.
+while NixOS has it prebuilt, it is an unfree vendor download or Cybex OS's own
+package, or Flathub has it.
+
+### Browsers
+
+With proprietary applications, **Google Chrome** is the Cybex pick for the
+browser: Google account sign-in and sync work in it, and the Claude and
+ChatGPT extensions support it. Without them, Firefox is. Chrome is Nixpkgs'
+`google-chrome`, started with `--password-store=gnome-libsecret` so saved
+passwords stay in the GNOME keyring on Hyprland; its wrapper follows the
+session's `NIXOS_OZONE_WL` to run on Wayland.
+
+Chrome, Chromium and Brave Origin read the same enterprise policy file,
+`cybexos.json`, from their own folders (`/etc/opt/chrome`, `/etc/chromium` and
+`/etc/brave`, each under `policies/managed`). It installs the 1Password
+extension for good, and the Claude in Chrome and ChatGPT extensions so their
+agents can use the browser; those two arrive on their own
+(`ExtensionSettings`, `normal_installed`) and can be turned off like any other
+extension. It also restores the last session on start, sets the spelling
+language, and turns off `DefaultBrowserSettingEnabled`: Software and Settings
+choose the default browser, so no browser makes itself the default when it
+starts or offers to. Administrators change it with
+`cybexos.browser.policies`; Cybex OS's values are defaults, so a personal
+module's own value wins. 1Password's native messaging host is declared in
+`/etc/opt/chrome/native-messaging-hosts` and
+`/etc/chromium/native-messaging-hosts` (which Brave Origin reads), pointing at
+the NixOS setgid helper.
+
+**Brave Origin** is offered in the browser picker as an install, downloaded
+from Brave like a vendor app and kept current by Cybex OS. Installing it
+removes nothing: Chrome stays, and Brave's profile in
+`~/.config/BraveSoftware` is used again if Brave comes back.
 
 ### Terminals and the Cybex theme
 
@@ -268,8 +304,8 @@ precedence.
 Cybex OS's browser, terminal and Files shortcuts, agent windows, maintenance
 and firmware terminals, web apps and dock suggestions use the same defaults.
 Super+E opens the selected file manager (`cybexos-apps files`). Chromium-based
-browsers (Brave, Chromium, Chrome, Vivaldi) open web apps in app mode; other
-browsers open their URL normally. Private browsing uses the selected browser's
+browsers (Chrome, Brave Origin, Chromium, Vivaldi) open web apps in app mode;
+other browsers open their URL normally. Private browsing uses the selected browser's
 advertised desktop action; unsupported private actions produce a notification.
 Explicit `VISUAL`/`EDITOR` values and personal shortcuts retain their
 precedence. Arguments are passed as argv, including filenames and URLs

@@ -339,7 +339,7 @@ def main():
                   'art': cover(covers / 'c2.png', (127, 209, 255), (27, 31, 58))},
                  {'title': 'Salt Road', 'artist': ['Hollis Fern'], 'album': 'Shoreline', 'length': 196,
                   'art': cover(covers / 'c3.png', (232, 226, 208), (150, 140, 110))}]},
-            {'bus': 'chromium.instance4242', 'identity': 'Brave', 'entry': 'brave-browser', 'status': 'Paused',
+            {'bus': 'chromium.instance4242', 'identity': 'Google Chrome', 'entry': 'google-chrome', 'status': 'Paused',
              'seek': False, 'modifiers': False, 'volume': 1.0, 'tracks': [
                  {'title': 'Lo-fi beats to refactor to (24/7 stream)', 'artist': ['Quiet Desk'],
                   'url': 'https://www.youtube.com/watch?v=live',
@@ -464,7 +464,7 @@ def main():
             # The playing app is the shell's player; the others wait in the list.
             first = wait(lambda: (s := state()).get('player') == 'Spotify' and len(s['others']) == 2 and s,
                          'the playing player and two others')
-            assert first['playing'] and sorted(first['others']) == ['Brave', 'mpv'], first
+            assert first['playing'] and sorted(first['others']) == ['Google Chrome', 'mpv'], first
             assert first['volumeAvailable'] and abs(first['volume'] - 0.6) < 0.01, first
             # The position moves on its own while playing.
             before = first['position']
@@ -580,10 +580,10 @@ def main():
 
             # Another player from the list: it is pinned while Spotify plays on.
             rows_y = top + 44 + 104 + 52 + 68 + 40 + 10 + 1 + 31 + 24
-            click(left + 80, rows_y + 48 * state()['others'].index('Brave'))
-            wait(lambda: (s := state())['player'] == 'Brave' and s['pinned'] != '', 'the browser picked')
+            click(left + 80, rows_y + 48 * state()['others'].index('Google Chrome'))
+            wait(lambda: (s := state())['player'] == 'Google Chrome' and s['pinned'] != '', 'the browser picked')
             time.sleep(1.5)
-            assert state()['player'] == 'Brave', 'the pick did not hold while Spotify played'
+            assert state()['player'] == 'Google Chrome', 'the pick did not hold while Spotify played'
             assert state()['others'][0] == 'Spotify', state()
             time.sleep(0.6)
             shot = Image.open(grab()).convert('RGB')

@@ -4,7 +4,9 @@
 The curated list lives in desktop/software/sources.json. This maintainer tool
 resolves each entry against the repository's locked Nixpkgs, keeps only apps
 that NixOS has prebuilt (or that are unfree vendor downloads, which NixOS never
-caches), and adds metadata from Flathub's public AppStream API: name, summary,
+caches, or Cybex OS's own optional packages from nix/packages/optional.nix,
+which build here from their maker's download), and adds metadata from
+Flathub's public AppStream API: name, summary,
 description, developer, brand colours, screenshot URLs, monthly installs (the
 "Popular" ranking) and a 128 px icon, re-encoded locally. What a profile
 includes besides its apps (Docker, Steam) gets an icon too: from Flathub when
@@ -152,11 +154,13 @@ def evaluate(attributes):
       let
         flake = builtins.getFlake (toString %s);
         pkgs = import flake.inputs.nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
+        own = import (flake.outPath + "/nix/packages/optional.nix") { inherit pkgs; };
         lib = pkgs.lib;
         licenses = l: map (x: x.spdxId or x.shortName or "unknown") (lib.toList l);
         one = attr: let
-          value = lib.attrByPath (lib.splitString "." attr) null pkgs;
+          value = own.${attr} or (lib.attrByPath (lib.splitString "." attr) null pkgs);
           info = {
+            own = own ? ${attr};
             exists = value != null && lib.isDerivation value;
             version = value.version or "";
             out = builtins.unsafeDiscardStringContext (toString value);
@@ -173,6 +177,24 @@ def evaluate(attributes):
     output = subprocess.run(NIX + ['eval', '--impure', '--json', '--expr', expression],
                             check=True, capture_output=True, text=True).stdout
     return json.loads(output)
+
+
+def build_own(attribute):
+    """Build one of Cybex OS's own optional packages here; its output path."""
+    expression = '''
+      let
+        flake = builtins.getFlake (toString %s);
+        pkgs = import flake.inputs.nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
+      in (import (flake.outPath + "/nix/packages/optional.nix") { inherit pkgs; }).${builtins.fromJSON %s}
+    ''' % (json.dumps(str(ROOT)), json.dumps(json.dumps(attribute)))
+    output = subprocess.run(NIX + ['build', '--impure', '--no-link', '--print-out-paths', '--expr', expression],
+                            check=True, capture_output=True, text=True).stdout
+    return output.strip().splitlines()[-1]
+
+
+def local_desktop_ids(path):
+    folder = Path(path) / 'share/applications'
+    return sorted(entry.name for entry in folder.iterdir() if entry.name.endswith('.desktop')) if folder.is_dir() else []
 
 
 def fetch(url, limit=4 * 1024 * 1024):
@@ -329,11 +351,16 @@ def mark(item_id):
     save(item_id, canvas)
 
 
-def package_icon(icon_id, out, relative):
-    """An option's icon from its own NixOS package, framed like a Flathub icon."""
+def package_icon(icon_id, out, relative, local=False):
+    """An option's icon from its own package, framed like a Flathub icon.
+
+    NixOS packages are read from cache.nixos.org; a local build (Cybex OS's
+    own packages) from the store here.
+    """
     from PIL import Image
-    raw = subprocess.run(NIX + ['store', 'cat', '--store', CACHE, f'{out}/{relative}'],
-                         check=True, capture_output=True, timeout=300).stdout
+    raw = (Path(out, relative).read_bytes() if local else
+           subprocess.run(NIX + ['store', 'cat', '--store', CACHE, f'{out}/{relative}'],
+                          check=True, capture_output=True, timeout=300).stdout)
     if relative.endswith('.svg'):
         with tempfile.NamedTemporaryFile(suffix='.svg') as source:
             source.write(raw)
@@ -417,7 +444,18 @@ def role_options(data, kept, nix, prebuilt, base):
             resolved[option_id] = row
             continue
         source = None
-        if 'attribute' in option:
+        own = nix.get(option.get('attribute'), {}).get('own')
+        if own:
+            # Cybex OS's own package builds here from its maker's download, so
+            # Software offers it as one (not free = "From the maker").
+            meta = nix[option['attribute']]
+            if meta.get('exists') and not meta['broken'] and meta['available']:
+                out = build_own(option['attribute'])
+                found = local_desktop_ids(out)
+                if option['desktop'] not in found:
+                    raise SystemExit(f'{option_id}: {option["attribute"]} installs no {option["desktop"]} ({", ".join(found)})')
+                source = {'attribute': option['attribute'], 'free': False, 'downloadBytes': None, 'out': out}
+        elif 'attribute' in option:
             meta = nix.get(option['attribute'], {})
             usable = (meta.get('exists') and not meta['broken'] and meta['available']
                       and (meta['unfree'] or prebuilt.get(option['attribute'])))
@@ -447,7 +485,7 @@ def role_options(data, kept, nix, prebuilt, base):
             if meta_stream and meta_stream['icon']:
                 icon(option_id, meta_stream['icon'])
             elif 'icon' in option and source:
-                package_icon(option_id, source['out'], option['icon'])
+                package_icon(option_id, source['out'], option['icon'], local=bool(own))
             else:
                 raise SystemExit(f'{option_id}: no icon')
             icons.add(option_id)
@@ -472,7 +510,8 @@ def generate():
     with ThreadPoolExecutor(16) as pool:
         streams = dict(zip([a[0] for a in data['apps']], pool.map(lambda a: appstream(a[2]), data['apps'])))
         prebuilt = dict(zip(attributes, pool.map(
-            lambda a: nix[a].get('exists') and not nix[a]['unfree'] and cached_quiet(nix[a]['out']), attributes)))
+            lambda a: nix[a].get('exists') and not nix[a]['unfree'] and not nix[a]['own']
+            and cached_quiet(nix[a]['out']), attributes)))
     print('Measuring downloads beyond the default installation…', file=sys.stderr)
     base = base_paths()
     apps, dropped = [], []

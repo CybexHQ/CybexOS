@@ -179,12 +179,12 @@
   ],
   "roles": [
     {"id": "browser", "options": [
-      {"id": "brave", "summary": "Brave Origin: fast and private, and blocks ads and trackers.", "desktop": "brave-browser.desktop", "name": "Brave", "included": true, "perks": ["1password", "webapps"]},
+      {"id": "chrome", "summary": "Google’s browser, synced with your Google account.", "desktop": "google-chrome.desktop", "included": true, "perks": ["1password", "webapps"]},
       {"id": "firefox", "summary": "Mozilla’s browser, with its own independent engine.", "desktop": "firefox.desktop", "name": "Firefox", "included": true, "perks": ["1password", "-webapps"]},
+      {"id": "brave", "summary": "Brave Origin: fast and private, and blocks ads and trackers.", "desktop": "brave-browser.desktop", "name": "Brave", "attribute": "brave-origin", "icon": "share/icons/hicolor/256x256/apps/brave-browser.png", "perks": ["1password", "webapps"]},
       {"id": "librewolf", "summary": "Firefox, hardened for privacy out of the box.", "desktop": "librewolf.desktop", "attribute": "librewolf", "perks": ["-1password", "-webapps"]},
       {"id": "chromium", "summary": "The open-source browser that Google Chrome is built on.", "desktop": "chromium-browser.desktop", "name": "Chromium", "attribute": "chromium", "perks": ["webapps", "-1password"]},
       {"id": "vivaldi", "summary": "Tabs, panels and notes, arranged however you like.", "desktop": "vivaldi-stable.desktop", "attribute": "vivaldi", "perks": ["webapps", "-1password"]},
-      {"id": "chrome", "summary": "Google’s browser, synced with your Google account.", "desktop": "google-chrome.desktop", "attribute": "google-chrome", "perks": ["webapps", "-1password"]},
       {"id": "zen", "summary": "A calm Firefox, with vertical tabs and split view.", "desktop": "app.zen_browser.zen.desktop", "flathub": "app.zen_browser.zen", "perks": ["sandbox", "-1password", "-webapps"]}]},
     {"id": "terminal", "options": [
       {"id": "kitty", "summary": "Fast and GPU-drawn, with tabs, splits and images.", "desktop": "kitty.desktop", "name": "Kitty", "included": true, "perks": ["theme", "tabs"]},

@@ -23,17 +23,31 @@ language, keyboard or time zone, as in the installer; the network opens
 Settings. The pills in the top bar show the network, keyboard layout and
 language, and the last one closes the guide.
 
-**Connect** offers two optional sign-ins, each on its own card. Both open
-windows, so the guide steps aside while you use them:
+**Connect** offers up to three optional sign-ins, each on its own card, side
+by side. Each opens windows, so the guide steps aside while you use them:
 
 - **1Password** comes first, when it is installed, so it can fill in the
-  password for your AI account in the browser. Its extension in Brave connects
-  to the app while 1Password is running, so the browser needs no sign-in of its
-  own. The guide comes back when you close the 1Password window it opened,
-  and **Resume** closes that window, so it does not cover the sign-in that
-  follows.
+  passwords that follow in the browser. Its extension in Google Chrome
+  connects to the app while 1Password is running, so the browser needs no
+  sign-in of its own. The guide comes back when you close the 1Password
+  window it opened, and **Resume** closes that window, so it does not cover
+  the sign-in that follows.
   Once you have signed in, the card shows a tick: the guide counts the
   accounts in 1Password's own database, without reading them.
+- **Google account**, when Google Chrome is installed (it comes with the
+  proprietary applications): **Sign in to Chrome** opens Chrome in a new
+  window on its own sign-in settings, `chrome://settings/people`, where you
+  sign in and turn on sync for your bookmarks, passwords and history. That
+  page rather than a Google web page, because signing in to Chrome itself is
+  what turns on sync, and the page offers it whatever state the profile is
+  in; a new window, so there is one to come back from even when Chrome is
+  already running. As with 1Password, closing that window brings the guide
+  back and **Resume** closes it. The card shows a tick, with the address,
+  once Chrome reports a profile signed in to Google: the guide reads
+  `profile.info_cache` in Chrome's `~/.config/google-chrome/Local State`
+  (a profile with a `gaia_id` or `user_name`), and a missing or partial file
+  reads as signed out. Chrome saves that file some seconds after the sign-in,
+  so the tick can follow a moment later.
 - **The AI assistant** (recommended) signs in to Claude Code or Codex with that
   agent's own sign-in, in your browser; no terminal opens. The guide comes
   back by itself once the agent reports you are signed in, and
@@ -44,13 +58,14 @@ windows, so the guide steps aside while you use them:
   once you have; sorry when the sign-in could not be checked.
 
 When you leave the guide, it closes the windows these sign-ins opened, as
-their close buttons would: a 1Password window still open, and the
+their close buttons would: a 1Password or Chrome window still open, and the
 sign-in's browser window. A window you opened yourself stays,
 and so does a sign-in you have not finished. Closing the guide from its pill
 leaves everything open, since you are using it.
 
 Without a network the step says so and links to the network settings. When
-neither 1Password nor the assistant is installed, the guide leaves Connect out.
+none of 1Password, Chrome and the assistant is installed, the guide leaves
+Connect out.
 
 **Wallpaper** opens on Wallhaven, with your own
 pictures one click away. Choosing a tile applies it straight away. A card
@@ -131,10 +146,10 @@ The shell exposes:
 ```sh
 cybexos-runtime ipc welcome open ''         # resume, or Hello after completion
 cybexos-runtime ipc welcome open wallpaper # open a particular step
-cybexos-runtime ipc welcome status          # JSON: open/status/step/steps/checklist/connect/doctor, coversAssistant/handOff
+cybexos-runtime ipc welcome status          # JSON: open/status/step/steps/checklist/connect (password/google/assistant)/doctor, coversAssistant/handOff
 cybexos-runtime ipc welcome close           # dismiss, preserving progress
 cybexos-runtime ipc welcome reset           # delete only welcome.json
-cybexos-runtime ipc welcome connect password # Connect's buttons: password, claude or codex
+cybexos-runtime ipc welcome connect password # Connect's buttons: password, google, claude or codex
 ```
 
 For implementation and integration interfaces, see the
@@ -185,7 +200,12 @@ with a test-only IPC target. Shortcut state is served by a fake `hyprctl`
   guide steps aside and returns only when that window closes, and Resume
   closes 1Password's windows but not one the person opened; the card gets
   its tick once an account appears in a database shaped like 1Password's,
-  while the guide shows; the assistant's
+  while the guide shows; Chrome opens from its desktop entry with
+  `--new-window chrome://settings/people`, the guide steps aside and returns
+  only when Chrome's window closes, the card stays as it is for a signed-out
+  Local State and gets its tick, with the address, once a signed-in profile
+  appears there, and Resume (opened again through `welcome connect google`)
+  closes Chrome's window under XWayland's class too; the assistant's
   own login command runs in the background, with no terminal, its input and
   output on `/dev/null`, against the real `cybexos-assistant`
   service with a scripted Claude Code, and the guide returns by itself once

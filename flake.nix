@@ -47,6 +47,9 @@
         t3-code = pkgs.callPackage ./nix/packages/t3-code.nix {};
         # Built by the vendor-updates workflow before it releases a Brave update.
         brave-origin = pkgs.callPackage ./nix/packages/brave {};
+        # The agent CLIs from the vendors' own builds, kept current the same way.
+        codex = pkgs.callPackage ./nix/packages/codex {};
+        claude-code = pkgs.callPackage ./nix/packages/claude-code {};
         titlebars = pkgs.callPackage ./nix/packages/titlebars.nix {};
         omasnap = pkgs.callPackage ./nix/packages/omasnap.nix {};
         iso = self.nixosConfigurations.installer.config.system.build.isoImage;
@@ -101,6 +104,11 @@
           python3 -B tests/system-settings.py
           touch $out
         '';
+        # Codex and Claude Code run, report their pins and offer what Wiz uses.
+        agent-clis = import ./nix/tests/agent-clis.nix {
+          inherit pkgs;
+          inherit (self.packages.${system}) codex claude-code;
+        };
         system = (nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [ module ./nix/tests/machine.nix ];
@@ -171,7 +179,8 @@
           inherit module;
           pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
         };
-        # 1Password and Brave Origin are the proprietary application choice.
+        # 1Password with Google Chrome (the proprietary application choice) and
+        # Brave Origin (from Software); the vendor-updates workflow runs it for Brave.
         browser-1password = import ./nix/tests/browser-1password.nix {
           inherit module;
           pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };

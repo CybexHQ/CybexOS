@@ -4,13 +4,15 @@ import "../Common"
 import "../Assistant" as Character
 import "../Common/AssistantHelpers.js" as AssistantHelpers
 
-// Connect: two optional sign-ins as installer cards. 1Password comes first,
-// when it is installed, so it can fill in the AI account's password in the
-// browser; then the assistant, through Claude Code's or Codex's own sign-in.
-// Both open windows, so the guide steps aside: it comes back once the agent
-// reports it is signed in, or when the 1Password window is closed. Ticks
-// come from live state only: the agent's sign-in, and whether 1Password has
-// an account, counted in its own database.
+// Connect: up to three optional sign-ins as installer cards. 1Password comes
+// first, when it is installed, so it can fill in the passwords that follow in
+// the browser; then the Google account in Chrome, when Chrome is installed;
+// then the assistant, through Claude Code's or Codex's own sign-in. Each
+// opens windows, so the guide steps aside: it comes back once the agent
+// reports it is signed in, or when the 1Password or Chrome window is closed.
+// Ticks come from live state only: the agent's sign-in, whether 1Password
+// has an account, counted in its own database, and whether Chrome's profile
+// is signed in to Google, from its Local State.
 //
 // The assistant's card shows Wiz himself: asleep until the agent is signed
 // in, attentive while it signs in, happy once it has, sorry when its state
@@ -18,7 +20,9 @@ import "../Common/AssistantHelpers.js" as AssistantHelpers
 Item {
     id: root
     readonly property bool online: EthernetState.connected || WifiState.connected || NetworkStatus.online
-    readonly property bool both: Welcome.passwordAvailable && Assistant.available
+    // The cards this computer shows, in order.
+    readonly property var shown: [Welcome.passwordAvailable ? "password" : "", Welcome.googleAvailable ? "google" : "",
+        Assistant.available ? "assistant" : ""].filter(id => id !== "")
     readonly property var installed: AssistantHelpers.AGENT_IDS.filter(id => (Assistant.agents[id] || {}).available === true)
     readonly property bool signingIn: Assistant.signingIn !== ""
     readonly property bool authUnknown: Assistant.agentInstalled && (Assistant.agents[Assistant.agent] || {}).auth === "unknown"
@@ -27,13 +31,23 @@ Item {
         : root.signingIn || (Assistant.authChecking && root.authUnknown) ? "listening"
         : root.authUnknown ? "sorry" : "asleep"
     Claim { active: root.visible; onClaimed: EthernetState.acquire(); onReleased: EthernetState.release() }
-    Component.onCompleted: { Assistant.refreshAuth(); Welcome.refreshPassword(); }
-    // A sign-in finished in 1Password while the guide is showing shows up too.
+    Component.onCompleted: { Assistant.refreshAuth(); Welcome.refreshPassword(); Welcome.refreshGoogle(); }
+    // A sign-in finished in 1Password or Chrome while the guide is showing
+    // shows up too: Chrome saves its Local State some seconds later.
     Timer {
+        readonly property bool password: Welcome.passwordOpened && !Welcome.passwordSignedIn
+        readonly property bool google: Welcome.googleOpened && !Welcome.googleSignedIn
         interval: 4000
         repeat: true
-        running: root.visible && !Welcome.aside && Welcome.passwordOpened && !Welcome.passwordSignedIn
-        onTriggered: Welcome.refreshPassword()
+        running: root.visible && !Welcome.aside && (password || google)
+        onTriggered: {
+            if (password) Welcome.refreshPassword();
+            if (google) Welcome.refreshGoogle();
+        }
+    }
+    // "01 · Password manager" when there is more than one card.
+    function kicker(id, label) {
+        return root.shown.length > 1 ? I18n.format("%1 · %2", ["0" + (root.shown.indexOf(id) + 1), label]) : label;
     }
 
     component ConnectCard: KioskCard {
@@ -75,7 +89,14 @@ Item {
                 Column {
                     width: parent.width - badge.width - parent.spacing
                     anchors.verticalCenter: parent.verticalCenter
-                    KioskKicker { width: parent.width; text: card.kicker; elide: Text.ElideRight }
+                    // Three cards side by side leave a long kicker two lines.
+                    KioskKicker {
+                        width: parent.width
+                        text: card.kicker
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
                     Item { width: 1; height: Kiosk.px(4) }
                     KioskText {
                         width: parent.width
@@ -183,8 +204,12 @@ Item {
         }
         KioskText {
             width: parent.width
-            text: root.both ? I18n.tr("Both are optional. Start with 1Password, so it can fill in the password for your AI account.")
+            text: root.shown.length === 3 ? I18n.tr("All three are optional. Start with 1Password, so it can fill in your passwords for the other two.")
+                : Welcome.passwordAvailable && Assistant.available ? I18n.tr("Both are optional. Start with 1Password, so it can fill in the password for your AI account.")
+                : Welcome.passwordAvailable && Welcome.googleAvailable ? I18n.tr("Both are optional. Start with 1Password, so it can fill in the password for your Google account.")
+                : Welcome.googleAvailable && Assistant.available ? I18n.tr("Both are optional. Sign in to Google first if your AI account uses it.")
                 : Assistant.available ? I18n.tr("Optional, and recommended: your assistant can then check this computer and help with what it finds.")
+                : Welcome.googleAvailable ? I18n.tr("Optional: sign in to Chrome with your Google account.")
                 : I18n.tr("Optional: sign in to 1Password if you use it.")
             size: 19
             tone: "fog"
@@ -192,7 +217,7 @@ Item {
         }
     }
 
-    // Both sign-ins need the internet; say so before a button fails.
+    // Every sign-in needs the internet; say so before a button fails.
     Rectangle {
         id: offline
         x: Kiosk.px(64)
@@ -230,10 +255,11 @@ Item {
 
     Row {
         id: cards
-        // Both cards share the taller one's height, so their buttons line up.
+        // The cards share the tallest one's height, so their buttons line up.
         readonly property real cardHeight: Math.max(Kiosk.px(260), passwordCard.visible ? passwordCard.contentHeight : 0,
-            assistantCard.visible ? assistantCard.contentHeight : 0)
-        readonly property real cardWidth: root.both ? (root.width - Kiosk.px(128) - spacing) / 2 : Kiosk.px(720)
+            googleCard.visible ? googleCard.contentHeight : 0, assistantCard.visible ? assistantCard.contentHeight : 0)
+        readonly property real cardWidth: root.shown.length > 1
+            ? (root.width - Kiosk.px(128) - spacing * (root.shown.length - 1)) / root.shown.length : Kiosk.px(720)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: offline.bottom
         anchors.topMargin: Kiosk.px(root.online ? 8 : 24)
@@ -245,9 +271,12 @@ Item {
             width: cards.cardWidth
             height: cards.cardHeight
             glyph: "lock"
-            kicker: root.both ? I18n.format("%1 · %2", ["01", I18n.tr("Password manager")]) : I18n.tr("Password manager")
+            kicker: root.kicker("password", I18n.tr("Password manager"))
             title: "1Password" // i18n: untranslated (brand)
-            body: I18n.tr("If you use 1Password, sign in first. It can then fill in your passwords for what follows, including your AI account.")
+            // Its extension in Chrome talks to the app, so the browser needs no sign-in of its own.
+            body: Welcome.googleAvailable
+                ? I18n.tr("If you use 1Password, sign in first. Its extension in Chrome can then fill in your passwords for what follows.")
+                : I18n.tr("If you use 1Password, sign in first. It can then fill in your passwords for what follows, including your AI account.")
             status: Welcome.passwordSignedIn ? I18n.tr("Signed in to 1Password.")
                 : Welcome.passwordOpened ? I18n.tr("1Password is open. Sign in there, then close its window to come back.") : ""
             statusTone: Welcome.passwordSignedIn ? "accent" : "fog"
@@ -261,12 +290,35 @@ Item {
         }
 
         ConnectCard {
+            id: googleCard
+            visible: Welcome.googleAvailable
+            width: cards.cardWidth
+            height: cards.cardHeight
+            glyph: "account_circle"
+            kicker: root.kicker("google", I18n.tr("Browser"))
+            title: I18n.tr("Google account")
+            body: I18n.tr("Sign in to Chrome with your Google account. Your bookmarks, passwords and history come along and stay in sync.")
+            status: Welcome.googleSignedIn ? (Welcome.googleAccount.account !== ""
+                    ? I18n.format("Signed in to Chrome as %1.", [Welcome.googleAccount.account]) : I18n.tr("Signed in to Chrome."))
+                : Welcome.googleOpened ? I18n.tr("Chrome is open. Sign in there, then close its window to come back.") : ""
+            statusTone: Welcome.googleSignedIn ? "accent" : "fog"
+            statusGlyph: Welcome.googleSignedIn ? "check" : "open_in_new"
+            KioskButton {
+                objectName: "connectGoogle"
+                kind: Welcome.googleOpened || Welcome.googleSignedIn ? "ghost" : "primary"
+                text: Welcome.googleSignedIn ? I18n.tr("Open Chrome")
+                    : Welcome.googleOpened ? I18n.tr("Open Chrome again") : I18n.tr("Sign in to Chrome")
+                onClicked: Welcome.openGoogle()
+            }
+        }
+
+        ConnectCard {
             id: assistantCard
             visible: Assistant.available
             width: cards.cardWidth
             height: cards.cardHeight
             character: root.wizPose
-            kicker: root.both ? I18n.format("%1 · %2", ["02", I18n.tr("AI assistant · recommended")]) : I18n.tr("AI assistant · recommended")
+            kicker: root.kicker("assistant", I18n.tr("AI assistant · recommended"))
             title: I18n.tr("Cybex OS Assistant")
             body: I18n.tr("Sign in with Claude Code or Codex. Your assistant can then check this computer for missing drivers and other problems, and fix what it finds once you agree.")
             status: !Assistant.connected ? I18n.tr("The assistant service is not running.")
@@ -341,7 +393,8 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: cards.width
         text: Assistant.available ? I18n.tr("Your sign-in stays with Claude Code or Codex; Cybex OS never stores it. A check sends what it finds to your AI provider only when you ask.")
-            : I18n.tr("Your passwords stay in 1Password; Cybex OS never sees them.")
+            : Welcome.passwordAvailable ? I18n.tr("Your passwords stay in 1Password; Cybex OS never sees them.")
+            : I18n.tr("Your Google account stays with Chrome; Cybex OS never sees it.")
         size: 14
         tone: "faint"
         wrapMode: Text.WordWrap

@@ -127,9 +127,13 @@ function sizeLimit(entry, size) {
 // (its command and working directory), with the pointer last applied. The
 // shell's own environment is the session's from login, so without this an
 // application started after a change would get the old pointer. `current` is
-// "THEME SIZE" as Pointer.qml keeps it; anything else adds nothing.
-function launchContext(entry, current) {
-    const context = { command: entry.command, workingDirectory: entry.workingDirectory || "" };
+// "THEME SIZE" as Pointer.qml keeps it; anything else adds nothing. `args`
+// go after the entry's command, as a launcher's file or URL would. The
+// command is a QML list, which concat would add as one element: copy it.
+function launchContext(entry, current, args) {
+    const extra = (Array.isArray(args) || args instanceof Array) ? Array.from(args, String) : [];
+    const context = { command: extra.length > 0 ? Array.from(entry.command || []).concat(extra) : entry.command,
+        workingDirectory: entry.workingDirectory || "" };
     const parts = String(current || "").split(" ");
     if (THEME.test(parts[0] || "") && /^[0-9]{2,3}$/.test(parts[1] || ""))
         context.environment = { XCURSOR_THEME: parts[0], XCURSOR_SIZE: parts[1] };

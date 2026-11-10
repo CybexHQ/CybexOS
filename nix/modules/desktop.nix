@@ -98,8 +98,8 @@ in {
       XCURSOR_THEME = lib.mkDefault "Bibata-Modern-Classic";
       XCURSOR_SIZE = lib.mkDefault "24";
       XCURSOR_PATH = lib.mkDefault "~/.icons:~/.local/share/icons:${pkgs.bibata-cursors}/share/icons:/run/current-system/sw/share/icons";
-      # Additional Chromium/Electron applications Nixpkgs wraps (VS Code,
-      # Discord, Obsidian) prefer Wayland. The bundled Chromium/Electron apps
+      # Additional Chromium/Electron applications Nixpkgs wraps (Google Chrome,
+      # VS Code, Discord, Obsidian) prefer Wayland. The bundled Chromium/Electron apps
       # explicitly select it in their executable wrappers; Spotify's upstream
       # wrapper only unsets DISPLAY and can still select X11 without the flag.
       # Hyprland draws native applications' pointer

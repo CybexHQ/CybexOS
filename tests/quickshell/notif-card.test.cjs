@@ -74,7 +74,7 @@ test("web notification icons resolve locally without sender-triggered lookup pro
     assert.ok(webBranch, "Notifs.iconSource must have an explicit web-origin branch");
     assert.match(webBranch[1], /entry\.image/);
     assert.doesNotMatch(webBranch[1], /entry\.appIcon/,
-        "a known web origin must never fall back to the Brave product logo");
+        "a known web origin must never fall back to the browser's product logo");
 });
 
 test("every style key the card reads is supplied by every caller", () => {

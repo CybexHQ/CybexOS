@@ -380,4 +380,15 @@ test("a player's own streams: by process id when it publishes one, else by name"
     assert.deepEqual(H.streamsForPlayer(mpv, [generic], [mpv]), [generic]);
     assert.deepEqual(H.streamsForPlayer(null, streams, []), []);
     assert.deepEqual(H.streamsForPlayer(mpv, [], [mpv]), []);
+    // Google Chrome, the default browser, the same way; a player naming only
+    // its desktop entry still finds Chrome's streams by name.
+    const chrome = stream(5, { "application.name": "Google Chrome", "application.process.id": "5151" });
+    const chromePlayer = { identity: "Google Chrome", desktopEntry: "google-chrome",
+        dbusName: "org.mpris.MediaPlayer2.chromium.instance5151", isPlaying: true, canPlay: true };
+    assert.deepEqual(H.streamsForPlayer(chromePlayer, [brave, chrome, spotify], [chromePlayer]), [chrome]);
+    const entryOnly = { identity: "", desktopEntry: "google-chrome", dbusName: "org.mpris.MediaPlayer2.chromium.instance9",
+        isPlaying: true, canPlay: true };
+    assert.deepEqual(H.streamsForPlayer(entryOnly, [brave, chrome, spotify], [entryOnly]), [chrome]);
+    assert.equal(H.friendlyStreamLabel("google chrome"), "Google Chrome");
+    assert.equal(H.friendlyStreamLabel("brave-browser"), "Brave");
 });

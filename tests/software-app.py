@@ -328,19 +328,19 @@ elif action in ('reset', 'cancel'):
     print(json.dumps(status()))
 '''
 
-CYBEX_PICKS = {'browser': 'brave-browser.desktop', 'terminal': 'kitty.desktop', 'editor': 'org.gnome.TextEditor.desktop',
+CYBEX_PICKS = {'browser': 'google-chrome.desktop', 'terminal': 'kitty.desktop', 'editor': 'org.gnome.TextEditor.desktop',
                'files': 'org.gnome.Nautilus.desktop', 'mail': '', 'music': 'mpv.desktop', 'video': 'mpv.desktop',
                'pdf': 'org.gnome.Evince.desktop', 'image': 'imv.desktop'}
 ACCOUNT = {
     'roles': {role: {'effective': pick, 'system': pick, 'personal': False, 'pending': ''} for role, pick in CYBEX_PICKS.items()},
     'installed': [pick for pick in CYBEX_PICKS.values() if pick] + ['firefox.desktop', 'nvim.desktop',
                   'cybexos-mail-gmail.desktop', 'cybexos-mail-outlook.desktop', 'org.gnome.Epiphany.desktop'],
-    'compatible': {'browser': ['brave-browser.desktop', 'firefox.desktop', 'org.gnome.Epiphany.desktop'],
+    'compatible': {'browser': ['google-chrome.desktop', 'firefox.desktop', 'org.gnome.Epiphany.desktop'],
                    'terminal': ['kitty.desktop', 'com.mitchellh.ghostty.desktop'],
                    'editor': ['org.gnome.TextEditor.desktop', 'nvim.desktop'], 'files': ['org.gnome.Nautilus.desktop'],
                    'mail': ['cybexos-mail-gmail.desktop', 'cybexos-mail-outlook.desktop', 'org.mozilla.Thunderbird.desktop'],
                    'music': ['mpv.desktop'], 'video': ['mpv.desktop'], 'pdf': ['org.gnome.Evince.desktop'], 'image': []},
-    'labels': {'brave-browser.desktop': 'Brave', 'firefox.desktop': 'Firefox', 'org.gnome.Epiphany.desktop': 'Web',
+    'labels': {'google-chrome.desktop': 'Google Chrome', 'firefox.desktop': 'Firefox', 'org.gnome.Epiphany.desktop': 'Web',
                'kitty.desktop': 'kitty', 'com.mitchellh.ghostty.desktop': 'Ghostty', 'org.gnome.TextEditor.desktop': 'Text Editor',
                'nvim.desktop': 'Neovim', 'org.gnome.Nautilus.desktop': 'Files', 'cybexos-mail-gmail.desktop': 'Gmail',
                'cybexos-mail-outlook.desktop': 'Outlook', 'org.mozilla.Thunderbird.desktop': 'Thunderbird',
@@ -851,7 +851,7 @@ def main():
             wait(lambda: state()['counts']['defaultCards'] == 9 and state().get('roleKeys') == 9
                  and not state().get('defaultsBusy'), 'nine jobs on Software\'s home')
             current = state()
-            assert current['defaults'][:5] == ['Brave', 'Kitty', 'Text Editor', 'Files', 'Choose an app'], current['defaults']
+            assert current['defaults'][:5] == ['Google Chrome', 'Kitty', 'Text Editor', 'Files', 'Choose an app'], current['defaults']
             assert current['defaultStatus'][0] == 'Cybex pick' and current['defaultStatus'][4] == 'Nothing set yet', current
             session.themed(shots, 'software-defaults')
             # An installed app takes over at once, with Undo.
@@ -859,20 +859,23 @@ def main():
             wait(lambda: state().get('pickerTitle') == 'Choose your web browser' and 'Firefox' in state().get('options', []), 'browser picker')
             current = state()
             assert current['use'] == {'text': 'In use', 'enabled': False}, current
-            assert current['options'][:2] == ['Brave', 'Firefox'] and 'Web' in current['options'], current['options']
+            # Brave Origin is Cybex OS's own install, downloaded from its maker.
+            assert current['options'][:3] == ['Google Chrome', 'Firefox', 'Brave'] and 'Web' in current['options'], current['options']
             session.themed(shots, 'software-defaults-picker')
             session.call('software-test', 'choose', 'librewolf')
             wait(lambda: (state().get('pickerNote') or '').startswith('Installs LibreWolf (≈ 129 MB, open source, ready to use)'), 'what installing does')
+            session.call('software-test', 'choose', 'brave')
+            wait(lambda: (state().get('pickerNote') or '').startswith('Downloads Brave from its maker'), 'Brave Origin from its maker')
             session.call('software-test', 'choose', 'firefox')
             wait(lambda: state().get('use') == {'text': 'Use Firefox', 'enabled': True}, 'Use Firefox')
-            assert state()['pickerNote'].startswith('Switches to Firefox right away. Brave stays installed'), state()['pickerNote']
+            assert state()['pickerNote'].startswith('Switches to Firefox right away. Google Chrome stays installed'), state()['pickerNote']
             assert session.press('softwareDefaultUse')
             wait(lambda: state().get('toast') == 'Firefox is now your web browser' and state()['defaults'][0] == 'Firefox'
                  and state()['defaultStatus'][0] == 'Your choice', 'Firefox took over')
             assert state()['picker'] == '', state()
             session.shot(shots, 'software-defaults-switched-dark.png')
             assert session.press('softwareDefaultsUndo')
-            wait(lambda: state()['defaults'][0] == 'Brave' and state()['defaultStatus'][0] == 'Cybex pick', 'undone')
+            wait(lambda: state()['defaults'][0] == 'Google Chrome' and state()['defaultStatus'][0] == 'Cybex pick', 'undone')
             # One NixOS has: installed through the install list, then the default.
             session.call('software-test', 'picker', 'terminal')
             wait(lambda: state().get('pickerTitle') == 'Choose your terminal', 'terminal picker')

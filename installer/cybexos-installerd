@@ -72,7 +72,7 @@ SYSTEM_FEATURES = [
     ('tailscale', 'Tailscale', 'Mesh VPN'),
     ('localNetworkServices', 'Local network discovery', 'Avahi, .local names and LAN ports'),
     ('connectedWidgets', 'Connected desktop widgets', 'Calendar, online accounts and service widgets'),
-    ('proprietary', 'Proprietary applications', 'Brave, 1Password, Claude Code, Steam and vendor apps'),
+    ('proprietary', 'Proprietary applications', 'Chrome, 1Password, Claude Code, Steam and vendor apps'),
 ]
 # Features whose software is itself unfree, off without proprietary applications.
 UNFREE_FEATURES = ('steam',)

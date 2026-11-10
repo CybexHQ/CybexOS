@@ -42,7 +42,7 @@ function resume(state, requested) {
     return visit(state, requested || (state.status === "completed" ? "hello" : state.step));
 }
 // The steps this computer shows: Connect only when it has something to
-// connect (1Password installed, or the assistant).
+// connect (1Password or Chrome installed, or the assistant).
 function steps(connect) {
     return connect ? STEPS.slice() : STEPS.filter(id => id !== "connect");
 }
@@ -79,25 +79,55 @@ function openedWindow(data) {
 function isPassword(name) {
     return /^(com\.onepassword\.onepassword|1password)$/i.test(String(name || ""));
 }
+// Google Chrome's desktop entry id and its windows' class: google-chrome on
+// Wayland, Google-chrome under XWayland.
+function isChrome(name) {
+    return /^google-chrome$/i.test(String(name || ""));
+}
+// The app a Connect card opens and stands aside for: "password" (1Password)
+// or "google" (Chrome, to sign in to the Google account).
+function appWindow(action, windowClass) {
+    return action === "password" ? isPassword(windowClass) : action === "google" ? isChrome(windowClass) : false;
+}
 // A window opened for a Connect action, or null for one the guide leaves
 // alone. While the guide stands aside for a sign-in ("sign-in"), every new
 // window is part of it: its terminal, the browser it opens, 1Password asked
-// to unlock. While it stands aside for 1Password ("password"), only
-// 1Password's own windows are.
+// to unlock. While it stands aside for 1Password ("password") or Chrome
+// ("google"), only that app's own windows are.
 function connectWindow(data, action) {
     const window = openedWindow(data);
     if (!window || window.address === "") return null;
-    if (action === "sign-in") return {address: window.address, signIn: true};
-    if (action === "password" && isPassword(window.windowClass)) return {address: window.address, signIn: false};
+    if (action === "sign-in") return {address: window.address, action: action};
+    if (appWindow(action, window.windowClass)) return {address: window.address, action: action};
     return null;
 }
 // Leaving the guide closes those windows, except a sign-in's while it still waits.
 function windowsToClose(windows, signInPending) {
-    return (windows || []).filter(window => !(window.signIn && signInPending)).map(window => window.address);
+    return (windows || []).filter(window => !(window.action === "sign-in" && signInPending)).map(window => window.address);
 }
-// Resuming from 1Password closes its windows, but not a sign-in's.
-function passwordWindows(windows) {
-    return (windows || []).filter(window => !window.signIn).map(window => window.address);
+// Resuming from 1Password or Chrome closes their windows, but not a sign-in's.
+function appWindows(windows) {
+    return (windows || []).filter(window => window.action !== "sign-in").map(window => window.address);
+}
+// The Google account Chrome is signed in to, from its Local State file:
+// {account} with the address (possibly ""), or null while no profile is
+// signed in. The profile used last comes first. A missing, partial or
+// unreadable file reads as signed out.
+function chromeAccount(text) {
+    let state;
+    try { state = JSON.parse(String(text || "")); } catch (_) { return null; }
+    const profile = object(state) && object(state.profile) ? state.profile : {};
+    const cache = object(profile.info_cache) ? profile.info_cache : {};
+    const names = Object.keys(cache);
+    const last = typeof profile.last_used === "string" ? names.indexOf(profile.last_used) : -1;
+    if (last > 0) names.unshift(names.splice(last, 1)[0]);
+    for (const name of names) {
+        const entry = object(cache[name]) ? cache[name] : {};
+        const gaia = typeof entry.gaia_id === "string" ? entry.gaia_id.trim() : "";
+        const user = typeof entry.user_name === "string" ? entry.user_name.trim() : "";
+        if (gaia !== "" || user !== "") return {account: user};
+    }
+    return null;
 }
 // The GECOS full name, or "" when the account has none.
 function fullName(passwd) {
@@ -111,4 +141,5 @@ function firstName(passwd, username) {
 }
 if (typeof module !== "undefined" && module.exports)
     module.exports = {STEPS, MIDDLE, ITEMS, initial, validate, parse, serialize, visit, resume, steps, neighbour, checklist,
-        openedWindow, isPassword, connectWindow, windowsToClose, passwordWindows, fullName, firstName};
+        openedWindow, isPassword, isChrome, appWindow, connectWindow, windowsToClose, appWindows, chromeAccount,
+        fullName, firstName};

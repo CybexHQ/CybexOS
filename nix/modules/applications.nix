@@ -8,11 +8,65 @@ let
   assistant = pkgs.callPackage ../packages/assistant.nix {};
   libreswanPlugin = pkgs.callPackage ../packages/networkmanager-libreswan.nix {};
   waylandApps = import ../packages/wayland-apps.nix { inherit pkgs; };
+  # The browser with proprietary applications: Nixpkgs' Google Chrome, an
+  # unfree vendor download unpacked on the computer. Its wrapper selects
+  # Wayland from the session's NIXOS_OZONE_WL (desktop.nix). Chrome does not
+  # recognise Hyprland as a desktop with a keyring, so saved passwords would
+  # stay unencrypted on disk; keep them in the GNOME keyring instead. Chrome
+  # opens straight to a window: its first-run dialog would sit in front of
+  # the welcome guide's sign-ins, and Software and Settings own the default
+  # browser choice it offers.
+  chrome = pkgs.google-chrome.override { commandLineArgs = "--password-store=gnome-libsecret --no-first-run"; };
+  browser = if cfg.features.proprietary then "google-chrome.desktop" else "firefox.desktop";
+  webStore = "https://clients2.google.com/service/update2/crx";
+  # Chromium-family browsers each read their own system directory: Chrome
+  # /etc/opt/chrome, Chromium /etc/chromium and Brave Origin /etc/brave.
+  # Whichever of them a person uses gets the same namespaced policy file.
+  policies = lib.mkIf (cfg.browser.policies != { }) { text = builtins.toJSON cfg.browser.policies; };
+  # 1Password writes its browser-extension host into the browser profiles it
+  # knows (Chrome's, and Origin's only since 8.12.42), and only once it has
+  # run. Chrome also reads /etc/opt/chrome, and Chromium and Brave Origin
+  # /etc/chromium. Point those system entries at the NixOS module's setgid
+  # helper, with the extension origins 1Password itself allows.
+  onePasswordHost = lib.mkIf (cfg.features.proprietary && config.programs._1password-gui.enable) {
+    text = builtins.toJSON {
+      name = "com.1password.1password";
+      description = "1Password BrowserSupport";
+      path = "${config.security.wrapperDir}/1Password-BrowserSupport";
+      type = "stdio";
+      allowed_origins = map (id: "chrome-extension://${id}/") [
+        "hjlinigoblmkhjejkmbegnoaljkphmgo" "bkpbhnjcbehoklfkljkkbbmipaphipgl" "gejiddohjgogedgjnonbofjigllpkmbf"
+        "khgocmkkpikpnmmkgmdnfckapcdkgfaf" "aeblfdkhhhdcdjpifhhbdiojplfjncoa" "dppgmdbiimibapkepcbdbmkaabgiofem"
+      ];
+    };
+  };
+  # The agent CLIs, from their makers' own release builds (pinned in
+  # nix/packages, kept current by the vendor-updates workflow), so an update
+  # never waits for NixOS to build them.
+  codexCli = pkgs.callPackage ../packages/codex {};
+  claudeCode = pkgs.callPackage ../packages/claude-code {};
+  # Claude in Chrome reaches Claude Code through a native messaging host.
+  # Claude Code writes its own entry into each browser profile it knows on
+  # its first /chrome, which Chrome then prefers; Brave Origin's profile is
+  # not among them, and Origin reads /etc/chromium. This system entry answers
+  # in both until then, with the extension origin Claude Code itself allows.
+  claudeHost = lib.mkIf cfg.features.proprietary {
+    text = builtins.toJSON {
+      name = "com.anthropic.claude_code_browser_extension";
+      description = "Claude Code Browser Extension Native Host";
+      path = "${pkgs.writeShellScript "claude-code-chrome-native-host" "exec ${claudeCode}/bin/claude --chrome-native-host"}";
+      type = "stdio";
+      allowed_origins = [ "chrome-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/" ];
+    };
+  };
 in {
-  options.cybexos.browser.bravePolicies = lib.mkOption {
+  options.cybexos.browser.policies = lib.mkOption {
     type = lib.types.attrsOf lib.types.anything;
     default = {};
-    description = "Brave enterprise policies; administrator values override vendor defaults.";
+    description = ''
+      Enterprise policies for Chromium-family browsers (Google Chrome,
+      Chromium and Brave Origin); administrator values override vendor defaults.
+    '';
   };
   config = lib.mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
@@ -35,8 +89,8 @@ in {
       (python3.withPackages (p: [ p.pygobject3 p.pillow p.dbus-python ]))
       gsettings-desktop-schemas adwaita-icon-theme adw-gtk3 glib
       # The agent CLIs are part of every installation. Claude Code is unfree.
-      codex
-    ] ++ lib.optionals cfg.features.proprietary [ (pkgs.callPackage ../packages/brave {}) waylandApps.spotify waylandApps.chatgpt claude-code ]
+      codexCli
+    ] ++ lib.optionals cfg.features.proprietary [ chrome waylandApps.spotify waylandApps.chatgpt claudeCode ]
       ++ lib.optionals cfg.features.assistant [ assistant ]
       ++ lib.optionals cfg.features.developer [ git-lfs gcc cmake gnumake mold sccache rustup nodejs bun jdk25 tree-sitter python3 ruff shellcheck lazygit lazydocker android-tools balena-cli (pkgs.callPackage ../packages/mdview.nix {}) (pkgs.callPackage ../packages/t3-code.nix {}) ]
       ++ lib.optionals cfg.features.podman [ distrobox podman-compose ]
@@ -92,12 +146,12 @@ in {
     xdg.mime = {
       enable = true;
       defaultApplications = {
-        "x-scheme-handler/http" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
-        "x-scheme-handler/https" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
-        "text/html" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
-        "application/xhtml+xml" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
-        "x-scheme-handler/about" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
-        "x-scheme-handler/unknown" = lib.mkDefault (if cfg.features.proprietary then "brave-browser.desktop" else "firefox.desktop");
+        "x-scheme-handler/http" = lib.mkDefault browser;
+        "x-scheme-handler/https" = lib.mkDefault browser;
+        "text/html" = lib.mkDefault browser;
+        "application/xhtml+xml" = lib.mkDefault browser;
+        "x-scheme-handler/about" = lib.mkDefault browser;
+        "x-scheme-handler/unknown" = lib.mkDefault browser;
         "text/plain" = lib.mkDefault "org.gnome.TextEditor.desktop";
         "application/pdf" = lib.mkDefault "org.gnome.Evince.desktop";
         "image/png" = lib.mkDefault "imv.desktop";
@@ -128,33 +182,38 @@ in {
         };
       };
     };
-    cybexos.browser.bravePolicies = lib.mkIf cfg.features.proprietary {
-      DefaultBrowserSettingEnabled = lib.mkDefault true;
+    cybexos.browser.policies = lib.mkIf cfg.features.proprietary {
+      # Software and Settings choose the default browser. Every browser that
+      # reads this file would otherwise make itself the default when it
+      # starts, undoing that choice.
+      DefaultBrowserSettingEnabled = lib.mkDefault false;
       RestoreOnStartup = lib.mkDefault 1;
       SpellcheckLanguage = lib.mkDefault [ (lib.toLower (lib.head (lib.splitString "_" config.i18n.defaultLocale))) ];
-      ExtensionInstallForcelist = lib.mkDefault [ "aeblfdkhhhdcdjpifhhbdiojplfjncoa;https://clients2.google.com/service/update2/crx" ];
+      # 1Password, which cannot be removed.
+      ExtensionInstallForcelist = lib.mkDefault [ "aeblfdkhhhdcdjpifhhbdiojplfjncoa;${webStore}" ];
+      # Claude in Chrome and ChatGPT arrive on their own, so the agents can
+      # use the browser, and can be turned off like any other extension.
+      ExtensionSettings = lib.genAttrs [ "fcoeoabgfenejglbffodgkkbkcdhcgfn" "hehggadaopoacecdllhhajmbjkdcmajg" ] (_: {
+        installation_mode = lib.mkDefault "normal_installed";
+        update_url = lib.mkDefault webStore;
+      });
     };
-    # The pinned Origin executable retains Brave's native policy root. Keep
-    # this namespaced file declarative and expose policy overrides above.
-    environment.etc."brave/policies/managed/cybexos.json" = lib.mkIf cfg.features.proprietary {
-      text = builtins.toJSON cfg.browser.bravePolicies;
-    };
-    # 1Password writes its browser-extension host to the profiles it knows,
-    # Origin's only since 8.12.42 and only once it has run; Origin also reads
-    # Chromium's system directory. Point that system entry at the NixOS
-    # module's setgid helper, with the extension origins 1Password itself allows.
-    environment.etc."chromium/native-messaging-hosts/com.1password.1password.json" = lib.mkIf (cfg.features.proprietary && config.programs._1password-gui.enable) {
-      text = builtins.toJSON {
-        name = "com.1password.1password";
-        description = "1Password BrowserSupport";
-        path = "${config.security.wrapperDir}/1Password-BrowserSupport";
-        type = "stdio";
-        allowed_origins = map (id: "chrome-extension://${id}/") [
-          "hjlinigoblmkhjejkmbegnoaljkphmgo" "bkpbhnjcbehoklfkljkkbbmipaphipgl" "gejiddohjgogedgjnonbofjigllpkmbf"
-          "khgocmkkpikpnmmkgmdnfckapcdkgfaf" "aeblfdkhhhdcdjpifhhbdiojplfjncoa" "dppgmdbiimibapkepcbdbmkaabgiofem"
-        ];
-      };
-    };
+    environment.etc."opt/chrome/policies/managed/cybexos.json" = policies;
+    environment.etc."chromium/policies/managed/cybexos.json" = policies;
+    environment.etc."brave/policies/managed/cybexos.json" = policies;
+    environment.etc."opt/chrome/native-messaging-hosts/com.1password.1password.json" = onePasswordHost;
+    environment.etc."chromium/native-messaging-hosts/com.1password.1password.json" = onePasswordHost;
+    environment.etc."opt/chrome/native-messaging-hosts/com.anthropic.claude_code_browser_extension.json" = claudeHost;
+    environment.etc."chromium/native-messaging-hosts/com.anthropic.claude_code_browser_extension.json" = claudeHost;
+    # Cybex OS keeps Codex current: no update notice, and no background daemon
+    # installing newer Codex releases into ~/.codex (Nixpkgs builds Codex with
+    # it off). A person's own ~/.codex/config.toml still overrides this.
+    environment.etc."codex/config.toml".text = lib.mkDefault ''
+      check_for_update_on_startup = false
+
+      [features]
+      daemon_auto_start = false
+    '';
     hardware.sane.enable = lib.mkDefault true;
     # Driverless printers remain available; retain the maintained free drivers
     # for devices that need them. HP's proprietary firmware plugin is a local,

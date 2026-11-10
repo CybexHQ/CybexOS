@@ -354,6 +354,25 @@ class CatalogueAndCheckTests(unittest.TestCase):
                           for name in ('gimp', 'krita', 'spotify')])
         self.assertIn('derivations = true', run.calls[0][0][-1])
 
+    def test_check_allows_cybex_os_optional_packages_built_from_their_makers_download(self):
+        brave = store('d', 'brave-origin.drv')
+        source = store('s', 'brave-origin.deb.drv')
+        run = Nix(metadata=METADATA | {'brave-origin': {'pname': 'brave-origin', 'version': '1.99.55', 'unfree': False,
+                                                         'available': True, 'broken': False, 'own': True}},
+                  build=f'these 2 derivations will be built:\n  {brave}\n  {source}\n',
+                  graph={brave: compile_step(source),
+                         source: {'outputs': {'out': {'path': store('t', 'deb'), 'hash': 'abc'}}, 'env': {}, 'inputDrvs': {}}})
+        result = software.check(['gimp', 'brave-origin'], config=self.config, run=run)
+        self.assertTrue(result['prebuilt'])
+        self.assertEqual({key: result['packages']['brave-origin'][key] for key in ('state', 'vendor', 'version')},
+                         {'state': 'prebuilt', 'vendor': True, 'version': '1.99.55'},
+                         'unpacking Brave Origin is expected, like an unfree vendor download')
+        self.assertFalse(result['packages']['gimp']['vendor'])
+        build = next(call for call in run.calls if call[0][:3] == ('nix', 'build', '--dry-run'))
+        machine = 'path:' + str(self.config.resolve()) + '#nixosConfigurations.cybexos.'
+        self.assertEqual([arg for arg in build[0] if '#' in arg],
+                         [machine + 'pkgs.gimp', machine + 'config.cybexos.software.optionalPackages.brave-origin'])
+
     def test_check_reports_unavailable_packages_without_a_dry_run(self):
         run = Nix(build='')
         result = software.check(['spotify', 'nonexistent'], config=self.config, run=run)

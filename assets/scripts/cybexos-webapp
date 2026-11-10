@@ -12,9 +12,11 @@ A web app is a website in its own browser window with an entry in the
 application launcher. Each one is a desktop entry,
 ~/.local/share/applications/cybexos-webapp-ID.desktop, whose command is
 `cybexos-webapp launch ID`, plus its name, address, and icon under
-~/.local/share/cybexos/webapps/ID/. Launching picks the browser each time:
-Brave Origin in app mode when it is installed (the proprietary applications
-choice), otherwise Firefox.
+~/.local/share/cybexos/webapps/ID/. Launching follows the browser choice each
+time (`cybexos-apps webapp`): a Chromium-family browser opens the site in its
+own app window, Google Chrome by default with the proprietary applications
+choice, or Brave Origin or Chromium when someone picks them; other browsers,
+Firefox included, open it as an ordinary page.
 
 Installing fetches the site's own icon: an https page's apple-touch-icon or
 icon link, else /favicon.ico, within strict size and time limits, converted

@@ -62,10 +62,11 @@ Singleton {
     readonly property bool busy: downloading !== "" || removing !== ""
 
     // Starts a desktop entry as DesktopEntry.execute() does, with the pointer
-    // in use now rather than the one this shell inherited at login.
-    function launch(desktopEntry) {
+    // in use now rather than the one this shell inherited at login, and any
+    // `args` after its command.
+    function launch(desktopEntry, args) {
         if (desktopEntry)
-            Quickshell.execDetached(PointerHelpers.launchContext(desktopEntry, current));
+            Quickshell.execDetached(PointerHelpers.launchContext(desktopEntry, current, args));
     }
 
     function entry(id) {

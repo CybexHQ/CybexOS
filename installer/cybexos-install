@@ -516,12 +516,13 @@ def interactive(release):
         print('\n3 of 5 · Software\n')
         print('What will you use this computer for? Choose as many as you like. Every app is')
         print('prebuilt, so nothing compiles here. Add or remove apps later in Software.')
-        print('Always included: Firefox, Files, LocalSend, Codex, the Wiz assistant and terminal')
-        print('tools, plus Brave, 1Password and Claude Code with proprietary applications.\n')
+        print('Always included: Firefox, Files, LocalSend, Codex, the Wiz assistant and')
+        print('terminal tools, plus Google Chrome, 1Password and Claude Code with')
+        print('proprietary applications.\n')
         profiles = [profile['id'] for profile in catalogue['profiles']
                     if yes_no(f"{profile.get('name', profile['id'])} ({profile.get('summary', '')})?", profile['id'] in profiles)]
-        print('\nProprietary applications come from their vendors under their own licenses: Brave,')
-        print('1Password, Claude Code, Steam and apps such as Slack or Zoom.')
+        print('\nProprietary applications come from their vendors under their own licenses:')
+        print('Google Chrome, 1Password, Claude Code, Steam and apps such as Slack or Zoom.')
         previous = choices
         choices = {'proprietary': yes_no('Include proprietary applications?', previous['proprietary'])}
         if yes_no('Choose system features individually?', any(key in previous for key, _ in SYSTEM_FEATURES)):

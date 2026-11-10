@@ -8,7 +8,9 @@ route as an installation. All service probes and writes inherit a private
 HOME/XDG tree; hyprctl is a fake that serves shortcut state from that tree.
 The real cybexos-assistant service runs beside the shell with a scripted
 `claude` (signed out until its login command runs), `cybex doctor` serves a
-fixture report, and 1Password is a desktop entry for a recording script.
+fixture report, and 1Password and Google Chrome are desktop entries for
+recording scripts; Chrome's sign-in is a Local State file written as Chrome
+writes it.
 The assistant's own Wiz is probed through the LazyLoader that holds it.
 No installed desktop is modified. Only requested screenshots survive
 teardown; failed logs are printed inline.
@@ -297,7 +299,9 @@ class Session:
         (base / 'bin').mkdir()
         for name, program in (('hyprctl', FAKE_HYPRCTL), ('cybex', FAKE_CYBEX), ('cybexos-apps', FAKE_APPS),
                               ('claude', FAKE_CLAUDE), ('fake-1password', 'import os, pathlib\n'
-                              'pathlib.Path(os.environ["HOME"], "1password-launched").touch()\n')):
+                              'pathlib.Path(os.environ["HOME"], "1password-launched").touch()\n'),
+                              ('fake-chrome', 'import json, os, pathlib, sys\n'
+                              'pathlib.Path(os.environ["HOME"], "chrome-argv.json").write_text(json.dumps(sys.argv[1:]))\n')):
             (base / 'bin' / name).write_text(('' if name == 'hyprctl' else f'#!{sys.executable}\n') + program)
             (base / 'bin' / name).chmod(0o700)
         applications = self.home / '.local/share/applications'
@@ -305,6 +309,9 @@ class Session:
         # Named as 1Password 8.12.42 names its entry.
         (applications / 'com.onepassword.OnePassword.desktop').write_text(
             f'[Desktop Entry]\nType=Application\nName=1Password\nExec={base / "bin/fake-1password"}\n')
+        # As Google Chrome's package names its entry, with its field code.
+        (applications / 'google-chrome.desktop').write_text(
+            f'[Desktop Entry]\nType=Application\nName=Google Chrome\nExec={base / "bin/fake-chrome"} %U\n')
         self.home.joinpath('signed-out-claude').touch()
         self.home.joinpath('doctor.json').write_text(json.dumps(DOCTOR))
         config = self.home / '.config/cybexos'
@@ -631,8 +638,9 @@ def main():
                 assert session.ipc('open', step) == 'ok'
                 session.wait(lambda: session.state().get('step') == step, step)
                 if step == 'connect':
-                    session.wait(lambda: session.state()['connect'] == {'password': 'available', 'assistant': 'required'},
-                                 'Connect offers 1Password and the assistant sign-in')
+                    session.wait(lambda: session.state()['connect']
+                                 == {'password': 'available', 'google': 'available', 'assistant': 'required'},
+                                 'Connect offers 1Password, Google and the assistant sign-in')
                     # Signed out, the assistant's Wiz sleeps on its card.
                     session.wait(lambda: session.probe()['wiz']['connect']['pose'] == 'asleep', 'Wiz asleep')
                 if step == 'finish':
@@ -692,6 +700,50 @@ def main():
             session.wait(lambda: not session.state().get('aside'), 'Resume')
             assert session.probe()['closed'] == ['c5d6'], session.probe()
             assert session.state()['connectWindows'] == [], session.state()
+            # Google: Chrome opens on its own sign-in settings, in a new window
+            # from its desktop entry. The guide steps aside and comes back when
+            # that window closes; another app's window does not count.
+            def chrome_argv():
+                path = session.home / 'chrome-argv.json'
+                return path.exists() and json.loads(path.read_text())
+            assert session.call('welcome-test', 'press', 'connectGoogle') == 'true'
+            argv = session.wait(chrome_argv, 'Chrome launched from its desktop entry')
+            assert argv == ['--new-window', 'chrome://settings/people'], argv
+            session.wait(lambda: session.state().get('aside'), 'the guide steps aside for Chrome')
+            assert session.state()['connect']['google'] == 'opened', session.state()
+            session.call('welcome-test', 'windowEvent', 'openwindow', 'a1c2,1,google-chrome,Settings - Google Chrome')
+            session.call('welcome-test', 'windowEvent', 'openwindow', 'b3c4,1,1password,1Password')
+            session.call('welcome-test', 'windowEvent', 'closewindow', 'b3c4')
+            time.sleep(.5)
+            assert session.state()['aside'], 'another window closing does not bring the guide back'
+            assert session.state()['connectWindows'] == ['a1c2'], session.state()
+            session.call('welcome-test', 'windowEvent', 'closewindow', 'a1c2')
+            session.wait(lambda: not session.state().get('aside'), 'closing Chrome brings the guide back')
+            assert session.state()['connectWindows'] == [], session.state()
+            # A missing, then signed-out, Local State leaves the card as it is;
+            # Chrome saving a signed-in profile while the guide shows ticks it.
+            local_state = session.home / '.config/google-chrome/Local State'
+            local_state.parent.mkdir(parents=True)
+            local_state.write_text(json.dumps({'profile': {'last_used': 'Default',
+                'info_cache': {'Default': {'gaia_id': '', 'user_name': '', 'name': 'Person 1'}}}}))
+            time.sleep(5)
+            assert session.state()['connect']['google'] == 'opened', session.state()
+            local_state.write_text(json.dumps({'profile': {'last_used': 'Default',
+                'info_cache': {'Default': {'gaia_id': '1234567890', 'user_name': 'ada@example.com', 'name': 'Ada'}}}}))
+            session.wait(lambda: session.state()['connect']['google'] == 'ready', 'Chrome signed in', timeout=15)
+            session.capture(shots, 'welcome-connect-google-en.png')
+            # Opened again, by the IPC call qualification uses, and left by
+            # Resume: its window closes, under XWayland's class too.
+            (session.home / 'chrome-argv.json').unlink()
+            assert session.ipc('connect', 'unknown') == 'unknown'
+            assert session.ipc('connect', 'google') == 'ok'
+            session.wait(chrome_argv, 'Chrome launched again')
+            session.wait(lambda: session.state().get('aside'), 'the guide steps aside for Chrome again')
+            session.call('welcome-test', 'windowEvent', 'openwindow', 'd5e6,1,Google-chrome,Settings - Google Chrome')
+            session.call('welcome-test', 'resume')
+            session.wait(lambda: not session.state().get('aside'), 'Resume from Chrome')
+            assert session.probe()['closed'] == ['c5d6', 'd5e6'], session.probe()
+            assert session.state()['connectWindows'] == [] and session.state()['connect']['google'] == 'ready', session.state()
             # The assistant: its own login command runs in the background, with
             # no terminal and its output discarded.
             def login_run():
@@ -718,7 +770,7 @@ def main():
             session.wait(lambda: session.state().get('aside'), 'the guide steps aside for the sign-in again')
             session.wait(login_run, 'the login command again')
             # Every window the sign-in opens is the guide's to close.
-            session.call('welcome-test', 'windowEvent', 'openwindow', '2c3d,1,brave-browser,Claude')
+            session.call('welcome-test', 'windowEvent', 'openwindow', '2c3d,1,google-chrome,Claude')
             session.call('welcome-test', 'windowEvent', 'openwindow', '4e5f,1,1password,Unlock 1Password')
             assert session.state()['connect']['assistant'] == 'signing-in', session.state()
             assert session.probe()['wiz']['connect']['pose'] == 'listening', session.probe()['wiz']
@@ -807,7 +859,7 @@ def main():
             landed_diff = region_difference(landed, Image.new('RGB', Image.open(landed).size, '#101116'), wiz_box)
             assert landed_diff > 5, f'the assistant Wiz shows in his corner (difference {landed_diff:.2f})'
             # Leaving for the desktop closes what Connect opened, and only that.
-            assert session.probe()['closed'] == ['c5d6', '2c3d', '4e5f'], session.probe()
+            assert session.probe()['closed'] == ['c5d6', 'd5e6', '2c3d', '4e5f'], session.probe()
             assert session.state()['connectWindows'] == [], session.state()
             session.wait(lambda: session.probe().get('watchers') == 0, 'Keybindings claim released on close')
             session.ipc('open', '')
@@ -1062,6 +1114,7 @@ def main():
                   'and after dismissal, the hand-off flight landing on his resting place, none with reduced motion), '
                   'fresh-install plain background behind the full-screen guide, installer zoom at four '
                   'output sizes, first login, all six steps, Connect (1Password aside and return on its window closing, its tick once an account appears, '
+                  'Chrome opened on its sign-in settings, aside and return on its window closing, its tick from Local State, Resume closing it, '
                   'the assistant\'s own sign-in and automatic return), the system check on Ready and the question it asks, '
                   'Keybindings keycaps (remapped/unbound) and claim '
                   'lifecycle, stepping aside for the launcher, tile apply, Space typing in search, Space peek '

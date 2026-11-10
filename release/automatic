@@ -1,31 +1,59 @@
 #!/usr/bin/env bash
-# Release a verified vendor-pin update to beta, as the vendor-updates workflow
-# does once scripts/vendor-pins has rewritten a pin and its checks passed.
+# Release verified vendor-pin updates to beta, as the vendor-updates workflow
+# does once scripts/vendor-pins has rewritten the pins and their checks passed.
 #
-#   release/automatic CHANGE.json [--dry-run]
+#   release/automatic CHANGES.json [--dry-run]
 #
-# CHANGE.json is `scripts/vendor-pins update NAME` output. This commits the
-# pin, takes the next patch version past VERSION and every v* tag, writes
-# release/notes.md for it, pushes main and runs release/publish (beta only;
+# CHANGES.json is `scripts/vendor-pins update NAME...` output: a list of
+# changes. This commits each pin (`Update TITLE to VERSION`), takes the next
+# patch version past VERSION and every v* tag, writes release/notes.md with a
+# paragraph per change, pushes main and runs release/publish (beta only;
 # promotion to stable stays a person's decision). When another session moves
 # main or takes the version first, it rebases onto main and takes the next one.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
 fail() { echo "release/automatic: $*" >&2; exit 1; }
-change=${1:-}
-[[ -f $change ]] || fail 'usage: release/automatic CHANGE.json [--dry-run]'
+changes=${1:-}
+[[ -f $changes ]] || fail 'usage: release/automatic CHANGES.json [--dry-run]'
 dry_run=0
 [[ ${2:-} == --dry-run ]] && dry_run=1
 
-field() { python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$change" "$1"; }
-title=$(field title) to=$(field to) file=$(field file) notes=$(field notes)
-[[ $file == nix/packages/* && -f $file ]] || fail "unexpected pin file $file"
-[[ $(git rev-parse --abbrev-ref HEAD) == main ]] || fail 'run from main'
-[[ -z $(git status --porcelain -- . ":(exclude)$file") ]] || fail "only $file may be changed"
+# One "file<TAB>title<TAB>version" line per change, in order.
+listing=$(python3 -I - "$changes" <<'EOF'
+import json, re, sys
+changes = json.load(open(sys.argv[1]))
+if not isinstance(changes, list) or not changes:
+    sys.exit('release/automatic: CHANGES.json lists no changes')
+files = [change['file'] for change in changes]
+if len(set(files)) != len(files):
+    sys.exit('release/automatic: a pin appears twice')
+for change in changes:
+    fields = [change['file'], change['title'], change['to'], change['notes']]
+    if any(not isinstance(field, str) or not field.strip() or '\t' in field or '\n' in field for field in fields):
+        sys.exit(f'release/automatic: incomplete change {change!r}')
+    if not re.fullmatch(r'nix/packages/[\w.-]+(/[\w.-]+)*', change['file']) or '..' in change['file']:
+        sys.exit(f"release/automatic: unexpected pin file {change['file']}")
+    print('\t'.join(fields[:3]))
+EOF
+) || exit 1
+# The notes' paragraphs, one per change.
+notes=$(python3 -I -c 'import json, sys; print("\n\n".join(c["notes"].strip() for c in json.load(open(sys.argv[1]))))' "$changes")
 
-git add -- "$file"
-git commit --quiet -m "Update $title to $to" -m "Upstream's stable release, checked against its published checksum by scripts/vendor-pins and verified by the vendor-updates workflow."
+files=()
+while IFS=$'\t' read -r file _ _; do
+    [[ -f $file ]] || fail "unexpected pin file $file"
+    files+=("$file")
+done <<< "$listing"
+[[ $(git rev-parse --abbrev-ref HEAD) == main ]] || fail 'run from main'
+exclude=()
+for file in "${files[@]}"; do exclude+=(":(exclude)$file"); done
+[[ -z $(git status --porcelain -- . "${exclude[@]}") ]] || fail "only ${files[*]} may be changed"
+
+while IFS=$'\t' read -r file title to; do
+    git add -- "$file"
+    git commit --quiet -m "Update $title to $to" -m "Upstream's release, checked against its published checksum by scripts/vendor-pins and verified by the vendor-updates workflow."
+done <<< "$listing"
 
 next_version() {
     # The highest final version among VERSION and the tags, plus one patch.
@@ -39,7 +67,7 @@ print(f"{major}.{minor}.{patch + 1}")'
 
 for attempt in 1 2 3; do
     git fetch --quiet --tags origin main
-    git rebase --quiet origin/main || { git rebase --abort; fail 'the pin commit no longer applies to main'; }
+    git rebase --quiet origin/main || { git rebase --abort; fail 'the pin commits no longer apply to main'; }
     version=$(next_version)
     printf '%s\n' "$version" > VERSION
     cat > release/notes.md <<EOF
@@ -65,7 +93,7 @@ EOF
             || fail "publishing $version failed"
         fail "v$version was taken after main was pushed; publish the next version by hand"
     fi
-    # main moved: drop the release commit and rebase the pin onto it.
+    # main moved: drop the release commit and rebase the pins onto it.
     git reset --quiet --hard HEAD~1
 done
 fail 'main kept moving; try again later'

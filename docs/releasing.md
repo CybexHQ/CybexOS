@@ -126,23 +126,48 @@ downloads Cybex OS pins itself only move when this repository does, so
 The **vendor-updates** workflow (`.github/workflows/vendor-updates.yml`) runs it
 daily on a GitHub-hosted runner:
 
-- **Brave Origin** is updated automatically. When Brave publishes a newer
-  stable release, the workflow rewrites `nix/packages/brave/release.json`
-  (accepting the package only when GitHub's digest and Brave's published
-  `.sha256` agree), builds the package, runs `nix flake check --no-build`,
-  `tests/run` and `checks.x86_64-linux.browser-1password`, then
-  `release/automatic`: it commits the pin, takes the next patch version past
-  `VERSION` and the tags, writes the release notes, pushes `main` and runs
-  `release/publish`. The release reaches beta only; promoting it stays a
-  person's decision. A failed run releases nothing and keeps a
-  `vendor-updates` issue open.
+- **Brave Origin, Codex and Claude Code** are updated automatically, each
+  only once its download checks out against the vendor's own checksums:
+  - Brave Origin follows Brave's stable releases
+    (`nix/packages/brave/release.json`), accepted when GitHub's digest and
+    Brave's published `.sha256` agree; its check is
+    `checks.x86_64-linux.browser-1password`.
+  - Codex follows OpenAI's stable releases (`rust-vX.Y.Z`, never the alphas
+    in between; `nix/packages/codex/release.json`). The pin is the
+    `codex-package` archive OpenAI's installer uses, accepted when GitHub's
+    digest and OpenAI's `codex-package_SHA256SUMS` agree.
+  - Claude Code follows Anthropic's `latest` channel
+    (`nix/packages/claude-code/release.json`): the compressed native build
+    its installer downloads, accepted when Anthropic's release key (fingerprint
+    `31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE`, as Claude Code's setup
+    documentation publishes it) has signed both release manifests. The
+    package build checks the unpacked executable against the signed
+    `manifest.json` as well.
+  - Codex and Claude Code are the agent CLIs Wiz drives. Both are Cybex OS
+    packages built from those prebuilt downloads, never compiled on the
+    computer, so an update does not wait for NixOS's build farm. Their check,
+    `checks.x86_64-linux.agent-clis`, runs both offline: their versions,
+    Codex's bundled tools and its app-server answering Wiz's `initialize`,
+    and every Claude Code option Wiz passes.
+
+  One run updates every pin that is behind (`scripts/vendor-pins update
+  NAME...`, all or none), builds the packages, runs `nix flake check
+  --no-build`, `tests/run` and each updated pin's checks, then
+  `release/automatic`: it commits each pin as `Update TITLE to VERSION`, takes
+  the next patch version past `VERSION` and the tags, writes release notes
+  with a paragraph per update, pushes `main` and runs `release/publish`. The
+  release reaches beta only; promoting it stays a person's decision. A failed
+  run releases none of them and keeps a `vendor-updates` issue open with the
+  attempted updates.
 - **T3 Code, Intel LPMd and Omawrite** are reported, not updated: each needs a
   review beyond its checksum (T3 Code's connected-widget bar API, for
   example). While one is behind upstream, a `vendor-pins-behind` issue lists it.
 - The XPS IPU7 camera recipe is never compared or updated automatically.
 
-Run it with **Run workflow** to publish an available update at once, or with
-`rehearse` to run every check with the current pins without publishing.
+Run it with **Run workflow** to publish available updates at once, with
+`pins` naming only some automatic pins (for example `codex claude-code` while
+another pin's update needs a person), or with `rehearse` to run every check
+with the current pins without publishing.
 `scripts/vendor-pins status` shows the same comparison locally.
 
 ### Nixpkgs canary

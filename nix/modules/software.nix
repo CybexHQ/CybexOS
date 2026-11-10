@@ -5,7 +5,8 @@ let
   selected = map (name: {
     attribute = name;
     package = lib.attrByPath (lib.splitString "." name)
-      (throw "Software package ${name} is unavailable in the machine's locked Nixpkgs") (pkgs // waylandApps);
+      (throw "Software package ${name} is unavailable in the machine's locked Nixpkgs")
+      (pkgs // waylandApps // cfg.software.optionalPackages);
   }) cfg.software.packages;
   # Who declared each systemPackages entry, from its definition's file:
   # Software's own selections (this module), Cybex OS's vendor modules (this
@@ -29,6 +30,15 @@ in {
     type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_][A-Za-z0-9_+.-]*");
     default = [];
     description = "Native package attributes selected through the staged Software interface.";
+  };
+  # Software's catalogue and check read these from the machine's configuration.
+  options.cybexos.software.optionalPackages = lib.mkOption {
+    type = lib.types.attrsOf lib.types.package;
+    default = import ../packages/optional.nix { inherit pkgs; };
+    defaultText = lib.literalExpression "import nix/packages/optional.nix { inherit pkgs; }";
+    readOnly = true;
+    internal = true;
+    description = "Cybex OS's own packages that Software installs by name, like Nixpkgs attributes.";
   };
   config = lib.mkIf cfg.enable {
     assertions = map (entry: {

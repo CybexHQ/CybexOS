@@ -85,16 +85,17 @@ test("automatic docks follow layout per monitor, including empty floating worksp
     assert.deepEqual(outputs.filter(row => D.showOnWorkspace(false, row, state[row.id])), [outputs[1]]);
 });
 
-test("Brave URL-app classes resolve to installed web-app entries across browser profiles", () => {
+test("Chrome and other Chromium URL-app classes resolve to installed web-app entries across browser profiles", () => {
     const apps = [{ id: "whatsapp", url: "https://web.whatsapp.com/" },
         { id: "chat", url: "https://example.com/chat/" },
         { id: "mail", url: "https://example.com/mail/?folder=inbox#top" }];
-    for (const browser of ["brave", "chrome", "chromium", "msedge"])
+    for (const browser of ["chrome", "brave", "chromium", "msedge"])
         for (const profile of ["Default", "Profile_1"])
             assert.equal(D.webAppEntryId(`${browser}-web.whatsapp.com__-${profile}`, apps), "cybexos-webapp-whatsapp");
+    assert.equal(D.webAppEntryId("chrome-example.com__chat_-Default", apps), "cybexos-webapp-chat");
     assert.equal(D.webAppEntryId("brave-example.com__chat_-Default", apps), "cybexos-webapp-chat");
     assert.equal(D.webAppEntryId("brave-example.com__mail_-Default", apps), "cybexos-webapp-mail");
-    for (const appId of ["brave", "firefox", "brave-web.whatsapp.com.evil__-Default",
+    for (const appId of ["google-chrome", "brave", "firefox", "chrome-web.whatsapp.com.evil__-Default", "brave-web.whatsapp.com.evil__-Default",
         "brave-example.com__unknown-Default", "brave-web.whatsapp.com__-", "web.whatsapp.com"])
         assert.equal(D.webAppEntryId(appId, apps), "", appId);
     assert.equal(D.webAppEntryId("brave-web.whatsapp.com__-Default", []), "", "removed apps do not match");
@@ -171,8 +172,8 @@ test("pinning appends once, unpinning removes, and the list is bounded", () => {
 });
 
 test("suggested pins hold until the person pins or unpins anything", () => {
-    const suggestions = D.suggestedPins("brave");
-    assert.deepEqual(suggestions, ["brave", "org.gnome.Nautilus", "kitty"]);
+    const suggestions = D.suggestedPins("google-chrome");
+    assert.deepEqual(suggestions, ["google-chrome", "org.gnome.Nautilus", "kitty"]);
     assert.deepEqual(D.suggestedPins(""), ["org.gnome.Nautilus", "kitty"]);
     assert.deepEqual(D.suggestedPins("firefox", "com.mitchellh.ghostty", "thunar"), ["firefox", "thunar", "com.mitchellh.ghostty"],
         "the chosen file manager and terminal replace Cybex OS's");
@@ -187,10 +188,10 @@ test("the default browser is read from mimeapps.list's default group only", () =
         "x-scheme-handler/https=chromium.desktop;",
         "[Default Applications]",
         "text/html=firefox.desktop",
-        "x-scheme-handler/https=brave.desktop;firefox.desktop;",
+        "x-scheme-handler/https=google-chrome.desktop;brave-browser.desktop;firefox.desktop;",
         ""
     ].join("\n");
-    assert.equal(D.defaultBrowserId(text), "brave");
+    assert.equal(D.defaultBrowserId(text), "google-chrome");
     assert.equal(D.defaultBrowserId("[Default Applications]\nx-scheme-handler/https = firefox.desktop\n"), "firefox");
     assert.equal(D.defaultBrowserId("[Default Applications]\nx-scheme-handler/https=../evil.desktop\n"), "");
     assert.equal(D.defaultBrowserId(""), "");

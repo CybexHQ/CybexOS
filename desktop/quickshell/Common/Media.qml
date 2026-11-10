@@ -191,8 +191,9 @@ Singleton {
         if (!target)
             return "";
 
-        // The YouTube shortcut is a Brave --app window, so it has no desktop
-        // entry of its own. Its MPRIS URL is classified in the pure helper.
+        // The YouTube shortcut is a browser --app window (Chrome's, or Brave's),
+        // so it has no desktop entry of its own. Its MPRIS URL is classified
+        // in the pure helper.
         if (StatusHelpers.playerBrand(target) === "youtube")
             return "";
 

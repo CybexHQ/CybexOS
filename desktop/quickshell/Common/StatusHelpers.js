@@ -153,14 +153,16 @@ function playerIconCandidates(player) {
     var id = playerIdentity(player);
     if (id.includes("spotify"))
         add("com.spotify.Client");
+    // Chromium browsers all name their MPRIS bus chromium.instance<pid>, so
+    // the browser itself goes before Chromium.
+    if (id.includes("chrome"))
+        add("google-chrome");
     if (id.includes("brave"))
         add("brave-browser");
     if (id.includes("firefox"))
         add("org.mozilla.firefox");
     if (id.includes("chromium"))
         add("chromium");
-    if (id.includes("chrome"))
-        add("google-chrome");
     if (id.includes("edge") || id.includes("msedge"))
         add("microsoft-edge");
     add(player.identity);

@@ -87,6 +87,7 @@ test("player glyphs cover every source the bar and the popover can show", () => 
     assert.equal(H.playerGlyph(player("Firefox", "firefox")), glyph.firefox);
     assert.equal(H.playerGlyph(player("Zen Browser", "zen")), glyph.firefox);
     assert.equal(H.playerGlyph(player("Chromium", "chromium")), glyph.chromium);
+    assert.equal(H.playerGlyph(player("Google Chrome", "google-chrome")), glyph.chromium);
     assert.equal(H.playerGlyph(player("Brave", "brave-browser")), glyph.chromium);
     assert.equal(H.playerGlyph(player("Microsoft Edge", "msedge")), glyph.edge);
     assert.equal(H.playerGlyph(player("YouTube Music", "youtube-music")), glyph.youtube);
@@ -113,6 +114,10 @@ test("a browser playing a YouTube tab keeps its browser mark", () => {
 });
 
 test("media brands recognize YouTube webapps from their MPRIS URL", () => {
+    assert.equal(H.playerBrand(player("Google Chrome", "google-chrome", {
+        dbusName: "org.mpris.MediaPlayer2.chromium.instance42",
+        metadata: { "xesam:url": "https://www.youtube.com/watch?v=abc" },
+    })), "youtube");
     assert.equal(H.playerBrand(player("Brave", "", {
         dbusName: "org.mpris.MediaPlayer2.brave.instance42",
         metadata: { "xesam:url": "https://www.youtube.com/watch?v=abc" },
@@ -132,6 +137,16 @@ test("player icon candidates bridge MPRIS names to installed desktop entries", (
         ["spotify", "com.spotify.Client"]);
     assert.deepEqual(H.playerIconCandidates(player("Brave", "")),
         ["brave-browser", "Brave"]);
+    // Every Chromium browser's bus is chromium.instance<pid>: the browser
+    // itself comes first, its desktop entry or not.
+    const bus = { dbusName: "org.mpris.MediaPlayer2.chromium.instance42" };
+    assert.deepEqual(H.playerIconCandidates(player("Google Chrome", "google-chrome", bus)),
+        ["google-chrome", "chromium", "Google Chrome"]);
+    assert.deepEqual(H.playerIconCandidates(player("Google Chrome", "", bus)),
+        ["google-chrome", "chromium", "Google Chrome"]);
+    assert.deepEqual(H.playerIconCandidates(player("Brave", "", bus)),
+        ["brave-browser", "chromium", "Brave"]);
+    assert.deepEqual(H.playerIconCandidates(player("Chromium", "", bus)), ["chromium"]);
     assert.deepEqual(H.playerIconCandidates(player("Firefox", "org.mozilla.firefox")),
         ["org.mozilla.firefox", "Firefox"]);
     assert.deepEqual(H.playerIconCandidates(player("Rhythmbox", "rhythmbox")),
@@ -218,6 +233,8 @@ test("a player's window comes from the dock's list, and a web app only matches i
         { address: "a1", appId: "brave-browser", entryId: "brave-browser" },
         { address: "b2", appId: "brave-www.youtube.com__-Default", entryId: "brave-youtube.desktop" },
         { address: "c3", appId: "Spotify", entryId: "com.spotify.Client" },
+        { address: "d4", appId: "google-chrome", entryId: "google-chrome" },
+        { address: "e5", appId: "chrome-www.youtube.com__-Default", entryId: "cybexos-webapp-youtube" },
     ];
     assert.equal(H.playerWindow(player("Spotify", "spotify"), windows), "c3");
     assert.equal(H.playerWindow(player("Brave", "brave-browser"), windows), "a1");
@@ -225,6 +242,10 @@ test("a player's window comes from the dock's list, and a web app only matches i
     assert.equal(H.playerWindow(youtube, windows), "b2");
     assert.equal(H.playerWindow(youtube, windows.slice(0, 1)), "",
         "a YouTube player never falls back to an unrelated browser window");
+    const chrome = player("Google Chrome", "google-chrome", { dbusName: "org.mpris.MediaPlayer2.chromium.instance7" });
+    assert.equal(H.playerWindow(chrome, windows), "d4");
+    const chromeYoutube = { ...chrome, metadata: { "xesam:url": "https://www.youtube.com/watch?v=y" } };
+    assert.equal(H.playerWindow(chromeYoutube, windows.slice(2)), "e5");
     assert.equal(H.playerWindow(player("mpv", "mpv"), windows), "");
     assert.equal(H.playerWindow(null, windows), "");
 });

@@ -374,7 +374,8 @@ Hello and Ready stand outside the step indicator, as the installer's welcome
 and done screens stand outside Disk · You · Review. The indicator shows
 Connect · Wallpaper · Style · Shortcuts. `Welcome.steps`
 (`WelcomeHelpers.steps`) leaves Connect out when there is nothing to connect:
-1Password's desktop entry is absent and the assistant feature is off. Continue
+1Password's and Google Chrome's desktop entries are absent and the assistant
+feature is off. Continue
 and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
 `connect` step on such a computer opens on its neighbour.
 
@@ -384,8 +385,9 @@ and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
    read from the live backends: language, keyboard layout, time zone,
    network, account and computer name. Change opens the language, keyboard
    or time zone sheet; the network row steps aside to Settings → Network.
-2. **`connect`.** Two optional sign-ins as installer cards, both of which
-   step aside because they open windows:
+2. **`connect`.** Up to three optional sign-ins as installer cards, side by
+   side and numbered when there is more than one, all of which step aside
+   because they open windows:
    - **1Password**, shown when its desktop entry exists:
      `com.onepassword.OnePassword` since 1Password 8.12.42, `1password`
      before (`WelcomeHelpers.isPassword`). `Welcome.openPassword()` runs that
@@ -395,7 +397,8 @@ and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
      `com.onepassword.OnePassword`; either counts, in any case. The
      `closewindow` event for that address resumes the guide, and Resume
      closes the windows it recorded. All three apply only while the guide
-     stands aside for 1Password (`Welcome.passwordAside`): once it is back, or
+     stands aside for 1Password or Chrome (`Welcome.appAside`, the first
+     window `Welcome.appWindow`): once it is back, or
      stands aside for a sign-in, a 1Password window closing (the one left
      open, or one 1Password raises for the browser) leaves it where it is,
      so it never comes back over a sign-in page. Whether 1Password is signed in comes
@@ -409,6 +412,27 @@ and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
      without that table, leaves the card without one.
      `connect.password` is `available`, `opened` (this session) or `ready`
      (signed in).
+   - **Google account**, shown when Google Chrome's desktop entry
+     `google-chrome` exists (`WelcomeHelpers.isChrome`, which also matches
+     its windows' class, `google-chrome` on Wayland and `Google-chrome` under
+     XWayland). `Welcome.openGoogle()` runs that entry through
+     `Pointer.launch(entry, ["--new-window", "chrome://settings/people"])`
+     and steps aside (`connectAside` `google`); its windows then behave as
+     1Password's do: the first one's `closewindow` resumes the guide and
+     Resume closes them. Chrome's own sign-in settings rather than a Google
+     web page, because signing in to Chrome is what turns on sync and the
+     page offers it in every profile state; a new window, so there is one
+     to come back from even when Chrome is already running. Whether Chrome
+     is signed in comes from its `$XDG_CONFIG_HOME/google-chrome/Local State`
+     (a `FileView`, read again rather than watched, since Chrome replaces the
+     file): `WelcomeHelpers.chromeAccount` takes the first profile in
+     `profile.info_cache`, `profile.last_used` first, with a non-empty
+     `gaia_id` or `user_name`, and the card shows that address. A missing,
+     partial or unreadable file is signed out. The guide reads it again when
+     it opens or resumes, when Connect is shown, and every 4 s while Connect
+     shows after Chrome was opened (Chrome saves the file some seconds after
+     a change). `connect.google` is `unavailable`, `available`, `opened`
+     (this session) or `ready` (signed in).
    - **The AI assistant** (recommended), shown when the assistant feature is
      on. One button per installed agent runs `Welcome.signIn(id)`, which
      calls `Assistant.signIn` (the agent's own login in a terminal) and steps
@@ -419,9 +443,10 @@ and Back follow that route (`WelcomeHelpers.neighbour`), and a saved
    - Without a network, a notice links to Settings → Network.
    - **Closing what Connect opened.** While the guide stands aside for one
      of these (`Welcome.connectAside`), it records the windows that open for
-     it (`WelcomeHelpers.connectWindow`): during a sign-in every new window
-     (its terminal, the browser the agent opens, 1Password asked to unlock),
-     during 1Password only 1Password's. A `closewindow` event drops a
+     it (`WelcomeHelpers.connectWindow`, `{address, action}`): during a
+     sign-in every new window (its terminal, the browser the agent opens,
+     1Password asked to unlock), during 1Password only 1Password's, during
+     Google only Chrome's. A `closewindow` event drops a
      record. `finish()`, and `dismiss()` while the guide shows, close the
      recorded windows that still exist, except a sign-in's while it is
      still waiting; `dismiss()` from the pill keeps them all. `WelcomeWindow` sends `hl.dsp.window.close` per address, as

@@ -5,7 +5,9 @@ Packages Nixpkgs maintains update with each machine's Nixpkgs. The ones below
 are pinned in this repository, so they only move when it does:
 
   auto    the vendor-updates workflow updates the pin, verifies and releases
-          it to beta (Brave Origin: its stable releases carry security fixes).
+          it to beta: Brave Origin (its stable releases carry security fixes)
+          and the agent CLIs Codex and Claude Code (the vendors' own builds,
+          so an update never waits for NixOS's build farm).
   report  shown in the workflow's report when upstream is ahead, for a person
           to review; updating them needs more than a checksum (T3 Code's bar
           API, for example).
@@ -14,15 +16,19 @@ The XPS IPU7 camera recipe is deliberately absent: its fail-closed ABI guard
 moves only with a reviewed kernel/camera stack, never automatically.
 
   scripts/vendor-pins status [--json | --markdown]
-  scripts/vendor-pins update NAME     rewrite an auto pin to upstream's latest
-                                      release; prints the change as JSON
+  scripts/vendor-pins update NAME...  rewrite auto pins to upstream's latest
+                                      release once every one of them checks
+                                      out; prints the changes as a JSON list
+                                      (release/automatic's input)
 """
 import base64
 import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -41,14 +47,54 @@ def github(path):
         return json.load(response)
 
 
-def fetch_text(url):
+def fetch(url, limit=1 << 20):
+    """A small download (a checksum list, manifest, signature or key)."""
     request = urllib.request.Request(url, headers={'User-Agent': 'cybexos-vendor-pins'})
     with urllib.request.urlopen(request, timeout=60) as response:
-        return response.read(65536).decode()
+        data = response.read(limit + 1)
+    if len(data) > limit:
+        raise SystemExit(f'vendor-pins: {url} is larger than expected')
+    return data
+
+
+def fetch_text(url):
+    return fetch(url).decode()
 
 
 def version_key(version):
     return tuple(int(part) for part in re.findall(r'\d+', version))
+
+
+def sri(digest):
+    """A hex SHA-256 digest as the SRI hash Nix's fetchurl checks."""
+    if not re.fullmatch('[0-9a-f]{64}', digest or ''):
+        raise SystemExit(f'vendor-pins: not a SHA-256 digest: {digest!r}')
+    return 'sha256-' + base64.b64encode(bytes.fromhex(digest)).decode()
+
+
+def signed(data, signature, key, fingerprint):
+    """Whether `signature` is a good detached OpenPGP signature of `data` by the
+    key `fingerprint` (its primary key), checked with gpg against `key` only."""
+    with tempfile.TemporaryDirectory(prefix='vendor-pins-gpg.') as home:
+        files = {name: Path(home, name) for name in ('data', 'data.sig', 'key.gpg')}
+        files['data'].write_bytes(data)
+        files['data.sig'].write_bytes(signature)
+        # No agent or keybox daemon: a throwaway home holding only this key.
+        gpg = ['gpg', '--homedir', home, '--batch', '--no-tty', '--no-autostart']
+        try:
+            dearmored = subprocess.run(gpg + ['--dearmor'], input=key, capture_output=True)
+            files['key.gpg'].write_bytes(dearmored.stdout)
+            verified = subprocess.run(gpg + ['--no-default-keyring', '--keyring', str(files['key.gpg']),
+                                             '--trust-model', 'always', '--status-fd', '1',
+                                             '--verify', str(files['data.sig']), str(files['data'])],
+                                      capture_output=True, text=True)
+        except FileNotFoundError:
+            raise SystemExit('vendor-pins: gpg is needed to check a signed release manifest') from None
+    if dearmored.returncode or verified.returncode:
+        return False
+    # VALIDSIG <signing key> ... <primary key fingerprint>
+    return any(fields[:2] == ['[GNUPG:]', 'VALIDSIG'] and fields[-1] == fingerprint
+               for fields in (line.split() for line in verified.stdout.splitlines()))
 
 
 def nix_version(path):
@@ -59,16 +105,20 @@ def nix_version(path):
     return found[0]
 
 
-class Brave:
-    name = 'brave-origin'
-    title = 'Brave Origin'
+class ReleaseJson:
+    """An auto pin recorded in a release.json beside its Nix recipe."""
     mode = 'auto'
-    file = 'nix/packages/brave/release.json'
-    # What the workflow must pass before it releases an update.
-    checks = ['packages.x86_64-linux.brave-origin', 'checks.x86_64-linux.browser-1password']
 
     def pinned(self):
         return json.loads((ROOT / self.file).read_text())['version']
+
+
+class Brave(ReleaseJson):
+    name = 'brave-origin'
+    title = 'Brave Origin'
+    file = 'nix/packages/brave/release.json'
+    # What the workflow must pass before it releases an update.
+    checks = ['packages.x86_64-linux.brave-origin', 'checks.x86_64-linux.browser-1password']
 
     def latest(self):
         """Newest stable release ("Release vX.Y.Z", not nightly or beta)."""
@@ -100,12 +150,108 @@ class Brave:
         url = f'https://github.com/brave/brave-browser/releases/download/v{version}/{asset_name}'
         if asset.get('browser_download_url') != url:
             raise SystemExit(f'vendor-pins: unexpected download location for {asset_name}')
-        record = {'version': version, 'chromium': latest['chromium'], 'url': url,
-                  'hash': 'sha256-' + base64.b64encode(bytes.fromhex(digest)).decode()}
-        (ROOT / self.file).write_text(json.dumps(record, indent=2) + '\n')
+        record = {'version': version, 'chromium': latest['chromium'], 'url': url, 'hash': sri(digest)}
         chromium = f" (Chromium {latest['chromium']})" if latest['chromium'] else ''
-        return {'notes': f"Brave Origin moves to {version}{chromium}, Brave's current stable release, "
+        return {'record': record,
+                'notes': f"Brave Origin moves to {version}{chromium}, Brave's current stable release, "
                          'with the security fixes it carries.'}
+
+
+class Codex(ReleaseJson):
+    name = 'codex'
+    title = 'Codex'
+    file = 'nix/packages/codex/release.json'
+    checks = ['packages.x86_64-linux.codex', 'checks.x86_64-linux.agent-clis']
+    # The package layout OpenAI's installer (chatgpt.com/codex/install.sh)
+    # installs on x86_64 Linux, and the checksum list it verifies it with.
+    asset = 'codex-package-x86_64-unknown-linux-musl.tar.gz'
+    sums = 'codex-package_SHA256SUMS'
+
+    def latest(self):
+        """Newest stable release (rust-vX.Y.Z), not the alphas in between.
+        Each release lists a few hundred assets, so GitHub serves the list in
+        small pages; the newest stable is usually on the first."""
+        releases = []
+        for page in range(1, 11):
+            listed = github(f'/repos/openai/codex/releases?per_page=20&page={page}')
+            releases += [r for r in listed if not r.get('prerelease') and not r.get('draft')
+                         and re.fullmatch(r'rust-v\d+\.\d+\.\d+', r.get('tag_name') or '')]
+            if releases or len(listed) < 20:
+                break
+        if not releases:
+            raise SystemExit('vendor-pins: no Codex stable release among the newest 200')
+        newest = max(releases, key=lambda r: version_key(r['tag_name']))
+        return {'version': newest['tag_name'].removeprefix('rust-v'), 'release': newest}
+
+    def update(self, latest):
+        version, release = latest['version'], latest['release']
+        assets = {asset['name']: asset for asset in release.get('assets', [])}
+        if self.asset not in assets or self.sums not in assets:
+            raise SystemExit(f'vendor-pins: Codex {version} has no {self.asset} with a checksum')
+        asset = assets[self.asset]
+        # GitHub's digest, computed at upload, and the list OpenAI publishes.
+        digest = (asset.get('digest') or '').removeprefix('sha256:')
+        published = {}
+        for line in fetch_text(assets[self.sums]['browser_download_url']).splitlines():
+            fields = line.split()
+            if len(fields) == 2:
+                published[fields[1].lstrip('*')] = fields[0].lower()
+        if not re.fullmatch('[0-9a-f]{64}', digest) or published.get(self.asset) != digest:
+            raise SystemExit(f'vendor-pins: {self.asset} checksums disagree or are missing')
+        url = f'https://github.com/openai/codex/releases/download/rust-v{version}/{self.asset}'
+        if asset.get('browser_download_url') != url:
+            raise SystemExit(f'vendor-pins: unexpected download location for {self.asset}')
+        return {'record': {'version': version, 'url': url, 'hash': sri(digest)},
+                'notes': f"Codex, the coding agent in the terminal and in Wiz, moves to {version}, "
+                         "OpenAI's current stable release."}
+
+
+class ClaudeCode(ReleaseJson):
+    name = 'claude-code'
+    title = 'Claude Code'
+    file = 'nix/packages/claude-code/release.json'
+    checks = ['packages.x86_64-linux.claude-code', 'checks.x86_64-linux.agent-clis']
+    # Where Claude Code's installer (claude.ai/install.sh) downloads from.
+    base = 'https://downloads.claude.ai/claude-code-releases'
+    platform = 'linux-x64'
+    # Anthropic's Claude Code release signing key, and its fingerprint as
+    # Claude Code's setup documentation publishes it (binary integrity).
+    key = 'https://downloads.claude.ai/keys/claude-code.asc'
+    fingerprint = '31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE'
+
+    def latest(self):
+        """The `latest` channel: each release as soon as Anthropic ships it."""
+        version = fetch_text(f'{self.base}/latest').strip()
+        if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+            raise SystemExit(f'vendor-pins: unexpected Claude Code version {version[:40]!r}')
+        manifest = json.loads(fetch(f'{self.base}/{version}/manifest.json'))
+        return {'version': version, 'release': {'published_at': manifest.get('buildDate') or ''}}
+
+    def manifest(self, version, name, key):
+        """This platform's entry in a release manifest Anthropic has signed."""
+        data = fetch(f'{self.base}/{version}/{name}')
+        if not signed(data, fetch(f'{self.base}/{version}/{name}.sig'), key, self.fingerprint):
+            raise SystemExit(f"vendor-pins: Claude Code {version} {name} is not signed by Anthropic's release key")
+        manifest = json.loads(data)
+        entry = (manifest.get('platforms') or {}).get(self.platform) or {}
+        if manifest.get('version') != version or not re.fullmatch('[0-9a-f]{64}', entry.get('checksum') or ''):
+            raise SystemExit(f'vendor-pins: Claude Code {version} {name} has no {self.platform} checksum')
+        return entry
+
+    def update(self, latest):
+        version = latest['version']
+        key = fetch(self.key)
+        # manifest.json covers the executable, manifest.zst.json the smaller
+        # compressed download; the package build checks the first after unpacking.
+        binary = self.manifest(version, 'manifest.json', key)
+        packed = self.manifest(version, 'manifest.zst.json', key)
+        if binary.get('binary') != 'claude' or packed.get('binary') != 'claude.zst':
+            raise SystemExit(f'vendor-pins: unexpected Claude Code {version} file names')
+        url = f'{self.base}/{version}/{self.platform}/claude.zst'
+        return {'record': {'version': version, 'url': url, 'hash': sri(packed['checksum']),
+                           'binarySha256': binary['checksum']},
+                'notes': f"Claude Code, the coding agent in the terminal and in Wiz, moves to {version}, "
+                         "Anthropic's newest release."}
 
 
 class GitHubRelease:
@@ -126,6 +272,8 @@ class GitHubRelease:
 
 PINS = [
     Brave(),
+    Codex(),
+    ClaudeCode(),
     GitHubRelease('t3-code', 'T3 Code', 'pingdotgg/t3code', 'nix/packages/t3-code.nix',
                   'review its connected-widget bar API with the release'),
     GitHubRelease('intel-lpmd', 'Intel LPMd', 'intel/intel-lpmd', 'nix/packages/intel-lpmd.nix',
@@ -173,6 +321,28 @@ def markdown(rows):
     return text
 
 
+def update(names):
+    """Check every named pin's newest release, then rewrite all of them, or none."""
+    pins = []
+    for name in dict.fromkeys(names):
+        pin = next((pin for pin in PINS if pin.name == name), None)
+        if pin is None or pin.mode != 'auto':
+            raise SystemExit(f'vendor-pins: {name} is not an automatically updated pin')
+        pins.append(pin)
+    planned = []
+    for pin in pins:
+        before, latest = pin.pinned(), pin.latest()
+        if version_key(latest['version']) <= version_key(before):
+            raise SystemExit(f'vendor-pins: {pin.title} {before} is already current')
+        planned.append((pin, before, latest, pin.update(latest)))
+    changes = []
+    for pin, before, latest, change in planned:
+        (ROOT / pin.file).write_text(json.dumps(change['record'], indent=2) + '\n')
+        changes.append({'name': pin.name, 'title': pin.title, 'from': before, 'to': latest['version'],
+                        'file': pin.file, 'checks': pin.checks, 'notes': change['notes']})
+    return changes
+
+
 def main(argv):
     if len(argv) >= 1 and argv[0] == 'status':
         rows = status()
@@ -188,16 +358,8 @@ def main(argv):
         else:
             raise SystemExit(__doc__)
         return 0
-    if len(argv) == 2 and argv[0] == 'update':
-        pin = next((pin for pin in PINS if pin.name == argv[1]), None)
-        if pin is None or pin.mode != 'auto':
-            raise SystemExit(f'vendor-pins: {argv[1]} is not an automatically updated pin')
-        before, latest = pin.pinned(), pin.latest()
-        if version_key(latest['version']) <= version_key(before):
-            raise SystemExit(f'vendor-pins: {pin.title} {before} is already current')
-        change = pin.update(latest)
-        json.dump({'name': pin.name, 'title': pin.title, 'from': before, 'to': latest['version'],
-                   'file': pin.file, 'checks': pin.checks} | change, sys.stdout, indent=2)
+    if len(argv) >= 2 and argv[0] == 'update':
+        json.dump(update(argv[1:]), sys.stdout, indent=2)
         print()
         return 0
     raise SystemExit(__doc__)
