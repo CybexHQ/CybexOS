@@ -15,7 +15,7 @@ from .common import CommandFailure, Failure, Runner, atomic, link, locked, parse
 from . import inputs
 from .trust import REPO, AheadOfChannel, Fetcher, NoPublishedRelease, discover, validate_source, version
 from . import channel as channels
-from . import compatibility, review, firmware, prebuilt
+from . import compatibility, review, firmware, prebuilt, verified
 from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
@@ -280,6 +280,10 @@ class Engine:
     def selected_channel(self):
         return channels.selected(self.channel_state, self.policy)['selected']
 
+    def verified_nixpkgs(self):
+        """The Nixpkgs revisions Cybex OS has verified, newest first (verified.py)."""
+        return verified.entries(Fetcher(self.state / 'cache'), 'nixos-unstable')
+
     def channel(self):
         installed, selected = read(self.release), self.selected_channel()
         candidate = discover(Fetcher(self.state / 'cache'), selected, installed['version'])
@@ -369,10 +373,20 @@ class Engine:
             except (Failure, KeyError, TypeError, ValueError):
                 problem = 'Nix returned malformed package-source metadata. Check Nix configuration.'
             else:
-                installed = inputs.identity(old, 'nixpkgs')['rev']
-                result['upstream'] = {'state': 'available' if revision != installed else 'current',
-                                      'installed': installed, 'available': revision,
-                                      'detail': 'Stage upstream to build and review actual package changes.'}
+                installed = inputs.identity(old, 'nixpkgs')
+                try:
+                    entry = verified.newest(self.verified_nixpkgs(), read(self.release)['version'], installed)
+                except Failure:
+                    problem = ("Cybex OS's list of verified NixOS packages is unavailable. "
+                               'Retry when connected; no account or token is required.')
+                else:
+                    # Only a revision Cybex OS has verified for this release
+                    # is offered; a newer channel head waits for that check.
+                    result['upstream'] = {'state': 'available' if entry else 'current',
+                                          'installed': installed['rev'],
+                                          'available': entry['rev'] if entry else installed['rev'],
+                                          'channel': revision, 'verifying': not entry and revision != installed['rev'],
+                                          'detail': 'Stage upstream to build and review actual package changes.'}
         if problem:
             result['upstream'] = {'state': 'unreachable', 'error':
                 'Nixpkgs (nixos-unstable) package-source status is unknown. ' + problem +
@@ -489,7 +503,15 @@ class Engine:
                 old = read(config / 'flake.lock')
                 inputs.validate_machine(old)
                 if scope in ('upstream', 'both'):
-                    self.nix('flake', 'update', 'nixpkgs', '--flake', f'path:{config}', step='inputs')
+                    # The newest Nixpkgs verified for the release this computer
+                    # will run (verified.py), never the channel head as it is;
+                    # with nothing newer verified, its Nixpkgs stays.
+                    target = candidate['version'] if candidate else read(self.release)['version']
+                    entry = verified.newest(self.verified_nixpkgs(), target, inputs.identity(old, 'nixpkgs'))
+                    if entry:
+                        lock = read(config / 'flake.lock')
+                        lock['nodes'][inputs.root_inputs(lock)['nixpkgs']]['locked'] = verified.locked(entry)
+                        atomic(config / 'flake.lock', lock)
                 if candidate:
                     flake = config / 'flake.nix'
                     # A machine installed from its medium's bundled source names

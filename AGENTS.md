@@ -88,8 +88,9 @@ for it. An ISO follows the ISO rules below.
   `Update … to …` and `Prepare Cybex OS X.Y.Z release` commits to `main` as
   github-actions[bot], so fetch before branching and before choosing a version.
   Don't widen what it updates or publishes without the owner.
-- An open `nixpkgs-canary` issue means machines' next Nixpkgs update will fail
-  to evaluate: fix it on `main` and release it before the channel moves on.
+- An open `nixpkgs-canary` issue means a release no longer verifies against
+  the channel (its machines keep the Nixpkgs they have) or `main` would break:
+  fix it on `main` and release it.
 
 ## NixOS installation and lifecycle contract
 
@@ -132,7 +133,11 @@ for it. An ISO follows the ISO rules below.
   enrollment and external-module trust are implemented and physically tested.
   A hardware profile does not solve these requirements. Never disable firmware
   verification to make installation or qualification pass.
-- Nixpkgs is selected independently of Cybex OS. Its packages come prebuilt
+- Nixpkgs updates don't wait for a Cybex OS release, but a machine moves its
+  Nixpkgs only to a channel revision the Nixpkgs canary has verified for the
+  release it runs (`lifecycle/cybexos/verified.py`, the `nixpkgs-verified`
+  branch; owner decision 2026-11-10), never to the channel head as it is.
+  Its packages come prebuilt
   from cache.nixos.org, guarded by the updater's prebuilt check
   (`lifecycle/cybexos/prebuilt.py`, `nix/modules/prebuilt.nix`). Only Cybex
   OS's own packages, unfree vendor downloads, kernel modules and machine

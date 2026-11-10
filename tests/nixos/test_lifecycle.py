@@ -55,6 +55,11 @@ def release():
     return {'version': '1.1.0', 'revision': REV_NEW, 'notes': 'A qualified release'}
 
 
+def verified():
+    """Nixpkgs REV_NEW, verified for the installed release and the next one."""
+    return [{'rev': REV_NEW, 'narHash': NAR_NEW, 'lastModified': 1793110635, 'releases': ['1.0.0', '1.1.0']}]
+
+
 def listing(*entries):
     """A GitHub release listing: (tag, prerelease, draft) entries, newest first."""
     return json.dumps([{'tag_name': tag, 'prerelease': prerelease, 'draft': draft, 'body': 'Notes for ' + tag}
@@ -319,6 +324,7 @@ class TrustTests(unittest.TestCase):
                     atomic(release_file, {'version': '1.0.0', 'architecture': 'x86_64-linux', 'nixos': 'unstable'})
                     policy = self.base / 'policy.json'; atomic(policy, {'channel': 'stable'})
                     engine = Engine(self.base / 'state', working, FakeRunner(), release_file, policy)
+                    engine.verified_nixpkgs = verified
                     result = engine.check()
                 self.assertEqual(result['upstream']['state'], 'available')
                 self.assertEqual(result['cybexos']['state'], 'unavailable')
@@ -465,6 +471,7 @@ class EngineTests(unittest.TestCase):
         self.engine=Engine(base/'state',self.working,self.runner,self.release,self.policy,self.system,self.booted)
         copy_config(self.config,base/'deployed');(self.engine.state/'deployed').symlink_to(base/'deployed')
         self.engine.channel=lambda:release()
+        self.engine.verified_nixpkgs=verified
         self.sentinel=config_digest(self.config)
         self.personal=base/'personal-data';self.personal.write_text('VPN key, widgets, preferences, plugin data and service database sentinel')
 
@@ -1204,12 +1211,58 @@ class EngineTests(unittest.TestCase):
     def test_check_valid_revisions_preserve_public_fields(self):
         for revision, state in ((REV_OLD, 'current'), (REV_NEW, 'available')):
             with self.subTest(state=state), patch.object(self.engine, 'run', return_value=json.dumps({'locked': {'rev': revision}})):
+                self.engine.verified_nixpkgs = verified if state == 'available' else list
                 result = self.engine.check()
                 self.assertEqual(result['upstream'], {
-                    'state': state, 'installed': REV_OLD, 'available': revision,
+                    'state': state, 'installed': REV_OLD, 'available': revision, 'channel': revision, 'verifying': False,
                     'detail': 'Stage upstream to build and review actual package changes.',
                 })
                 self.assertEqual(result['cybexos']['state'], 'available')
+
+    def test_only_a_newer_revision_verified_for_this_release_is_offered(self):
+        head = '3' * 40
+        newer = {'rev': head, 'narHash': NAR_NEW, 'lastModified': 1793200000, 'releases': ['1.0.0']}
+        with patch.object(self.engine, 'run', return_value=json.dumps({'locked': {'rev': head}})):
+            for found, offered in (([], None), (verified(), REV_NEW), ([newer] + verified(), head),
+                                   ([dict(newer, releases=['1.1.0'])], None)):
+                with self.subTest(found=found):
+                    self.engine.verified_nixpkgs = lambda: found
+                    upstream = self.engine.check()['upstream']
+                    self.assertEqual((upstream['state'], upstream['available'], upstream['channel'], upstream['verifying']),
+                                     ('available', offered, head, False) if offered else ('current', REV_OLD, head, True))
+        # Never backwards: the installed revision is newer than the verified one.
+        installed = lock(); installed['nodes']['nixpkgs']['locked']['lastModified'] = 1793200000
+        atomic(self.config / 'flake.lock', installed)
+        self.engine.verified_nixpkgs = verified
+        with patch.object(self.engine, 'run', return_value=json.dumps({'locked': {'rev': head}})):
+            self.assertEqual(self.engine.check()['upstream']['state'], 'current')
+
+    def test_an_unreadable_verification_record_offers_nothing(self):
+        def unreadable():
+            raise Failure('The verified Nixpkgs record is invalid.')
+        self.engine.verified_nixpkgs = unreadable
+        with patch.object(self.engine, 'run', return_value=json.dumps({'locked': {'rev': REV_NEW}})):
+            upstream = self.engine.check()['upstream']
+        self.assertEqual(upstream['state'], 'unreachable')
+        self.assertIn('verified NixOS packages is unavailable', upstream['error'])
+        with self.assertRaisesRegex(Failure, 'invalid'):
+            self.engine.stage('upstream')
+        self.assertEqual(read(self.config / 'flake.lock'), lock())
+
+    def test_staging_locks_the_verified_revision_and_content(self):
+        self.engine.stage('upstream')
+        staged = read(self.engine.status_path)['inputs']['nixpkgs']
+        self.assertEqual(staged, {'type': 'github', 'owner': 'NixOS', 'repo': 'nixpkgs', 'rev': REV_NEW,
+                                  'narHash': NAR_NEW, 'lastModified': 1793110635})
+        self.assertFalse(any(call[:4] == ('nix', 'flake', 'update', 'nixpkgs') for call in self.runner.calls))
+        # Nothing newer verified for this release: its Nixpkgs stays.
+        self.engine.verified_nixpkgs = list
+        self.engine.stage('upstream')
+        self.assertEqual(read(self.engine.status_path)['inputs']['nixpkgs']['rev'], REV_OLD)
+        # A combined update takes the release alone then.
+        self.engine.stage('both')
+        status = read(self.engine.status_path)
+        self.assertEqual((status['inputs']['nixpkgs']['rev'], status['inputs']['cybexos']['rev']), (REV_OLD, REV_NEW))
 
     def test_check_reports_both_source_failures_independently(self):
         with patch.object(self.engine, 'run', side_effect=Failure('lookup failed')):

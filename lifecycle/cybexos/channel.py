@@ -6,7 +6,8 @@ choose the other one at runtime; that choice lives beside the other update
 policies in /var/lib/cybexos, so switching needs no rebuild and a generation
 rollback does not silently switch back. Choosing the declared channel removes
 the override again. Only Cybex OS releases follow the channel: NixOS package
-updates are selected independently.
+updates follow the Nixpkgs revisions verified for the installed release
+(verified.py).
 """
 from pathlib import Path
 

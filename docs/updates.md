@@ -30,6 +30,30 @@ no compatibility overlay. Other upstream inputs continue to advance independentl
 `cybex update check` checks upstream and Cybex OS independently. An unreachable
 source is unknown/unavailable, never reported current. Nixpkgs checks identify
 available revisions; preview builds expose the actual package closure changes.
+
+### Verified Nixpkgs
+
+A machine doesn't take the newest nixos-unstable revision as it is. NixOS moves
+the channel on while packages it couldn't build are still missing (codex and
+tectonic on 2026-11-10), and each machine would be the first to try that
+Nixpkgs with its own Cybex OS release. The Nixpkgs canary checks every
+published beta and stable release against the channel twice a day and when a
+release is published ([releasing](releasing.md#nixpkgs-canary)). A revision
+where the release evaluates, needs nothing NixOS hasn't built (with or
+without NVIDIA) and builds every expected local build is recorded as verified
+for it, in `nixpkgs/verified.json` on the repository's `nixpkgs-verified`
+branch.
+
+Discovery reads that record through the same GitHub API as releases
+(`lifecycle/cybexos/verified.py`) and offers the newest revision verified for
+the installed release; preparing a combined update uses the newest one
+verified for the release it brings. The lock pins that revision and its NAR
+hash, which Nix checks when it fetches it. Nixpkgs never moves backwards, and
+a newer channel revision that isn't verified yet reads as up to date
+(`upstream.verifying` in `cybex update check`). With nothing newer verified,
+preparing keeps the machine's Nixpkgs. If the record can't be read, Nixpkgs
+is reported unreachable and nothing moves. Updaters before 1.0.33 still
+follow the channel head; their guard and fallback cover them.
 The menubar shows one icon only when a source has confirmed an available
 update. There are no source counts, zero badges or success/error icons.
 

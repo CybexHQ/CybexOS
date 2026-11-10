@@ -4,10 +4,11 @@ The machine flake, its lock and a "release" are tiny stand-ins: the release's
 system is a Nixpkgs `runCommand` that, with the new Nixpkgs revision, also
 needs a package whose builder fails (as tectonic did on 2026-11-10). Its
 Nixpkgs is this repository's locked Nixpkgs, under its real revision for the
-installed system and under another revision for the new one: the same
-source, already in the store, so Nix resolves both offline. Only release
-discovery, input updates and device firmware are stand-ins; evaluation, the
-prebuilt check, the build, its failure and the fallback are the real ones.
+installed system and under another, "verified" revision for the new one: the
+same source, already in the store, so Nix resolves both offline. Only release
+discovery, the verified record, the release's input update and device
+firmware are stand-ins; evaluation, the prebuilt check, the build, its
+failure and the fallback are the real ones.
 
 Skipped where Nix can't build (the Nix build sandbox of checks.lifecycle).
 """
@@ -80,21 +81,18 @@ def usable():
 
 
 class Inputs(Runner):
-    """The real Runner, except input updates: they would ask GitHub."""
-    def __init__(self, nixpkgs, release, revision):
+    """The real Runner, except the release's input update: it would ask GitHub."""
+    def __init__(self, release, revision):
         super().__init__()
-        self.nixpkgs, self.release, self.revision, self.builds = nixpkgs, release, revision, 0
+        self.release, self.revision, self.builds = release, revision, 0
 
     def __call__(self, *args, **kwargs):
         args = tuple(map(str, args))
-        if args[:3] == ('nix', 'flake', 'update'):
+        if args[:4] == ('nix', 'flake', 'update', 'cybexos'):
             config = Path(args[args.index('--flake') + 1].removeprefix('path:'))
             lock = read(config / 'flake.lock')
-            if args[3] == 'nixpkgs':
-                lock['nodes']['nixpkgs']['locked'] = self.nixpkgs
-            else:
-                lock['nodes']['cybexos']['locked'] |= {'rev': self.revision, 'narHash': self.release}
-                lock['nodes']['cybexos']['original']['rev'] = self.revision
+            lock['nodes']['cybexos']['locked'] |= {'rev': self.revision, 'narHash': self.release}
+            lock['nodes']['cybexos']['original']['rev'] = self.revision
             atomic(config / 'flake.lock', lock)
             return ''
         if args[:2] == ('nix', 'build') and '--dry-run' not in args:
@@ -142,7 +140,7 @@ class FallbackWithNix(unittest.TestCase):
         (base / 'current-system').symlink_to(built.stdout.strip())
         atomic(base / 'release.json', {'version': '1.0.0', 'architecture': 'x86_64-linux', 'nixos': 'unstable'})
         atomic(base / 'update.json', {'channel': 'beta'})
-        self.runner = Inputs(nixpkgs['locked'] | {'rev': new}, release, self.released)
+        self.runner = Inputs(release, self.released)
         self.engine = Engine(base / 'state', config, self.runner, base / 'release.json', base / 'update.json',
                              base / 'current-system', base / 'current-system')
         copy_config(config, base / 'deployed')
@@ -150,6 +148,10 @@ class FallbackWithNix(unittest.TestCase):
         candidate = lifecycle.release() | {'revision': self.released, 'channel': 'beta'}
         self.engine.channel = lambda: candidate
         self.engine.release_source = lambda found: found | {'narHash': release}
+        # The new Nixpkgs, as Cybex OS's canary would have verified it.
+        self.engine.verified_nixpkgs = lambda: [{'rev': new, 'narHash': nixpkgs['locked']['narHash'],
+                                                 'lastModified': nixpkgs['locked']['lastModified'] + 1,
+                                                 'releases': ['1.0.0', '1.1.0']}]
 
     def test_the_release_comes_alone_and_the_packages_wait_without_building_again(self):
         cli.stage_update(self.engine, 'both', 'a' * 32)
