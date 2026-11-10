@@ -10,6 +10,7 @@ from unittest.mock import patch
 import test_lifecycle as lifecycle
 from cybexos import cli, review
 from cybexos.common import Failure, atomic, read
+from cybexos.engine import IncompatibleNixpkgs, NotPrebuilt
 
 
 class UpdateRequests(unittest.TestCase):
@@ -57,6 +58,59 @@ class UpdateRequests(unittest.TestCase):
             result = self.engine.check()
         self.assertEqual(result['installedIdentity'], hashlib.sha256(body).hexdigest())
         self.assertNotEqual(result['installedIdentity'], self.status()['installedIdentity'])
+
+    def run_stage(self, scope, prebuilt):
+        """Run one queued stage request with the prebuilt guard's answers in order."""
+        identifier = self.enqueue('stage', [scope])['requestId']
+        with patch.object(self.engine, 'require_prebuilt', side_effect=prebuilt) as guard:
+            try:
+                cli.run_update(self.engine, identifier)
+            except Failure:
+                pass
+        return self.status(), guard
+
+    def test_a_release_is_not_held_back_by_nixos_packages(self):
+        # NixOS has not built codex for the new packages: the release is
+        # prepared alone on the current ones, and the request succeeds.
+        result, guard = self.run_stage('both', [NotPrebuilt(['codex-0.167.0']), None])
+        self.assertEqual(guard.call_count, 2)
+        self.assertEqual((result['state'], result['scope'], result['availableVersion']), ('ready', 'cybexos', '1.1.0'))
+        self.assertEqual(result['request']['state'], 'done')
+        self.assertEqual(result['inputs']['nixpkgs'], lifecycle.inputs.identity(lifecycle.lock(), 'nixpkgs'))
+
+    def test_a_release_is_not_held_back_by_packages_awaiting_a_newer_release(self):
+        held = IncompatibleNixpkgs({'origin': 'cybexos', 'file': 'nix/modules/applications.nix',
+                                    'message': "attribute 'brave' missing"}, '1.1.0')
+        result, guard = self.run_stage('both', [held, None])
+        self.assertEqual((guard.call_count, result['state'], result['scope']), (2, 'ready', 'cybexos'))
+
+    def test_only_a_held_combined_update_with_a_newer_release_is_prepared_alone(self):
+        waiting = lambda: NotPrebuilt(['codex-0.167.0'])
+        # NixOS packages alone have no release to fall back to.
+        result, guard = self.run_stage('upstream', [waiting()])
+        self.assertEqual((guard.call_count, result['state'], result['notPrebuilt']), (1, 'failed', ['codex-0.167.0']))
+        self.assertEqual(result['request']['state'], 'failed')
+        # A kernel build is refused, never worked around.
+        result, guard = self.run_stage('both', [NotPrebuilt(['linux-6.18'], kernel=True)])
+        self.assertEqual((guard.call_count, result['state']), (1, 'failed'))
+        # A personal module that needs changing is the person's to fix.
+        personal = IncompatibleNixpkgs({'origin': 'personal', 'file': 'local/personal.nix', 'message': 'gone'}, '1.1.0')
+        result, guard = self.run_stage('both', [personal])
+        self.assertEqual((guard.call_count, result['state']), (1, 'failed'))
+        # A newer release is required: none, or an unreadable listing, is no reason.
+        self.assertTrue(cli.release_alone(self.engine, 'both', waiting()))
+        self.engine.channel = lambda: lifecycle.release() | {'version': '1.0.0'}
+        self.assertFalse(cli.release_alone(self.engine, 'both', waiting()))
+        self.engine.channel = lambda: (_ for _ in ()).throw(Failure('Release listing unavailable'))
+        self.assertFalse(cli.release_alone(self.engine, 'both', waiting()))
+
+    def test_a_prepared_release_is_not_prepared_again_for_held_packages(self):
+        result, _ = self.run_stage('cybexos', [None])
+        prepared = (result['transaction'], result['availableVersion'])
+        result, guard = self.run_stage('both', [NotPrebuilt(['codex-0.167.0'])])
+        self.assertEqual(guard.call_count, 1)
+        self.assertEqual((result['state'], result['transaction'], result['availableVersion']), ('ready', *prepared))
+        self.assertEqual(result['replacement']['notPrebuilt'], ['codex-0.167.0'])
 
     def test_preflight_rejection_survives_repeated_status_reads(self):
         self.engine.status(state='awaiting-boot', transaction='a' * 32, phase='Waiting for reboot')

@@ -30,6 +30,7 @@ class NotPrebuilt(Failure):
     """A candidate would compile Nixpkgs packages NixOS has not built yet."""
     def __init__(self, names, *, kernel=False):
         self.names = list(names)
+        self.kernel = kernel
         shown = ', '.join(self.names[:5]) + (f' and {len(self.names) - 5} more' if len(self.names) > 5 else '')
         if kernel:
             super().__init__(f'The candidate would compile a Linux kernel ({shown}). '
