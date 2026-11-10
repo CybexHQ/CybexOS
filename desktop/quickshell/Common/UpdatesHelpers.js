@@ -106,6 +106,16 @@ function held(deployment) {
     return waitingPackages(deployment).length > 0 || incompatible(deployment) !== null;
 }
 
+// Newer NixOS packages NixOS hasn't built yet, with nothing else to install.
+// There is nothing for the person to do, so the system reads as up to date
+// and the packages follow once NixOS has them; the worker retries daily. A
+// newer Cybex OS release, firmware or newer packages still show as updates
+// (lifecycle/cybexos/cli.py prepares a held release on its own).
+function quietHold(deployment, sources, holdTarget) {
+    return waitingPackages(deployment).length > 0 && incompatible(deployment) === null
+        && holdTarget !== "changed" && (((sources || {}).cybexos || {}).state !== "available");
+}
+
 // Same rules as lifecycle/cybexos/prebuilt.py: unknown identities never hide
 // a notification, and a new source or firmware candidate remains discoverable.
 function holdTarget(deployment, sources) {
@@ -175,8 +185,11 @@ function page(m) {
         return "restart";
     if (state === "awaiting-login")
         return confirmFailed(state, request) || !(m.automatic || {}).confirm ? "confirm" : "finishing";
-    if (m.waitingForPackages)
+    if (m.waitingForPackages) {
+        if (m.quietHold)
+            return m.sourcesLoaded ? "current" : "checking";
         return m.holdTarget === "changed" && m.hasUpdates ? "available" : "waiting";
+    }
     if (["failed", "interrupted", "stale", "rolled-back", "recovery-failed"].includes(state))
         return "problem";
     if (m.hasUpdates)
@@ -488,7 +501,7 @@ function clockFormat(clock24) {
 
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
-    overviewVisible, indicator, waitingPackages, incompatible, held, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
+    overviewVisible, indicator, waitingPackages, incompatible, held, quietHold, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
     announce, releaseNotes, versionParts, releaseOrder, newerRelease, IDENTITY_ORDER, trialVersions,
     summary, noteItems, sizeChange, targetKey, autoPrepare, preparedUpdate, replacement, replacementRequest, PREPARATION_LABELS, preparation, elapsed, downloadSize,
     clockFormat

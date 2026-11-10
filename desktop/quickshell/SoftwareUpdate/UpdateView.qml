@@ -119,7 +119,11 @@ Item {
                 title: kept ? I18n.format("You're on Cybex OS %1", [kept.version]) : I18n.tr("Your system is up to date"),
                 body: (deployment.state === "done" && deployment.changeKind === "update"
                     ? I18n.tr("The last update was installed and passed its checks.") + "\n" : "")
-                    + (aheadNote() !== "" ? aheadNote() + "\n" : "") + checked() };
+                    + (aheadNote() !== "" ? aheadNote() + "\n" : "")
+                    + (service.nixosPending ? (service.automatic.prepare
+                        ? I18n.tr("Newer NixOS packages are prepared for you once NixOS has finished building them.")
+                        : I18n.tr("Newer NixOS packages can be prepared once NixOS has finished building them.")) + "\n" : "")
+                    + checked() };
         case "available":
             return { tone: "accent", busy: false, title: I18n.tr("Updates are available"),
                 body: availableBody() };

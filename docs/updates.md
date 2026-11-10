@@ -327,12 +327,24 @@ system against this computer's store and caches
 (`lifecycle/cybexos/prebuilt.py`). If anything beyond the expected builds below
 would compile, it stops before building: the status is `failed`, its phase
 "Waiting for NixOS to finish building this change", `notPrebuilt` names the
-packages, and nothing changes. Software Update presents this result as
-**Waiting for NixOS packages**, lists the packages and keeps **Check Again**
-available. It retains that explanation after a restart, and does not show a
-new-update indicator for the exact candidate already held back. A different
-Nixpkgs revision, Cybex OS release or available firmware still gets an indicator.
-Unknown candidate identities never suppress an indicator.
+packages, and nothing changes.
+
+A hold never keeps a published Cybex OS release back. When a combined update
+(`both`) is held for packages NixOS hasn't built, or for packages that need a
+newer Cybex OS, the same request prepares the newer release alone on this
+computer's current packages (`stage_update` in `lifecycle/cybexos/cli.py`).
+A kernel build or a personal module that needs changing is never worked
+around this way, and a prepared update that already holds the release is kept.
+
+When only newer NixOS packages are held, there is nothing for the person to
+do. Software Update, Settings and the Control Center read as up to date, with
+one quiet line saying the packages follow once NixOS has built them, and no
+indicator, package names or "Prepare again" card appear. The hold is kept
+after a restart. A different Nixpkgs revision, Cybex OS release or available
+firmware is offered as usual. **Waiting for NixOS packages**, with the
+package names, remains only for a hold that also has a Cybex OS release
+waiting, which preparing the release alone normally resolves. Unknown
+candidate identities never suppress an indicator.
 
 NixOS builds nixos-unstable continuously, so a later revision normally passes.
 With automatic preparation enabled, background preparation retries a package

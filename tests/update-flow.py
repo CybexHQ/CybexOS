@@ -440,25 +440,41 @@ def main():
             session.call('updates','open')
             session.wait(lambda:'worker rejected' in (session.state().get('failureText') or ''),'durable failure in the app')
 
-            # A prebuilt refusal is a durable wait, with no duplicate update
-            # indicator or red request error. A changed revision is still new.
+            # A prebuilt refusal of newer NixOS packages alone needs nothing
+            # from the person: up to date, with one quiet line and no
+            # indicator, package names or red request error, also after a
+            # restart. A changed revision is still new.
             held = {'state':'failed', 'transaction':'a'*32, 'changeKind':'update', 'scope':'upstream',
                 'requestId':'d'*32, 'notPrebuilt':['opencode-2.2.5'],
                 'inputs':{'nixpkgs':{'rev':'new-revision'}},
                 'request':{'id':'d'*32, 'action':'stage', 'state':'failed', 'error':'Package not prebuilt'}}
             session.fixture(reject=False)
             session.status(**held, automatic={'prepare':True, 'confirm':True})
-            session.wait(lambda:session.state().get('page')=='waiting' and session.state().get('title',{}).get('text')=='Waiting for NixOS packages',
-                'clear package wait')
+            session.wait(lambda:session.state().get('page')=='current' and session.state().get('title',{}).get('text')=='Your system is up to date',
+                'quiet package wait')
             state = session.state()
             assert not state['indicator'] and not state['failureText'], state
-            assert 'opencode-2.2.5' in state['body'] and 'automatically' in state['body'], state
+            assert 'opencode' not in state['body'] and 'once NixOS has finished building them' in state['body'], state
+            assert session.pose()==('happy',False), state
+            shot('software-update-packages-pending.png')
+            session.start_shell('qs-waiting-reloaded.log')
+            session.wait(lambda:session.state().get('window') and session.state().get('page')=='current'
+                and not session.state().get('indicator'), 'quiet package wait after shell restart')
+            # Held together with a Cybex OS release, the wait is explained.
+            session.fixture(sources={**sources, 'cybexos':{'state':'available','available':'1.1.0','revision':'r'*40}})
+            session.status(**{**held, 'scope':'both'}, automatic={'prepare':True, 'confirm':True})
+            session.call('update-test','refresh')
+            session.wait(lambda:session.state().get('page')=='waiting' and session.state().get('title',{}).get('text')=='Waiting for NixOS packages',
+                'package wait with a release')
+            state = session.state()
+            assert 'opencode-2.2.5' in state['body'] and not state['failureText'], state
             assert state['primary']['label']=='Check again' and state['primary']['enabled'], state
             assert session.pose()==('needs-input',False), state
             shot('software-update-waiting.png')
-            session.start_shell('qs-waiting-reloaded.log')
-            session.wait(lambda:session.state().get('window') and session.state().get('page')=='waiting'
-                and not session.state().get('indicator'), 'package wait after shell restart')
+            session.fixture(sources=sources)
+            session.status(**held, automatic={'prepare':True, 'confirm':True})
+            session.call('update-test','refresh')
+            session.wait(lambda:session.state().get('page')=='current', 'quiet package wait again')
             session.fixture(sources={**sources, 'upstream':{'state':'available','available':'newer-revision'}})
             session.call('update-test','refresh')
             session.wait(lambda:session.state().get('page')=='available' and session.state().get('indicator'),
