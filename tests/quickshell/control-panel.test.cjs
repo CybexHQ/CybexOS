@@ -109,7 +109,7 @@ test("launcher and session power compatibility routes toggle control", () => {
     assert.match(launcherPower,
         /Popouts\.toggle\("control", undefined, undefined,[\s\S]*Screens\.focused/);
     assert.equal(providerData.BUILTIN_ACTIONS.find(action => action.id === "power").name,
-        "Open Control Panel");
+        "Open Control Center");
 
     assert.doesNotMatch(session,
         /powerOpen|openMenu|closeMenu|toggleMenu/,

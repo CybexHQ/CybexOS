@@ -44,8 +44,8 @@ test("weather is fetched only for a set location someone is shown", () => {
     assert.match(sheet, /onClaimed: \{[^}]*Weather\.acquire\(\);/);
     assert.match(sheet, /onReleased: \{[^}]*Weather\.release\(\);/);
     assert.match(sheet,
-        /LinkText \{\s*visible: !Weather\.locationSet[\s\S]{0,120}?text: "Set a location in Settings"[\s\S]{0,160}?Settings\.openWidgetSettings\("weather"\);\s*Settings\.showPanel\("bar"/,
-        "the sheet links to where the location is set");
+        /id: locationPrompt\s*visible: !Weather\.locationSet[\s\S]{0,2000}?label: "Set location"[\s\S]{0,400}?Settings\.openWidgetSettings\("weather"\);\s*Settings\.showPanel\("bar"/,
+        "the sheet's no-location prompt opens where the location is set");
 });
 
 test("an enabled weather widget with no location stays on the bar and says so", () => {

@@ -61,12 +61,10 @@ BarModule {
                 : WifiState.signal >= 33 ? "network_wifi_2_bar"
                 : "network_wifi_1_bar"
             size: Theme.barIconSize
-            color: chip.fg
-            opacity: EthernetState.connected || WifiState.connected ? 1 : 0.35
-
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.chipFadeDuration }
-            }
+            // Offline is dimmed, not faded away: the disabled ink stays
+            // readable (about 3:1) where a 35 % fade fell below 2:1.
+            color: EthernetState.connected || WifiState.connected
+                ? chip.fg : Theme.barTextDisabled
         }
     }
 }

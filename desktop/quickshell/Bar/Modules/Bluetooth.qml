@@ -23,12 +23,8 @@ BarModule {
             anchors.verticalCenter: parent.verticalCenter
             name: BluetoothState.enabled ? "bluetooth" : "bluetooth_disabled"
             size: Theme.barIconSize
-            color: chip.fg
-            opacity: BluetoothState.connected ? 1 : 0.35
-
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.chipFadeDuration }
-            }
+            // Not connected is dimmed in the readable disabled ink (Wifi.qml).
+            color: BluetoothState.connected ? chip.fg : Theme.barTextDisabled
         }
     }
 }

@@ -225,9 +225,13 @@ BarModule {
 
                             BarTooltip {
                                 check: itemHover.check
+                                // Every icon names itself: an item with no
+                                // tooltip or title falls back to its id.
                                 text: trayItem.modelData.tooltipTitle !== ""
                                     ? trayItem.modelData.tooltipTitle
-                                    : trayItem.modelData.title
+                                    : trayItem.modelData.title !== ""
+                                    ? trayItem.modelData.title
+                                    : trayItem.modelData.id
                                 y: trayItem.height + 11
                                 x: (trayItem.width - width) / 2
                             }

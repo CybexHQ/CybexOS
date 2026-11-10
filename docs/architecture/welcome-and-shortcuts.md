@@ -180,8 +180,8 @@ state with `hyprctl binds -j`:
 
 - A catalog key that is no longer bound with the action's description is
   shown as "changed in user.lua".
-- A described binding that is not in the catalog is listed read-only as
-  "From user.lua".
+- A described binding that is not in the catalog is listed read-only under
+  the "Hand-written" filter.
 
 ### 1.5 Applying changes
 
@@ -245,7 +245,7 @@ While a shortcut is being recorded, the recording window activates Quickshell
 - **Settings → Keyboard → Shortcuts** (the Keyboard page's second tab since
   the 2026-10 Settings redesign; the old page id `shortcuts` still opens it):
   - search by action or keys;
-  - filters: All, Changed, Conflicts, From user.lua;
+  - filters: All, Changed, Conflicts, Hand-written (user.lua);
   - groups in sheet order;
   - per row: Edit (record), Reset and Disable;
   - Add shortcut (app, website, web app or command);
@@ -271,7 +271,7 @@ As built:
   key names; the "Conflicts" filter combines Lua's `conflict`/`displaced`
   diagnostics with duplicate combinations among the shown rows (draft and
   `userBinds` included). "Changed" lists vendor overrides and custom
-  entries; "From user.lua" lists `source: "user"` rows and `userBinds`.
+  entries; "Hand-written" lists `source: "user"` rows and `userBinds`.
   `failed(message)` and `Keybindings.error` appear at the top of the page
   and in the Apply bar. Reset all asks inline and edits the draft.
 - **Recorder.** `Settings/ShortcutRecorder.qml`, a modal card over its host

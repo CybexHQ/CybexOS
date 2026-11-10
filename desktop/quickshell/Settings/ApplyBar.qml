@@ -42,7 +42,10 @@ Rectangle {
     anchors.right: parent ? parent.right : undefined
     anchors.bottom: parent ? parent.bottom : undefined
     height: Math.max(Theme.scaled(52), copy.implicitHeight + Theme.scaled(18))
-    visible: shown
+    // While the review sheet is open its footer is the one Apply; a pending
+    // bar steps back rather than repeat it under the scrim. A trial keeps its
+    // countdown in view. The page keeps its inset, so nothing reflows.
+    visible: shown && (trial || !SettingsChanges.reviewOpen)
     color: Theme.popBg
     Accessible.role: root.trial ? Accessible.AlertMessage : Accessible.StaticText
     Accessible.name: root.title + ". " + root.detail

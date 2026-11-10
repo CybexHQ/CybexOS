@@ -27,6 +27,7 @@ HermesTranscript HermesTranscript.qml
 IconButton IconButton.qml
 LinkText LinkText.qml
 MediaPopover MediaPopover.qml
+MonthGrid MonthGrid.qml
 NotesPopover NotesPopover.qml
 NotifsPopover NotifsPopover.qml
 OverflowPopover OverflowPopover.qml

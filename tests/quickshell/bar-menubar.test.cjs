@@ -134,20 +134,29 @@ test("bar targets span the bar's height and at least 32 px", () => {
         assert.match(read(rel), /height: Math\.max\(parent\.height, Theme\.barHeight\)/, rel);
 });
 
-test("the dots style marks the current workspace with an 18 × 6 accent pill", () => {
+test("the dots style marks the current workspace with a 20 × 8 accent pill", () => {
+    // Claude Fable, 2026-11 review: "pills of at least 8px, a filled or
+    // wider pill for the active workspace, and a dimmer state for empty ones."
     const source = read("Bar/Workspaces.qml");
     const Motion = load("WorkspaceMotion.js");
-    const inset = (Motion.CELL_WIDTH + 4 - 18) / 2;
+    const inset = (Motion.CELL_WIDTH - 4 - 20) / 2;
     const cell = Motion.indicatorBounds([1, 2, 3], 2);
-    assert.equal((cell.right - inset) - (cell.left + inset), 18);
+    assert.equal((cell.right - inset) - (cell.left + inset), 20);
     assert.equal((cell.left + inset + cell.right - inset) / 2, Motion.CELL_WIDTH * 1.5,
         "the pill is centred on its cell");
-    assert.match(source, /readonly property real dotPillInset: \(WorkspaceMotion\.CELL_WIDTH \+ 4 - 18\) \/ 2/);
+    assert.match(source, /readonly property int dotSize: 8/);
+    assert.match(source, /readonly property int dotPillWidth: 20/);
+    assert.match(source, /readonly property real dotPillInset: \(WorkspaceMotion\.CELL_WIDTH - 4 - dotPillWidth\) \/ 2/);
     assert.match(source, /const inset = numbered \? 0 : dotPillInset;/);
-    assert.match(source, /height: root\.numbered \? Theme\.chipInnerHeight : 6/);
+    assert.match(source, /height: root\.numbered \? Theme\.chipInnerHeight : root\.dotSize/);
     assert.match(source, /color: Theme\.barWsCurrent/);
     assert.match(source, /focused && !root\.numbered \? "transparent"/,
         "the pill replaces the current workspace's dot");
+    // Every place is an 8 px pip in both styles; an empty one is a ring.
+    assert.match(source, /width: slot\.showNumber \? Theme\.chipInnerHeight : root\.dotSize/);
+    assert.match(source, /readonly property bool hollow: !exists && !urgent && !showNumber/);
+    assert.match(source, /color: slot\.hollow \? "transparent" : slot\.restingTone/);
+    assert.match(source, /border\.width: slot\.hollow \? 1\.5 : 0/);
 });
 
 test("the Cybex X is two-tone from its own SVG geometry", () => {

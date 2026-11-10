@@ -1,4 +1,5 @@
 import QtQuick
+import "Monogram.js" as Monogram
 import "NotifHelpers.js" as Helpers
 
 // A notification's source icon: the desktop entry's icon where one resolves,
@@ -7,7 +8,9 @@ import "NotifHelpers.js" as Helpers
 // warning for critical. Callers opt into a compact well so icons with very
 // different silhouettes keep the same visual weight: the shell's resting chip
 // rather than an accent tint, which made every card look like an alert. The
-// monogram always sits in that well, since a bare letter reads as text.
+// monogram always sits in a well of its own, the same tile the launcher and
+// Software draw for an app without an icon (Common/Monogram.js): a colour
+// derived from the sender's name, so two icon-less senders differ at a glance.
 Item {
     id: root
 
@@ -27,6 +30,7 @@ Item {
     readonly property string monogram: Helpers.monogram(entry.displayAppName || entry.appName || "")
     readonly property bool showsMark: !brand.visible && !image.visible
     readonly property bool showsMonogram: showsMark && !urgent && monogram !== ""
+    readonly property var monogramTile: Monogram.tile(entry.displayAppName || entry.appName || "", Theme.dark)
 
     function requestSiteIcon() {
         // Site brand icons and safe sender images are resolved in process.
@@ -43,7 +47,8 @@ Item {
         anchors.fill: parent
         radius: Theme.chipRadius
         color: root.urgent && (root.framed || root.showsMark) ? Theme.redBgSoft
-            : root.framed || root.showsMonogram ? root.wellColor
+            : root.showsMonogram ? root.monogramTile.fill
+            : root.framed ? root.wellColor
             : "transparent"
         border.width: root.urgent && (root.framed || root.showsMark) ? 1 : 0
         border.color: Theme.redBorder
@@ -84,7 +89,7 @@ Item {
             font.family: Theme.fontMenu
             font.pixelSize: root.monogramSize
             font.weight: Theme.weightBold
-            color: Theme.textHi
+            color: root.monogramTile.ink
         }
 
         Sym {

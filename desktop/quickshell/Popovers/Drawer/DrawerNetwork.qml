@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import Quickshell.Networking as QsNetworking
 import "../../Common"
 import "../../Common/NetworkHelpers.js" as NetworkHelpers
 import ".."
@@ -8,8 +9,31 @@ import ".."
 // in-range networks, the Tailscale row, a VPN switch when a VPN profile
 // exists, the DNS selector, and the live throughput metrics. Share and Speed test hand off to the network
 // overlay, which already owns those two flows.
+//
+// With nothing to connect through it says why in the drawer's one
+// empty-state pattern (DrawerEmptyState): the network service is not
+// running, there is no adapter or no cable, or Wi-Fi is blocked or off —
+// with at most one way out. Rows for things that are not there (Tailscale
+// when it is not installed, DNS without the network service, readings
+// without a connection) stay out of sight.
 Column {
     id: root
+
+    // NetworkManager answered at startup (Quickshell's backend is fixed then).
+    readonly property bool serviceDown:
+        QsNetworking.Networking.backend === QsNetworking.NetworkBackendType.None
+    readonly property bool wifiPresent: WifiState.device !== null
+    readonly property bool wifiBlocked: wifiPresent && !QsNetworking.Networking.wifiHardwareEnabled
+    readonly property bool wired: EthernetState.connected
+    readonly property bool online: wired || WifiState.connected
+    // "" while there is something to show; otherwise why there is not.
+    readonly property string emptyKind: wired ? ""
+        : serviceDown ? "service"
+        : !wifiPresent ? (!EthernetState.known || EthernetState.devices.length > 0
+            ? "cable" : "hardware")
+        : wifiBlocked ? "blocked"
+        : !WifiState.enabled ? "off" : ""
+    readonly property bool cableMissing: emptyKind === "cable"
 
     readonly property var networks: NetworkDetails.groupedNetworks.all
     // Every network snapshot (on NetworkManager events, scan changes and a
@@ -117,24 +141,51 @@ Column {
         return "--";
     }
 
+    DrawerEmptyState {
+        visible: root.emptyKind !== ""
+        glyph: root.cableMissing ? "lan" : "wifi_off"
+        title: root.emptyKind === "service" ? I18n.tr("Network service isn't running")
+            : root.emptyKind === "hardware" ? I18n.tr("No network adapter found")
+            : root.emptyKind === "cable" ? I18n.tr("No cable connected")
+            : root.emptyKind === "blocked" ? I18n.tr("Wi-Fi is blocked")
+            : I18n.tr("Wi-Fi is off")
+        detail: root.emptyKind === "service"
+            ? I18n.tr("Wi-Fi and wired connections can't be managed until it starts.")
+            : root.emptyKind === "hardware"
+            ? I18n.tr("This computer has no Wi-Fi or network port the system can use.")
+            : root.emptyKind === "cable" ? I18n.tr("Plug in a network cable to go online.")
+            : root.emptyKind === "blocked"
+            ? I18n.tr("Turn off airplane mode or the wireless switch on this computer.")
+            : I18n.tr("Turn it on to see networks nearby.")
+        actionText: root.emptyKind === "off" ? I18n.tr("Turn on")
+            : root.emptyKind === "service" || root.emptyKind === "cable"
+            ? I18n.tr("Network settings") : ""
+        onAction: {
+            if (root.emptyKind === "off")
+                WifiState.setEnabled(true);
+            else
+                Settings.showPanel("network", Popouts.hostScreenName);
+        }
+    }
+
     // ---- header ----------------------------------------------------------
     Item {
+        visible: root.emptyKind === ""
         width: parent.width
         height: 40
 
         Column {
             anchors.left: parent.left
             anchors.leftMargin: 4
-            anchors.right: wifiToggle.left
-            anchors.rightMargin: 10
+            anchors.right: wifiToggle.visible ? wifiToggle.left : parent.right
+            anchors.rightMargin: wifiToggle.visible ? 10 : 0
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
 
             Text {
                 width: parent.width
-                text: EthernetState.connected ? "Ethernet"
-                    : !WifiState.enabled ? "Wi-Fi off"
-                    : WifiState.connected ? WifiState.name : "Not connected"
+                text: root.wired ? I18n.tr("Ethernet")
+                    : WifiState.connected ? WifiState.name : I18n.tr("Wi-Fi")
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.title
                 font.weight: Theme.weightSemibold
@@ -145,6 +196,8 @@ Column {
             Text {
                 width: parent.width
                 text: {
+                    if (!root.online)
+                        return I18n.tr("Not connected");
                     const parts = [];
                     if (WifiState.connected && WifiState.signal >= 0)
                         parts.push(WifiState.signal + "%");
@@ -166,12 +219,16 @@ Column {
             }
         }
 
+        // Only for a Wi-Fi adapter that is there, and faded while a switch
+        // or airplane mode blocks it.
         Toggle {
             id: wifiToggle
+            visible: root.wifiPresent
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             metrics: Theme.switchCompact
             checked: WifiState.enabled
+            enabled: !root.wifiBlocked
             accessibleName: "Wi-Fi"
             onToggled: value => WifiState.setEnabled(value)
         }
@@ -179,7 +236,7 @@ Column {
 
     // ---- networks --------------------------------------------------------
     Column {
-        visible: WifiState.enabled
+        visible: WifiState.enabled && root.emptyKind === ""
         width: parent.width
         spacing: 2
 
@@ -369,10 +426,13 @@ Column {
 
     // ---- tailscale · vpn · dns ------------------------------
     Column {
+        visible: root.emptyKind === ""
         width: parent.width
         spacing: 2
 
+        // Tailscale only where it is installed.
         Item {
+            visible: !Tailscale.missing
             width: parent.width
             height: 40
 
@@ -427,7 +487,7 @@ Column {
         }
 
         LinkText {
-            visible: !Tailscale.connected
+            visible: !Tailscale.missing && !Tailscale.connected
             text: Tailscale.needsApproval ? "View approval status"
                 : Tailscale.authPending ? "Continue sign-in"
                 : Tailscale.needsLogin ? "Sign in to Tailscale" : "Tailscale connection details"
@@ -514,7 +574,9 @@ Column {
             wrapMode: Text.WordWrap
         }
 
+        // DNS is NetworkManager's to change.
         Item {
+            visible: !root.serviceDown
             width: parent.width
             height: 40
 
@@ -600,8 +662,10 @@ Column {
     }
 
     // ---- metrics ---------------------------------------------------------
+    // Readings of a connection, so only while there is one.
     Grid {
         id: metricsGrid
+        visible: root.emptyKind === "" && root.online
         width: parent.width
         columns: 2
         columnSpacing: 6
@@ -649,22 +713,27 @@ Column {
         }
     }
 
+    // Share hands out the Wi-Fi network in use; a speed test needs a
+    // connection. The empty state carries its own action instead.
     DrawerFooter {
+        visible: root.emptyKind === ""
         info: {
             const primary = NetworkDetails.primary;
             const raw = primary && primary.ipv4 ? String(primary.ipv4) : "";
-            const address = raw.split("/")[0];
-            const wired = EthernetState.connected ? "Ethernet" : "no Ethernet";
-            return address !== "" ? address + " · " + wired : wired;
+            return raw.split("/")[0];
         }
-        secondaryText: I18n.tr("Share")
-        actionText: I18n.tr("Speed test")
+        secondaryText: WifiState.connected ? I18n.tr("Share") : ""
+        actionText: root.online ? I18n.tr("Speed test") : I18n.tr("Network settings")
         onSecondaryClicked: {
             const iface = NetworkDetails.activeWifiInterface;
             Popouts.close();
             NetworkOverlayState.openQr(Screens.byName(Popouts.hostScreenName), iface);
         }
         onActionClicked: {
+            if (!root.online) {
+                Settings.showPanel("network", Popouts.hostScreenName);
+                return;
+            }
             const iface = NetworkDetails.primaryInterface;
             Popouts.close();
             NetworkOverlayState.openSpeedTest(

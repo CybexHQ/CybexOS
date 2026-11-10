@@ -51,6 +51,31 @@ test("a change reads as what it is, with its old and new value", () => {
     assert.equal(A.formatValue("a".repeat(40)).length, 28);
 });
 
+test("a setting change is named as Settings names it, with its resolved values", () => {
+    const rows = [{ key: "glassEnabled", label: "Glass effect", pageLabel: "Appearance", group: "Theme" }];
+    const glass = A.changeRow({ kind: "setting", key: "glassEnabled", hadBefore: false, hasAfter: true, after: true,
+        undoable: true }, rows, { glassEnabled: false });
+    assert.deepEqual([glass.label, glass.place, glass.before, glass.after], ["Glass effect", "Appearance · Theme", "Off", "On"],
+        "a default the file did not hold reads as the value it stood at");
+    const undone = A.changeRow({ kind: "setting", key: "glassEnabled", hadBefore: true, before: true, hasAfter: false },
+        rows, { glassEnabled: false });
+    assert.deepEqual([undone.before, undone.after], ["On", "Off"], "a value taken back to its default");
+    const unknown = A.changeRow({ kind: "setting", key: "mystery", hadBefore: false, after: 2 }, rows, { glassEnabled: false });
+    assert.deepEqual([unknown.place, unknown.before], ["", "default"], "an unknown default still says so");
+    const changes = read("Assistant/AssistantChanges.qml");
+    assert.match(changes, /AssistantHelpers\.changeRow\(change, SettingsSearchData\.ROWS,\s*Settings\.defaults\)/);
+    assert.match(changes, /case "On": return I18n\.tr\("On"\);/, "values read in the person's language");
+});
+
+test("the reply's copy and terminal actions say what they do", () => {
+    const reply = read("Assistant/AssistantReply.qml");
+    assert.match(reply, /objectName: "assistantCopyReply"[\s\S]{0,160}?label: I18n\.tr\("Copy"\)/);
+    assert.match(reply, /objectName: "assistantHandoff"[\s\S]{0,160}?label: I18n\.tr\("Terminal"\)[\s\S]{0,120}?tip: I18n\.tr\("Continue in a terminal"\)/);
+    const button = read("Assistant/AssistantButton.qml");
+    assert.match(button, /property string tip: label === "" \? accessibleName : ""/, "a glyph-only button names itself on hover");
+    assert.match(button, /hitPad: Math\.max\(0, \(Theme\.scaled\(32\) - height\) \/ 2\)/, "a 32 px pointer target");
+});
+
 test("one suggestion fits the moment: a failure, then a kept update, then a repeated warning", () => {
     const now = 10 * 3600 * 1000;
     const warnings = [1, 2, 3].map(minute => ({ key: "nm|Wi-Fi disconnected", summary: "Wi-Fi disconnected",

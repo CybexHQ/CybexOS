@@ -5,7 +5,7 @@ import "../Common/SoftwareHelpers.js" as Helpers
 import "../Common/TablerGlyphs.js" as Tabler
 
 // An installer profile as a collection: its apps, what installing the
-// missing ones downloads, and one action that adds them all to the list.
+// missing ones downloads, and one action that adds them all to the queue.
 Rectangle {
     id: root
 
@@ -126,9 +126,9 @@ Rectangle {
             visible: root.summary.missing.length > 0
             queued: root.allAdded
             glyph: root.allAdded ? "check" : "plus"
-            text: root.allAdded ? I18n.tr("Added") : I18n.tr("Install all")
+            text: root.allAdded ? I18n.tr("All in queue") : I18n.tr("Add all to queue")
             enabled: !root.allAdded
-            accessibleName: I18n.format("Install all of %1", [Software.label(root.profile.name || "")])
+            accessibleName: I18n.format("Add all of %1 to the install queue", [Software.label(root.profile.name || "")])
             onTriggered: Software.installAll(root.profile.id)
         }
     }

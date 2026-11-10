@@ -221,6 +221,13 @@ Rectangle {
                     readonly property real stampRight: closeBeside
                         ? countWidth + expandWidth + stampSlot
                         : countWidth + stampSlot
+                    // × and the disclosure keep their drawn size, but each
+                    // answers to at least a 32 px target (negative margins:
+                    // the hit area reaches past the drawing). Where the two
+                    // sit side by side, 2 px apart, they meet halfway.
+                    readonly property real hitInset: Math.min(0,
+                        (target - Theme.inlineActionHeight) / 2)
+                    readonly property bool adjacent: !closeBeside && card.allowTextExpansion
 
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
@@ -323,6 +330,10 @@ Rectangle {
                         MouseArea {
                             id: disclosureMouse
                             anchors.fill: parent
+                            anchors.leftMargin: trailing.adjacent ? -trailing.gap / 2 : trailing.hitInset
+                            anchors.rightMargin: trailing.hitInset
+                            anchors.topMargin: trailing.hitInset
+                            anchors.bottomMargin: trailing.hitInset
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
@@ -382,6 +393,10 @@ Rectangle {
                         MouseArea {
                             id: closeMouse
                             anchors.fill: parent
+                            anchors.leftMargin: trailing.hitInset
+                            anchors.rightMargin: trailing.adjacent ? -trailing.gap / 2 : trailing.hitInset
+                            anchors.topMargin: trailing.hitInset
+                            anchors.bottomMargin: trailing.hitInset
                             enabled: closeButton.shown
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor

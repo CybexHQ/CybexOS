@@ -317,3 +317,28 @@ test("both event views say when a calendar could not be read", () => {
     assert.match(read("Popovers/CalendarPopover.qml"), warning);
     assert.match(read("Popovers/DaySheetPopover.qml"), warning);
 });
+
+test("the Day sheet and the calendar panel share one month grid", () => {
+    const grid = read("Popovers/MonthGrid.qml");
+    const sheet = read("Popovers/DaySheetPopover.qml");
+    const panel = read("Popovers/CalendarPopover.qml");
+
+    assert.match(read("Popovers/qmldir"), /^MonthGrid MonthGrid\.qml$/m);
+    // Six Monday-first weeks; three marks at most; today is the accent pill
+    // and a chosen date a selected tile.
+    assert.match(grid, /model: 42/);
+    assert.match(grid, /const startOffset = \(root\.first\.getDay\(\) \+ 6\) % 7;/);
+    assert.match(grid, /CalendarHelpers\.eventsInRange\([\s\S]*?, 3\)/);
+    assert.match(grid, /color: isToday \? Theme\.accent\s*: isSelected \? Theme\.selectedFill/);
+    assert.match(grid, /signal chosen\(var date\)/);
+    // The sheet's grid opens the calendar app on the date, as its week did;
+    // the panel's selects the date for its agenda.
+    assert.match(sheet, /MonthGrid \{[\s\S]*?month: root\.shownMonth[\s\S]*?onChosen: date => \{\s*Popouts\.close\(\);\s*Calendar\.openCalendar\(date\);/);
+    assert.match(panel, /MonthGrid \{[\s\S]*?onChosen: date => root\.selectDay\(date\)/);
+    assert.doesNotMatch(panel, /model: 42/, "the panel no longer draws its own copy");
+    // Browsing another month fetches its events; each open starts on today's.
+    assert.match(sheet, /onVisibleChanged: \{\s*if \(visible\)\s*monthOffset = 0;/);
+    assert.match(sheet, /Calendar\.ensureMonth\(shownMonth, false\)/);
+    // The sky without a location is a prompt with one action.
+    assert.match(sheet, /id: locationPrompt\s*visible: !Weather\.locationSet/);
+});

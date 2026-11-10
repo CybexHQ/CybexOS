@@ -20,8 +20,15 @@ Rectangle {
     property string tooltip: compact ? text : ""
     signal triggered()
 
-    readonly property color ink: primary ? Theme.textOnAccent
-        : danger ? Theme.redText : Theme.textMid
+    // A disabled action keeps its shape but drops its call to action: a
+    // primary trades the accent for the chip and hairline, and every tier's
+    // copy and icon take textDisabled, dimmed but still about 3:1. A 0.4
+    // fade of the accent fill left "Use this wallpaper" near-illegible
+    // (2026-11 council review).
+    readonly property bool accentFill: primary && enabled
+    readonly property bool chipFill: secondary || (primary && !enabled)
+    readonly property color ink: !enabled ? Theme.textDisabled
+        : primary ? Theme.textOnAccent : danger ? Theme.redText : Theme.textMid
     readonly property bool filled: primary || secondary
     readonly property bool ringShown: Theme.focusWidth(activeFocus) > 0
     // Every tier answers to at least a 32 px target, the quiet ones included,
@@ -32,12 +39,11 @@ Rectangle {
     width: compact ? Theme.chipHeight : actionRow.implicitWidth + (filled ? 24 : 16)
     height: Theme.chipHeight
     radius: Theme.chipRadius
-    color: primary ? Theme.accent : secondary ? Theme.chip : "transparent"
+    color: accentFill ? Theme.accent : chipFill ? Theme.chip : "transparent"
     // The keyboard ring replaces the secondary hairline while it shows. On the
     // accent fill an accent ring would vanish, so a primary takes textHi.
-    border.width: ringShown ? Theme.focusRingWidth : secondary ? 1 : 0
-    border.color: ringShown ? (primary ? Theme.textHi : Theme.focusRing) : Theme.hairline
-    opacity: enabled ? 1 : 0.4
+    border.width: ringShown ? Theme.focusRingWidth : chipFill ? 1 : 0
+    border.color: ringShown ? (accentFill ? Theme.textHi : Theme.focusRing) : Theme.hairline
     activeFocusOnTab: enabled && visible
     Accessible.role: Accessible.Button
     Accessible.name: root.text

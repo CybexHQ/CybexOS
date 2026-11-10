@@ -4,9 +4,10 @@ import "../Common"
 import "../Common/ExternalUrl.js" as ExternalUrl
 import "../Common/SoftwareHelpers.js" as Helpers
 
-// One app: who makes it, how it arrives (prebuilt by NixOS or a vendor
-// download), what installing it downloads, screenshots from Flathub, what
-// it does, the facts, and similar apps. Install adds it to the list.
+// One app: who makes it, where it comes from (open source from NixOS, or
+// from its maker) in one plain line, what installing it downloads,
+// screenshots from Flathub, what it does, the facts, and similar apps.
+// "Add to queue" puts it on the install queue (docs/software-and-defaults.md).
 PageScroll {
     id: root
 
@@ -40,7 +41,7 @@ PageScroll {
                 : I18n.tr("Included with Cybex OS");
         }
         if (queuedAction === "install")
-            return I18n.tr("On your install list");
+            return I18n.tr("In the queue. Install it from the bar below.");
         if (app.unavailable === "unfree")
             return I18n.tr("Proprietary apps are turned off on this computer.");
         if (app.unavailable === "missing")
@@ -54,21 +55,29 @@ PageScroll {
             return verdict.reason === "unfree" ? I18n.tr("Proprietary apps are turned off on this computer.")
                 : I18n.tr("NixOS marks this app as unavailable for this computer.");
         if (vendor)
-            return state === "prebuilt" ? I18n.tr("Vendor download · nothing to compile")
-                : I18n.tr("Vendor download · checking…");
+            return state === "prebuilt" ? I18n.tr("Downloads from its maker, ready to use")
+                : I18n.tr("Downloads from its maker · checking…");
         const exact = state === "prebuilt" ? Helpers.size(verdict.downloadBytes) : "";
         const estimate = Helpers.size(app.downloadBytes);
         if (state === "prebuilt")
-            return exact !== "" ? I18n.format("Download ≈ %1 · nothing to compile", [exact])
-                : I18n.tr("Already downloaded · nothing to compile");
+            return exact !== "" ? I18n.format("Download ≈ %1 · ready to use", [exact])
+                : I18n.tr("Already downloaded · ready to use");
         if (state === "error")
-            return estimate !== "" ? I18n.format("Download ≈ %1 · couldn't check NixOS's cache", [estimate])
-                : I18n.tr("Couldn't check NixOS's cache. Software checks again before installing.");
+            return estimate !== "" ? I18n.format("Download ≈ %1 · couldn't check the download yet", [estimate])
+                : I18n.tr("Couldn't check the download. Software checks again before installing.");
         return estimate !== "" ? I18n.format("Download ≈ %1 · checking…", [estimate]) : I18n.tr("Checking the download…");
+    }
+    // Where the app comes from, in words: the line under the heading.
+    function sourceLine() {
+        if (vendor)
+            return app.developer
+                ? I18n.format("Made by %1 and downloaded from them, ready to use. It isn't open source, and it updates with Software Update.", [app.developer])
+                : I18n.tr("Downloaded from its maker, ready to use. It isn't open source, and it updates with Software Update.");
+        return I18n.tr("Open source, from NixOS, which Cybex OS is built on. It arrives ready to use and updates with Software Update.");
     }
     function downloadFact() {
         if (vendor)
-            return I18n.tr("From the vendor");
+            return I18n.tr("From the maker");
         if (app.installed)
             return I18n.tr("Installed");
         const exact = verdict && verdict.state === "prebuilt" ? verdict.downloadBytes : -1;
@@ -126,12 +135,13 @@ PageScroll {
                 spacing: Theme.scaled(6)
                 Tag {
                     tone: root.vendor ? "vendor" : "ok"
-                    glyph: root.vendor ? "download" : "bolt"
-                    text: root.vendor ? I18n.tr("Vendor download") : I18n.tr("Prebuilt by NixOS")
+                    glyph: root.vendor ? "download" : "code"
+                    text: root.vendor ? I18n.tr("From the maker")
+                        : root.licence !== "" ? I18n.format("Open source · %1", [root.licence]) : I18n.tr("Open source")
                 }
                 Tag {
-                    text: root.vendor ? I18n.tr("Proprietary")
-                        : root.licence !== "" ? I18n.format("Free software · %1", [root.licence]) : I18n.tr("Free software")
+                    visible: root.vendor
+                    text: I18n.tr("Proprietary")
                 }
                 Tag {
                     visible: root.app.installed === true
@@ -184,6 +194,30 @@ PageScroll {
                 wrapMode: Text.Wrap
                 textFormat: Text.PlainText
             }
+        }
+    }
+
+    // Where it comes from, in one line. An app installed from Flathub
+    // instead says so in the notice below.
+    Row {
+        objectName: "softwareAppSource"
+        width: parent.width
+        visible: !root.viaFlathub
+        spacing: Theme.scaled(8)
+        Sym {
+            name: root.vendor ? "download" : "code"
+            size: Theme.iconSmall
+            color: Theme.textDim
+        }
+        Text {
+            objectName: "softwareAppSourceText"
+            width: parent.width - x
+            text: root.sourceLine()
+            color: Theme.textMid
+            font.family: Theme.fontMenu
+            font.pixelSize: Theme.typography.secondary
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
         }
     }
 
@@ -388,7 +422,7 @@ PageScroll {
                 FactRow {
                     width: parent.width
                     label: I18n.tr("Comes from")
-                    value: root.vendor ? I18n.tr("Vendor, via NixOS") : I18n.tr("NixOS")
+                    value: root.vendor ? I18n.tr("Its maker, via NixOS") : I18n.tr("NixOS")
                     code: root.app.attribute || ""
                 }
                 FactRow {

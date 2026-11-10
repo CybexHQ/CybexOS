@@ -86,7 +86,8 @@ def main():
         source = entry.read_text().replace('import "Common"', 'import "Common"\nimport "Common" as TestCommon\nimport "Popovers/Drawer" as TestDrawer').replace('SettingsWindow {}', 'SettingsWindow { id: wallpaperSettings }')
         source = source.replace('    id: shell', '''    id: shell
     // The session row moved out of the Overview into the drawer's pinned
-    // footer (2026-11); its eight buttons must still fit at every scale.
+    // footer (2026-11); its three labelled buttons (Lock, Power, More) must
+    // still fit at every scale.
     TestDrawer.DrawerSessionFooter {
         id: drawerProbe
         width: Theme.drawerWidth - Theme.panelPadding * 2
@@ -227,7 +228,7 @@ def main():
             for scale in (100, 125, 150, 200):
                 ipc('wallpaper-test', 'scale', str(scale))
                 bounds = json.loads(ipc('wallpaper-test', 'footer'))
-                assert len(bounds['buttons']) == 8, bounds
+                assert len(bounds['buttons']) == 3, bounds
                 assert all(button['top'] >= 0 and button['bottom'] <= bounds['height'] - 1
                            for button in bounds['buttons']), (scale, bounds)
             ipc('wallpaper-test', 'scale', '100')

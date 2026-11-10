@@ -264,6 +264,40 @@ test("prebuilt refusals wait without masking an active worker or a changed candi
         "an explicit check remains available while waiting");
 });
 
+test("keeping a trial boot names the version running and the one Go back returns to", () => {
+    const release = { scope: "both", installedVersion: "1.0.25", availableVersion: "1.0.26" };
+    assert.deepEqual(H.trialVersions(release), { id: "cybexos", now: "1.0.26", before: "1.0.25" });
+    const packages = { scope: "upstream", installedVersion: "1.0.25", availableVersion: "1.0.25", highlights: { schema: 1,
+        components: [{ id: "kernel", before: "6.12.55", after: "6.12.58" },
+            { id: "nixos", before: "26.05.20261024.abc", after: "26.05.20261027.def" }] } };
+    assert.deepEqual(H.trialVersions(packages), { id: "nixos", now: "26.05.20261027.def", before: "26.05.20261024.abc" },
+        "NixOS before the kernel; an unchanged Cybex OS is no identity");
+    assert.deepEqual(H.trialVersions({ highlights: { schema: 1, components: [{ id: "kernel", before: "6.12.55", after: "6.12.58" }] } }),
+        { id: "kernel", now: "6.12.58", before: "6.12.55" });
+    assert.equal(H.trialVersions({ state: "awaiting-login", transaction: "a" }), null, "an older record names none");
+    assert.equal(H.trialVersions(null), null);
+    const view = require("node:fs").readFileSync(require("node:path").join(require("./shell.cjs").shellDir,
+        "SoftwareUpdate/UpdateView.qml"), "utf8");
+    assert.match(view, /readonly property var trial: page === "confirm" \? Helpers\.trialVersions\(deployment\) : null/);
+    assert.match(view, /I18n\.tr\("This version"\)[\s\S]*?I18n\.tr\("Previous version"\)/);
+    assert.match(view, /I18n\.tr\("Keep this version"\)/);
+    assert.match(view, /I18n\.tr\("Go back to the previous version"\)/);
+});
+
+test("Software Update's buttons and labels are in sentence case", () => {
+    const fs = require("node:fs"), path = require("node:path"), { shellDir } = require("./shell.cjs");
+    for (const name of ["UpdateView.qml", "ReadyPage.qml", "TechnicalDetails.qml", "WhatsNewPage.qml", "StatusPage.qml"]) {
+        const source = fs.readFileSync(path.join(shellDir, "SoftwareUpdate", name), "utf8");
+        for (const [, text] of source.matchAll(/I18n\.tr\("([^"]+)"\)/g)) {
+            const names = text.replace(/Cybex OS|NixOS|Linux|Wiz|NVIDIA|Flathub|Wi-Fi|Bluetooth|Mesa|Hyprland|OK/g, "");
+            for (const sentence of names.split(/[.?!:]\s+/)) {
+                const words = sentence.trim().split(/\s+/).slice(1);
+                assert.ok(!words.some(word => /^[A-Z][a-z]/.test(word)), `${name}: "${text}"`);
+            }
+        }
+    }
+});
+
 test("a trial boot is confirmed automatically unless that failed or is switched off", () => {
     assert.equal(page({ state: "awaiting-login" }), "finishing");
     assert.equal(page({ state: "awaiting-login", automatic: { prepare: true, confirm: false } }), "confirm");

@@ -50,8 +50,31 @@ layer only for keyboard modality.
 
 - An off switch has a quiet track (`switchOffTrack`), and a border and knob in
   `textMid`, which carry the 3:1 boundary. An on switch has an accent track.
-- A disabled control fades. Its reason stays at full contrast and any
-  recovery action stays enabled.
+- Every switch track is at least 24 px tall at about 1.7:1 proportions
+  (`Theme.switchPopover`, `switchRow`, `switchCompact`; plugins'
+  `Ui/ToggleSwitch`), and its pointer target reaches at least 32 px both ways
+  (`Theme.switchHitMin`), invisibly where the row is shorter.
+- Disabled content uses one token, `Theme.textDisabled` (`barTextDisabled` on
+  the menubar): dimmed, but about 3:1 over `copyReferenceBg`, so it reads as
+  unavailable without becoming illegible. A disabled switch draws its track,
+  border and knob in it instead of fading. The reason a control is disabled
+  stays at full contrast and any recovery action stays enabled.
+
+## Copy contrast and light-mode edges
+
+- Every step of the copy ladder below `textHi` (`textMid`, `textLow`,
+  `textDim`, `textFaint`, `icon`) clears 4.5:1 on every window and card
+  surface, in the default palette in both modes and in every theme pack. In
+  dark mode the reference (`copyReferenceBg`) is a resting card
+  (`Theme.tile`, `darkCardAlpha`) on the raised panel surface, the lightest
+  thing copy sits on; in light mode it is a hovered chip on the base.
+  `tests/quickshell/state-tokens.test.cjs` and `typography.test.cjs` check it.
+- Light mode gives every floating surface (popovers, the drawer, the
+  launcher, toasts, bar tooltips) a 1 px ink edge (`Theme.surfaceEdge`, drawn
+  through `surfaceBorderWidth`/`surfaceBorderColor`) while no border is
+  chosen. Cards inside a window take `Theme.cardEdgeWidth` and
+  `Theme.cardEdge`. Dark mode draws neither, and the menubar slab stays
+  borderless.
 
 ## Action tiers
 
@@ -77,7 +100,9 @@ A status pill (dot and label) sits beside its action.
   keeps its inset; the target reaches half the gap towards each neighbour, so
   a narrow icon is laid out a little wider rather than overlapping the one
   beside it, and hover lights wherever a click would land (`PointerCheck`'s
-  `region`). Workspace cells already meet side by side and keep their 22 px.
+  `region`). Workspace cells meet side by side, each 32 px wide
+  (`WorkspaceMotion.CELL_WIDTH`), and the layout button beside them is one
+  cell. Every icon-only target names itself in a tooltip.
 - **Running out of room:** the right cluster outranks the clock, the clock
   the workspaces, and the workspaces the media chip. The media title first
   shortens so the chip ends 12 px short of the centre group, then goes, then
@@ -85,28 +110,62 @@ A status pill (dot and label) sits beside its action.
   anything (`BarGeometry.fitMenubar` over `LayoutHelpers.fitBar`). Bar height,
   the Control Center icon and the media module's maximum width and title
   format stay the user's.
-- **Workspaces, dots style:** the current workspace is an 18 × 6 px accent
-  pill (`barWsCurrent`), occupied dots `barWsOccupied`, empty dots
-  `barWsEmpty`. The numbers style is unchanged.
-- **The Cybex X:** two-tone at rest (the short stroke at 55 % of `barIcon`)
-  so it does not read as a close button, the brand red on hover or while
+- **Workspaces:** every place is an 8 px pip. An occupied place is a filled
+  dot (`barWsOccupied`), an empty one a dimmer 1.5 px ring (`barWsEmpty`), so
+  the two differ in shape as well as tone. In the dots style the current
+  workspace is a 20 × 8 px accent pill (`barWsCurrent`); the numbers style
+  keeps its accent chip around the number and shows empty places as rings.
+- **The Control Center button:** a chip (the status group's `barChip` fill)
+  so the mark at the far right reads as a button that opens something, not a
+  close button; while the drawer is open it lights (`barChipHover`) with a
+  1 px `barAccent` edge. Its tooltip is "Control Center". The icon stays the
+  owner's choice (`controlIcon`). The Cybex X is also two-tone at rest (the
+  short stroke at 55 % of `barIcon`) and turns brand red on hover or while
   Control Center is open; every other bar mark keeps the shared ink.
+- **Unavailable marks:** an offline network or an unconnected Bluetooth mark
+  is drawn in `barTextDisabled` (about 3:1), not faded.
 
 ## Control Center
 
 - **Pinned rows:** the tab strip and the session row stay put on every tab;
-  only the body scrolls, with a fade while more is below. Lock and Suspend act
-  at once. Log out, Restart and Shut down turn the row into a question with
-  Cancel focused: Enter confirms, Esc cancels without closing the drawer.
+  only the body scrolls, with a fade while more is below.
+- **Tabs:** every tab shows its icon with a short label under it
+  (Overview, Sound, Network, Bluetooth, Power, Alerts; the tooltip and
+  description keep "Notifications"). Tabs take their natural width plus an
+  equal share of the rest; when the labels do not fit whole (a narrow drawer,
+  a larger text size, a longer translation) the strip wraps onto more rows,
+  label beside icon, rather than cutting one short
+  (`DrawerFormat.tabLayout`).
+- **Session row:** three labelled secondary buttons. **Lock** acts at once;
+  **Power ▴** is a menu of Sleep, Restart…, Shut down… and Log out…; **More ▴**
+  a menu of Settings, Keyboard shortcuts and Screenshot (`DrawerMenu`: Up and
+  Down move, Esc closes it and returns to its button before it would close
+  the drawer). Sleep acts at once. Log out, Restart and Shut down turn the
+  row into a question with Cancel focused: Enter confirms, Esc cancels
+  without closing the drawer.
 - **Overview order:** quick toggles, sliders, now playing, a ready update,
   the system summary, then processes. That order is also what stays above
   the fold at every text size, and the Overview section switches in Settings
   still hide any of them.
-- **Processes:** five rows, three when the body is short. The end button
-  appears on hover or keyboard focus and opens the existing confirmation
-  (name and PID, then Force quit if ignored).
+- **Details:** the system summary shows the machine and one plain line of
+  readings ("CPU 6% · Memory 34% · Disk 62%", amber or red when one needs
+  attention). Its **Show details** reveals the usage meters, the system
+  facts and the top processes, and the choice holds for the session
+  (`DrawerViewState`). Collapsed, the process list does not sample at all.
+- **Processes:** five rows, three when the body is short, named as people
+  know them (".firefox-wrapped" reads "firefox"). The end button appears on
+  hover or keyboard focus and opens the existing confirmation (name and PID,
+  then Force quit if ignored).
 - **Missing devices:** a slider without a device is faded and shows a
   full-contrast reason with a link ("No output device · Sound settings").
+- **Empty tabs:** Sound, Network, Bluetooth and Power share one empty state
+  (`DrawerEmptyState`): a quiet glyph, the cause in one plain line, a
+  sentence on what it means, and at most one action. Missing hardware ("No
+  Bluetooth adapter found"), something turned off ("Wi-Fi is off", with
+  **Turn on**) and a service that is not running ("Sound service isn't
+  running") read differently. The tab's other controls and its footer step
+  aside while it shows; switches stay out of sight for hardware that is not
+  there, and so do features that are not installed (Tailscale).
 
 ## Notifications
 
@@ -128,6 +187,16 @@ A status pill (dot and label) sits beside its action.
 
   Focus, quiet hours, snoozes and placement are applied first, and nothing
   replays when the drawer closes.
+- **Welcome guide:** while the full-screen guide covers an output, an
+  ordinary toast there goes quietly to the notification centre: it stays in
+  history and counts as unread on the Notifications tab
+  (`NotifPolicy.guideRoute`). A critical one still shows, below the guide's
+  top bar or above its footer (`NotifPolicy.guideInset`). The drawer rule is
+  unchanged.
+- **Toast edge:** a toast floats over any window, so it always draws an
+  edge: the panel border when one is set, otherwise a 1 px hairline, and a
+  shadow while glass is off. Its × and the group buttons answer to a 32 px
+  target around the drawn control.
 - **Focus:** one name everywhere for silencing pop-ups ("Do Not Disturb"
   before 2026-11): the Overview tile, the Notifications tab's switch,
   Settings, the bar and the launcher.

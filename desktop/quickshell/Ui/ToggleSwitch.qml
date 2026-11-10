@@ -57,7 +57,8 @@ Item {
   // and blurs their edges. The derived sizes only carry floors low enough to
   // stay out of an override's way; at the default track height each one is
   // already above its floor, so nothing about the normal switch changes.
-  property int trackHeight: Math.max(22, Math.round(Style.spacing.controlHeight * 0.55))
+  // The default is at least 24 px tall, the shell's switch floor (2026-11).
+  property int trackHeight: Math.max(24, Math.round(Style.spacing.controlHeight * 0.55))
   property int trackWidth: Math.round(trackHeight * 1.9)
   property int knobSize: Math.max(6, Math.round(trackHeight * 0.72))
   property int knobInset: Math.max(1, Math.round((trackHeight - knobSize) / 2))
@@ -101,9 +102,13 @@ Item {
     }
   }
 
+  // At least 32 px both ways, invisibly, when the drawn switch is smaller
+  // (a compact track without its cursor ring).
   MouseArea {
     id: mouse
-    anchors.fill: parent
+    anchors.centerIn: parent
+    width: Math.max(parent.width, 32)
+    height: Math.max(parent.height, 32)
     enabled: root.interactive
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor

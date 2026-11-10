@@ -1,16 +1,27 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Shapes
 import "../Common"
 import "../Common/ShortcutEditor.js" as Helpers
 
 // The Super+letter and Super+digit keys, drawn as a keyboard, each with the
-// action it runs. A protected action's reserved defaults carry a lock (its
-// other keys can move like any key); free keys are lit. Choosing a
-// bound key asks to edit its action; choosing a free key offers to make it
-// open an app, a website, a web app or a command. Used by Settings →
-// Keyboard shortcuts and by the welcome guide.
+// action it runs. Used by Settings → Keyboard → Shortcuts; the welcome guide
+// draws the same model and the same meanings in installer keycaps
+// (Welcome/KioskKeyMap.qml).
 //
-// One key is a tab stop; the arrows move between keys (roving focus).
+// One meaning in both maps (2026-11 council review, where Settings lit its
+// free keys and the guide its bound ones): a key in use is lit and names its
+// action; a free key is plain, with a dashed outline; a protected key carries
+// a lock and a key held twice an amber edge and a warning mark. Colour is
+// never the only cue. An action name that does not fit on its key whole
+// shows its group's icon instead of an elided word; the key's tip, its
+// accessible name and the detail under the map always name it in full.
+//
+// Choosing a bound key asks to edit its action; choosing a free key offers
+// to make it open an app, a website, a web app or a command. The detail area
+// below the legend is always there, so the page does not jump as keys are
+// chosen. One key is a tab stop; the arrows move between keys (roving
+// focus) and the detail follows them.
 Column {
     id: root
 
@@ -19,11 +30,12 @@ Column {
     // While keybindings.json is rejected the map only shows what is bound.
     property bool readOnly: Keybindings.readOnly
     readonly property var map: Helpers.keyboardMap(actions, userBinds)
+    readonly property var allKeys: [].concat.apply([], map)
     // The key whose details show under the map, by combination.
     property string selected: ""
     property int focusRow: 1
     property int focusColumn: 0
-    readonly property var selectedKey: [].concat.apply([], map).find(key => key.combo === selected) || null
+    readonly property var selectedKey: allKeys.find(key => key.combo === selected) || null
     readonly property real unit: Math.floor((width - Theme.scaled(3) * 9) / 10.5)
     readonly property real keyHeight: Math.min(Theme.scaled(64), Math.max(Theme.scaled(48), unit * 0.92))
     readonly property var offsets: [0, 0.5, 0.75, 1.25]
@@ -36,27 +48,68 @@ Column {
         property Repeater keys: null
         function keyAt(column: int): Item { return keys ? keys.itemAt(column) : null; }
     }
+
+    // A free key's outline: dashed, so it reads apart from a lit key
+    // without relying on colour.
+    component DashedOutline: Shape {
+        id: outline
+        property color stroke: Theme.textFaint
+        property real cornerRadius: Theme.scaled(6)
+        ShapePath {
+            strokeColor: outline.stroke
+            strokeWidth: 1
+            strokeStyle: ShapePath.DashLine
+            dashPattern: [3, 3]
+            fillColor: "transparent"
+            PathRectangle {
+                x: 0.5
+                y: 0.5
+                width: Math.max(0, outline.width - 1)
+                height: Math.max(0, outline.height - 1)
+                radius: outline.cornerRadius
+            }
+        }
+    }
+
+    // One legend entry: a small key drawn the way the map draws that state,
+    // and its name. The guide's map uses the same words.
     component Legend: Row {
         id: legend
-        property color fill
-        property color edge
-        property string glyph: ""
+        // "used", "free", "protected", "shared" or "user".
+        property string kind: "used"
         property string text
+        // The mark a protected or twice-held key carries.
+        readonly property string mark: kind === "shared" ? "warning" : kind === "protected" ? "lock" : ""
         spacing: Theme.iconTextSpacing
         Rectangle {
+            id: swatch
             anchors.verticalCenter: parent.verticalCenter
-            width: Theme.iconSmall + Theme.scaled(4)
+            width: Theme.iconSmall + Theme.scaled(6)
             height: width
             radius: Theme.scaled(3)
-            color: legend.fill
-            border.width: 1
-            border.color: legend.edge
+            color: legend.kind === "free" ? "transparent" : Theme.accentAlpha(0.16)
+            border.width: legend.kind === "free" ? 0 : 1
+            border.color: legend.kind === "shared" ? Theme.amber : Theme.accentAlpha(0.55)
+            DashedOutline {
+                anchors.fill: parent
+                visible: legend.kind === "free"
+                cornerRadius: swatch.radius
+            }
             Sym {
                 anchors.centerIn: parent
-                visible: legend.glyph !== ""
-                name: legend.glyph
+                visible: legend.mark !== ""
+                name: legend.mark
                 size: Theme.iconSmall - Theme.scaled(2)
-                color: Theme.textFaint
+                color: legend.kind === "shared" ? Theme.amber : Theme.textFaint
+            }
+            Text {
+                anchors.centerIn: parent
+                visible: legend.kind === "user"
+                text: "Aa" // i18n: untranslated (type sample)
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.metadata
+                font.italic: true
+                color: Theme.textMid
             }
         }
         Text {
@@ -83,7 +136,7 @@ Column {
         if (key.shared)
             text = I18n.format("%1 and %2 more", [text, key.owners.length - 1]);
         if (key.owner.source === "user")
-            text = I18n.format("%1 (from user.lua)", [text]);
+            text = I18n.format("%1 (hand-written)", [text]);
         return text;
     }
     function activate(key) {
@@ -100,6 +153,11 @@ Column {
             item.forceActiveFocus();
         focusRow = target.row;
         focusColumn = target.column;
+        // The detail follows the keyboard, so every key's full name can be
+        // read without choosing it.
+        const key = map[target.row] ? map[target.row][target.column] : null;
+        if (key)
+            selected = key.combo;
     }
 
     Column {
@@ -128,15 +186,21 @@ Column {
                         readonly property bool current: root.focusRow === modelData.row && root.focusColumn === modelData.column
                         readonly property bool chosen: root.selected === modelData.combo
                         readonly property bool user: !!modelData.owner && modelData.owner.source === "user"
+                        // Lit: the key does something while Super is held.
+                        readonly property bool lit: !modelData.free
+                        readonly property string group: modelData.owner ? modelData.owner.group
+                            : modelData.reservedBy ? modelData.reservedBy.group : ""
                         width: root.unit
                         height: root.keyHeight
                         radius: Theme.scaled(6)
-                        color: modelData.free ? Theme.accentAlpha(chosen ? 0.26 : 0.16)
-                            : chosen ? Theme.chipHover : Theme.cardFill
-                        border.width: activeFocus || chosen ? 2 : 1
-                        border.color: activeFocus ? Theme.accentText
-                            : modelData.shared ? Theme.amber
-                            : modelData.free ? Theme.accentAlpha(0.55) : Theme.stroke
+                        color: lit ? Theme.accentAlpha(chosen ? 0.28 : 0.16)
+                            : chosen ? Theme.chipHover : "transparent"
+                        // A free key's edge is the dashed outline below until it
+                        // is chosen; a chosen key takes a 2 px edge in its ink.
+                        border.width: chosen ? 2 : lit ? 1 : 0
+                        border.color: modelData.shared ? Theme.amber
+                            : lit ? (chosen ? Theme.accentText : Theme.accentAlpha(0.55))
+                            : Theme.textMid
                         activeFocusOnTab: current
                         Accessible.role: Accessible.Button
                         Accessible.name: I18n.format("Super+%1: %2", [modelData.key, root.describe(modelData)])
@@ -158,15 +222,29 @@ Column {
                             }
                         }
 
+                        DashedOutline {
+                            anchors.fill: parent
+                            visible: !keyCap.lit && !keyCap.chosen
+                            cornerRadius: keyCap.radius
+                        }
+
                         StateLayer {
                             id: keyState
                             anchors.fill: parent
                             radius: parent.radius
                             hovered: keyMouse.containsMouse
                             pressed: keyMouse.pressed
-                            focused: keyCap.activeFocus
-                            tint: keyCap.modelData.free ? Theme.accent : Theme.textHi
+                            tint: keyCap.lit ? Theme.accent : Theme.textHi
                             pressPoint: Qt.point(keyMouse.mouseX, keyMouse.mouseY)
+                        }
+
+                        // The keyboard ring, apart from the chosen key's edge.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: parent.radius
+                            color: "transparent"
+                            border.width: Theme.focusWidth(keyCap.activeFocus)
+                            border.color: Theme.focusRing
                         }
 
                         Text {
@@ -176,20 +254,23 @@ Column {
                             font.family: Theme.fontMono
                             font.pixelSize: Theme.typography.control
                             font.weight: Theme.weightBold
-                            color: keyCap.modelData.free ? Theme.accentText : Theme.textHi
+                            color: keyCap.lit ? Theme.accentText : Theme.textFaint
                         }
+                        // Protected before held twice: a lock says more about
+                        // what you can do with the key.
                         Sym {
-                            visible: keyCap.modelData.protected || keyCap.modelData.free
+                            visible: keyCap.modelData.protected || keyCap.modelData.shared
                             anchors.right: parent.right
                             anchors.rightMargin: Theme.scaled(4)
                             y: Theme.scaled(5)
-                            name: keyCap.modelData.free ? "add" : "lock"
+                            name: keyCap.modelData.protected ? "lock" : "warning"
                             size: Theme.iconSmall
-                            color: keyCap.modelData.free ? Theme.accentText : Theme.textFaint
+                            color: keyCap.modelData.protected ? Theme.textFaint : Theme.amber
                         }
-                        // Two lines at word boundaries; one elided line when a
-                        // word alone is wider than the key (a narrow map, a
-                        // long translation), so it never runs into the next.
+                        // Two lines at word boundaries. A name that does not
+                        // fit whole (a word wider than the key, a third line)
+                        // gives way to its group's icon rather than an elided
+                        // "Worksp…"; the tip and the detail name it in full.
                         TextMetrics {
                             id: longestWord
                             font: keyLabel.font
@@ -201,7 +282,10 @@ Column {
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: Theme.scaled(3)
                             width: parent.width - Theme.scaled(8)
-                            visible: !keyCap.modelData.free
+                            visible: keyCap.lit
+                            // Laid out even when it gives way, so `truncated`
+                            // keeps answering.
+                            opacity: truncated ? 0 : 1
                             text: keyCap.modelData.reservedBy ? I18n.actionLabel(keyCap.modelData.reservedBy.label)
                                 : root.label(keyCap.modelData.owner)
                             wrapMode: longestWord.advanceWidth <= width ? Text.WordWrap : Text.NoWrap
@@ -212,6 +296,15 @@ Column {
                             font.pixelSize: Theme.typography.metadata
                             font.italic: keyCap.user
                             color: keyCap.modelData.reservedBy || keyCap.user ? Theme.textFaint : Theme.textMid
+                        }
+                        Sym {
+                            visible: keyCap.lit && keyLabel.truncated
+                            x: Theme.scaled(5)
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: Theme.scaled(5)
+                            name: Helpers.groupGlyph(keyCap.group)
+                            size: Theme.iconSmall
+                            color: Theme.textMid
                         }
 
                         MouseArea {
@@ -224,28 +317,55 @@ Column {
                                 root.activate(keyCap.modelData);
                             }
                         }
+                        // The full name under the pointer; made only while
+                        // hovered, so forty keys do not each hold a popup.
+                        Loader {
+                            anchors.fill: parent
+                            active: keyMouse.containsMouse
+                            sourceComponent: SettingsTooltip {
+                                visible: true
+                                text: I18n.format("Super+%1: %2", [keyCap.modelData.key, root.describe(keyCap.modelData)])
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    // The legend, then what the chosen key does.
+    // The legend, in the guide's words: only the states the map shows.
     Flow {
         width: parent.width
         spacing: Theme.panelSectionSpacing
 
-        Legend { fill: Theme.accentAlpha(0.16); edge: Theme.accentAlpha(0.55); text: I18n.tr("Free") }
-        Legend { fill: Theme.cardFill; edge: Theme.stroke; glyph: "lock"; text: I18n.tr("Protected default") }
-        Legend { fill: Theme.cardFill; edge: Theme.amber; text: I18n.tr("Used more than once") }
-        Legend { fill: Theme.cardFill; edge: Theme.stroke; text: I18n.tr("Italic: from user.lua") }
+        Legend { kind: "used"; text: I18n.tr("In use") }
+        Legend { kind: "free"; text: I18n.tr("Free") }
+        Legend {
+            kind: "protected"
+            visible: root.allKeys.some(key => key.protected)
+            text: I18n.tr("Protected")
+        }
+        Legend {
+            kind: "shared"
+            visible: root.allKeys.some(key => key.shared)
+            text: I18n.tr("Used more than once")
+        }
+        Legend {
+            kind: "user"
+            visible: root.allKeys.some(key => key.owners.some(owner => owner.source === "user"))
+            text: I18n.tr("Italic: hand-written")
+        }
     }
 
+    // What the chosen key does, in full. Always present and never shorter
+    // than a key's name and one row of actions, so choosing keys does not
+    // move the page.
     Rectangle {
         id: detail
-        visible: root.selectedKey !== null
+        objectName: "shortcutMapDetail"
         width: parent.width
-        height: visible ? detailBody.implicitHeight + Theme.controlSpacing * 2 : 0
+        height: Math.max(detailBody.implicitHeight, Theme.settingsControlHeight * 2 + Theme.iconTextSpacing)
+            + Theme.controlSpacing * 2
         radius: Theme.chipRadius
         color: Theme.cardFill
         border.width: 1
@@ -258,13 +378,27 @@ Column {
             width: parent.width - Theme.controlSpacing * 2
             spacing: Theme.iconTextSpacing
 
+            Text {
+                width: parent.width
+                visible: root.selectedKey === null
+                wrapMode: Text.Wrap
+                text: I18n.tr("Choose a key to see what it does.")
+                font.family: Theme.fontMenu
+                font.pixelSize: Theme.typography.control
+                color: Theme.textFaint
+            }
             Row {
+                visible: root.selectedKey !== null
+                width: parent.width
                 spacing: Theme.controlSpacing
-                ShortcutKeycaps { keys: root.selectedKey ? [root.selectedKey.combo] : [] }
+                ShortcutKeycaps {
+                    id: detailCaps
+                    keys: root.selectedKey ? [root.selectedKey.combo] : []
+                }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, detailBody.width - Theme.scaled(120))
-                    elide: Text.ElideRight
+                    width: Math.max(0, parent.width - detailCaps.width - parent.spacing)
+                    wrapMode: Text.Wrap
                     text: !root.selectedKey ? ""
                         : root.selectedKey.free ? (root.readOnly ? I18n.tr("This key is free.") : I18n.tr("This key is free. Make it open:"))
                         : root.describe(root.selectedKey)
@@ -286,7 +420,8 @@ Column {
                         [root.label(root.selectedKey.owner)])
                     : root.selectedKey.owner.source === "user" ? I18n.tr("Set in ~/.config/cybexos/hypr/user.lua. Change it there.")
                     : root.selectedKey.shared ? root.selectedKey.owners.map(owner => root.label(owner)).join(", ")
-                    : !root.selectedKey.owner.editable ? I18n.tr("This shortcut cannot be changed here.") : ""
+                    : !root.selectedKey.owner.editable ? I18n.tr("This shortcut cannot be changed here.")
+                    : I18n.actionLabel(root.selectedKey.owner.group)
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textFaint

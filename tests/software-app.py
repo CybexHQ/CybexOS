@@ -46,6 +46,14 @@ VERSIONS = {'gimp': '3.0.6', 'krita': '5.2.13', 'blender': '4.5.3', 'inkscape': 
             'localsend': '1.17.0', 'obs-studio': '32.0.1', 'spotify': '1.2.74', 'zed-editor': '0.208.4'}
 
 
+# Nixpkgs' own descriptions, as the inventory reports them for packages
+# that are not catalogue apps.
+DESCRIPTIONS = {'kitty': 'A modern, hackable, featureful, OpenGL based terminal emulator',
+                'nautilus': 'The file manager for GNOME', 'coreutils': 'The GNU Core Utilities',
+                'git': 'Distributed version control system', 'ripgrep': 'A utility that searches the current directory',
+                'htop': 'An interactive process viewer', 'hello': 'A program that produces a familiar, friendly greeting'}
+
+
 def store(name, letter='a'):
     return '/nix/store/' + letter * 32 + '-' + name
 
@@ -74,7 +82,7 @@ def inventory(rows):
         path = store(name + '-' + VERSIONS.get(name, '1.0'), letter)
         attributes = [name] if origin == 'software' else []
         packages.append({'path': path, 'name': name, 'version': VERSIONS.get(name, '1.0'),
-                         'description': 'The ' + name + ' package', 'attributes': attributes,
+                         'description': DESCRIPTIONS.get(name, 'The ' + name + ' package'), 'attributes': attributes,
                          'origins': [origin], 'managedElsewhere': origin != 'software'})
         entries[path] = [{'id': ident, 'name': title, 'icon': icon} for ident, title, icon in apps]
     return packages, entries
@@ -631,10 +639,10 @@ def main():
             # ---- an app page: checked on demand ----------------------------
             session.call('software-test', 'app', 'gimp')
             wait(lambda: state().get('appName') == 'GIMP' and state()['checks'].get('gimp') == 'prebuilt', 'GIMP page and check')
-            wait(lambda: state().get('download') == 'Download ≈ 182 MB · nothing to compile', 'exact download')
+            wait(lambda: state().get('download') == 'Download ≈ 182 MB · ready to use', 'exact download')
             assert session.calls()[-1] == ['software', 'check', 'gimp'], session.calls()
             assert state()['counts']['screenshots'] == 3, state()
-            assert state()['appPrimary'] == {'text': 'Install', 'enabled': True}, state()
+            assert state()['appPrimary'] == {'text': 'Add to queue', 'enabled': True}, state()
             session.themed(shots, 'software-app', settle=3.0)
             # Escape goes back one page, to the category.
             session.key('-k', 'Escape')
@@ -644,8 +652,8 @@ def main():
 
             # ---- the queue -------------------------------------------------
             assert session.press('softwareAppPrimary')
-            wait(lambda: state().get('queue') == ['gimp:install'] and state().get('appPrimary', {}).get('text') == 'Added', 'GIMP added')
-            wait(lambda: 'all prebuilt, nothing to compile' in (state().get('detail') or ''), 'queue bar summary')
+            wait(lambda: state().get('queue') == ['gimp:install'] and state().get('appPrimary', {}).get('text') == 'In queue', 'GIMP queued')
+            wait(lambda: 'ready to use' in (state().get('detail') or ''), 'queue bar summary')
             # A package from the full search, checked before Install is offered.
             session.call('software-test', 'search', 'hello')
             wait(lambda: state().get('view') == 'search' and state()['counts']['packages'] == 1, 'more packages')
@@ -690,7 +698,7 @@ def main():
             wait(lambda: state().get('phase') == 'preparing', 'preparing the change')
             stage = next(call for call in reversed(session.calls()) if call[:2] == ['software', 'stage'])
             assert stage[2] == {'packages': ['gimp', 'hello'], 'previous': []}, stage
-            wait(lambda: 'Downloading prebuilt packages · 96 MB of 230 MB' == state().get('detail'), 'download progress')
+            wait(lambda: 'Downloading · 96 MB of 230 MB' == state().get('detail'), 'download progress')
             session.shot(shots, 'software-installing-dark.png')
             software_change = {'packages': ['gimp', 'hello'], 'previous': []}
             session.status(state='ready', changeKind='software', requestId='c' * 32, transaction='a' * 32,
@@ -836,6 +844,10 @@ def main():
             session.fixture(verdicts={'ghostty': {'state': 'prebuilt', 'downloadBytes': 17610075}})
             session.call('software-test', 'tab', 'explore')
             session.call('software-test', 'scrollTo', 'softwareExplorePage', '0')
+            # Under the featured apps the jobs fold to one row; Show all opens all nine.
+            wait(lambda: 0 < state()['counts']['defaultCards'] < 9 and state().get('roleKeys') == 9,
+                 'one row of jobs under the featured apps')
+            assert session.press('softwareDefaultsMore')
             wait(lambda: state()['counts']['defaultCards'] == 9 and state().get('roleKeys') == 9
                  and not state().get('defaultsBusy'), 'nine jobs on Software\'s home')
             current = state()
@@ -850,7 +862,7 @@ def main():
             assert current['options'][:2] == ['Brave', 'Firefox'] and 'Web' in current['options'], current['options']
             session.themed(shots, 'software-defaults-picker')
             session.call('software-test', 'choose', 'librewolf')
-            wait(lambda: (state().get('pickerNote') or '').startswith('Installs LibreWolf (≈ 129 MB, prebuilt by NixOS)'), 'what installing does')
+            wait(lambda: (state().get('pickerNote') or '').startswith('Installs LibreWolf (≈ 129 MB, open source, ready to use)'), 'what installing does')
             session.call('software-test', 'choose', 'firefox')
             wait(lambda: state().get('use') == {'text': 'Use Firefox', 'enabled': True}, 'Use Firefox')
             assert state()['pickerNote'].startswith('Switches to Firefox right away. Brave stays installed'), state()['pickerNote']

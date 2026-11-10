@@ -2,8 +2,10 @@ import QtQuick
 import "../Common"
 
 // Software's buttons: one accent-filled primary action per surface, quiet
-// outlined ones, and "queued" for an app already on the install list. Over
-// brand artwork a view passes its own `foreground`.
+// outlined ones, and "queued" for an app already in the install queue. Over
+// brand artwork a view passes its own `foreground`, and for its main action
+// a `solidFill` with `solidInk`: a solid button that contrasts with any
+// brand colour, where the accent could be blue on blue.
 Rectangle {
     id: root
 
@@ -15,23 +17,29 @@ Rectangle {
     property bool big: false
     property bool busy: false
     property color foreground: "transparent"
+    property color solidFill: "transparent"
+    property color solidInk: "transparent"
     property string accessibleName: text
     signal triggered()
 
     readonly property bool custom: foreground.a > 0
-    readonly property color ink: primary ? Theme.textOnAccent : queued ? Theme.accentText
-        : custom ? foreground : Theme.textHi
+    readonly property bool solid: solidFill.a > 0
+    readonly property color ink: solid ? solidInk : primary ? Theme.textOnAccent
+        : custom ? foreground : queued ? Theme.accentText : Theme.textHi
+    // The pointer target reaches 32 px even where the button is drawn smaller.
+    readonly property real hitPad: Math.max(0, (Theme.scaled(32) - height) / 2)
 
     implicitWidth: content.implicitWidth + Theme.scaled(big ? 36 : 24)
     implicitHeight: Theme.scaled(big ? 38 : 30)
     radius: Theme.chipRadius + (big ? 2 : 0)
-    color: primary ? Theme.accent : queued ? Theme.accentAlpha(0.16)
+    color: solid ? solidFill : primary ? Theme.accent
         : custom ? Qt.rgba(foreground.r, foreground.g, foreground.b, quiet ? 0 : 0.14)
+        : queued ? Theme.accentAlpha(0.16)
         : quiet ? "transparent" : Theme.hoverFill
     border.width: activeFocus ? 2 : (queued || quiet) ? 1 : 0
-    border.color: activeFocus ? (primary ? Theme.textHi : Theme.accentText)
-        : queued ? Theme.accentAlpha(0.5)
-        : custom ? Qt.rgba(foreground.r, foreground.g, foreground.b, 0.35) : Theme.stroke
+    border.color: activeFocus ? (solid ? solidInk : primary ? Theme.textHi : Theme.accentText)
+        : custom ? Qt.rgba(foreground.r, foreground.g, foreground.b, 0.35)
+        : queued ? Theme.accentAlpha(0.5) : Theme.stroke
     opacity: enabled ? 1 : 0.45
     activeFocusOnTab: enabled && visible
     Accessible.role: Accessible.Button
@@ -56,7 +64,7 @@ Rectangle {
         pressed: mouse.pressed
         focused: false
         tint: root.ink
-        pressPoint: Qt.point(mouse.mouseX, mouse.mouseY)
+        pressPoint: Qt.point(mouse.mouseX, mouse.mouseY - root.hitPad)
     }
 
     Row {
@@ -91,6 +99,8 @@ Rectangle {
     MouseArea {
         id: mouse
         anchors.fill: parent
+        anchors.topMargin: -root.hitPad
+        anchors.bottomMargin: -root.hitPad
         hoverEnabled: true
         cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: {

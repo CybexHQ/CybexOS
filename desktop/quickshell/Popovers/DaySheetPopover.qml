@@ -4,10 +4,11 @@ import Quickshell
 import "../Common"
 
 // The Day sheet: the surface the clock (and the weather pill) unrolls under
-// the bar — big time, today's sky, the week at a glance with each day's
-// forecast and event dots, and the next few events. Attached flush under the
-// bar and centred on the bar regardless of which trigger opened it
-// (PanelRegistryData `attached` + `centerAnchored`).
+// the bar — big time, today's sky and the next days' forecast, the month
+// with event marks (MonthGrid, shared with CalendarPopover), and the next
+// few events. Without a location the sky is a prompt to set one. Attached
+// flush under the bar and centred on the bar regardless of which trigger
+// opened it (PanelRegistryData `attached` + `centerAnchored`).
 Surface {
     id: root
 
@@ -20,36 +21,27 @@ Surface {
         precision: SystemClock.Minutes
     }
 
-    // Monday-first week around today, each day carrying its date, its slice
-    // of the five-day forecast when there is one, and its event dots.
-    readonly property var week: {
-        void clock.date;
-        void Calendar.events;
-        void Weather.days;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        // Monday-first: today's position in the strip is also the offset of
-        // every other cell from it, so no date arithmetic in milliseconds.
-        const todayAt = (today.getDay() + 6) % 7;
-        const days = [];
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(today);
-            date.setDate(today.getDate() + (i - todayAt));
-            const offset = i - todayAt;
-            const forecast = offset >= 0 && offset < Weather.days.length
-                ? Weather.days[offset] : null;
-            const dots = Calendar.eventsForDay(date, 3).map(event => event.color);
-            days.push({
-                date: date,
-                dow: Qt.formatDateTime(date, "ddd").toUpperCase(),
-                day: date.getDate(),
-                today: offset === 0,
-                forecast: forecast,
-                dots: dots
-            });
-        }
-        return days;
+    // The month shown, as an offset from this one. Every open starts on
+    // today's month; browsing asks the calendar for that month's events.
+    property int monthOffset: 0
+    readonly property var shownMonth: new Date(clock.date.getFullYear(),
+        clock.date.getMonth() + monthOffset, 1)
+
+    onVisibleChanged: {
+        if (visible)
+            monthOffset = 0;
     }
+    onShownMonthChanged: {
+        if (visible && monthOffset !== 0)
+            Calendar.ensureMonth(shownMonth, false);
+    }
+
+    // The next five days' sky, today first, once a location is set.
+    readonly property var forecast: Weather.days.slice(0, 5).map((day, offset) => {
+        const date = new Date(clock.date.getFullYear(), clock.date.getMonth(),
+            clock.date.getDate() + offset);
+        return { date: date, code: day.code, hi: day.hi, lo: day.lo };
+    })
 
     readonly property var events: Calendar.upcoming(3)
 
@@ -74,7 +66,7 @@ Surface {
         // ---- clock and sky ------------------------------------------------
         Column {
             id: clockColumn
-            width: Math.max(Theme.scaled(190), clockText.implicitWidth)
+            width: Math.max(Theme.scaled(220), clockText.implicitWidth)
             spacing: 6
 
             Text {
@@ -90,13 +82,16 @@ Surface {
             }
 
             Text {
+                width: parent.width
                 text: Qt.formatDateTime(clock.date, "dddd d MMMM")
+                wrapMode: Text.Wrap
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textFaint
             }
 
             Row {
+                visible: Weather.locationSet
                 topPadding: 8
                 spacing: 8
 
@@ -119,25 +114,13 @@ Surface {
                     color: Theme.textHi
                 }
 
-                // Without coordinates there is no sky to describe, only where
-                // to set them: the weather widget's own options.
-                LinkText {
-                    visible: !Weather.locationSet
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.tr("Set a location in Settings")
-                    font.pixelSize: Theme.typography.secondary
-                    onClicked: {
-                        Settings.openWidgetSettings("weather");
-                        Settings.showPanel("bar", Popouts.hostScreenName);
-                    }
-                }
-
                 Text {
-                    visible: Weather.locationSet
                     anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, clockColumn.width - x)
+                    elide: Text.ElideRight
                     text: {
                         if (!Weather.ready)
-                            return Weather.offline ? "offline" : "loading…";
+                            return Weather.offline ? I18n.tr("Offline") : I18n.tr("Loading…");
                         const today = Weather.days.length > 0
                             ? Weather.days[0] : null;
                         return Weather.condition + (today
@@ -148,113 +131,186 @@ Surface {
                     color: Theme.textFaint
                 }
             }
-        }
 
-        // ---- the week -----------------------------------------------------
-        Grid {
-            id: weekGrid
-            width: parent.width - clockColumn.width - parent.spacing
-            columns: 7
-            columnSpacing: 4
+            // The next days at a glance: what the week strip carried.
+            Row {
+                visible: Weather.locationSet && Weather.ready && root.forecast.length > 1
+                topPadding: 4
+                spacing: 0
 
-            readonly property real cellWidth: (width - columnSpacing * 6) / 7
+                Repeater {
+                    model: root.forecast
 
-            Repeater {
-                model: root.week
+                    delegate: Column {
+                        id: forecastDay
 
-                delegate: Rectangle {
-                    id: dayCell
+                        required property var modelData
+                        required property int index
 
-                    required property var modelData
+                        width: clockColumn.width / 5
+                        spacing: 3
 
-                    width: weekGrid.cellWidth
-                    height: Theme.scaled(96)
-                    radius: 10
-                    // Today is the selected tile (docs/shell-states.md): the
-                    // accent tint and a 2 px accent border, which still reads
-                    // at 3:1 on a light sheet where chipHover did not.
-                    color: modelData.today ? Theme.selectedFill : Theme.chip
-                    border.width: modelData.today ? Theme.selectedBorderWidth : 0
-                    border.color: Theme.selectedMark
-
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 5
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: Qt.formatDateTime(modelData.date, "dddd") + ", "
+                            + modelData.hi + "° / " + modelData.lo + "°"
 
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: dayCell.modelData.dow
+                            text: forecastDay.index === 0 ? I18n.tr("Today")
+                                : Qt.formatDateTime(forecastDay.modelData.date, "ddd")
                             font.family: Theme.fontMenu
                             font.pixelSize: Theme.typography.metadata
                             font.weight: Theme.weightSemibold
-                            font.letterSpacing: 0.5
-                            color: dayCell.modelData.today
-                                ? Theme.accentText : Theme.textFaint
+                            color: forecastDay.index === 0 ? Theme.accentText : Theme.textFaint
+                        }
+
+                        Sym {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            name: Weather.symbol(forecastDay.modelData.code, true)
+                            size: Theme.iconMedium
+                            color: Weather.glyphColor(forecastDay.modelData.code, true)
                         }
 
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: dayCell.modelData.day
+                            text: forecastDay.modelData.hi + "°"
                             font.family: Theme.fontNumeric
-                            font.pixelSize: Theme.typography.heading
+                            font.pixelSize: Theme.typography.secondary
                             font.weight: Theme.weightSemibold
                             font.features: Theme.tabularNumberFeatures
-                            // The border carries the accent; the number keeps
-                            // full contrast on the tint.
                             color: Theme.textHi
                         }
+                    }
+                }
+            }
 
-                        Item {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: 14
-                            height: 14
+            // Without coordinates there is no sky to describe: a short
+            // prompt and the one action that fixes it, which opens the
+            // weather widget's own options in Settings.
+            Item {
+                width: parent.width
+                height: Theme.scaled(4)
+                visible: !Weather.locationSet
+            }
 
-                            Sym {
-                                anchors.centerIn: parent
-                                visible: dayCell.modelData.forecast !== null
-                                name: dayCell.modelData.forecast
-                                    ? Weather.symbol(
-                                        dayCell.modelData.forecast.code, true)
-                                    : "circle"
-                                size: 14
-                                color: dayCell.modelData.forecast
-                                    ? Weather.glyphColor(
-                                        dayCell.modelData.forecast.code, true)
-                                    : Theme.textFaint
-                            }
-                        }
+            Rectangle {
+                id: locationPrompt
 
-                        Row {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            height: 4
-                            spacing: 2
+                visible: !Weather.locationSet
+                width: parent.width
+                height: promptColumn.implicitHeight + Theme.scaled(12) * 2
+                radius: Theme.cardRadius
+                color: Theme.chip
 
-                            Repeater {
-                                model: dayCell.modelData.dots
+                Accessible.role: Accessible.Grouping
+                Accessible.name: I18n.tr("Weather needs a location")
 
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    width: 4
-                                    height: 4
-                                    radius: 2
-                                    color: modelData
-                                }
-                            }
-                        }
+                Sym {
+                    id: promptGlyph
+                    x: Theme.scaled(12)
+                    y: Theme.scaled(12)
+                    name: "map-pin"
+                    size: Theme.iconLarge
+                    color: Theme.accentText
+                }
+
+                Column {
+                    id: promptColumn
+                    x: promptGlyph.x + promptGlyph.width + Theme.scaled(10)
+                    y: Theme.scaled(12)
+                    width: Math.max(0, parent.width - x - Theme.scaled(12))
+                    spacing: Theme.scaled(8)
+
+                    Text {
+                        width: parent.width
+                        text: I18n.tr("Add your location to see the weather here.")
+                        wrapMode: Text.Wrap
+                        font.family: Theme.fontMenu
+                        font.pixelSize: Theme.typography.secondary
+                        color: Theme.textMid
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Popouts.close();
-                            Calendar.openCalendar(dayCell.modelData.date);
+                    ActionButton {
+                        label: I18n.tr("Set location")
+                        hPadding: 24
+                        tint: Theme.accentText
+                        fill: Theme.accentBgSoft
+                        onTriggered: {
+                            Settings.openWidgetSettings("weather");
+                            Settings.showPanel("bar", Popouts.hostScreenName);
                         }
                     }
+                }
+            }
+        }
 
-                    Accessible.role: Accessible.Button
-                    Accessible.name: Qt.formatDateTime(
-                        dayCell.modelData.date, "dddd d MMMM")
+        // ---- the month ----------------------------------------------------
+        Column {
+            id: monthColumn
+            width: parent.width - clockColumn.width - parent.spacing
+            spacing: 4
+
+            Item {
+                width: parent.width
+                height: Theme.inlineActionHeight
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 4
+                    anchors.right: monthActions.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Qt.formatDateTime(root.shownMonth, "MMMM yyyy")
+                    elide: Text.ElideRight
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.primary
+                    font.weight: Theme.weightSemibold
+                    color: Theme.textMid
+                }
+
+                Row {
+                    id: monthActions
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+
+                    IconButton {
+                        visible: root.monthOffset !== 0
+                        symbol: "today"
+                        tint: Theme.textLow
+                        controlSize: Theme.inlineActionHeight
+                        accessibleName: I18n.tr("This month")
+                        onTriggered: root.monthOffset = 0
+                    }
+
+                    IconButton {
+                        symbol: "chevron_left"
+                        tint: Theme.textLow
+                        controlSize: Theme.inlineActionHeight
+                        accessibleName: I18n.tr("Previous month")
+                        onTriggered: root.monthOffset--
+                    }
+
+                    IconButton {
+                        symbol: "chevron_right"
+                        tint: Theme.textLow
+                        controlSize: Theme.inlineActionHeight
+                        accessibleName: I18n.tr("Next month")
+                        onTriggered: root.monthOffset++
+                    }
+                }
+            }
+
+            // A date opens the calendar app on that day, as the week's
+            // cells did.
+            MonthGrid {
+                width: parent.width
+                month: root.shownMonth
+                today: clock.date
+                events: Calendar.enabled ? Calendar.events : []
+                onChosen: date => {
+                    Popouts.close();
+                    Calendar.openCalendar(date);
                 }
             }
         }

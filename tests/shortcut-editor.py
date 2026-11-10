@@ -337,7 +337,7 @@ def main():
             assert loaded['browser']['keys'] == ['SUPER + B'] and loaded['slack']['keys'] == ['SUPER + M']
             screenshot('shortcuts-page.png')
             ipc('shortcut-test', 'filter', 'user')
-            wait(lambda: state().get('groups') == ['Mine'], 'From user.lua filter')
+            wait(lambda: state().get('groups') == ['Mine'], 'Hand-written (user.lua) filter')
             screenshot('shortcuts-user-filter.png')
             ipc('shortcut-test', 'filter', 'all')
 

@@ -6,11 +6,18 @@ import "../Common/ShortcutEditor.js" as Helpers
 
 // Settings → Keyboard → Shortcuts. Every row is a Keybindings action, in the
 // Super+K sheet's group order: search by name or keys, filter what changed,
-// what conflicts and what user.lua binds, record new keys, reset, disable,
-// and add custom shortcuts. Edits form a draft that the Apply bar saves
-// through the keybindings service; user.lua still loads last and wins.
-// A keybindings.json the loader rejects makes the page read only: the banner
-// says why, and only Reset all (which keeps the broken file) is offered.
+// what conflicts and what user.lua binds ("Hand-written"), record new keys,
+// reset, disable, and add custom shortcuts. Edits form a draft that the
+// Apply bar saves through the keybindings service; user.lua still loads last
+// and wins. A keybindings.json the loader rejects makes the page read only:
+// the banner says why, and only Reset all (which keeps the broken file) is
+// offered, right under it.
+//
+// The controls above the list are one compact toolbar (2026-11 council
+// review: five rows pushed the first shortcut below the fold): the view and
+// Add on one line, then the page's one search field with the filters beside
+// it, wrapping under it when the column is narrow. Reset all sits at the
+// page's foot, as every page's reset does.
 SettingsPage {
     id: page
     objectName: "shortcutsPage"
@@ -161,84 +168,88 @@ SettingsPage {
             tone: page.recovering ? "warning" : "info"
         }
 
-        SettingsGroup {
+        // A rejected file's way out stays beside the banner that names it.
+        ResetRows {
             width: parent.width
-            title: I18n.tr("Keyboard shortcuts")
+            visible: page.readOnly
+        }
 
-            DraftFieldRow {
-                width: parent.width
-                label: I18n.tr("Search")
-                mono: false
-                value: page.query
-                placeholder: I18n.tr("Action or keys, such as Super+B")
-                onEdited: text => page.query = text
-            }
-            PickerRow {
-                width: parent.width
-                label: I18n.tr("Show")
-                visible: page.view === "list"
-                model: [{ value: "all", label: I18n.tr("All") }, { value: "changed", label: I18n.tr("Changed") },
-                    { value: "conflicts", label: I18n.tr("Conflicts") }, { value: "user", label: I18n.tr("From user.lua") }]
-                current: page.filter
-                hint: page.filter === "all" ? "" : I18n.format("%1 shown", [page.counts[page.filter]])
-                onPicked: value => page.filter = value
-            }
-            PickerRow {
-                width: parent.width
-                label: I18n.tr("View")
-                property string searchAnchor: "shortcuts-map"
-                model: [{ value: "list", label: I18n.tr("List") }, { value: "map", label: I18n.tr("Keyboard map") }]
-                current: page.view
-                onPicked: value => page.view = value
-            }
-            ValueRow {
-                width: parent.width
-                label: I18n.tr("Your own shortcuts")
-                hint: I18n.tr("Open an app, a website, a web app or a command.")
-                property string searchAnchor: "shortcuts-add"
+        // The toolbar: the view and Add, then search and filters.
+        Column {
+            id: toolbar
+            x: Theme.settingsMarkInset
+            width: parent.width - Theme.settingsMarkInset - Theme.chipHeight
+            spacing: Theme.controlSpacing
 
+            Item {
+                width: parent.width
+                height: Math.max(viewPicker.height, addAction.height)
+
+                PillRow {
+                    id: viewPicker
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(naturalWidth, parent.width - addAction.width - Theme.controlSpacing)
+                    property string searchAnchor: "shortcuts-map"
+                    Accessible.name: I18n.tr("View")
+                    model: [{ value: "list", label: I18n.tr("List") }, { value: "map", label: I18n.tr("Keyboard map") }]
+                    current: page.view
+                    onPicked: value => page.view = value
+                }
                 SettingsAction {
+                    id: addAction
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    property string searchAnchor: "shortcuts-add"
+                    secondary: true
                     text: I18n.tr("Add shortcut")
                     glyph: "add"
+                    tooltip: I18n.tr("Open an app, a website, a web app or a command.")
+                    Accessible.description: tooltip
                     enabled: Keybindings.loaded && !page.readOnly
                     onTriggered: page.add("", "app")
                 }
             }
-            ValueRow {
-                width: parent.width
-                label: I18n.tr("All shortcuts")
-                hint: page.readOnly ? I18n.tr("Replace the unreadable keybindings.json with the defaults.")
-                    : I18n.tr("Return every shortcut to its default and remove your own.")
-                visible: !page.confirmingReset
-                property string searchAnchor: "shortcuts-reset"
 
-                SettingsAction {
-                    text: I18n.tr("Reset all…")
-                    glyph: "undo"
-                    enabled: Keybindings.loaded && (page.anyChanged || page.readOnly) && !page.recovering
-                    onTriggered: page.confirmingReset = true
-                }
-            }
-            ValueRow {
+            // Search and the filters share a line while the field keeps a
+            // useful width; otherwise the filters wrap under it.
+            Flow {
+                id: findLine
+                visible: page.view === "list"
                 width: parent.width
-                visible: page.confirmingReset
-                label: I18n.tr("Reset all shortcuts?")
-                hint: page.readOnly
-                    ? I18n.tr("When you apply, keybindings.json is replaced with the defaults. The broken file is kept beside it as keybindings.json.invalid-<time>, so nothing is lost. Your user.lua is not touched.")
-                    : I18n.tr("Every change and custom shortcut goes when you apply. Your user.lua is not touched.")
-                hintTone: "warning"
+                spacing: Theme.controlSpacing
+                readonly property real besideWidth: filterPicker.naturalWidth
+                    + (countText.visible ? countText.implicitWidth + spacing : 0) + spacing
+                readonly property bool oneLine: width - besideWidth >= Theme.scaled(240, Theme.typeScale)
 
-                SettingsAction {
-                    text: I18n.tr("Reset all")
-                    danger: true
-                    onTriggered: {
-                        Keybindings.resetAll();
-                        page.confirmingReset = false;
-                    }
+                SettingsField {
+                    id: searchField
+                    objectName: "shortcutsSearch"
+                    width: findLine.oneLine ? findLine.width - findLine.besideWidth : findLine.width
+                    font.family: Theme.fontMenu
+                    text: page.query
+                    placeholderText: I18n.tr("Search by action or keys, such as Super+B")
+                    inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+                    Accessible.name: I18n.tr("Search shortcuts")
+                    onTextEdited: page.query = text
                 }
-                SettingsAction {
-                    text: I18n.tr("Cancel")
-                    onTriggered: page.confirmingReset = false
+                PillRow {
+                    id: filterPicker
+                    width: Math.min(naturalWidth, findLine.width)
+                    Accessible.name: I18n.tr("Show")
+                    model: [{ value: "all", label: I18n.tr("All") }, { value: "changed", label: I18n.tr("Changed") },
+                        { value: "conflicts", label: I18n.tr("Conflicts") }, { value: "user", label: I18n.tr("Hand-written") }]
+                    current: page.filter
+                    onPicked: value => page.filter = value
+                }
+                Text {
+                    id: countText
+                    visible: page.filter !== "all"
+                    height: filterPicker.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: I18n.format("%1 shown", [page.counts[page.filter]])
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.secondary
+                    color: Theme.textFaint
                 }
             }
         }
@@ -260,7 +271,7 @@ SettingsPage {
 
             SettingsHint {
                 width: parent.width
-                text: I18n.tr("Choose a key to change what it does. Lit keys are free.")
+                text: I18n.tr("Lit keys are in use. Choose one to change it, or choose a free key to give it a shortcut.")
             }
             ShortcutKeyboardMap {
                 objectName: "settingsShortcutMap"
@@ -276,7 +287,7 @@ SettingsPage {
             visible: page.view === "list" && Keybindings.loaded && page.groups.length === 0
             text: page.query.trim() !== "" ? I18n.tr("No shortcuts match your search.")
                 : page.filter === "conflicts" ? I18n.tr("No shortcuts share a key.")
-                : page.filter === "user" ? I18n.tr("Your user.lua adds no described shortcuts.")
+                : page.filter === "user" ? I18n.tr("There are no hand-written shortcuts in your user.lua.")
                 : I18n.tr("Nothing has changed.")
         }
 
@@ -322,9 +333,60 @@ SettingsPage {
             }
         }
 
+        // Every page's reset lives at its foot (SettingsPage.pageReset).
+        ResetRows {
+            width: parent.width
+            visible: !page.readOnly
+        }
+
         SettingsHint {
             width: parent.width
             text: I18n.tr("Changes are saved in ~/.config/cybexos/keybindings.json. Bindings in ~/.config/cybexos/hypr/user.lua load afterwards and win.")
+        }
+    }
+
+    // Reset all, and the question it asks first. Drawn under the read-only
+    // banner while keybindings.json is rejected, at the foot otherwise; the
+    // search jump lands on whichever shows.
+    component ResetRows: Column {
+        property string searchAnchor: visible ? "shortcuts-reset" : ""
+        spacing: Theme.settingsRowSpacing
+
+        ValueRow {
+            width: parent.width
+            label: I18n.tr("All shortcuts")
+            hint: page.readOnly ? I18n.tr("Replace the unreadable keybindings.json with the defaults.")
+                : I18n.tr("Return every shortcut to its default and remove your own.")
+            visible: !page.confirmingReset
+
+            SettingsAction {
+                text: I18n.tr("Reset all…")
+                glyph: "undo"
+                enabled: Keybindings.loaded && (page.anyChanged || page.readOnly) && !page.recovering
+                onTriggered: page.confirmingReset = true
+            }
+        }
+        ValueRow {
+            width: parent.width
+            visible: page.confirmingReset
+            label: I18n.tr("Reset all shortcuts?")
+            hint: page.readOnly
+                ? I18n.tr("When you apply, keybindings.json is replaced with the defaults. The broken file is kept beside it as keybindings.json.invalid-<time>, so nothing is lost. Your user.lua is not touched.")
+                : I18n.tr("Every change and custom shortcut goes when you apply. Your user.lua is not touched.")
+            hintTone: "warning"
+
+            SettingsAction {
+                text: I18n.tr("Reset all")
+                danger: true
+                onTriggered: {
+                    Keybindings.resetAll();
+                    page.confirmingReset = false;
+                }
+            }
+            SettingsAction {
+                text: I18n.tr("Cancel")
+                onTriggered: page.confirmingReset = false
+            }
         }
     }
 }

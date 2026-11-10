@@ -12,11 +12,14 @@ also run.
 ## Prebuilt only
 
 Cybex OS installs prebuilt packages. Free apps come from NixOS's binary cache
-(cache.nixos.org) and are labelled **Prebuilt**; nothing compiles on your
+(cache.nixos.org) and are labelled **Open source**; nothing compiles on your
 computer. Unfree vendor apps (Spotify, Discord, Slack, Zoom, Obsidian,
 VS Code, Chrome and others) are never in the NixOS cache: Nix unpacks the
-vendor's own download, so they are labelled **Vendor download**. They are
-unavailable while proprietary apps are turned off for the machine.
+vendor's own download, so they are labelled **From the maker**. They are
+unavailable while proprietary apps are turned off for the machine. Everyday
+surfaces say this in plain words ("ready to use") rather than "prebuilt" or
+"nothing to compile"; an app page explains its source in one line under its
+heading, and a Flathub app's page does the same for Flathub.
 
 Before anything is staged, `cybex software check ATTR…` dry-runs the machine's
 own packages (`path:/etc/nixos#nixosConfigurations.cybexos.pkgs.ATTR`, the same
@@ -30,10 +33,14 @@ download beyond the default installation) is an estimate until then.
 
 ## Explore, categories and app pages
 
-**Explore** starts with [your default apps](#default-apps). Under **Discover**
-it shows featured apps, eight categories, collections built from the
-installer's profiles (**Install all** adds a collection's missing apps), and the
-most popular apps by Flathub's install counts. A category page has subcategory
+**Explore** leads with the featured apps. [Your default apps](#default-apps)
+follow as one row of cards, with **Show all** opening every job; then eight
+categories, collections built from the installer's profiles (**Add all to
+queue** adds a collection's missing apps), and the most popular apps by
+Flathub's install counts. The featured slide's main action is a solid button
+in the slide's own ink, so it contrasts with any brand colour. An app without
+an icon shows a monogram tile: its first letter on a colour derived from its
+name (`Common/Monogram.js`, shared with other surfaces). A category page has subcategory
 filters, an Editor's choice and every app in it by popularity. An app page
 shows how it arrives, its licence, the download, its version in this system,
 its Nixpkgs attribute, a description and similar apps. The description is
@@ -67,17 +74,20 @@ search button. The button, typing, / or Ctrl+F opens it over the tabs;
 Escape, a click elsewhere or moving focus away folds it again, and the query
 and its results stay.
 
-## The install list
+## The install queue
 
-**Install** adds an app to a list at the bottom of the window ("Added"); you can
-keep browsing. **Install N apps** checks the whole list, then stages one
+One rule for the words: **Install** always starts installing now (the queue's
+**Install N apps**, a Flathub app, **Install and use** for a default app),
+and a NixOS app is only ever *added*. **Add to queue** puts an app in the
+queue at the bottom of the window (**In queue**, with a tick; press again to
+take it out); you can keep browsing. **Install N apps** checks the whole queue, then stages one
 change: the supervised worker builds the complete system from prebuilt
 packages, showing download progress. When it is ready, **Install now** asks
 for authorization and applies it, the same serialized, checked deployment,
 trial boot, confirmation and rollback path as system updates. Your current
 system stays as a fallback. Afterwards **Open** starts the app through its
 desktop entry; restart when convenient to finish, as for any system change.
-Removing apps uses the same list.
+Removing apps uses the same queue.
 
 Closing Software does not cancel a change. Cancelled authorization, a worker
 failure, or a change started elsewhere (a system update being prepared or
@@ -186,14 +196,14 @@ windows for the terminal, Super+E for files) and lists a short set of apps
 Cybex OS has checked work for it. For each one it shows what keeps working
 with Cybex OS and what doesn't, such as the 1Password extension, web apps in
 their own windows, or following the Cybex theme. It also shows how the app
-would arrive: already **Installed**, **Prebuilt** with its download, a
-**Vendor download**, or from **Flathub**. Installed apps that can do the job
+would arrive: already **Installed**, **Open source** with its download,
+**From the maker**, or **From Flathub**. Installed apps that can do the job
 but are not on the list follow under **Also on this computer**, and **Find
 another … in Software** searches for more. The footer says what choosing
 will do before you press anything.
 
 - **An installed app** takes over at once.
-- **A NixOS app** goes on the install list, which starts preparing the change
+- **A NixOS app** goes in the install queue, which starts preparing the change
   right away. You confirm with your password, as for any app. The app takes
   over once it is installed, with no restart.
 - **A Flathub app** (one NixOS has no prebuilt package for, such as
@@ -208,7 +218,7 @@ will do before you press anything.
 A choice that waits for its app is kept by `cybexos-apps`, so closing Software
 or restarting the shell loses nothing. It applies the next time the app is
 there, within a day. Software drops it when the install fails or the app is
-taken off the install list. Each switch shows a note with **Undo**, which
+taken out of the install queue. Each switch shows a note with **Undo**, which
 puts back what was there before. **Reset to Cybex picks** appears once any
 job differs from Cybex OS's pick: it forgets this account's choices and
 leaves installed apps installed. The app that did a job before stays

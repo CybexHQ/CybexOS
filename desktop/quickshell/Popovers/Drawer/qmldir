@@ -17,3 +17,6 @@ DrawerSystemHero DrawerSystemHero.qml
 DrawerTabs DrawerTabs.qml
 DrawerTile DrawerTile.qml
 DrawerArrival DrawerArrival.qml
+DrawerEmptyState DrawerEmptyState.qml
+DrawerMenu DrawerMenu.qml
+singleton DrawerViewState DrawerViewState.qml

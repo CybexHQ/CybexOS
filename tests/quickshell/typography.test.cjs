@@ -74,7 +74,8 @@ test("semantic typography tokens retain the intended logical-pixel scale", () =>
 });
 
 test("menu typography keeps the bar's own compact metrics", () => {
-    assert.equal(stringToken("fontSans"), "JetBrainsMono Nerd Font");
+    assert.equal(stringToken("fontSans"), "Space Grotesk");
+    assert.equal(stringToken("fontMono"), "JetBrainsMono Nerd Font");
     assert.equal(stringToken("fontIcon"), "Cybex OS Tabler Outline");
     assert.deepEqual([
         intToken("chipHeight"),
@@ -98,7 +99,10 @@ test("settings-driven tokens default to the selected menu face", () => {
     assert.equal(d.barStyle, "hug");
     assert.equal(d.accent, "#60a5fa");
     const menuChoice = H.FONT_CHOICES.find(choice => choice.id === d.font);
-    assert.equal(menuChoice.family, "JetBrainsMono Nerd Font");
+    assert.equal(menuChoice.family, "Space Grotesk");
+    // The all-monospace shell stays one choice away.
+    assert.equal(H.FONT_CHOICES.find(choice => choice.id === "mono").family,
+        "JetBrainsMono Nerd Font");
 
     assert.match(theme,
         /readonly property int barHeight:\s*Math\.max\(Settings\.barHeight, chipHeight \+ 8\)/);
@@ -121,6 +125,29 @@ test("shared surfaces carry the roomier density tokens", () => {
         intToken("rowHeight"),
         intToken("tileHeight"),
     ], [408, 448, 16, 52, 64]);
+});
+
+test("the shell pairs the installer's sans with a mono for labels and data", () => {
+    // Claude Fable, 2026-11 review: "Sans for headings, body and buttons;
+    // mono for labels, keycaps, versions and data." The installer and the
+    // welcome guide set Space Grotesk beside JetBrains Mono.
+    const kiosk = fs.readFileSync(path.join(shellDir, "Welcome", "Kiosk.qml"), "utf8");
+    assert.match(kiosk, /readonly property string sans: "Space Grotesk"/);
+    assert.match(theme, /readonly property string fontNumeric: Settings\.font === "mono" \|\| Settings\.font === "grotesk"\s*\? fontMono : "Geist Mono"/,
+        "Space Grotesk's data face is JetBrains Mono, as in the installer");
+    assert.match(theme, /readonly property string fontLabel: fontNumeric/);
+    assert.match(theme, /Settings\.font === "grotesk" \? 1\.5 : 1\.45/,
+        "Space Grotesk prose takes its own line height");
+    // Uppercase section labels and kickers draw in the mono label face.
+    for (const name of ["Popovers/SectionLabel.qml", "Settings/SectionHeader.qml"]) {
+        const source = fs.readFileSync(path.join(shellDir, name), "utf8");
+        assert.match(source, /font\.family: Theme\.fontLabel/, name);
+    }
+    assert.match(fs.readFileSync(path.join(shellDir, "Ui", "PanelSectionHeader.qml"), "utf8"),
+        /property string fontFamily: Host\.Theme\.fontLabel/);
+    // The font package the installer vendors is installed for the desktop.
+    const apps = fs.readFileSync(path.resolve(shellDir, "../../nix/modules/applications.nix"), "utf8");
+    assert.match(apps, /space-grotesk\.nix/);
 });
 
 test("every dialog shares the menubar's face, including T3", () => {
@@ -261,8 +288,13 @@ test("only the classic floating bar and internal glows draw shadows", () => {
     const insideASurface = [
         "Bar/Bar.qml",               // the screenshot's floating slab shadow
         "Bar/T3Chip.qml",            // the running dot's bloom, inside the bar
-        "Settings/ModulesPage.qml"   // the drag proxy, over an opaque page
+        "Settings/ModulesPage.qml",  // the drag proxy, over an opaque page
+        "NotificationToasts.qml"     // the toast's shadow, with glass off only
     ];
+    // With glass off nothing blurs the layer, so the toast can float over a
+    // dark window (2026-11 council review); with glass on it draws none.
+    assert.match(fs.readFileSync(path.join(shellDir, "NotificationToasts.qml"), "utf8"),
+        /RectangularShadow \{\s*visible: !Settings\.glassEnabled/);
     const offenders = [];
     for (const file of [...qmlFiles("Bar"), ...qmlFiles("Popovers"),
                         ...qmlFiles("Settings"),
@@ -312,8 +344,13 @@ test("low-emphasis text remains WCAG AA in both palettes", () => {
     const H = load("SettingsHelpers.js");
     const hover = Number(theme.match(/readonly property real chipHoverAlpha:\s*([\d.]+)/)[1]);
     const lightInk = theme.match(/readonly property color lightInk:[^\n]*"(#[0-9a-fA-F]{6})"/)[1];
+    // Dark copy also sits on cards: a tile (darkCardAlpha white) on either
+    // panel surface, which is lighter than any bare surface (2026-11 review).
+    const card = H.DARK_CARD_ALPHA;
     const references = {
-        dark: [hexToken("darkPopBg")],
+        dark: [hexToken("darkPopBg"), hexToken("darkBackground"), hexToken("darkMenuBg"),
+            H.mixHex(hexToken("darkPopBg"), "#ffffff", card),
+            H.mixHex(hexToken("darkBackground"), "#ffffff", card)],
         light: [hexToken("lightPopBg"), hexToken("lightBackground"),
             H.mixHex(hexToken("lightBackground"), lightInk, hover)]
     };

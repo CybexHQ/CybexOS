@@ -138,12 +138,18 @@ or set up themselves.
   finishes**: When the box is closed (default), Always, Never. Focus and
   game mode keep it in the notification centre, as any notification.
 - **Replies** stay under the character until closed. Copy, Reply (continue the
-  conversation), Speak, and Continue in a terminal (opens the same Claude
-  Code or Codex session in Kitty, for longer coding work) appear under a
-  reply. Each code block has its own **Copy** button.
+  conversation), Speak, and Terminal (Continue in a terminal: opens the same
+  Claude Code or Codex session in Kitty, for longer coding work) appear under
+  a reply, each with a visible label. A button drawn with only a glyph shows
+  its name on hover or keyboard focus, and every button takes the pointer over
+  at least 32 px. Each code block has its own **Copy** button.
 - **What changed** is listed under the answer, one row each with its own
-  Undo: a preference with its old and new value ("Menubar opacity 100% →
-  80%"), a file, a widget, an app installed for this account, a routine.
+  Undo: a preference named as Settings names it, where it lives
+  ("Appearance · Theme") and its old and new value ("Glass effect Off → On";
+  a value the preferences file did not hold yet reads as the default it stood
+  at, never "default"), a file, a widget, an app installed for this account,
+  a routine. `settings_set` returns the same label and page, and the agent is
+  asked to call the setting by that name in its answer.
   **Undo all** undoes every row that still can. A row that cannot be undone
   any more says why: it was changed again by a later answer (undo that one
   first), or changed since by something else, which is left as it is.

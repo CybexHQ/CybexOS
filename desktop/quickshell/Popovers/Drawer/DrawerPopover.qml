@@ -59,11 +59,16 @@ Surface {
         return false;
     }
 
-    // Escape answers a pending session question first; only then does it
-    // close the drawer (PopoutPanel.handleEscape).
+    // Escape answers a pending session question, or closes the session row's
+    // open menu, first; only then does it close the drawer
+    // (PopoutPanel.handleEscape).
     function handleEscape(): bool {
         if (sessionFooter.confirming) {
             sessionFooter.cancel();
+            return true;
+        }
+        if (sessionFooter.menuOpen) {
+            sessionFooter.dismissMenu();
             return true;
         }
         return false;

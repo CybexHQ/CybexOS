@@ -1,8 +1,9 @@
 import QtQuick
 import "../Common"
 
-// A catalogue app as a card: icon, name, category, summary, how it arrives
-// (prebuilt or a vendor download) and its action. Opens the app's page.
+// A catalogue app as a card: icon, name, category, summary, where it comes
+// from (open source from NixOS, or from its maker) and its action. Opens the
+// app's page.
 Rectangle {
     id: root
 
@@ -95,8 +96,8 @@ Rectangle {
             anchors.left: parent.left
             anchors.verticalCenter: action.verticalCenter
             tone: root.app.free === false ? "vendor" : "ok"
-            glyph: root.app.free === false ? "download" : "bolt"
-            text: root.app.free === false ? I18n.tr("Vendor download") : I18n.tr("Prebuilt")
+            glyph: root.app.free === false ? "download" : "code"
+            text: root.app.free === false ? I18n.tr("From the maker") : I18n.tr("Open source")
         }
         AppAction {
             id: action

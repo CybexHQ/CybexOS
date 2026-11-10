@@ -7,6 +7,36 @@ All three resolve through the same library. Existing `Theme.fontBody` and
 similar aliases, `Style.font.body`, and `api.theme.fontSize` remain compatible.
 New native views must use the named roles below, not the old aliases.
 
+## Faces: a sans for copy, a mono for labels and data
+
+Since the 2026-11 UI review the shell uses the installer's and the welcome
+guide's pairing everywhere: **Space Grotesk** for headings, body copy and
+buttons, and **JetBrains Mono** for labels, keycaps, versions and data.
+
+| Token | Face (default) | Use |
+| --- | --- | --- |
+| `Theme.fontMenu` | Space Grotesk (the Interface font setting) | Headings, body copy, buttons, rows, tooltips |
+| `Theme.fontNumeric` | JetBrains Mono | Readings (clock, percentages, meters), versions, tables of values, code |
+| `Theme.fontLabel` | JetBrains Mono | Uppercase section labels and kickers (`Popovers/SectionLabel`, `Settings/SectionHeader`, `Ui/PanelSectionHeader`) |
+| `Theme.fontMono` | JetBrains Mono | Keycaps and other strictly monospaced text |
+
+`fontMenu` follows Settings → Appearance → Interface font, whose choices are
+`SettingsHelpers.FONT_CHOICES`. Space Grotesk (`grotesk`) is the default for
+fresh settings and an Appearance reset; JetBrains Mono (`mono`) remains a
+choice for an all-monospace shell. With Figtree, Google Sans Flex, Urbanist,
+IBM Plex Sans or Inter the data and label face is Geist Mono, the edge-drawer
+redesign's pairing. Space Grotesk prose uses a 1.5 line height
+(`Theme.proseLineHeight`), monospace 1.55 and the other sans faces 1.45.
+
+Settings files store only the keys a person set (`SettingsHelpers.overrideKeys`,
+`serializeDocument`). An installation that never chose a font therefore
+follows the new default; one that chose any font, including the former default
+JetBrains Mono, keeps it. No migration rewrites a saved choice.
+
+The fonts come from `nix/packages/space-grotesk.nix` (the installer's
+vendored copy) and `nerd-fonts.jetbrains-mono`, both in
+`nix/modules/applications.nix`.
+
 ## Readable defaults
 
 Since 2026-09-26 the default base is **14 logical pixels**. Normal labels,
@@ -120,6 +150,10 @@ spacing. The service finished as the sole Quickshell process with no QML
 errors in its current invocation. Both outputs used 2× device scaling;
 fractional output scaling and the isolated full-shell lifecycle harness were
 not exercised on this live desktop.
+
+`typography.test.cjs` also checks the face pairing above: Space Grotesk as
+the default with JetBrains Mono for data and labels, and the three section
+label components drawing `Theme.fontLabel`.
 
 `tests/quickshell/typography-scale.test.cjs` checks reference values, usage
 roles, native/plugin adapter wiring, the accessibility/density matrix, plugin

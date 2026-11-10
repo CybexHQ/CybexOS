@@ -175,119 +175,17 @@ Surface {
         }
     }
 
-    // Monday-first month grid. EDS calendar colors become small event marks;
-    // only three are drawn so a busy date stays a date rather than a chart.
-    Grid {
+    // Monday-first month grid (MonthGrid, shared with the Day sheet).
+    // Choosing a date shows its agenda below.
+    MonthGrid {
         id: calendarGrid
-        columns: 7
-        rowSpacing: 1
         width: parent.width - 8
         x: 4
-
-        Repeater {
-            model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-
-            delegate: Text {
-                required property string modelData
-                width: calendarGrid.width / 7
-                height: 20
-                text: modelData
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.typography.secondary
-                font.weight: Theme.weightMedium
-                color: Theme.textFaint
-            }
-        }
-
-        Repeater {
-            model: 42
-
-            delegate: Rectangle {
-                id: day
-
-                required property int index
-                readonly property var cell: {
-                    const first = root.shownMonth;
-                    const startOffset = (first.getDay() + 6) % 7;
-                    return new Date(first.getFullYear(), first.getMonth(),
-                        1 - startOffset + index);
-                }
-                readonly property bool inMonth: cell.getMonth() === root.shownMonth.getMonth()
-                    && cell.getFullYear() === root.shownMonth.getFullYear()
-                readonly property bool isToday: root.sameDay(cell, root.now)
-                readonly property bool selected: !root.upcomingMode
-                    && root.sameDay(cell, root.selectedDate)
-                readonly property var matches: root.eventsEnabled
-                    ? CalendarHelpers.eventsInRange(root.serviceEvents,
-                        root.dayStart(cell), root.dayEnd(cell), 3) : []
-
-                width: calendarGrid.width / 7
-                height: 28
-                radius: Theme.chipRadius
-                color: isToday ? Theme.accent
-                    : selected ? Theme.accentBgSoft
-                    : dayMouse.containsMouse ? Theme.hoverFillStrong : "transparent"
-                border.width: selected && !isToday ? 1 : 0
-                border.color: Theme.accentText
-                activeFocusOnTab: true
-                Accessible.role: Accessible.Button
-                Accessible.name: Qt.formatDateTime(cell, "dddd, MMMM d")
-                    + (matches.length > 0 ? ", " + matches.length + " events" : "")
-                Accessible.onPressAction: root.selectDay(day.cell)
-
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-                            || event.key === Qt.Key_Space) {
-                        root.selectDay(day.cell);
-                        event.accepted = true;
-                    }
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: day.matches.length > 0 ? 2 : 5
-                    text: day.cell.getDate()
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.typography.primary
-                    font.weight: day.isToday || day.selected
-                        ? Theme.weightSemibold : Theme.weightRegular
-                    color: day.isToday ? Theme.accentFg
-                        : day.inMonth ? Theme.textMid : Theme.textFaint
-                }
-
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 3
-                    spacing: 2
-
-                    Repeater {
-                        model: day.matches
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            width: 3
-                            height: 3
-                            radius: 2
-                            color: day.isToday ? Theme.accentFg : modelData.color
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: dayMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        day.forceActiveFocus();
-                        root.selectDay(day.cell);
-                    }
-                }
-            }
-        }
+        month: root.shownMonth
+        today: root.now
+        selected: root.upcomingMode ? null : root.selectedDate
+        events: root.eventsEnabled ? root.serviceEvents : []
+        onChosen: date => root.selectDay(date)
     }
 
     Rectangle {

@@ -88,9 +88,9 @@ test("the app directory keeps every match in a fixed scrolling viewport", () => 
         "the provider must not discard apps below the first viewport");
     // At most eight rows tall; a selected clipboard image adds its preview
     // inside that viewport rather than growing the card, as Wiz's taller
-    // row does when nothing matched.
+    // row and the Apps/Actions group labels do.
     assert.match(results,
-        /height:\s*Math\.min\(Math\.min\(root\.maxResults \* root\.rowHeight, root\.rows\.length \* root\.rowHeight\s*\+ \(root\.selectedPreview \? root\.previewRowHeight - root\.rowHeight : 0\)\s*\+ \(root\.asking \? root\.askRowHeight - root\.rowHeight : 0\)\),/);
+        /height:\s*Math\.min\(Math\.min\(root\.maxResults \* root\.rowHeight, root\.rows\.length \* root\.rowHeight\s*\+ \(root\.selectedPreview \? root\.previewRowHeight - root\.rowHeight : 0\)\s*\+ \(root\.asking \? root\.askRowHeight - root\.rowHeight : 0\)\s*\+ root\.groupLabelSpace\),/);
     assert.match(results, /interactive:\s*contentHeight > height/);
     assert.match(results, /boundsBehavior:\s*Flickable\.StopAtBounds/);
     assert.match(results, /ScrollChrome\s*\{[\s\S]*target:\s*resultList/);
@@ -515,4 +515,27 @@ test("the Ask Wiz row shows a listening Wiz, the quoted query and the Enter key"
     assert.match(askRow, /text: "“" \+ root\.askQuote\s*textFormat: Text\.PlainText[\s\S]*?elide: Text\.ElideRight/);
     assert.match(askRow, /id: closingQuote\s*text: "”"/);
     assert.match(askRow, /text: "Enter" \/\/ i18n: untranslated \(key name\)/);
+});
+
+test("the search field shows a magnifier, labels mixed results and fades a list that goes on", () => {
+    const view = read("LauncherView.qml");
+    const providers = read("Common/LauncherProviders.qml");
+    const results = view.slice(view.indexOf("// ---- Results"),
+        view.indexOf("// ---- Empty state"));
+
+    // The Apps tab's grid glyph read as another app; a prefix or a prompt
+    // still names what the field does.
+    assert.match(view, /id: searchGlyph[\s\S]*?name: root\.argumentMode \? root\.pendingAction\.glyph\s*: root\.mode !== "" \? root\.provider\.glyph : "search"/);
+    assert.match(providers, /readonly property var groupLabels: ProviderHelpers\.groupLabels\(rows\)/);
+    assert.match(results, /readonly property string groupLabel: root\.groupLabels\[index\] \|\| ""/);
+    assert.match(results, /text: resultRow\.groupLabel === "Actions" \? "Actions" : "Apps"/);
+    // The label is outside the row's box: hover and click select the row.
+    assert.match(results, /id: rowBox\s*y: resultRow\.labelSpace/);
+    assert.match(results, /MouseArea \{\s*anchors\.fill: rowBox/);
+    assert.match(results, /ScrollChrome \{[\s\S]*?fadeSize: Math\.round\(root\.rowHeight \* 0\.75\)/);
+    // An icon that does not resolve, or fails to load, falls back to the
+    // app's monogram tile from the shared helper.
+    assert.match(view, /import "Common\/Monogram\.js" as Monogram/);
+    assert.match(results, /Monogram\.tile\(modelData\.title, Theme\.dark\)/);
+    assert.match(results, /visible: resultRow\.iconUrl === "" \|\| iconImage\.status === Image\.Error/);
 });

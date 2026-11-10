@@ -1,7 +1,7 @@
 import QtQuick
 import "../Common"
 
-// A short fact about an app: "Prebuilt", "Vendor download", its licence.
+// A short fact about an app: "Open source", "From the maker", its licence.
 Rectangle {
     id: root
 

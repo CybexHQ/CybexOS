@@ -68,7 +68,7 @@ bind(mainMod .. " + comma", hl.dsp.exec_cmd("cybexos-runtime ipc settings toggle
 bind(mainMod .. " + N", hl.dsp.exec_cmd("cybexos-runtime ipc popouts toggle notifications"),
   { description = "Shell: Notifications" }, "shell.notifications")
 bind(mainMod .. " + A", hl.dsp.exec_cmd("cybexos-runtime ipc popouts toggle control"),
-  { description = "Shell: Control Panel" }, "shell.control-panel")
+  { description = "Shell: Control Center" }, "shell.control-panel")
 bind(mainMod .. " + K", hl.dsp.exec_cmd("cybexos-runtime ipc session keys"),
   { description = "Shell: Keyboard shortcuts" }, "shell.shortcuts")
 bind(mainMod .. " + E", hl.dsp.exec_cmd("cybexos-apps files"), { description = "Apps: Files" }, "apps.files")

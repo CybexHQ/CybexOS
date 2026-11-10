@@ -3,14 +3,20 @@ import QtQuick
 import QtQuick.Controls as Controls
 import "../../Common"
 import "../../Common/PanelRegistryData.js" as PanelRegistry
+import "DrawerFormat.js" as DrawerFormat
 
-// The drawer's tab strip. The current tab carries its icon and label on the
-// shared selected state (docs/shell-states.md: accent tint, an inset accent
-// edge along its foot, accent icon, textHi label) with the design's 12px side
-// padding; the others compress to icons sharing the remaining width, so the
-// strip holds one row at every drawer width, and hover stays the neutral
-// chip. Selecting a tab reopens the popout under that tab's canonical panel
-// name — same name space as the bar glyphs and IPC — which keeps the surface
+// The drawer's tab strip. Every tab carries its icon and a short label
+// (2026-11 UI council: a strip of bare icons asked people to recognise
+// them), the label under the icon so six fit one row. Tabs take their
+// natural width plus an equal share of the rest; when the labels do not fit
+// whole — a narrow drawer, a larger text size or a longer translation — the
+// strip wraps onto more rows instead of cutting a label short
+// (DrawerFormat.tabLayout). The current tab wears the shared selected state
+// (docs/shell-states.md: accent tint, an inset accent edge along its foot,
+// accent icon, textHi label); hover stays the neutral chip.
+//
+// Selecting a tab reopens the popout under that tab's canonical panel name —
+// same name space as the bar glyphs and IPC — which keeps the surface
 // exactly where it is. The Notifications tab counts arrivals the drawer took
 // instead of a toast until it is shown (Notifs.unread).
 Rectangle {
@@ -18,13 +24,15 @@ Rectangle {
 
     property string current: "overview"
 
+    // `label` is what the tab shows; `name` the full name, for the tooltip
+    // and assistive technology when the two differ.
     readonly property var tabMeta: ({
-        overview: { glyph: "dashboard", label: I18n.tr("Overview") },
-        sound: { glyph: "volume_down", label: I18n.tr("Sound") },
-        network: { glyph: "wifi", label: I18n.tr("Network") },
-        bluetooth: { glyph: "bluetooth", label: I18n.tr("Bluetooth") },
-        power: { glyph: "battery_5_bar", label: I18n.tr("Power") },
-        notifications: { glyph: "notifications", label: I18n.tr("Notifications") }
+        overview: { glyph: "dashboard", label: I18n.tr("Overview"), name: I18n.tr("Overview") },
+        sound: { glyph: "volume_down", label: I18n.tr("Sound"), name: I18n.tr("Sound") },
+        network: { glyph: "wifi", label: I18n.tr("Network"), name: I18n.tr("Network") },
+        bluetooth: { glyph: "bluetooth", label: I18n.tr("Bluetooth"), name: I18n.tr("Bluetooth") },
+        power: { glyph: "battery_5_bar", label: I18n.tr("Power"), name: I18n.tr("Power") },
+        notifications: { glyph: "notifications", label: I18n.tr("Alerts"), name: I18n.tr("Notifications") }
     })
 
     // Order and visibility come from the Drawer settings page. A tab the user
@@ -37,17 +45,30 @@ Rectangle {
             tab: entry.id,
             glyph: tabMeta[entry.id].glyph,
             label: tabMeta[entry.id].label,
+            name: tabMeta[entry.id].name,
             rotate: tabMeta[entry.id].rotate === true
         }))
 
     readonly property int unreadCount: Notifs.unread.length
-    readonly property real tabPadding: Theme.controlSpacing
     readonly property real tabIconSize: Theme.iconMedium
-    readonly property real usableWidth: Math.max(0, tabRow.width - tabRow.spacing * (tabs.length - 1))
-    readonly property real restingWidth: Math.min(Theme.scaled(28), usableWidth / Math.max(1, tabs.length))
-    readonly property real selectedWidth: Math.min(tabPadding * 2 + tabIconSize
-        + Theme.iconTextSpacing + Math.ceil(selectedMetrics.advanceWidth) + 1,
-        Math.max(0, usableWidth - restingWidth * (tabs.length - 1)))
+    // The least room either side of a label; the layout shares out the rest.
+    readonly property real tabPadding: Theme.scaled(4)
+    readonly property real tabGap: 2
+    readonly property real innerWidth: Math.max(0, width - 6)
+
+    // Measured in the selected weight, so selecting a tab never reflows the
+    // strip. Reading the font ties the widths to the text size as well.
+    readonly property var labelWidths: labelMetrics.font.pixelSize > 0
+        ? tabs.map(entry => Math.ceil(labelMetrics.advanceWidth(entry.label)))
+        : tabs.map(() => 0)
+    readonly property var layout: DrawerFormat.tabLayout(
+        labelWidths.map(w => Math.max(tabIconSize, w) + tabPadding * 2),
+        labelWidths.map(w => tabIconSize + Theme.iconTextSpacing + w + tabPadding * 2),
+        innerWidth, tabGap)
+    readonly property real labelHeight: Math.ceil(labelMetrics.height)
+    readonly property real segmentHeight: layout.stacked
+        ? Math.max(Theme.scaled(44), tabIconSize + Theme.scaled(2) + labelHeight + Theme.scaled(6) * 2)
+        : Math.max(Theme.scaled(34), Math.max(tabIconSize, labelHeight) + Theme.controlSpacing * 2)
 
     function activateTab(index, focusTab) {
         if (index < 0 || index >= tabs.length)
@@ -74,23 +95,25 @@ Rectangle {
         }
     }
 
-    TextMetrics {
-        id: selectedMetrics
+    FontMetrics {
+        id: labelMetrics
         font.family: Theme.fontMenu
         font.pixelSize: Theme.typography.navigation
         font.weight: Theme.weightSemibold
-        text: root.tabMeta[root.current] ? I18n.tr(root.tabMeta[root.current].label) : ""
     }
 
-    height: Math.max(Theme.scaled(42), Theme.typography.navigation + Theme.controlSpacing * 2)
+    height: segmentHeight * layout.rows + tabGap * (layout.rows - 1) + 6
     radius: 10
     color: Theme.chip
 
-    Row {
-        id: tabRow
-        anchors.fill: parent
-        anchors.margins: 3
-        spacing: 2
+    Grid {
+        id: tabGrid
+        x: 3
+        y: 3
+        width: root.innerWidth
+        columns: Math.max(1, root.layout.columns)
+        columnSpacing: root.tabGap
+        rowSpacing: root.tabGap
 
         Repeater {
             id: tabRepeater
@@ -100,16 +123,14 @@ Rectangle {
                 id: segment
 
                 required property var modelData
-                readonly property bool on: modelData.tab === root.current
                 required property int index
-                readonly property bool showLabel: on && width >= root.tabPadding * 2
-                    + root.tabIconSize + Theme.iconTextSpacing + Theme.typography.navigation
-                width: root.tabs.length === 1 ? root.usableWidth : on ? root.selectedWidth
-                    : Math.max(0, (root.usableWidth - root.selectedWidth) / (root.tabs.length - 1))
+                readonly property bool on: modelData.tab === root.current
                 readonly property bool counted: modelData.tab === "notifications"
                     && root.unreadCount > 0
+                readonly property bool renamed: modelData.name !== modelData.label
 
-                height: parent.height
+                width: root.layout.widths[index] || 0
+                height: root.segmentHeight
                 radius: 8
                 color: on ? Theme.selectedFill : "transparent"
                 border.width: Theme.focusWidth(activeFocus)
@@ -117,8 +138,10 @@ Rectangle {
                 activeFocusOnTab: on
                 Accessible.selected: on
                 Accessible.onPressAction: root.activateTab(index, true)
-                Controls.ToolTip.visible: segmentMouse.containsMouse || activeFocus
-                Controls.ToolTip.text: I18n.tr(modelData.label)
+                // The label is on the tab; a tooltip adds only a fuller name.
+                Controls.ToolTip.visible: renamed
+                    && (segmentMouse.containsMouse || (activeFocus && FocusModality.keyboard))
+                Controls.ToolTip.text: modelData.name
                 Keys.onPressed: event => {
                     let next = index;
                     if (event.key === Qt.Key_Left) next = Math.max(0, index - 1);
@@ -131,24 +154,23 @@ Rectangle {
                     event.accepted = true;
                 }
 
-                Behavior on width {
-                    NumberAnimation {
-                        duration: Theme.expandDuration
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: Theme.springCurve
-                    }
-                }
-
                 Behavior on color {
                     ColorAnimation { duration: Theme.chipFadeDuration }
                 }
 
-                Row {
+                // Icon over label in one row; icon beside label once the
+                // strip has wrapped onto rows of wider cells.
+                Grid {
+                    id: tabContent
                     anchors.centerIn: parent
-                    spacing: Theme.iconTextSpacing
+                    columns: root.layout.stacked ? 1 : 2
+                    columnSpacing: Theme.iconTextSpacing
+                    rowSpacing: Theme.scaled(2)
+                    horizontalItemAlignment: Grid.AlignHCenter
+                    verticalItemAlignment: Grid.AlignVCenter
 
                     Item {
-                        anchors.verticalCenter: parent.verticalCenter
+                        id: tabIcon
                         width: root.tabIconSize
                         height: root.tabIconSize
 
@@ -157,20 +179,23 @@ Rectangle {
                             name: segment.modelData.glyph
                             size: root.tabIconSize
                             rotation: segment.modelData.rotate === true ? 90 : 0
-                            color: segment.on ? Theme.accentText : Theme.textFaint
+                            color: segment.on ? Theme.accentText : Theme.textMid
                         }
                     }
 
                     Text {
-                        visible: segment.showLabel
-                        width: Math.max(0, segment.width - root.tabPadding * 2 - root.tabIconSize - Theme.iconTextSpacing)
-                        elide: Text.ElideRight
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: I18n.tr(segment.modelData.label)
+                        // Wider than the whole strip only at the narrowest
+                        // single column; it wraps there rather than eliding.
+                        width: Math.min(implicitWidth, Math.max(0, segment.width - root.tabPadding * 2
+                            - (root.layout.stacked ? 0 : root.tabIconSize + Theme.iconTextSpacing)))
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        text: segment.modelData.label
                         font.family: Theme.fontMenu
                         font.pixelSize: Theme.typography.navigation
-                        font.weight: Theme.weightSemibold
-                        color: Theme.textHi
+                        font.weight: segment.on ? Theme.weightSemibold : Theme.weightMedium
+                        color: segment.on ? Theme.textHi : Theme.textMid
+                        Accessible.ignored: true
                     }
                 }
 
@@ -188,16 +213,14 @@ Rectangle {
                     color: Theme.selectedMark
                 }
 
-                // Kept notifications on the resting Notifications tab, in the
-                // same place the bar's bell wears its dot — unless the count
-                // below says more.
+                // Kept notifications on the resting Notifications tab, at the
+                // icon's top end, where the bar's bell wears its dot — unless
+                // the count below says more.
                 Rectangle {
                     visible: segment.modelData.tab === "notifications"
                         && !segment.on && !segment.counted && Notifs.count > 0
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.rightMargin: 8
-                    anchors.topMargin: 7
+                    x: tabContent.x + tabIcon.x + tabIcon.width - Theme.scaled(3)
+                    y: tabContent.y + tabIcon.y - Theme.scaled(1)
                     width: 6
                     height: 6
                     radius: 3
@@ -205,16 +228,17 @@ Rectangle {
                 }
 
                 // The unread count: arrivals the open drawer took instead of
-                // a toast. It sits over the icon's top end, outside the label,
-                // and is drawn last so nothing in the segment covers it.
+                // a toast. It sits over the icon's top end — at the cell's end
+                // when the label is beside the icon — and is drawn last so
+                // nothing in the segment covers it.
                 Rectangle {
                     id: countBadge
                     visible: segment.counted
                     z: 2
-                    x: segment.showLabel
-                        ? segment.width - width - Theme.scaled(2)
-                        : Math.min(segment.width - width,
-                            segment.width / 2 + root.tabIconSize / 2 - Theme.scaled(4))
+                    x: root.layout.stacked
+                        ? Math.min(segment.width - width,
+                            tabContent.x + tabIcon.x + tabIcon.width - Theme.scaled(4))
+                        : segment.width - width - Theme.scaled(2)
                     y: Theme.scaled(2)
                     height: Math.max(Theme.scaled(16), countLabel.implicitHeight + 2)
                     width: Math.max(height, countLabel.implicitWidth + Theme.scaled(8))
@@ -258,6 +282,7 @@ Rectangle {
                 Accessible.name: segment.counted
                     ? I18n.format("%1, %2 unread", [segment.modelData.label, root.unreadCount])
                     : segment.modelData.label
+                Accessible.description: segment.renamed ? segment.modelData.name : ""
             }
         }
     }

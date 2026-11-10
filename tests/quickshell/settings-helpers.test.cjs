@@ -33,7 +33,7 @@ test("defaults carry the design values", () => {
         [230, 14, 9]);
     assert.equal(d.barHeight, 36);
     assert.equal(d.barRadius, 11);
-    assert.equal(d.font, "mono");
+    assert.equal(d.font, "grotesk");
     assert.equal(d.accent, "#60a5fa");
     assert.equal(d.paletteMode, "wallpaper");
     assert.equal(d.position, "top");
@@ -509,7 +509,7 @@ test("merge clamps and snaps numeric ranges", () => {
 });
 
 test("merge falls back on invalid enums, colors and names", () => {
-    assert.equal(H.merge({ font: "comic-sans" }).font, "mono");
+    assert.equal(H.merge({ font: "comic-sans" }).font, "grotesk");
     assert.equal(H.merge({ v: H.VERSION, font: "inter" }).font, "inter",
         "the previous menu face stays selectable");
     assert.equal(H.merge({ themeMode: "sepia" }).themeMode, "dark");
@@ -595,9 +595,9 @@ test("schema-6 migration preserves module order and adds clock-side indicators",
 test("missing font preferences use the current default across first-run and legacy settings", () => {
     for (const raw of [null, {}, { wall: "mountain.jpg" }, { v: 3 }, { v: 6 }, { v: H.VERSION }]) {
         const merged = H.merge(raw);
-        assert.equal(merged.font, "mono", JSON.stringify(raw));
+        assert.equal(merged.font, "grotesk", JSON.stringify(raw));
         assert.equal(H.FONT_CHOICES.find(choice => choice.id === merged.font).family,
-            "JetBrainsMono Nerd Font");
+            "Space Grotesk");
     }
     for (const font of H.FONT_IDS)
         assert.equal(H.merge({ v: H.VERSION, font }).font, font,
@@ -611,6 +611,12 @@ test("legacy fonts remain explicit even when equal to an old default", () => {
         "an explicit previous-schema choice survives");
     assert.equal(H.merge({ v: H.VERSION, font: "urbanist" }).font, "urbanist",
         "Urbanist remains selectable after migration");
+    // Space Grotesk became the default in 2026-11 without rewriting anyone's
+    // choice: a saved former default stays, and a settings file that never
+    // chose a font stores none, so it simply follows the new default.
+    assert.equal(H.merge({ v: H.VERSION, font: "mono" }).font, "mono");
+    assert.deepEqual(H.overrideKeys({ v: H.VERSION, font: "mono" }), ["font"]);
+    assert.doesNotMatch(H.serializeDocument(H.defaults(), {}, []), /"font"/);
 });
 
 test("normalizeMods drops unknown ids and dedupes across columns", () => {

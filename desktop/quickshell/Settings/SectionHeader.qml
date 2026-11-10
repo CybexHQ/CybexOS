@@ -1,8 +1,9 @@
 import QtQuick
 import "../Common"
 
-// The one section mark in the shell's dialogs: an uppercase label, indented
-// to the settings rows' own label column, and a hairline running to the edge.
+// The one section mark in the shell's dialogs: an uppercase label in the mono
+// label face (Theme.fontLabel), indented to the settings rows' own label
+// column, and a hairline running to the edge.
 //
 // Resetting is a row's job (its undo chip) or the page's (the header's Reset
 // page). A third, per-group level between them said the same thing again on
@@ -27,7 +28,7 @@ Item {
         width: Math.min(implicitWidth, Math.max(0, root.width - Theme.settingsMarkInset))
         wrapMode: Text.Wrap
         text: root.label
-        font.family: Theme.fontMenu
+        font.family: Theme.fontLabel
         font.pixelSize: Theme.typography.section
         font.weight: Theme.weightSemibold
         font.letterSpacing: 1

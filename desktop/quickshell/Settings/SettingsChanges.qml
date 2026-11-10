@@ -14,6 +14,9 @@ QtObject {
 
     // Home's "Review…" asks the window to open the review sheet it hosts.
     signal reviewRequested()
+    // The review sheet is open. Its footer is then the one Apply: a page's
+    // own Apply bar, dimmed beneath it, would repeat the same action.
+    property bool reviewOpen: false
 
     readonly property var items: {
         const touchpad = InputDrafts.touchpad;

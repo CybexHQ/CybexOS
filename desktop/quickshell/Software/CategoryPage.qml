@@ -127,7 +127,7 @@ PageScroll {
         big: true
         primary: true
         glyph: "plus"
-        text: I18n.format("Install all %1", [root.collection.missing.length])
+        text: I18n.format("Add all %1 to queue", [root.collection.missing.length])
         onTriggered: Software.installAll(root.profile.id)
     }
 

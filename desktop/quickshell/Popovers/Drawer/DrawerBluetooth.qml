@@ -7,6 +7,11 @@ import "../../Common"
 import "../../Common/BluetoothHelpers.js" as BluetoothHelpers
 import ".."
 
+// The drawer's Bluetooth tab: the adapter's switch, then connected, paired
+// and nearby devices, discovered while the tab is open. Without a usable
+// adapter it says why in the drawer's one empty-state pattern
+// (DrawerEmptyState): no adapter, the Bluetooth service not running, a
+// blocking switch, or Bluetooth turned off — the last with "Turn on".
 Column {
     id: root
 
@@ -38,6 +43,30 @@ Column {
     readonly property bool displayPrompt: prompt !== null
         && (prompt.kind === "DisplayPinCode" || prompt.kind === "DisplayPasskey")
 
+    // Whether the kernel sees a Bluetooth controller, asked only while the
+    // tab is open without an adapter: with one, BlueZ is what is missing.
+    // -1 until known.
+    property int controllerPresent: -1
+    // "" while there are controls to show; otherwise why there are not.
+    readonly property string emptyKind: adapter === null
+        ? (controllerPresent === 1 ? "service" : "hardware")
+        : blocked ? "blocked"
+        : !powered && !powerBusy ? "off" : ""
+
+    function probeController() {
+        if (visible && adapter === null && !controllerProbe.running)
+            controllerProbe.running = true;
+    }
+
+    onVisibleChanged: probeController()
+    Component.onCompleted: probeController()
+
+    Process {
+        id: controllerProbe
+        command: ["sh", "-c", "for f in /sys/class/bluetooth/hci*; do [ -e \"$f\" ] && exit 0; done; exit 1"]
+        onExited: code => root.controllerPresent = code === 0 ? 1 : 0
+    }
+
     function startBackend() {
         ready = false;
         error = "";
@@ -49,6 +78,7 @@ Column {
     onAdapterChanged: {
         if (backend.running && adapter && backend.command[2] !== adapter.dbusPath)
             backend.running = false;
+        probeController();
     }
 
     function send(message) {
@@ -144,7 +174,26 @@ Column {
         }
     }
 
+    DrawerEmptyState {
+        visible: root.emptyKind !== ""
+        glyph: "bluetooth_disabled"
+        title: root.emptyKind === "service" ? I18n.tr("Bluetooth service isn't running")
+            : root.emptyKind === "hardware" ? I18n.tr("No Bluetooth adapter found")
+            : root.emptyKind === "blocked" ? I18n.tr("Bluetooth is blocked")
+            : I18n.tr("Bluetooth is off")
+        detail: root.emptyKind === "service"
+            ? I18n.tr("Bluetooth devices can't connect until it starts.")
+            : root.emptyKind === "hardware"
+            ? I18n.tr("This computer has no Bluetooth, or it is turned off in the firmware settings.")
+            : root.emptyKind === "blocked"
+            ? I18n.tr("Turn off airplane mode or the wireless switch on this computer.")
+            : I18n.tr("Turn it on to use wireless headphones, mice and keyboards.")
+        actionText: root.emptyKind === "off" ? I18n.tr("Turn on") : ""
+        onAction: BluetoothState.setEnabled(true)
+    }
+
     Item {
+        visible: root.emptyKind === ""
         width: parent.width
         height: 40
         Column {
@@ -163,12 +212,11 @@ Column {
             }
             Text {
                 width: parent.width
-                text: !root.adapter ? "No Bluetooth adapter"
-                    : root.blocked ? "Blocked by hardware switch"
-                    : root.powerBusy ? "Changing power…"
-                    : !root.powered ? "Bluetooth is off"
-                    : root.connectedDevices.length > 0 ? root.connectedDevices.length + " connected"
-                    : "Not connected"
+                // The states without controls are the empty state's to say.
+                text: root.powerBusy ? I18n.tr("Changing power…")
+                    : root.connectedDevices.length > 0
+                    ? I18n.format("%1 connected", [root.connectedDevices.length])
+                    : I18n.tr("Not connected")
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
                 color: Theme.textFaint
@@ -322,7 +370,8 @@ Column {
     }
 
     Text {
-        visible: root.powered && root.connectedDevices.length === 0 && root.pairedDevices.length === 0 && !root.showNearby
+        visible: root.emptyKind === "" && root.powered && root.connectedDevices.length === 0
+            && root.pairedDevices.length === 0 && !root.showNearby
         width: parent.width
         text: I18n.tr("Preparing Bluetooth controls…")
         wrapMode: Text.WordWrap
@@ -416,7 +465,8 @@ Column {
     }
 
     DrawerFooter {
-        info: root.scanning ? "Searching for devices…" : root.adapter ? root.adapter.name : "Bluetooth unavailable"
+        visible: root.emptyKind === ""
+        info: root.scanning ? I18n.tr("Searching for devices…") : ""
         actionText: !root.powered || !root.ready || root.scanBusy ? ""
             : root.scanning ? "Stop scan" : "Scan again"
         onActionClicked: {

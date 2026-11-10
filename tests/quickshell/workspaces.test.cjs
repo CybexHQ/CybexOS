@@ -44,14 +44,20 @@ test("workspace states restore the accent-number-and-dot hierarchy", () => {
     assert.ok(empty[0] > dim[0] && empty[1] > dim[1], `${empty} over ${dim}`);
     assert.match(workspaces, /exists\s*\?\s*", occupied"\s*:\s*", empty"/,
         "assistive output must announce the same distinction shown visually");
+    // Shape carries it too: an occupied place is filled, an empty one a ring.
+    assert.match(workspaces, /border\.width: slot\.hollow \? 1\.5 : 0/);
+    assert.match(workspaces, /border\.color: slot\.focused \? Theme\.barWsCurrentFg : Theme\.barWsEmpty/);
+    // The layout button beside the strip is a full cell as well.
+    assert.match(workspaces, /id: layoutChip[\s\S]{0,260}?width: WorkspaceMotion\.CELL_WIDTH/);
 });
 
 test("workspace cells and hide-empty geometry stay deterministic", () => {
-    assert.equal(Motion.CELL_WIDTH, 22);
+    // A 32 px pointer cell per workspace, the shell's target floor.
+    assert.equal(Motion.CELL_WIDTH, 32);
     assert.deepEqual(Motion.visibleIds(5, [1, 3], 1, false), [1, 2, 3, 4, 5]);
     assert.deepEqual(Motion.visibleIds(5, [1, 3], 1, true), [1, 3]);
     assert.deepEqual(Motion.visibleIds(5, [1, 3], 4, true), [1, 3, 4]);
-    assert.deepEqual(Motion.indicatorBounds([1, 3, 4], 3), { left: 20, right: 46 });
+    assert.deepEqual(Motion.indicatorBounds([1, 3, 4], 3), { left: 34, right: 62 });
     assert.equal(Motion.indicatorBounds([1, 3], 2), null);
 });
 

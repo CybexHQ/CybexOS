@@ -2,15 +2,17 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
+import "../Common" as Host
 
 // Small-caps-style label that introduces a panel section ("DNS provider",
 // "Wi-Fi networks", "Output device", "Paired devices"). Sits between a
-// PanelSeparator and the content rows.
+// PanelSeparator and the content rows. Set in the shell's mono label face
+// (Theme.fontLabel) by default, as native section labels are.
 Text {
   id: root
 
   property color foreground: Commons.Color.foreground
-  property string fontFamily: Style.font.family
+  property string fontFamily: Host.Theme.fontLabel
   property real fontSize: Style.font.section
 
   // Callers bind `text` from outside this file, so the default has to be set

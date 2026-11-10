@@ -100,7 +100,8 @@ test('native forms share field chrome and drawer tabs expose keyboard selection'
     assert.match(tabs, /Accessible.selected: on/);
     for (const key of ['Left', 'Right', 'Home', 'End'])
         assert.match(tabs, new RegExp(`Qt.Key_${key}`));
-    assert.match(tabs, /Math.max\(0, usableWidth - restingWidth/);
+    // Every tab keeps its label; the strip wraps rather than hiding one.
+    assert.match(tabs, /layout: DrawerFormat.tabLayout\(/);
 });
 
 test('widget editor pins a bar preview over lanes and one tray, and opens options in a dialog', () => {

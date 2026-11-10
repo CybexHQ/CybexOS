@@ -29,12 +29,12 @@ Rectangle {
             return { tone: "", glyph: "world", text: I18n.tr("In your browser") };
         case "nixos": {
             const size = Helpers.size(option.downloadBytes);
-            return { tone: "ok", glyph: "bolt", text: size !== "" ? I18n.format("Prebuilt · ≈ %1", [size]) : I18n.tr("Prebuilt") };
+            return { tone: "ok", glyph: "code", text: size !== "" ? I18n.format("Open source · ≈ %1", [size]) : I18n.tr("Open source") };
         }
         case "vendor":
-            return { tone: "vendor", glyph: "download", text: I18n.tr("Vendor download") };
+            return { tone: "vendor", glyph: "download", text: I18n.tr("From the maker") };
         case "flathub":
-            return { tone: "", glyph: "shield-lock", text: I18n.tr("Flathub") };
+            return { tone: "", glyph: "shield-lock", text: I18n.tr("From Flathub") };
         }
         return row.other ? { tone: "ok", glyph: "check", text: I18n.tr("Installed") } : null;
     }

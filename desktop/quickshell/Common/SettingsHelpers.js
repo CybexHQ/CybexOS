@@ -100,7 +100,13 @@ var DETAIL_IDS = ["remote", "media", "weather", "clock", "t3", "hermes", "gh", "
     "notifications", "vol", "batt"];
 var DETAIL_POLICIES = ["auto", "prefer", "compact"];
 
+// Space Grotesk is the installer's and the welcome guide's face, and the
+// shell's default since the 2026-11 UI review: a sans for headings, body and
+// buttons, beside JetBrains Mono for labels and data (Theme.fontNumeric,
+// Theme.fontLabel). Only fresh settings and an Appearance reset take it; a
+// saved choice is never rewritten (settings files store explicit keys only).
 var FONT_CHOICES = [
+    { id: "grotesk", label: "Space Grotesk", family: "Space Grotesk" },
     { id: "figtree", label: "Figtree", family: "Figtree" },
     { id: "google", label: "Google Sans Flex", family: "Google Sans Flex" },
     { id: "urbanist", label: "Urbanist", family: "Urbanist" },
@@ -559,7 +565,7 @@ function defaults() {
         barCustomLightness: 9,
         barHeight: 36,
         barRadius: 11,
-        font: "mono",
+        font: "grotesk",
         accent: "#60a5fa",
         paletteMode: "wallpaper",
         // The named theme applied last ("" for none) and its explicit
@@ -858,6 +864,22 @@ function contrastTone(background, foreground, target) {
     return mixHex(background, foreground, high);
 }
 
+// Disabled content (2026-11, docs/shell-states.md): dimmed so it reads as
+// unavailable, but still readable at about 3:1 over the least favourable
+// backdrop, a step below the 4.5:1 floor every other piece of copy holds.
+var DISABLED_CONTRAST = 3.0;
+
+function disabledTone(background, foreground) {
+    return contrastTone(background, foreground, DISABLED_CONTRAST);
+}
+
+// The brightest resting card a dark panel carries: Theme.tile, white at this
+// alpha over the panel. Dark copy is held against such a card on the lightest
+// panel surface rather than against the bare surface, where secondary text on
+// a card used to fall to about 3.4:1. Light mode needs no counterpart: its
+// reference, a hovered chip on the base, is already darker than any card.
+var DARK_CARD_ALPHA = 0.09;
+
 // Preserve a semantic colour when it already reads; otherwise pull it toward
 // the bar's automatically selected foreground until it does.
 function ensureContrast(value, background, target) {
@@ -916,6 +938,7 @@ function barPalette(background) {
         textLow: contrastTone(bg, foreground, 5.5),
         textDim: contrastTone(bg, foreground, 4.8),
         textFaint: contrastTone(bg, foreground, 4.5),
+        textDisabled: disabledTone(bg, foreground),
         icon: ensureContrast(iconBase, bg, 10.5)
     };
 }
@@ -947,6 +970,7 @@ function semanticPalette(background, onSurface, onSurfaceVariant) {
         textLow: paletteTone(bg, variant, 5.5),
         textDim: paletteTone(bg, variant, 4.8),
         textFaint: paletteTone(bg, variant, 4.5),
+        textDisabled: disabledTone(bg, hi),
         icon: paletteTone(bg, variant, 6.0)
     };
 }
@@ -993,8 +1017,9 @@ function themeIdIn(value) {
 // A theme palette's surfaces and inks, deriving what it leaves out the way
 // Theme.qml layers its own: in both modes a raised surface steps toward
 // white, and quieter text steps toward the base. Surfaces are held to their
-// mode — at least 7.5:1 against white in dark mode, 9:1 against black in
-// light mode — so a theme cannot put light panels in a dark shell, and the
+// mode — at least 7.5:1 against white in dark mode, for the two panel
+// surfaces even under a resting card (DARK_CARD_ALPHA), and 9:1 against black
+// in light mode — so a theme cannot put light panels in a dark shell, and the
 // text floors below are always reachable. Real themes sit far inside both.
 function themeSurfaces(palette) {
     var p = themePaletteIn(palette);
@@ -1003,8 +1028,15 @@ function themeSurfaces(palette) {
     function polar(value) {
         return dark ? ensureContrast(value, "#ffffff", 7.5) : ensureContrast(value, "#000000", 9);
     }
-    var background = polar(p.background || fallback.background);
-    var surface = polar(p.surface || mixHex(background, "#ffffff", dark ? 0.03 : 0.35));
+    function panel(value) {
+        var out = polar(value);
+        for (var i = 0; dark && i < 40
+                && contrastRatio(mixHex(out, "#ffffff", DARK_CARD_ALPHA), "#ffffff") < 7.5; i++)
+            out = mixHex(out, "#000000", 0.05);
+        return out;
+    }
+    var background = panel(p.background || fallback.background);
+    var surface = panel(p.surface || mixHex(background, "#ffffff", dark ? 0.03 : 0.35));
     var text = p.text || fallback.text;
     var muted = p.textMuted || mixHex(text, background, 0.25);
     return {
@@ -1024,14 +1056,20 @@ function themeSurfaces(palette) {
 }
 
 // The least favourable backdrop for copy in a themed shell
-// (Theme.copyReferenceBg): in dark mode the lightest surface, in light mode
-// the darkest one under a hovered chip of the theme's ink.
-function themeReference(palette, chipAlpha) {
+// (Theme.copyReferenceBg): in dark mode the lightest of the raised surface and
+// a resting card (`cardAlpha`, default DARK_CARD_ALPHA) on either panel
+// surface; in light mode the darkest surface under a hovered chip of the
+// theme's ink.
+function themeReference(palette, chipAlpha, cardAlpha) {
     var s = themeSurfaces(palette);
-    var surfaces = [s.background, s.surface, s.surfaceRaised].sort(function(a, b) {
-        return relativeLuminance(a) - relativeLuminance(b);
-    });
-    return s.mode === "dark" ? surfaces[2] : mixHex(surfaces[0], s.ink, chipAlpha);
+    var byLuminance = function(a, b) { return relativeLuminance(a) - relativeLuminance(b); };
+    if (s.mode !== "dark") {
+        var darkest = [s.background, s.surface, s.surfaceRaised].sort(byLuminance)[0];
+        return mixHex(darkest, s.ink, chipAlpha);
+    }
+    var card = cardAlpha === undefined ? DARK_CARD_ALPHA : cardAlpha;
+    return [s.surfaceRaised, mixHex(s.background, "#ffffff", card),
+        mixHex(s.surface, "#ffffff", card)].sort(byLuminance)[2];
 }
 
 // The text ladder of a theme palette over `reference`, its least favourable
@@ -1050,6 +1088,7 @@ function themeTextPalette(reference, palette) {
         textLow: ensureContrast(mixHex(s.textMuted, s.textDim, 0.5), bg, 4.5),
         textDim: ensureContrast(s.textDim, bg, 4.5),
         textFaint: ensureContrast(mixHex(s.textDim, s.background, 0.12), bg, 4.5),
+        textDisabled: disabledTone(bg, hi),
         icon: ensureContrast(mixHex(s.text, s.textMuted, 0.5), bg, 4.5)
     };
 }
@@ -2138,6 +2177,9 @@ var exported = {
     contrastRatio: contrastRatio,
     foregroundFor: foregroundFor,
     ensureContrast: ensureContrast,
+    DISABLED_CONTRAST: DISABLED_CONTRAST,
+    disabledTone: disabledTone,
+    DARK_CARD_ALPHA: DARK_CARD_ALPHA,
     stateTokens: stateTokens,
     mixHex: mixHex,
     barPalette: barPalette,

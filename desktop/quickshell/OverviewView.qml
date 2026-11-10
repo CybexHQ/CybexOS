@@ -81,12 +81,18 @@ FocusScope {
     readonly property int focusedWorkspaceId: Hyprland.focusedWorkspace
         ? Hyprland.focusedWorkspace.id : -1
 
+    // No window anywhere: the view says so and offers one way on, the
+    // launcher, instead of a row of window actions with nothing to act on.
+    readonly property bool empty: windows.length === 0
+
     readonly property real outputAspect: output.width / Math.max(1, output.height)
+    // Empty tiles are only places to go, so they stay small rather than
+    // giving a bare wallpaper most of the screen.
     readonly property var layout: OverviewHelpers.gridLayout(tiles.length,
         grid.width, grid.height, outputAspect, {
             spacing: Theme.scaled(28),
             labelHeight: Theme.scaled(32),
-            maxTileWidth: output.width * 0.42
+            maxTileWidth: output.width * (empty ? 0.3 : 0.42)
         })
     // Each tile's letterboxed box and window rects, and every thumbnail's
     // placement in grid coordinates for keyboard navigation.
@@ -234,6 +240,12 @@ FocusScope {
             : Math.max(0, tiles.findIndex(tile => !tile.isNew && tile.id === selectedWorkspaceId));
         selectedTileIndex = Math.max(0, Math.min(tiles.length - 1, current + direction));
         selected = "";
+    }
+
+    // The empty state's one action. The launcher opening closes the
+    // overview (OverviewWindow), so this never stacks two keyboard grabs.
+    function openLauncher() {
+        Launcher.openProvider("apps", root.output);
     }
 
     function minimizeSelected() {
@@ -422,6 +434,8 @@ FocusScope {
                 case Qt.Key_Enter:
                     if (root.selectedTileIndex >= 0)
                         root.activateWorkspace(root.tiles[root.selectedTileIndex]);
+                    else if (root.empty)
+                        root.openLauncher();
                     else
                         root.activateWindow(root.selected);
                     break;
@@ -470,43 +484,72 @@ FocusScope {
 
     Text {
         id: status
+        visible: !root.empty
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: filterField.bottom
         anchors.topMargin: Theme.controlSpacing
-        text: root.windows.length === 0 ? "No open windows"
-            : !root.anyMatch ? "No windows match “" + root.query.trim() + "”"
+        width: Math.min(implicitWidth, root.width - Theme.scaled(48))
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
+        text: !root.anyMatch ? I18n.format("No windows match “%1”", [root.query.trim()])
             : I18n.tr("Enter to restore or switch · drag to move · Page Up/Down for workspaces")
+        textFormat: Text.PlainText
         font.family: Theme.fontMenu
         font.pixelSize: Theme.typography.secondary
         color: Theme.textMid
     }
 
+    // One row centred under the hint. A Flow is as wide as it is allowed to
+    // be and lays out from its left edge, which left the row hanging off
+    // centre; it takes the width of its visible actions instead, and still
+    // wraps when they do not fit.
     Flow {
         id: windowActions
-        width: Math.min(Theme.scaled(900), root.width - Theme.scaled(48))
+
+        readonly property real maxWidth: Math.min(Theme.scaled(900), root.width - Theme.scaled(48))
+        readonly property real rowWidth: {
+            let total = 0;
+            let count = 0;
+            for (let index = 0; index < children.length; index++) {
+                const child = children[index];
+                if (!child.visible)
+                    continue;
+                total += child.width;
+                count++;
+            }
+            return total + Math.max(0, count - 1) * spacing;
+        }
+
+        visible: !root.empty
+        width: Math.max(1, Math.min(maxWidth, rowWidth))
         height: childrenRect.height
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: status.bottom
         anchors.topMargin: Theme.controlSpacing
         spacing: Theme.controlSpacing
+        // Chips, not bare copy: they sit on the wallpaper, not on a panel.
         SettingsAction {
+            secondary: true
             text: I18n.tr("New workspace")
             glyph: "add"
             onTriggered: root.activateWorkspace(root.tiles[root.tiles.length - 1])
         }
         SettingsAction {
+            secondary: true
             text: I18n.tr("Cycle workspace layout")
             glyph: "view_quilt"
             enabled: DesktopWorkspaces.canSetLayout(root.selectedWorkspaceTarget)
             onTriggered: DesktopWorkspaces.cycleLayout(root.selectedWorkspaceTarget)
         }
         SettingsAction {
+            secondary: true
             text: I18n.tr("Minimize")
             glyph: "remove"
             enabled: root.selectedWindow !== null && !root.selectedWindow.minimized && DesktopWorkspaces.canMinimize(root.selected)
             onTriggered: root.minimizeSelected()
         }
         SettingsAction {
+            secondary: true
             text: I18n.tr("Maximize / restore")
             glyph: "open_in_full"
             enabled: root.selectedWindow !== null && !root.selectedWindow.minimized
@@ -515,6 +558,7 @@ FocusScope {
             }
         }
         SettingsAction {
+            secondary: true
             text: I18n.tr("Close window")
             glyph: "close"
             enabled: root.selectedWindow !== null
@@ -524,13 +568,64 @@ FocusScope {
         }
     }
 
+    // ---- nothing open ----------------------------------------------------
+    // A heading, one line and one action, centred under the filter. The
+    // window actions are gone with the windows; New workspace stays a tile.
+    Column {
+        id: emptyState
+
+        visible: root.empty
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: filterField.bottom
+        anchors.topMargin: Theme.scaled(28)
+        width: Math.min(Theme.scaled(480), root.width - Theme.scaled(48))
+        spacing: Theme.controlSpacing
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: I18n.tr("No windows open")
+
+        Text {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: I18n.tr("No windows open")
+            font.family: Theme.fontMenu
+            font.pixelSize: Theme.typography.heading
+            font.weight: Theme.weightSemibold
+            color: Theme.textHi
+        }
+
+        Text {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: I18n.tr("Apps you open show up here, on their workspace.")
+            font.family: Theme.fontMenu
+            font.pixelSize: Theme.typography.secondary
+            color: Theme.textMid
+        }
+
+        Item {
+            width: parent.width
+            height: Theme.controlSpacing
+        }
+
+        SettingsAction {
+            anchors.horizontalCenter: parent.horizontalCenter
+            primary: true
+            text: I18n.tr("Open an app")
+            glyph: "apps"
+            onTriggered: root.openLauncher()
+        }
+    }
+
     // ---- workspace grid --------------------------------------------------
     Item {
         id: grid
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: windowActions.bottom
+        anchors.top: root.empty ? emptyState.bottom : windowActions.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: Theme.scaled(48)
         anchors.rightMargin: Theme.scaled(48)

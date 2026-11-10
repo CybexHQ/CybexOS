@@ -57,3 +57,37 @@ test('cleanup preference drafts retain their original policy until explicitly di
     assert.equal(root.draft.keepConfirmed, 10);
     assert.equal(root.same(root.draft, root.policyBaseline), true);
 });
+
+test('one rule for the words: adding queues a NixOS app, Install starts installing now', () => {
+    const action = read('Software/AppAction.qml');
+    assert.match(action, /: I18n\.tr\("Add to queue"\)/, 'a catalogue app joins the queue');
+    assert.match(action, /mode === "added" \? I18n\.tr\("In queue"\)/, 'an obvious queued state');
+    assert.doesNotMatch(action, /I18n\.tr\("Install"\)/, 'a catalogue app never says Install for queueing');
+    assert.match(read('Software/PackageRow.qml'), /I18n\.tr\("Add to queue"\)/);
+    assert.match(read('Software/CollectionCard.qml'), /I18n\.tr\("Add all to queue"\)/);
+    // Install is the queue bar's commit, and a Flathub app's immediate install.
+    assert.match(read('Software/QueueBar.qml'), /I18n\.tr\("Install 1 app"\) : I18n\.format\("Install %1 apps"/);
+    assert.match(read('Software/FlathubAction.qml'), /mode === "install" \? I18n\.tr\("Install"\)/);
+});
+
+test('badges say where an app comes from in plain words, and its page explains it', () => {
+    for (const name of ['Software/AppCard.qml', 'Software/AppPage.qml', 'Software/InstalledRow.qml',
+        'Software/DefaultOption.qml', 'Software/PackageRow.qml', 'Software/ExplorePage.qml'])
+        assert.doesNotMatch(read(name), /I18n\.(?:tr|format)\("(?:Prebuilt|Vendor download)[^"]*"/, name);
+    const page = read('Software/AppPage.qml');
+    assert.match(page, /objectName: "softwareAppSource"/);
+    assert.match(page, /I18n\.tr\("Open source, from NixOS, which Cybex OS is built on\./);
+    assert.match(read('Software/FlathubPage.qml'), /objectName: "softwareFlathubSource"/);
+});
+
+test('Explore leads with the featured apps; the default apps fold to one row', () => {
+    const explore = read('Software/ExplorePage.qml');
+    assert.ok(explore.indexOf('HeroCarousel {') < explore.indexOf('DefaultsSection {'), 'the hero comes first');
+    const defaults = read('Software/DefaultsSection.qml');
+    assert.match(defaults, /model: root\.expanded \? Software\.roles : Software\.roles\.slice\(0, root\.columns\)/);
+    assert.match(defaults, /actionName: "softwareDefaultsMore"/);
+    // The hero's main action is solid in the slide's ink, never the accent on a brand colour.
+    const hero = read('Software/HeroCarousel.qml');
+    assert.match(hero, /solidFill: heroAction\.mode === "install" \|\| heroAction\.mode === "open" \? slide\.ink : "transparent"/);
+    assert.doesNotMatch(hero, /prominent: true/);
+});

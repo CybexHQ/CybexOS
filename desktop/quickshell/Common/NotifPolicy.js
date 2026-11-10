@@ -158,6 +158,42 @@ function drawerRoute(drawer, screen, position, critical) {
     return critical ? "banner" : "strip";
 }
 
+// ---- the welcome guide (2026-11) ---------------------------------------------
+// The full-screen guide (WelcomeWindow) keeps Offline, the language and its
+// close button in a top bar exactly where toasts appear, and Back/Continue
+// in a footer at the bottom. While it covers an output, an ordinary toast
+// there goes quietly to the notification centre (history, and the drawer
+// tab's unread count) instead; a critical one still shows, clear of both.
+// This sits beside the drawer rule above and changes nothing in it.
+//
+// `guide` is { shown, screen }: whether the guide is up (not stepped aside)
+// and the name of the output it covers.
+
+function guideCovers(guide, screen) {
+    return !!guide && guide.shown === true && typeof guide.screen === "string"
+        && guide.screen !== "" && guide.screen === screen;
+}
+
+// "centre" (history only) or "toast".
+function guideRoute(guide, screen, critical) {
+    return guideCovers(guide, screen) && !critical ? "centre" : "toast";
+}
+
+// The guide centres its 1280×800 design canvas, zoomed by Kiosk.zoom; its
+// top bar is the canvas's first 72 design pixels and its footer the last 88
+// (Welcome/KioskTopBar.qml, Welcome/KioskFooter.qml). How far a toast stack
+// on the top or bottom edge moves in to clear them, in logical pixels.
+var GUIDE_CANVAS_HEIGHT = 800;
+var GUIDE_HEADER_HEIGHT = 72;
+var GUIDE_FOOTER_HEIGHT = 88;
+
+function guideInset(screenHeight, zoom, atTop) {
+    var scale = Number(zoom) > 0 ? Number(zoom) : 1;
+    var height = Math.max(0, Number(screenHeight) || 0);
+    var margin = Math.max(0, Math.round((height - GUIDE_CANVAS_HEIGHT * scale) / 2));
+    return Math.ceil(margin + (atTop ? GUIDE_HEADER_HEIGHT : GUIDE_FOOTER_HEIGHT) * scale);
+}
+
 // Keys still present in `entries`, in entry order. Unread and pinned marks
 // name entries by key; a dismissed or evicted entry drops out on its own.
 function presentKeys(entries, keys) {
@@ -211,5 +247,6 @@ if (typeof module !== "undefined" && module.exports)
         groups: groups, popupPlan: popupPlan, targetScreen: targetScreen,
         toastSide: toastSide, notificationsTabEnabled: notificationsTabEnabled,
         drawerCovers: drawerCovers, drawerRoute: drawerRoute,
+        guideCovers: guideCovers, guideRoute: guideRoute, guideInset: guideInset,
         presentKeys: presentKeys, markKey: markKey,
         overflowCounts: overflowCounts, liveOverflow: liveOverflow };

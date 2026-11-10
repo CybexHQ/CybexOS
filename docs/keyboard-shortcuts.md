@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-Press `Super+K`, or use **Keyboard shortcuts** in the Control Panel, to open
+Press `Super+K`, or use **Keyboard shortcuts** in the Control Center, to open
 the shortcut sheet. It lists the keybindings Hyprland actually has, read with
 `hyprctl binds -j` each time the sheet opens. There is no separate list to
 fall out of date, and a failed read is shown as an error.
@@ -44,12 +44,19 @@ changed in Settings or added there; a ring marks one that
 ## Changing shortcuts in Settings
 
 **Settings → Keyboard → Shortcuts**, the Keyboard page's second tab, lists every Cybex OS
-shortcut in the sheet's group order. Search by name (in English or the
-interface language) or by keys, such as `super+b` or `Super Enter`. **Show**
-narrows the list to **Changed** shortcuts, **Conflicts** (two shortcuts on the
-same keys, or a key Hyprland dropped when it loaded your changes) or **From
-user.lua**. **View → Keyboard map** draws the `Super`+letter and
-`Super`+digit keys with what each one does.
+shortcut in the sheet's group order. A compact toolbar sits above the list:
+**List** or **Keyboard map** and **Add shortcut** on one line, then the
+page's search field with the filters beside it. Search by name (in English or
+the interface language) or by keys, such as `super+b` or `Super Enter`. The
+filters narrow the list to **Changed** shortcuts, **Conflicts** (two shortcuts
+on the same keys, or a key Hyprland dropped when it loaded your changes) or
+**Hand-written** ones, which your `user.lua` binds. **Keyboard map** draws the
+`Super`+letter and `Super`+digit keys with what each one does: a key in use is
+lit and names its action, a free key is plain with a dashed outline, a lock
+marks a protected key and an amber edge with a warning mark a key used twice.
+The welcome guide's map uses the same meanings and legend. A name too long
+for its key shows its group's icon; pointing at a key names it in full, and
+the detail under the map names the chosen key (it follows the arrow keys).
 
 Each row shows its keys and three actions:
 
@@ -97,7 +104,7 @@ Personal bindings that only `user.lua` defines, mouse drags and hardware keys
 are read-only. A Cybex OS shortcut that `user.lua` changed can still be edited
 here, and says that `user.lua` wins wherever both set the same keys.
 
-**Add shortcut**, or a free (lit) key on the keyboard map, adds your own
+**Add shortcut**, or a free (dashed) key on the keyboard map, adds your own
 shortcut. Choose what it opens: **An app** from your installed applications,
 **A website** (opened in your default browser), **A web app** (Slack,
 WhatsApp, YouTube, Google Photos, X and any others you installed), or **A
@@ -107,7 +114,8 @@ removed from their rows.
 
 Changes collect until you choose **Apply** in the bar at the foot of the page,
 or **Discard**. Applying reloads Hyprland; if the reload fails the previous
-file is restored and the error appears on the page. **Reset all…** asks before
+file is restored and the error appears on the page. **Reset all…**, at the
+foot of the page (under the banner while `keybindings.json` is unreadable), asks before
 it returns every shortcut to its default and removes your own; that too waits
 for Apply. Nothing in Settings writes `user.lua`. `Escape` closes an open Add
 form or Reset question first; a second `Escape` closes Settings.

@@ -80,6 +80,7 @@ PageScroll {
             id: icon
             url: root.app.icon || ""
             icon: root.installedRow ? root.installedRow.icon || "" : ""
+            name: root.app.name || ""
             size: Theme.scaled(84)
         }
         Column {
@@ -192,6 +193,29 @@ PageScroll {
                 wrapMode: Text.Wrap
                 textFormat: Text.PlainText
             }
+        }
+    }
+
+    // Where it comes from, in one line.
+    Row {
+        objectName: "softwareFlathubSource"
+        width: parent.width
+        spacing: Theme.scaled(8)
+        Sym {
+            name: "shield-lock"
+            size: Theme.iconSmall
+            color: Theme.textDim
+        }
+        Text {
+            width: parent.width - x
+            text: root.installedRow && root.installedRow.installation !== "user"
+                ? I18n.tr("From Flathub, an app store for Linux. An administrator installed it for everyone on this computer; it runs in a sandbox.")
+                : I18n.tr("From Flathub, an app store for Linux. It installs right away for your account only, runs in a sandbox and updates separately from the system.")
+            color: Theme.textMid
+            font.family: Theme.fontMenu
+            font.pixelSize: Theme.typography.secondary
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
         }
     }
 
