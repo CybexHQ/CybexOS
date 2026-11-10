@@ -76,6 +76,9 @@ in pkgs.testers.runNixOSTest {
     # use the real Nix/updater path without requiring external delivery in a VM.
     system.extraDependencies = inputSources ++ staged ++ builders
       ++ [ candidate previewFlake initialLock pkgs.hello pkgs.sshpass ];
+    # The VM has no network. Asking an unreachable cache.nixos.org (Nix
+    # retries each lookup) kept the interrupted build from starting in time.
+    nix.settings.substituters = lib.mkForce [ ];
     system.stateVersion = "26.05";
     boot.loader.systemd-boot.enable = lib.mkForce false;
   };
