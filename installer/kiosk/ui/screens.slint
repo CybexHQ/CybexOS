@@ -168,13 +168,13 @@ export component WelcomeScreen inherits Rectangle {
             width: 600px;
             alignment: start;
             Kicker {
-                text: "FRESH INSTALLATION · " + Store.version;
+                text: Store.version == "" ? "FRESH INSTALLATION" : "FRESH INSTALLATION · " + Store.version;
                 color: Theme.accent;
             }
             Rectangle { height: 14px; }
             Heading { text: "Let's make this\ncomputer yours."; }
             Rectangle { height: 14px; }
-            Lead { text: "Three short steps. Your disks stay untouched until you review everything and confirm."; }
+            Lead { text: "Three short steps, then a review. Your disks stay untouched until you confirm."; }
             Rectangle { height: 30px; }
             Pick {
                 label: "LANGUAGE";
@@ -487,7 +487,7 @@ export component DiskScreen inherits Rectangle {
                             size: 16px;
                         }
                         Text {
-                            text: Store.show-all-disks ? "Fewer details" : Store.hidden-disks > 0 ? "More options · serial numbers and " + Store.hidden-disks + " disk(s) that can't be used" : "More options · serial numbers";
+                            text: Store.show-all-disks ? "Fewer details" : Store.hidden-disks > 0 ? "More options · serial numbers and " + (Store.hidden-disks == 1 ? "1 disk" : Store.hidden-disks + " disks") + " that can't be used" : "More options · serial numbers";
                             color: Theme.fog;
                             font-size: 15px;
                             vertical-alignment: center;
@@ -1554,7 +1554,7 @@ export component DoneScreen inherits Rectangle {
         y: 316px;
         width: parent.width;
         horizontal-alignment: center;
-        text: "Cybex OS " + Store.version + " is installed on " + Store.done-host + ".";
+        text: (Store.version == "" ? "Cybex OS" : "Cybex OS " + Store.version) + " is installed on " + Store.done-host + ".";
     }
     // Three equal cards, whatever their text.
     HorizontalLayout {

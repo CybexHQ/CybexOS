@@ -58,7 +58,7 @@
 
   /* ───────────── Kiosk canvas (fixed Cybex OS brand colours) ───────────── */
   .k { --bg: #1A1B1E; --bg-deep: #141517; --card: #202125; --card-2: #26272c; --line: #2f3136; --line-2: #3b3d43;
-       --ink: #F3F2EC; --fog: #A6A8A1; --faint: #6E7069; --accent: #60A5FA; --red: #FF6B57; --amber: #F2C14E;
+       --ink: #F3F2EC; --fog: #A6A8A1; --faint: #8F918A; --accent: #60A5FA; --red: #FF6B57; --amber: #F2C14E;
        position: absolute; left: 0; top: 0; width: 1280px; height: 800px; transform-origin: 0 0; overflow: hidden;
        background: var(--bg); color: var(--ink); font-family: "Space Grotesk", var(--font-sans, system-ui, sans-serif); font-size: 16px; line-height: 1.4;
        -webkit-font-smoothing: antialiased; user-select: none; }
@@ -529,7 +529,7 @@ const SCREENS = {
         <div>
           <div class="kicker accent">Fresh installation · ${VERSION}</div>
           <h1>Let's make this<br>computer yours.</h1>
-          <div class="lead">Three short steps. Your disks stay untouched until you review everything and confirm.</div>
+          <div class="lead">Three short steps, then a review. Your disks stay untouched until you confirm.</div>
           <div style="margin-top:34px;max-width:520px">
             <button class="pick" data-act="sheet" data-v="lang"><span class="pk-l">Language</span><span class="pk-v">${langName()}</span>${I("right")}</button>
             <button class="pick" data-act="sheet" data-v="kb"><span class="pk-l">Keyboard</span><span class="pk-v">${kbName()}</span>${I("right")}</button>

@@ -21,7 +21,7 @@ Singleton {
     readonly property color line2: "#3b3d43"
     readonly property color ink: "#f3f2ec"
     readonly property color fog: "#a6a8a1"
-    readonly property color faint: "#6e7069"
+    readonly property color faint: "#8f918a"
     readonly property color accent: "#60a5fa"
     readonly property color accentInk: "#1a1b1e"
     readonly property color accentTint: "#2060a5fa"
