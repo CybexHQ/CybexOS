@@ -3,7 +3,7 @@
   gobject-introspection, wrapGAppsNoGuiHook, networkmanager, libsecret,
   gnome-online-accounts, evolution-data-server, libical, fwupd, glib-networking,
   gsettings-desktop-schemas, adwaita-icon-theme,
-  satty, wayfreeze, tesseract, zbar, qrencode, hyprpicker, hyprsunset, imagemagick, matugen,
+  callPackage, wayfreeze, tesseract, zbar, qrencode, hyprpicker, hyprsunset, imagemagick, matugen,
   libnotify, wtype, pulseaudio, pipewire, wireplumber, wl-clipboard, cliphist, grim, slurp,
   wf-recorder, ffmpeg, libva-utils, jq, procps, findutils, gnugrep, gnused, gawk,
   xdg-utils, xdg-terminal-exec, curl, nodejs, iw, iproute2, brightnessctl, playerctl, bluez, upower,
@@ -16,6 +16,8 @@ let
     rev = "803bc181d7c0d6d5eeba9274d9be49b287294d99";
     hash = "sha256-QrpnlDD4r1X4C8PqBhQ+S3ar5C+qDrU1Jm/lPqyMIFM=";
   };
+  # `screenshot` runs it (nix/packages/omasnap.nix).
+  omasnap = callPackage ./omasnap.nix {};
   # QML helpers inherit this interpreter from the managed desktop. A plain
   # python3 earlier in PATH would shadow the system's withPackages environment.
   python = python3.withPackages (p: [ p.pygobject3 p.pillow p.dbus-python p.websockets ]);
@@ -23,7 +25,7 @@ let
   # desktop environment so optional developer tools or ambient host PATH cannot
   # conceal a missing product dependency (notably Node for connected widgets).
   runtimeTools = [ bash python coreutils glibc.bin quickshell hyprland hyprlock hypridle systemd dbus glib openssl git
-    satty wayfreeze tesseract zbar qrencode hyprpicker hyprsunset imagemagick matugen libnotify wtype
+    omasnap wayfreeze tesseract zbar qrencode hyprpicker hyprsunset imagemagick matugen libnotify wtype
     pulseaudio pipewire wireplumber wl-clipboard cliphist grim slurp wf-recorder ffmpeg libva-utils jq
     procps findutils gnugrep gnused gawk xdg-utils xdg-terminal-exec curl nodejs iw iproute2 brightnessctl playerctl
     networkmanager bluez upower power-profiles-daemon gnome-keyring restic openssh age gnutar zstd util-linux kitty libsecret fwupd
@@ -135,6 +137,6 @@ in stdenv.mkDerivation {
     env -i HOME="$TMPDIR" $out/libexec/cybexos-desktop-runtime-check
     runHook postInstallCheck
   '';
-  passthru = { inherit images python runtimeTools; };
+  passthru = { inherit images omasnap python runtimeTools; };
   meta.license = lib.licenses.mit;
 }

@@ -124,27 +124,3 @@ test("the bubble is a round, input-masked overlay inside the recorded area", () 
     assert.match(overlay, /onErrorOccurred: \{\s*root\.failed = true;/);
     assert.match(overlay, /visible: root\.targetScreen !== null && root\.cameraDevice !== null && !root\.failed/);
 });
-
-test("a scrolling screenshot lights the recording indicator and finishes from it", () => {
-    const recorder = read("Common/Recorder.qml");
-    const indicators = read("Bar/Modules/Indicators.qml");
-    assert.match(recorder, /path: root\.stateDir \+ "\/scroll-capture"/);
-    assert.match(recorder, /path: root\.scrollPid > 0 \? "\/proc\/" \+ root\.scrollPid \+ "\/stat" : ""/);
-    assert.match(recorder,
-        /root\.scrolling = root\.scrollStartTicks !== ""\s*&& root\.startTicks\(text\(\)\) === root\.scrollStartTicks/,
-        "a killed capture cannot leave the indicator lit");
-    assert.match(recorder,
-        /running: root\.scrollPid > 0 && root\.scrolling\s*repeat: true\s*onTriggered: scrollStatView\.reload\(\)/,
-        "only a live capture is polled");
-    assert.match(recorder, /Quickshell\.execDetached\(\[root\.screenshotScript, "scroll-stop"\]\)/,
-        "the indicator can finish a capture but never start one");
-    assert.match(indicators, /case "recording": return Recorder\.active \|\| Recorder\.scrolling;/);
-    assert.match(indicators,
-        /if \(Recorder\.scrolling && !Recorder\.active\)\s*Recorder\.finishScroll\(\);\s*else\s*Recorder\.toggle/);
-    assert.match(indicators, /Finish scrolling screenshot · Enter/);
-
-    const screenshot = fs.readFileSync(path.resolve(__dirname, "../../assets/scripts/screenshot"), "utf8");
-    assert.match(screenshot, /RECORD_STATE_DIR="\$\{XDG_RUNTIME_DIR:-\/tmp\}\/screen-record"/,
-        "the script and the shell must agree on the state directory");
-    assert.match(screenshot, /SCROLL_STATE="\$RECORD_STATE_DIR\/scroll-capture"/);
-});

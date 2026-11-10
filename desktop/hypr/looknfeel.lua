@@ -244,6 +244,15 @@ hl.layer_rule({
   no_anim = true,
 })
 
+-- The screenshot overlay (Omasnap) appears and leaves at once. It stays
+-- visible to screen capture: hiding it would black out its whole layer in
+-- captures, and a scrolling capture records the screen through it.
+hl.layer_rule({
+  name = "omasnap-no-animation",
+  match = { namespace = "^omasnap$" },
+  no_anim = true,
+})
+
 -- Blur behind the glass. The wallpaper layer is deliberately absent: it is
 -- opaque and at the bottom, so blurring it would only cost a pass. So is the
 -- window overview: its backdrop is the wallpaper, and a blur behind live

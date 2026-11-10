@@ -10,9 +10,8 @@ import Quickshell.Io
 // owns region selection, the freeze overlay, the output path and the saved
 // notification, and it is bound to a compositor key, so a recording can start
 // without the shell involved at all. Watching its state is what keeps the bar
-// chip honest either way. A scrolling screenshot (screenshot
-// scroll) publishes its capture in the same directory and lights the same
-// chip, and a --webcam recording its area for WebcamOverlay.
+// chip honest either way. A --webcam recording also publishes its area there
+// for WebcamOverlay.
 Singleton {
     id: root
 
@@ -20,8 +19,6 @@ Singleton {
         (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/screen-record"
     readonly property string script:
         "screen-record"
-    readonly property string screenshotScript:
-        "screenshot"
 
     property bool active: false
     property int recorderPid: 0
@@ -34,13 +31,6 @@ Singleton {
     property double startedAt: 0
     // Seconds since the recording began, ticking once a second while active.
     property int elapsed: 0
-
-    // `screenshot scroll` publishes "PID START_TICKS" here while it captures
-    // frames. It shares the recording indicator: both mean "the screen is
-    // being captured; click to finish".
-    property bool scrolling: false
-    property int scrollPid: 0
-    property string scrollStartTicks: ""
 
     // The area a `screen-record --webcam` recording covers ("X,Y WxH"); empty
     // for any other recording. The camera bubble (WebcamOverlay) is shown
@@ -72,18 +62,12 @@ Singleton {
         settle.restart();
     }
 
-    // Finishes a running scrolling screenshot; never starts one.
-    function finishScroll() {
-        Quickshell.execDetached([root.screenshotScript, "scroll-stop"]);
-    }
-
     function refresh() {
         pidView.reload();
         ticksView.reload();
         stampView.reload();
         outputView.reload();
         webcamView.reload();
-        scrollView.reload();
     }
 
     // /proc comm is cut to 15 characters, so gpu-screen-recorder, which the
@@ -282,48 +266,5 @@ Singleton {
             root.webcamGeometry = geometry;
         }
         onLoadFailed: root.webcamGeometry = ""
-    }
-
-    // A scrolling capture is published as one "PID START_TICKS" line and
-    // validated against procfs like the recorder, so a capture that was
-    // killed cannot leave the indicator lit. While a published capture is
-    // alive, procfs is read again every four seconds; otherwise nothing polls.
-    Timer {
-        interval: 4000
-        running: root.scrollPid > 0 && root.scrolling
-        repeat: true
-        onTriggered: scrollStatView.reload()
-    }
-
-    FileView {
-        id: scrollView
-        path: root.stateDir + "/scroll-capture"
-        printErrors: false
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            const fields = text().trim().split(/\s+/);
-            const pid = Number(fields[0]);
-            root.scrollPid = Number.isInteger(pid) && pid > 0 ? pid : 0;
-            root.scrollStartTicks = fields.length > 1 ? fields[1] : "";
-            if (root.scrollPid > 0)
-                scrollStatView.reload();
-            else
-                root.scrolling = false;
-        }
-        onLoadFailed: {
-            root.scrollPid = 0;
-            root.scrollStartTicks = "";
-            root.scrolling = false;
-        }
-    }
-
-    FileView {
-        id: scrollStatView
-        path: root.scrollPid > 0 ? "/proc/" + root.scrollPid + "/stat" : ""
-        printErrors: false
-        onLoaded: root.scrolling = root.scrollStartTicks !== ""
-            && root.startTicks(text()) === root.scrollStartTicks
-        onLoadFailed: root.scrolling = false
     }
 }

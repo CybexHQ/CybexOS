@@ -41,6 +41,7 @@ remain in place through rollback. Back up and test explicit data migrations
 before a future service/schema change; rolling system code back does not undo
 data writes. Do not downgrade a database or rewrite an unknown newer schema.
 
-Use the user's normal desktop commands for screenshots (`screenshot region`),
-recording (`screen-record`), OCR (`screen-ocr`) and file sharing (`localsend-share`).
+Use the user's normal desktop commands for screenshots (`screenshot region`, or
+`omasnap FILE` to annotate an existing image), recording (`screen-record`), OCR
+(`screen-ocr`) and file sharing (`localsend-share`).
 Do not capture or transmit private material without an authorized task.

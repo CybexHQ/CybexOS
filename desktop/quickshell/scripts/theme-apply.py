@@ -31,17 +31,25 @@ import theme_kitty
 import theme_ghostty
 import theme_alacritty
 import theme_foot
+import theme_omasnap
 
 # The terminals render files whether or not they are installed, so one chosen
 # later in Software starts in the current theme.
-TARGETS = (theme_kitty, theme_hyprland, theme_gtk, theme_hyprlock, theme_ghostty, theme_alacritty, theme_foot)
+TARGETS = (theme_kitty, theme_hyprland, theme_gtk, theme_hyprlock, theme_ghostty, theme_alacritty, theme_foot,
+           theme_omasnap)
 TOKENS_FILE = 'tokens.json'
 MAX_INPUT = 65536
 
 
 def write_if_changed(directory, name, content):
-    """Atomically replaces directory/name with content; False when identical."""
+    """Atomically replaces directory/name with content; False when identical.
+
+    A name may be in a folder of its own (omasnap/colors.toml), for an
+    application that reads every file in one folder.
+    """
     path = os.path.join(directory, name)
+    directory, name = os.path.split(path)
+    os.makedirs(directory, exist_ok=True)
     try:
         with open(path, encoding='utf-8') as handle:
             if handle.read() == content:

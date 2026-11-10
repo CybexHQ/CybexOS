@@ -17,9 +17,10 @@ in {
   config = lib.mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
       cfg.desktopPackage cfg.updaterPackage
-      (pkgs.callPackage ../packages/omawrite.nix {}) oh-my-posh cfg.dictationPackage
+      (pkgs.callPackage ../packages/omawrite.nix {}) (pkgs.callPackage ../packages/omasnap.nix {})
+      oh-my-posh cfg.dictationPackage
       hyprland quickshell hyprlock hypridle hyprsunset hyprpicker
-      wl-clipboard cliphist grim slurp satty swappy wayfreeze wf-recorder tesseract zbar qrencode
+      wl-clipboard cliphist grim slurp wayfreeze wf-recorder tesseract zbar qrencode
       imagemagick libnotify wtype pulseaudio
       wlr-randr brightnessctl playerctl pavucontrol networkmanagerapplet bluez polkit
       kitty fish firefox nautilus sushi pinta evince file-roller unicode-emoji

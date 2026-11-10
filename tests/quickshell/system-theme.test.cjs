@@ -48,7 +48,7 @@ test("apply validates tokens and saves the normalized copy", t => {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.report.success, true);
     assert.deepEqual(Object.keys(result.report.targets),
-        ["kitty", "hyprland", "gtk", "hyprlock", "ghostty", "alacritty", "foot"]);
+        ["kitty", "hyprland", "gtk", "hyprlock", "ghostty", "alacritty", "foot", "omasnap"]);
     const saved = JSON.parse(fs.readFileSync(path.join(state, "tokens.json"), "utf8"));
     assert.equal(saved.colors.accent, "#d3d283");
     assert.equal(fs.statSync(path.join(state, "tokens.json")).mode & 0o777, 0o644);

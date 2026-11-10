@@ -38,7 +38,7 @@ BarModule {
             Settings.modOpts.indicators.order, Dictation.available)
         .map(id => actionCatalog[id]).filter(action => action !== undefined)
     readonly property string actionStateKey: [
-        Dictation.state, Recorder.active, Recorder.scrolling, Reminders.count,
+        Dictation.state, Recorder.active, Reminders.count,
         SysInfo.nightLight, Notifs.dnd, SysInfo.idleInhibited, GameMode.active
     ].join(":")
     readonly property bool reminderOpen: host !== null
@@ -79,7 +79,7 @@ BarModule {
     function isActive(id) {
         switch (id) {
         case "dictation": return Dictation.busy;
-        case "recording": return Recorder.active || Recorder.scrolling;
+        case "recording": return Recorder.active;
         case "ocr": return false;
         case "reminder": return Reminders.count > 0;
         case "night-light": return SysInfo.nightLight;
@@ -132,8 +132,6 @@ BarModule {
                 : Dictation.transcribing ? "Cancel transcription"
                 : "Dictate · F9 · middle click history";
         case "recording":
-            if (Recorder.scrolling && !Recorder.active)
-                return "Finish scrolling screenshot · Enter";
             return Recorder.active ? "Stop recording" + (Recorder.outputFile !== ""
                 ? " · " + Recorder.outputFile.split("/").pop() : "")
                 : "Record a " + Settings.modOpts.indicators.recordingMode;
@@ -169,10 +167,7 @@ BarModule {
                 Dictation.toggle();
             break;
         case "recording":
-            if (Recorder.scrolling && !Recorder.active)
-                Recorder.finishScroll();
-            else
-                Recorder.toggle(Settings.modOpts.indicators.recordingMode);
+            Recorder.toggle(Settings.modOpts.indicators.recordingMode);
             break;
         case "ocr":
             Quickshell.execDetached([root.ocrScript]);
@@ -279,8 +274,7 @@ BarModule {
         readonly property string actionId: modelData
         readonly property var action: root.actionCatalog[actionId] ?? ({})
         readonly property bool activeState: root.isActive(actionId)
-        readonly property bool recording: actionId === "recording"
-            && (Recorder.active || Recorder.scrolling)
+        readonly property bool recording: actionId === "recording" && Recorder.active
         readonly property bool transcribing: actionId === "dictation" && Dictation.transcribing
         readonly property string actionLabel: root.labelFor(actionId)
         readonly property color ink: recording ? Theme.barRedFg

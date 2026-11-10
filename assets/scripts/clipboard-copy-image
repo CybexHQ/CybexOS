@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy image from stdin to clipboard, then save temp file for CLI tools
-# Used by Satty's copy button
+# For editors and scripts that hand over a finished image
 set -euo pipefail
 umask 077
 
