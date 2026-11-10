@@ -1,4 +1,4 @@
-{ pkgs, module, inputSources, candidate }:
+{ pkgs, nixpkgs, module, inputSources, candidate }:
 let
   passwordSink = pkgs.writeShellScript "cybexos-plymouth-answer" ''
     ${pkgs.coreutils}/bin/cat > /run/cybexos-plymouth-answer
@@ -30,6 +30,32 @@ let
       environment.systemPackages = [ (pkgs.runCommand "cybexos-update-interruption" {} "sleep 300; touch $out") ];
     }
   '';
+  # The systems the script stages, as the preview flake above evaluates them on
+  # the VM (its `path:` Cybex OS input has no Git revision). The VM is offline
+  # and can't build NixOS's own tools, so each is prebuilt like the product
+  # candidate: the working configuration, Software adding hello, the cleanup
+  # policy and the region change.
+  preview = extra: nixpkgs.lib.nixosSystem {
+    system = "x86_64-linux";
+    modules = [ module ../../templates/machine/settings.nix ./machine.nix ../../templates/machine/local/maintenance.nix
+      ({ lib, ... }: { cybexos.release.revision = lib.mkForce "uncommitted"; }) extra ];
+  };
+  software = (preview { cybexos.software.packages = [ "hello" ]; }).config;
+  staged = [ software.system.build.toplevel ] ++ map (extra: (preview extra).config.system.build.toplevel) [
+    { }
+    ({ lib, ... }: { cybexos.maintenance = lib.mkForce { automatic = false; keepConfirmed = 10; keepDays = 60; }; })
+    ({ lib, ... }: { time.timeZone = lib.mkOverride 900 "Europe/Berlin"; i18n.defaultLocale = lib.mkOverride 900 "nl_NL.UTF-8"; })
+  ];
+  # The interrupted preparation really builds: with a new package, NixOS
+  # rebuilds these from its own tools, which the VM then needs.
+  builders = let completions = software.environment.etc."fish/generated_completions".source; in
+    map (derivation: derivation.inputDerivation) ([
+      software.system.build.toplevel software.system.build.etc software.system.path
+      software.documentation.man.man-db.manualPages software.environment.etc."dbus-1".source
+      completions (builtins.head completions.paths)
+      software.environment.etc."systemd/system".source software.environment.etc."systemd/user".source
+    ] ++ map (unit: software.systemd.units.${unit}.unit) [ "polkit.service" "mandb.service" "dbus-broker.service" ]
+      ++ [ software.systemd.user.units."dbus-broker.service".unit ]);
   invalidConfiguration = pkgs.writeText "cybexos-verifier-invalid.lua" ''
   dofile("/etc/cybexos/runtime/hypr/hyprland.lua")
   hl.config({ general = { qualification_invalid_option = 1 } })
@@ -48,7 +74,8 @@ in pkgs.testers.runNixOSTest {
     users.users.tester.initialPassword = "qualification-only";
     # Retain the complete candidate and its exact input sources. Staging must
     # use the real Nix/updater path without requiring external delivery in a VM.
-    system.extraDependencies = inputSources ++ [ candidate previewFlake initialLock pkgs.hello pkgs.sshpass ];
+    system.extraDependencies = inputSources ++ staged ++ builders
+      ++ [ candidate previewFlake initialLock pkgs.hello pkgs.sshpass ];
     system.stateVersion = "26.05";
     boot.loader.systemd-boot.enable = lib.mkForce false;
   };

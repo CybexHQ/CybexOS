@@ -151,7 +151,7 @@
           } ];
         }).config.system.build.toplevel;
         vm = import ./nix/tests/lifecycle.nix {
-          inherit pkgs module inputSources;
+          inherit pkgs nixpkgs module inputSources;
           candidate = self.checks.${system}.system;
         };
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
