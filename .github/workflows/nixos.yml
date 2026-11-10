@@ -47,6 +47,13 @@ jobs:
       - run: nix build .#checks.x86_64-linux.product -L
       - name: Build matched XPS stack and evaluate NVIDIA independently
         run: nix build .#checks.x86_64-linux.xps-system .#checks.x86_64-linux.nvidia-evaluation -L
+      # A fresh machine's update builds only what the updater expects: a new
+      # local build Cybex OS doesn't declare would hold every update.
+      - name: Check that machines build only expected packages
+        run: |
+          python3 -I -B scripts/check-prebuilt
+          python3 -I -B scripts/check-prebuilt --nvidia
+          python3 -I -B scripts/check-prebuilt --catalogue
   vm:
     runs-on: [self-hosted, linux, x64, cybexos-isolated]
     steps:
