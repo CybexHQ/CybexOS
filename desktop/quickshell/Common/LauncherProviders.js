@@ -786,6 +786,29 @@ function blendRows(appRows, actions, query) {
     return apps.concat(blendedActionRows(actions, query, BLEND_LIMIT));
 }
 
+// The group label each row starts, "" for none: "Apps" over the first app
+// and "Actions" over the first blended action, only while one list holds
+// both. A list of one kind is already named by its tab.
+function groupLabels(rows) {
+    var list = (Array.isArray(rows) || rows instanceof Array) ? rows : [];
+    var group = function(row) {
+        return !row ? "" : row.blended ? "Actions" : row.kind === "app" ? "Apps" : "";
+    };
+    var labels = list.map(function() { return ""; });
+    var seen = {};
+    list.forEach(function(row) { seen[group(row)] = true; });
+    if (!seen.Apps || !seen.Actions)
+        return labels;
+    var previous = "";
+    for (var i = 0; i < list.length; i++) {
+        var current = group(list[i]);
+        if (current !== "" && current !== previous)
+            labels[i] = current;
+        previous = current;
+    }
+    return labels;
+}
+
 // ---- Ask Wiz -------------------------------------------------------------
 // A plain Apps query that matches nothing is offered to the assistant as a
 // question: one row, never under a prefix or in a prompt, which keep their
@@ -1077,6 +1100,7 @@ var exported = {
     actionRows: actionRows,
     blendedActionRows: blendedActionRows,
     blendRows: blendRows,
+    groupLabels: groupLabels,
     ASK_PREVIEW_LIMIT: ASK_PREVIEW_LIMIT,
     askRows: askRows,
     askHandoff: askHandoff,

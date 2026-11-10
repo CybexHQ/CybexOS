@@ -110,7 +110,7 @@ test("the overview's keys: arrows, Tab, Enter, and Esc clears before it closes",
         ["Down", "down"], ["Tab", "next"], ["Backtab", "previous"]])
         assert.match(keys, new RegExp(`Qt\\.Key_${key}:\\s*root\\.move\\("${action}"\\)`));
     assert.match(keys, /Qt\.Key_Escape:\s*if \(filterInput\.text !== ""\)\s*filterInput\.text = "";\s*else\s*Overview\.close\(\);/);
-    assert.match(keys, /Qt\.Key_Enter:[\s\S]{0,250}?root\.activateWorkspace\(root\.tiles\[root\.selectedTileIndex\]\)[\s\S]{0,80}?root\.activateWindow\(root\.selected\)/);
+    assert.match(keys, /Qt\.Key_Enter:[\s\S]{0,250}?root\.activateWorkspace\(root\.tiles\[root\.selectedTileIndex\]\)[\s\S]{0,160}?root\.activateWindow\(root\.selected\)/);
 });
 
 test("overview motion uses the shared tokens, which reduced motion zeroes", () => {
@@ -253,4 +253,26 @@ test("both surfaces skip layer animations; only the dock is blurred", () => {
     assert.ok(blur);
     assert.match(blur[1], /\|dock\)\$$/);
     assert.doesNotMatch(blur[1], /overview/, "a blur behind live captures redraws every frame");
+});
+
+test("an overview with no windows says so and offers one way on", () => {
+    assert.match(overviewView, /readonly property bool empty: windows\.length === 0/);
+    // The window actions and the hint go with the windows; a heading, one
+    // line and Open an app take their place, centred under the filter.
+    assert.match(overviewView, /id: status\s*visible: !root\.empty/);
+    assert.match(overviewView, /id: windowActions[\s\S]*?visible: !root\.empty/);
+    const empty = overviewView.slice(overviewView.indexOf("id: emptyState"),
+        overviewView.indexOf("// ---- workspace grid"));
+    assert.match(empty, /visible: root\.empty\s*anchors\.horizontalCenter: parent\.horizontalCenter/);
+    assert.match(empty, /text: "No windows open"/);
+    assert.equal((empty.match(/SettingsAction \{/g) || []).length, 1, "one action");
+    assert.match(empty, /primary: true\s*text: "Open an app"[\s\S]*?onTriggered: root\.openLauncher\(\)/);
+    // The launcher opening closes the overview (OverviewWindow), and Enter
+    // with nothing to select does the same as the button.
+    assert.match(functionBody(overviewView, "openLauncher"), /Launcher\.openProvider\("apps", root\.output\)/);
+    assert.match(overviewView, /else if \(root\.empty\)\s*root\.openLauncher\(\);/);
+    assert.match(overviewView, /anchors\.top: root\.empty \? emptyState\.bottom : windowActions\.bottom/);
+    // The action row is as wide as its actions, so it centres under the hint.
+    assert.match(overviewView, /width: Math\.max\(1, Math\.min\(maxWidth, rowWidth\)\)/);
+    assert.match(overviewView, /I18n\.format\("No windows match “%1”", \[root\.query\.trim\(\)\]\)/);
 });

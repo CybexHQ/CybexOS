@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../Common"
 import "../Common/NotesHelpers.js" as NotesHelpers
+import "../Assistant"
 import "../Common/PanelRegistryData.js" as PanelRegistry
 
 // A compact two-state Markdown notebook. Draft text belongs to this view;
@@ -38,6 +39,9 @@ Surface {
         : Notes.titleError(editingId)
     readonly property bool editorTitleActionVisible: editingId !== ""
         && Settings.modOpts.notes.titleProvider !== "off"
+    // No notes at all: Wiz, one line and "Write a note" stand in for the
+    // list, and take over from the header's Add.
+    readonly property bool empty: Notes.ready && Notes.count === 0
     readonly property string statusText: Notes.error !== "" ? Notes.error
         : !Notes.ready ? "Loading…"
         : Notes.undoAvailable ? "Note deleted"
@@ -51,7 +55,7 @@ Surface {
     function focusInitial() {
         Qt.callLater(() => {
             if (root.visible && !root.editing)
-                addButton.forceActiveFocus();
+                (root.empty ? writeButton : addButton).forceActiveFocus();
         });
     }
 
@@ -425,6 +429,7 @@ Surface {
 
                 ActionButton {
                     id: addButton
+                    visible: !root.empty
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     label: I18n.tr("Add")
@@ -445,39 +450,58 @@ Surface {
 
             Item {
                 id: emptyState
-                visible: Notes.ready && Notes.count === 0
+                visible: root.empty
                 width: parent.width
-                height: visible ? Math.min(Theme.scaled(104),
+                height: visible ? Math.min(emptyColumn.implicitHeight + Theme.scaled(16),
                     Math.max(1, root.heightEnvelope - root.padding * 2
                         - overviewHeader.height - overviewColumn.spacing
                         - (overviewStatus.visible
                             ? overviewStatus.height + overviewColumn.spacing : 0))) : 0
+                clip: true
                 Accessible.role: Accessible.StaticText
                 Accessible.name: I18n.tr("No notes yet")
-                Accessible.description: I18n.tr("Use Add to start a note")
+                Accessible.description: I18n.tr("Jot down a thought, a list or a link.")
 
                 Column {
+                    id: emptyColumn
                     anchors.centerIn: parent
                     width: parent.width
-                    spacing: 5
+                    spacing: Theme.scaled(8)
 
-                    Text {
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        text: I18n.tr("No notes yet")
-                        font.family: Theme.fontMenu
-                        font.pixelSize: Theme.typography.primary
-                        font.weight: Theme.weightSemibold
-                        color: Theme.textMid
+                    Wiz {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Theme.scaled(64)
+                        height: Theme.scaled(64)
+                        pose: "idle"
                     }
 
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
-                        text: I18n.tr("Use Add to start a note.")
+                        wrapMode: Text.Wrap
+                        text: I18n.tr("Jot down a thought, a list or a link.")
                         font.family: Theme.fontMenu
-                        font.pixelSize: Theme.typography.secondary
-                        color: Theme.textFaint
+                        font.pixelSize: Theme.typography.primary
+                        color: Theme.textMid
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: Theme.scaled(4)
+                    }
+
+                    ActionButton {
+                        id: writeButton
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        label: I18n.tr("Write a note")
+                        hPadding: 24
+                        tint: Theme.accent
+                        fill: Theme.accentBgSoft
+                        enabled: Notes.ready
+                        activeFocusOnTab: enabled && visible
+                        Accessible.role: Accessible.Button
+                        Accessible.name: I18n.tr("Write a note")
+                        onTriggered: root.beginNew()
                     }
                 }
             }

@@ -1,11 +1,14 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
 import "Common"
 import "Common/Format.js" as Format
 import "Common/NotifHolds.js" as Holds
+import "Common/NotifPolicy.js" as NotifPolicy
+import "Welcome" as Guide
 
 // One source-grouped, bounded popup surface per output. Decks stay on the
 // display chosen on arrival. Hover or explicit expansion pauses all members;
@@ -14,7 +17,48 @@ import "Common/NotifHolds.js" as Holds
 // (Super+N). Notifications the group bounds kept off the stack are counted
 // on a "+n more" chip that opens that tab, and while the drawer is open over
 // this corner new arrivals go to it instead (NotifPolicy.drawerRoute).
+//
+// A toast is a separate floating surface over whatever window is under it,
+// so it always draws an edge: the person's panel border when one is set,
+// otherwise a 1 px hairline, plus a shadow while glass is off.
 Scope {
+    id: toasts
+
+    // ---- the welcome guide (NotifPolicy.guideRoute) ----------------------
+    // The full-screen guide keeps Offline, the language and its close button
+    // in a top bar exactly where toasts appear. While it covers an output, an
+    // ordinary toast there goes quietly to the notification centre: it stays
+    // in history and counts as unread on the drawer's Notifications tab. A
+    // critical one still shows, moved clear of the guide's top bar or footer.
+    readonly property var guide: ({
+        shown: Welcome.open && !Welcome.aside,
+        screen: Welcome.screenName
+    })
+
+    function underGuide(entry) {
+        return NotifPolicy.guideRoute(toasts.guide, entry.screenName,
+            entry.urgency === NotificationUrgency.Critical) === "centre";
+    }
+
+    function retireUnderGuide() {
+        for (const entry of Notifs.toasts.filter(item => toasts.underGuide(item))) {
+            Notifs.hideToast(entry, false);
+            Notifs.unreadKeys = NotifPolicy.markKey(Notifs.unreadKeys, entry.key);
+        }
+    }
+
+    onGuideChanged: retireUnderGuide()
+
+    // The windows below never draw these; retiring them waits a turn so the
+    // service is not written from inside its own change signal.
+    Connections {
+        target: Notifs
+
+        function onToastsChanged() {
+            Qt.callLater(toasts.retireUnderGuide);
+        }
+    }
+
     Variants {
         model: Screens.layerSurfaceModel
         delegate: PanelWindow {
@@ -25,7 +69,8 @@ Scope {
             // same output; reading that property here closes a cycle via visible.
             readonly property var screenGroups: Notifs.toastGroups.map(group => ({
                 key: group.key, app: group.app,
-                items: group.items.filter(entry => root.modelData.screen && entry.screenName === root.modelData.screen.name)
+                items: group.items.filter(entry => root.modelData.screen && entry.screenName === root.modelData.screen.name
+                    && !toasts.underGuide(entry))
             })).filter(group => group.items.length > 0)
             readonly property var groupKeys: screenGroups.map(group => group.key)
             readonly property string screenName: root.modelData.screen ? root.modelData.screen.name : ""
@@ -35,6 +80,12 @@ Scope {
             readonly property bool onLeft: Settings.notifPosition.indexOf("left") !== -1
             readonly property bool barSameEdge: Screens.hasBar(root.screen)
                 && (Settings.position === "top") === onTop
+            // A critical toast over the guide keeps clear of its top bar (or,
+            // for bottom corners, its footer); the guide covers the bar.
+            readonly property bool guideCovers: NotifPolicy.guideCovers(toasts.guide, root.screenName)
+            readonly property int guideInset: guideCovers
+                ? NotifPolicy.guideInset(root.modelData.screen ? root.modelData.screen.height : 0,
+                    Guide.Kiosk.zoom, root.onTop) : 0
             // Density scales the card's inner padding and content gap.
             readonly property int padV: Theme.scaled(Settings.notifDensity === "compact" ? 8
                 : Settings.notifDensity === "roomy" ? 15 : 11)
@@ -75,9 +126,11 @@ Scope {
             // a bar on the same edge.
             // qmllint disable unqualified
             margins.top: root.onTop
-                ? (root.barSameEdge ? Theme.barTopMargin + Theme.barHeight : 0) : 0
+                ? (root.guideCovers ? root.guideInset
+                    : root.barSameEdge ? Theme.barTopMargin + Theme.barHeight : 0) : 0
             margins.bottom: !root.onTop
-                ? (root.barSameEdge ? Theme.barTopMargin + Theme.barHeight : 0) : 0
+                ? (root.guideCovers ? root.guideInset
+                    : root.barSameEdge ? Theme.barTopMargin + Theme.barHeight : 0) : 0
             // qmllint enable unqualified
 
             // end-4's two current notification styles land around 344–390 logical px.
@@ -85,7 +138,9 @@ Scope {
             // Keep a little more room than the compact reference while still adapting
             // to unusually narrow outputs.
             readonly property int edgeMargin: Math.max(10, Theme.barSideMargin)
-            readonly property int windowPad: 12
+            // Room beside and below the stack for the cards' shadow.
+            readonly property int windowPad: 16
+            readonly property int shadowRoom: 8
             readonly property int cardWidth: Math.max(1, Math.min(Theme.scaled(380, Theme.contentScale),
                 root.screen ? root.screen.width - edgeMargin - windowPad : 380))
             implicitWidth: cardWidth + edgeMargin + windowPad
@@ -93,7 +148,7 @@ Scope {
             // Without this reserve the layer surface shrinks before the departing
             // delegate can paint its slide/fade.
             property real reservedListHeight: 0
-            implicitHeight: Math.min(reservedListHeight + 24,
+            implicitHeight: Math.min(reservedListHeight + 24 + shadowRoom,
                 root.screen ? root.screen.height - Theme.barHeight - 32 : 800)
             exclusionMode: ExclusionMode.Ignore
             color: "transparent"
@@ -145,10 +200,12 @@ Scope {
                 anchors.right: root.onLeft ? undefined : parent.right
                 anchors.rightMargin: root.edgeMargin
                 width: root.cardWidth
-                height: Math.min(root.reservedListHeight, root.height - 24)
+                height: Math.min(root.reservedListHeight, root.height - 24 - root.shadowRoom)
                 spacing: 8
                 interactive: contentHeight > height
-                clip: true
+                // Only a stack taller than the screen scrolls and needs its
+                // edges cut; otherwise the cards' shadows spill past the list.
+                clip: interactive
 
                 onContentHeightChanged: root.syncListHeight()
                 Component.onCompleted: root.syncListHeight()
@@ -234,8 +291,9 @@ Scope {
                             height: Theme.chipHeight
                             radius: Theme.chipRadius
                             color: chipMouse.containsMouse ? Theme.surfaceMenu : Theme.panelSurface
-                            border.width: Theme.surfaceBorderWidth
-                            border.color: Theme.surfaceBorderColor
+                            // The same edge as the cards it counts.
+                            border.width: Math.max(1, Theme.surfaceBorderWidth)
+                            border.color: Theme.surfaceBorderWidth > 0 ? Theme.surfaceBorderColor : Theme.stroke
                             Accessible.role: Accessible.Button
                             Accessible.name: I18n.format("%1 more notifications", [root.overflowCount])
                             Accessible.onPressAction: chip.open()
@@ -259,6 +317,9 @@ Scope {
                             MouseArea {
                                 id: chipMouse
                                 anchors.fill: parent
+                                // A 32 px target around the 28 px chip.
+                                anchors.topMargin: Math.min(0, (chip.height - Theme.inlineActionHeight) / 2)
+                                anchors.bottomMargin: Math.min(0, (chip.height - Theme.inlineActionHeight) / 2)
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: chip.open()
@@ -353,6 +414,21 @@ Scope {
                                 onFinished: Notifs.hideToast(slot.modelData, true)
                             }
 
+                            // Under the card, so a toast reads as floating over a
+                            // dark window. Glass off only: with glass on the
+                            // compositor blurs the whole layer, and a shadow in
+                            // its margin reads as a haze band instead
+                            // (desktop/hypr/looknfeel.lua).
+                            RectangularShadow {
+                                visible: !Settings.glassEnabled
+                                anchors.fill: card
+                                radius: card.radius
+                                blur: Theme.scaled(14)
+                                spread: 0
+                                offset.y: Theme.scaled(3)
+                                color: Theme.dark ? Qt.rgba(0, 0, 0, 0.5) : Qt.rgba(0, 0, 0, 0.18)
+                            }
+
                             NotifCard {
                                 id: card
                                 entry: slot.modelData
@@ -374,8 +450,9 @@ Scope {
                                 clip: true
                                 readonly property color baseSurface: hovered ? Theme.surfaceMenu : Theme.panelSurface
                                 color: slot.critical ? Qt.tint(baseSurface, Theme.redBgSoft) : baseSurface
-                                border.width: Theme.surfaceBorderWidth
-                                border.color: slot.critical ? Theme.redBorder : Theme.surfaceBorderColor
+                                border.width: Math.max(1, Theme.surfaceBorderWidth)
+                                border.color: slot.critical ? Theme.redBorder
+                                    : Theme.surfaceBorderWidth > 0 ? Theme.surfaceBorderColor : Theme.stroke
                                 onActivated: Notifs.activate(slot.modelData)
                                 onCloseRequested: Notifs.dismiss(slot.modelData)
 

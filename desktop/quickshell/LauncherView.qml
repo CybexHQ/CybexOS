@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "Common"
 import "Common/LauncherNavigation.js" as Navigation
+import "Common/Monogram.js" as Monogram
 import "Assistant"
 import "Popovers"
 
@@ -39,6 +40,14 @@ Surface {
     readonly property bool selectedPreview: !!(selectedRow && selectedRow.thumbnail)
     readonly property bool asking: rows.length === 1 && rows[0].kind === "ask"
     readonly property string askQuote: asking ? rows[0].subtitle : ""
+    // "Apps" and "Actions" over the first row of each while a typed query
+    // lists both (LauncherProviders.groupLabels). A label takes its own
+    // strip above its row, inside the same scrolling viewport.
+    readonly property var groupLabels: LauncherProviders.groupLabels
+    readonly property bool grouped: groupLabels.some(label => label !== "")
+    readonly property int groupLabelHeight: Theme.scaled(26)
+    readonly property int groupLabelSpace: groupLabels.filter(label => label !== "").length
+        * groupLabelHeight
     readonly property string searchPlaceholder: argumentMode
         ? (pendingAction.argument ? pendingAction.argument.placeholder : "Search web apps")
         : ({
@@ -356,11 +365,14 @@ Surface {
             ColorAnimation { duration: Theme.surfaceDuration }
         }
 
+        // A magnifier says "type here" on every tab. A typed prefix (/ > = @)
+        // or a prompt shows what the field now does instead.
         Sym {
             id: searchGlyph
             x: 16
             anchors.verticalCenter: parent.verticalCenter
-            name: root.argumentMode ? root.pendingAction.glyph : root.provider.glyph
+            name: root.argumentMode ? root.pendingAction.glyph
+                : root.mode !== "" ? root.provider.glyph : "search"
             size: 18
             color: Theme.textDim
         }
@@ -450,7 +462,8 @@ Surface {
         width: parent.width
         height: Math.min(Math.min(root.maxResults * root.rowHeight, root.rows.length * root.rowHeight
                 + (root.selectedPreview ? root.previewRowHeight - root.rowHeight : 0)
-                + (root.asking ? root.askRowHeight - root.rowHeight : 0)),
+                + (root.asking ? root.askRowHeight - root.rowHeight : 0)
+                + root.groupLabelSpace),
             root.availableHeight > 0 ? Math.max(0, root.availableHeight - root.padding * 2 - root.tabHeight - root.searchHeight - root.spacing * 2) : root.maxResults * root.rowHeight)
         clip: true
 
@@ -462,7 +475,7 @@ Surface {
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.VerticalFlick
 
-            delegate: Rectangle {
+            delegate: Item {
                 id: resultRow
 
                 required property var modelData
@@ -474,29 +487,63 @@ Surface {
                 // Nothing matched, and this row offers the query to Wiz, who
                 // is drawn over it (below).
                 readonly property bool asking: modelData.kind === "ask"
+                // The group this row starts, if any; its label sits above the
+                // row's own box and is not part of what a click selects.
+                readonly property string groupLabel: root.groupLabels[index] || ""
+                readonly property int labelSpace: groupLabel !== "" ? root.groupLabelHeight : 0
                 readonly property string iconUrl: modelData.thumbnail
                     ? modelData.thumbnail : LauncherProviders.iconSource(modelData.icon)
+                // An app whose icon does not resolve shows its monogram tile
+                // (Common/Monogram.js, shared with Software) rather than the
+                // Apps tab's grid glyph, so two such apps still look different.
+                readonly property var monogram: modelData.kind === "app"
+                    ? Monogram.tile(modelData.title, Theme.dark) : null
+                readonly property bool showsMonogram: monogram !== null && monogram.letter !== ""
                 width: resultList.width
                 height: asking ? root.askRowHeight
-                    : previewing ? root.previewRowHeight : root.rowHeight
-                radius: Theme.rowRadius
+                    : previewing ? root.previewRowHeight : root.rowHeight + labelSpace
+
+                Text {
+                    visible: resultRow.groupLabel !== ""
+                    x: Theme.scaled(10)
+                    width: Math.max(0, parent.width - x * 2)
+                    height: resultRow.labelSpace
+                    verticalAlignment: Text.AlignVCenter
+                    text: resultRow.groupLabel === "Actions" ? I18n.tr("Actions") : I18n.tr("Apps")
+                    elide: Text.ElideRight
+                    font.family: Theme.fontMenu
+                    font.pixelSize: Theme.typography.section
+                    font.weight: Theme.weightSemibold
+                    font.letterSpacing: 1
+                    font.capitalization: Font.AllUppercase
+                    color: Theme.textDim
+                }
+
                 // The selected result lights the bar's held chip. A full-accent
                 // slab across a 460px row was the loudest thing in the shell, and
                 // the value jump from mid copy to white already says which row it
                 // is — the same way a taken segment says it everywhere else.
-                color: isSelected ? Theme.chipHover : "transparent"
+                Rectangle {
+                    id: rowBox
+                    y: resultRow.labelSpace
+                    width: parent.width
+                    height: Math.max(0, parent.height - y)
+                    radius: Theme.rowRadius
+                    color: resultRow.isSelected ? Theme.chipHover : "transparent"
+                }
 
                 Item {
                     id: resultIcon
                     visible: !resultRow.asking
                     x: Theme.scaled(10)
-                    y: Math.round((root.rowHeight - height) / 2)
+                    y: resultRow.labelSpace + Math.round((root.rowHeight - height) / 2)
                     width: root.resultIconSize
                     height: root.resultIconSize
 
                     Image {
+                        id: iconImage
                         anchors.fill: parent
-                        visible: source !== ""
+                        visible: source !== "" && status !== Image.Error
                         source: resultRow.iconUrl
                         sourceSize: Qt.size(64, 64)
                         fillMode: resultRow.modelData.thumbnail
@@ -505,14 +552,14 @@ Surface {
                     }
 
                     Rectangle {
-                        visible: resultRow.iconUrl === ""
+                        visible: resultRow.iconUrl === "" || iconImage.status === Image.Error
                         anchors.fill: parent
                         radius: 9
-                        color: Theme.chip
+                        color: resultRow.showsMonogram ? resultRow.monogram.fill : Theme.chip
 
                         Sym {
                             anchors.centerIn: parent
-                            visible: !resultRow.modelData.iconText
+                            visible: !resultRow.modelData.iconText && !resultRow.showsMonogram
                             name: resultRow.modelData.glyph || root.provider.glyph
                             size: Theme.iconMedium
                             animateColor: false
@@ -526,12 +573,24 @@ Surface {
                             font.family: Theme.fontMenu
                             font.pixelSize: Theme.typography.title
                         }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: resultRow.showsMonogram && !resultRow.modelData.iconText
+                            text: resultRow.showsMonogram ? resultRow.monogram.letter : ""
+                            textFormat: Text.PlainText
+                            font.family: Theme.fontMenu
+                            font.pixelSize: Theme.typography.title
+                            font.weight: Theme.weightBold
+                            color: resultRow.showsMonogram ? resultRow.monogram.ink : Theme.textHi
+                        }
                     }
                 }
 
                 Text {
                     visible: !resultRow.asking
                     x: resultIcon.x + resultIcon.width + Theme.scaled(10)
+                    y: resultRow.labelSpace
                     width: Math.max(0, parent.width - x - Theme.scaled(12)
                         - (trailing.width > 0 ? trailing.width + Theme.scaled(10) : 0))
                     height: root.rowHeight
@@ -546,16 +605,18 @@ Surface {
                 }
 
                 // An action's group ("Capture"), or "Action" where one joins
-                // the app results; a pin glyph on a pinned clipboard entry.
+                // the app results without an Actions label above it; a pin
+                // glyph on a pinned clipboard entry.
                 Row {
                     id: trailing
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.scaled(12)
-                    y: Math.round((root.rowHeight - height) / 2)
+                    y: resultRow.labelSpace + Math.round((root.rowHeight - height) / 2)
                     spacing: Theme.scaled(6)
 
                     Text {
                         visible: !!resultRow.modelData.tag
+                            && !(root.grouped && resultRow.modelData.blended)
                         anchors.verticalCenter: parent.verticalCenter
                         text: I18n.tr(resultRow.modelData.tag || "")
                         font.family: Theme.fontMenu
@@ -577,9 +638,9 @@ Surface {
                 Image {
                     visible: resultRow.previewing
                     x: resultIcon.x
-                    y: root.rowHeight
+                    y: resultRow.labelSpace + root.rowHeight
                     width: parent.width - x * 2
-                    height: Math.max(0, parent.height - root.rowHeight - Theme.scaled(8))
+                    height: Math.max(0, parent.height - y - Theme.scaled(8))
                     source: resultRow.previewing ? resultRow.modelData.thumbnail : ""
                     sourceSize: Qt.size(512, 512)
                     fillMode: Image.PreserveAspectFit
@@ -588,7 +649,7 @@ Surface {
                 }
 
                 MouseArea {
-                    anchors.fill: parent
+                    anchors.fill: rowBox
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -616,9 +677,12 @@ Surface {
             sourceComponent: AskWiz {}
         }
 
+        // The fade spans most of a row, so a list that goes on below reads
+        // as going on rather than as a last row cut off at the edge.
         ScrollChrome {
             anchors.fill: parent
             target: resultList
+            fadeSize: Math.round(root.rowHeight * 0.75)
         }
     }
 

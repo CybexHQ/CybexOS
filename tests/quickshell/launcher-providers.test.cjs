@@ -529,3 +529,17 @@ test("image previews are requested for the newest image entries only", () => {
     ]);
     assert.deepEqual(P.clipboardPreviewTargets(["1\tplain"], 24), []);
 });
+
+test("a typed query that lists apps and actions labels each group once", () => {
+    const apps = [{ kind: "app", title: "Firefox" }, { kind: "app", title: "Files" }];
+    const actions = P.blendedActionRows(P.BUILTIN_ACTIONS, "screenshot");
+    assert.ok(actions.length > 0);
+    assert.deepEqual(P.groupLabels(apps.concat(actions)),
+        ["Apps", ""].concat(["Actions"], actions.slice(1).map(() => "")));
+    // One kind alone is already named by its tab, and Wiz's row by himself.
+    assert.deepEqual(P.groupLabels(apps), ["", ""]);
+    assert.deepEqual(P.groupLabels(actions), actions.map(() => ""));
+    assert.deepEqual(P.groupLabels(P.actionRows(P.BUILTIN_ACTIONS, "", 4)), ["", "", "", ""]);
+    assert.deepEqual(P.groupLabels([]), []);
+    assert.deepEqual(P.groupLabels(undefined), []);
+});

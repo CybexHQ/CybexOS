@@ -226,6 +226,10 @@ Singleton {
         }
     }
 
+    // "Apps" and "Actions" over the first row of each, while a typed Apps
+    // query lists both (ProviderHelpers.groupLabels); otherwise all "".
+    readonly property var groupLabels: ProviderHelpers.groupLabels(rows)
+
     readonly property bool busy: argumentMode
         ? pendingAction.choices === "webapps" && webAppsLoading
         : activeProviderId === "files" ? fileLoading

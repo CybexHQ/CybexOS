@@ -201,7 +201,13 @@ test("overview rows show titles, fresh relative times, and stable contextual act
     assert.match(panel, /new Date\(updatedAt\)\.toLocaleString\(\)/);
     assert.match(panel, /Accessible\.description:\s*exactModified/,
         "each row exposes its exact local modified time");
-    assert.match(panel, /Accessible\.name:\s*"No notes yet"[\s\S]*?Use Add to start a note/);
+    // Empty, Wiz and one line stand in for the list, and "Write a note"
+    // takes over from the header's Add (and its first focus).
+    assert.match(panel, /Accessible\.name:\s*"No notes yet"[\s\S]*?Jot down a thought, a list or a link\./);
+    assert.match(panel, /readonly property bool empty: Notes\.ready && Notes\.count === 0/);
+    assert.match(panel, /id: emptyState\s*visible: root\.empty[\s\S]*?Wiz \{[\s\S]*?id: writeButton[\s\S]*?label: "Write a note"[\s\S]*?onTriggered: root\.beginNew\(\)/);
+    assert.match(panel, /id: addButton\s*visible: !root\.empty/);
+    assert.match(panel, /\(root\.empty \? writeButton : addButton\)\.forceActiveFocus\(\)/);
     assert.match(panel, /function deleteCard\([\s\S]*?focusInitial\(\)/,
         "deleting a focused card must return keyboard focus to Add");
     assert.match(panel, /label:\s*"Undo"[\s\S]*?Notes\.undoDelete\(\)/);

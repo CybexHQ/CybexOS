@@ -88,7 +88,10 @@ test('production screen selection follows the assigned output without reading th
     Object.defineProperty(root,'screen',{get(){
         assert.fail('native screenChanged during visibility mapping must not invalidate screenGroups');
     }});
-    const context=vm.createContext({root,Notifs:{toastGroups:[
+    // The full-screen welcome guide keeps an output's ordinary toasts off it
+    // (NotifPolicy.guideRoute); nothing is under it here until said so.
+    const toasts={covered:[],underGuide:entry=>toasts.covered.includes(entry.key)};
+    const context=vm.createContext({root,toasts,Notifs:{toastGroups:[
         {key:'source-one',app:'One',items:[a,b]},
         {key:'source-two',app:'Two',items:[c]}
     ]}});
@@ -101,6 +104,9 @@ test('production screen selection follows the assigned output without reading th
         {key:'source-one',app:'One',items:[b]},
         {key:'source-two',app:'Two',items:[c]}
     ]);
+    toasts.covered=['c'];
+    assert.deepEqual(select(),[{key:'source-one',app:'One',items:[b]}]);
+    toasts.covered=[];
     root.modelData={screen:null};
     assert.deepEqual(select(),[]);
     root.modelData={screen:{name:'disconnected'}};

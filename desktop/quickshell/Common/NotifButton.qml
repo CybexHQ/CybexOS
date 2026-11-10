@@ -1,9 +1,14 @@
 import QtQuick
 
+// A small labelled notification button (Expand group, Dismiss group, the
+// snooze choices). The chip keeps its compact height; its hit area reaches
+// past it to at least a 32 px target, as SettingsAction's does.
 Rectangle {
     id: root
     property string text: ""
     signal triggered()
+    readonly property real hitInsetX: Math.min(0, (width - Theme.inlineActionHeight) / 2)
+    readonly property real hitInsetY: Math.min(0, (height - Theme.inlineActionHeight) / 2)
     implicitWidth: label.implicitWidth + Theme.controlSpacing * 2
     implicitHeight: Math.max(Theme.chipHeight, label.implicitHeight + 10)
     radius: Theme.chipRadius
@@ -32,6 +37,10 @@ Rectangle {
     }
     MouseArea {
         anchors.fill: parent
+        anchors.leftMargin: root.hitInsetX
+        anchors.rightMargin: root.hitInsetX
+        anchors.topMargin: root.hitInsetY
+        anchors.bottomMargin: root.hitInsetY
         cursorShape: Qt.PointingHandCursor
         onClicked: {
             root.forceActiveFocus();
