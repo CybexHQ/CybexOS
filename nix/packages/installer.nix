@@ -24,7 +24,9 @@ let
     pname = "cybexos-installer-screen";
     inherit version;
     src = kioskSource;
-    cargoLock.lockFile = kioskSource + "/Cargo.lock";
+    # Read during evaluation: Nix 2.35's `flake check --no-build` doesn't add
+    # the filtered copy to an empty store, so it can't be read from there.
+    cargoLock.lockFile = source + "/installer/kiosk/Cargo.lock";
     # Slint 1.18's KMS software renderer drops the cursor callback, repaints
     # triple buffers in full and blends in uncached display memory. Its
     # libinput backend also has no held-key repeat. Patch pinned dependencies
