@@ -895,6 +895,12 @@ def main():
             session.capture(shots, 'welcome-wallpaper-search-en.png')
 
             # Hold Space: the guide fades and the actual desktop shows.
+            # Closing the guide posts a "finish setting up any time" toast,
+            # and reopening it moves that toast to the notification centre
+            # (NotifPolicy.guideRoute), so the reference desktop would show a
+            # toast the peek no longer has. Focus keeps both frames toast-free.
+            session.patch_settings(notifDnd=True)
+            time.sleep(1)
             session.ipc('close')
             session.wait(lambda: session.guide_rect() is None, 'guide unmapped')
             desktop = session.capture(base, 'desktop.png')
@@ -920,6 +926,7 @@ def main():
             assert peek_diff < 2, f'Space must reveal the actual desktop (difference {peek_diff:.2f})'
             back = session.capture(base, 'back.png')
             assert region_difference(back, shown, box) < 2, 'release restores the guide'
+            session.patch_settings(notifDnd=False)
 
             # A sheet opens over the guide and Escape closes only the sheet.
             session.call('welcome-test', 'sheet', 'keyboard')
