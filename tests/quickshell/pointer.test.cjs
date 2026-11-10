@@ -183,8 +183,14 @@ test("applications started from the shell get the pointer in use now", () => {
     // the shell's own environment, exactly as DesktopEntry.execute().
     for (const current of [" ", "", "a;b 24", "Adwaita x", undefined])
         assert.deepEqual(P.launchContext({ command: ["x"] }, current), { command: ["x"], workingDirectory: "" });
+    // Arguments follow the entry's command, which stays as it was.
+    const chrome = { command: ["google-chrome-stable"] };
+    assert.deepEqual(P.launchContext(chrome, "", ["--new-window", "chrome://settings/people"]).command,
+        ["google-chrome-stable", "--new-window", "chrome://settings/people"]);
+    assert.deepEqual(chrome.command, ["google-chrome-stable"]);
+    assert.deepEqual(P.launchContext(chrome, "", "--new-window").command, ["google-chrome-stable"]);
     const pointer = read("Common/Pointer.qml");
-    assert.match(pointer, /Quickshell\.execDetached\(PointerHelpers\.launchContext\(desktopEntry, current\)\)/);
+    assert.match(pointer, /Quickshell\.execDetached\(PointerHelpers\.launchContext\(desktopEntry, current, args\)\)/);
     assert.match(pointer, /root\.current = record\.split/, "only a successful apply changes it");
     // Every launch of a desktop entry goes through it.
     const files = spawnSync("git", ["-C", repo, "ls-files", "desktop/quickshell"], { encoding: "utf8" }).stdout

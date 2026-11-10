@@ -58,27 +58,59 @@ test('1Password is known by its desktop entry id from 8.12.42 on, and before', (
     assert.equal(W.isPassword('1password-beta'), false);
     assert.equal(W.isPassword(undefined), false);
 });
-test('a sign-in owns every window it opens; 1Password only its own', () => {
-    assert.deepEqual(W.connectWindow('a1,1,kitty,claude auth login', 'sign-in'), {address: 'a1', signIn: true});
-    assert.deepEqual(W.connectWindow('b2,1,brave-browser,Claude', 'sign-in'), {address: 'b2', signIn: true});
-    assert.deepEqual(W.connectWindow('c3,1,1Password,Lock Screen, 1Password', 'password'), {address: 'c3', signIn: false});
-    assert.deepEqual(W.connectWindow('c4,1,1password,1Password', 'password'), {address: 'c4', signIn: false});
-    assert.deepEqual(W.connectWindow('c5,1,com.onepassword.OnePassword,1Password', 'password'), {address: 'c5', signIn: false});
+test('Chrome is known by its desktop entry id and its windows\' class, Wayland or XWayland', () => {
+    assert.equal(W.isChrome('google-chrome'), true);
+    assert.equal(W.isChrome('Google-chrome'), true);
+    for (const name of ['google-chrome-beta', 'chromium', 'brave-browser', 'chrome-web.whatsapp.com__-Default', undefined])
+        assert.equal(W.isChrome(name), false, String(name));
+});
+test('a sign-in owns every window it opens; 1Password and Chrome only their own', () => {
+    assert.deepEqual(W.connectWindow('a1,1,kitty,claude auth login', 'sign-in'), {address: 'a1', action: 'sign-in'});
+    assert.deepEqual(W.connectWindow('b2,1,google-chrome,Claude', 'sign-in'), {address: 'b2', action: 'sign-in'});
+    assert.deepEqual(W.connectWindow('c3,1,1Password,Lock Screen, 1Password', 'password'), {address: 'c3', action: 'password'});
+    assert.deepEqual(W.connectWindow('c4,1,1password,1Password', 'password'), {address: 'c4', action: 'password'});
+    assert.deepEqual(W.connectWindow('c5,1,com.onepassword.OnePassword,1Password', 'password'), {address: 'c5', action: 'password'});
+    assert.deepEqual(W.connectWindow('g1,1,google-chrome,Settings - Google Chrome', 'google'), {address: 'g1', action: 'google'});
+    assert.deepEqual(W.connectWindow('g2,1,Google-chrome,Settings - Google Chrome', 'google'), {address: 'g2', action: 'google'});
     assert.equal(W.connectWindow('d4,1,thunderbird,Inbox', 'password'), null, 'mail opened for a code stays');
     assert.equal(W.connectWindow('d5,1,com.onepassword.OnePassword.Helper,1Password', 'password'), null);
+    assert.equal(W.connectWindow('d6,1,1password,1Password', 'google'), null, '1Password asked to fill in stays');
+    assert.equal(W.connectWindow('d7,1,google-chrome,New Tab', 'password'), null);
     assert.equal(W.connectWindow('e5,1,1Password,1Password', ''), null, 'not while the guide shows');
+    assert.equal(W.connectWindow('e6,1,google-chrome,New Tab', ''), null, 'not while the guide shows');
     assert.equal(W.connectWindow('f6', 'sign-in'), null);
 });
 test('leaving closes the Connect windows, but not a sign-in still waiting', () => {
-    const windows = [{address: 'c3', signIn: false}, {address: 'a1', signIn: true}, {address: 'b2', signIn: true}];
-    assert.deepEqual(W.windowsToClose(windows, false), ['c3', 'a1', 'b2']);
-    assert.deepEqual(W.windowsToClose(windows, true), ['c3']);
+    const windows = [{address: 'c3', action: 'password'}, {address: 'g1', action: 'google'},
+        {address: 'a1', action: 'sign-in'}, {address: 'b2', action: 'sign-in'}];
+    assert.deepEqual(W.windowsToClose(windows, false), ['c3', 'g1', 'a1', 'b2']);
+    assert.deepEqual(W.windowsToClose(windows, true), ['c3', 'g1']);
     assert.deepEqual(W.windowsToClose(undefined, false), []);
 });
-test('resuming from 1Password closes its windows, not a sign-in\'s', () => {
-    const windows = [{address: 'c3', signIn: false}, {address: 'a1', signIn: true}, {address: 'c4', signIn: false}];
-    assert.deepEqual(W.passwordWindows(windows), ['c3', 'c4']);
-    assert.deepEqual(W.passwordWindows(undefined), []);
+test('resuming from 1Password or Chrome closes their windows, not a sign-in\'s', () => {
+    const windows = [{address: 'c3', action: 'password'}, {address: 'a1', action: 'sign-in'},
+        {address: 'c4', action: 'password'}, {address: 'g1', action: 'google'}];
+    assert.deepEqual(W.appWindows(windows), ['c3', 'c4', 'g1']);
+    assert.deepEqual(W.appWindows(undefined), []);
+});
+test('Chrome\'s Local State names the signed-in Google account, and tolerates a missing or partial file', () => {
+    const state = (cache, last) => JSON.stringify({profile: Object.assign({info_cache: cache}, last ? {last_used: last} : {})});
+    assert.deepEqual(W.chromeAccount(state({Default: {gaia_id: '1234', user_name: 'ada@example.com'}})),
+        {account: 'ada@example.com'});
+    assert.deepEqual(W.chromeAccount(state({Default: {gaia_id: '1234', user_name: ''}})), {account: ''},
+        'an account id alone is signed in');
+    assert.deepEqual(W.chromeAccount(state({Default: {gaia_id: '', user_name: 'ada@example.com'}})),
+        {account: 'ada@example.com'});
+    // The profile used last comes first; a signed-out one is passed over.
+    const two = {Default: {gaia_id: '1', user_name: 'home@example.com'}, 'Profile 1': {gaia_id: '2', user_name: 'work@example.com'}};
+    assert.deepEqual(W.chromeAccount(state(two, 'Profile 1')), {account: 'work@example.com'});
+    assert.deepEqual(W.chromeAccount(state(two, 'Gone')), {account: 'home@example.com'});
+    assert.deepEqual(W.chromeAccount(state({Default: {gaia_id: '', user_name: ''},
+        'Profile 1': {gaia_id: '2', user_name: 'work@example.com'}}, 'Default')), {account: 'work@example.com'});
+    for (const text of ['', '{', 'null', '[]', '{}', '{"profile": null}', '{"profile": {"info_cache": []}}',
+        '{"profile": {"info_cache": {"Default": null}}}', state({Default: {gaia_id: ' ', user_name: ''}}),
+        state({Default: {gaia_id: 12, user_name: true}}), state({Default: {name: 'Person 1'}}), undefined])
+        assert.equal(W.chromeAccount(text), null, String(text));
 });
 test('checklist derives actual readiness independently of Later or opening Settings', () => {
     const facts = {reader: false, backupKnown: false, accountsKnown: false};

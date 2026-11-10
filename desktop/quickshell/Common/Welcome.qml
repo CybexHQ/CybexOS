@@ -53,29 +53,42 @@ Singleton {
     }, document.checklist)
     property bool backupRead: false
     // ---- Connect ---------------------------------------------------------------
-    // 1Password, when the proprietary applications are installed. While the
-    // guide stands aside for it, its window tells the guide when the person
-    // is done: closing it brings the guide back, and coming back by Resume
-    // (or by opening the guide again) closes it, so it does not cover the
-    // sign-in that follows. Once the guide is back, or stands aside for a
-    // sign-in, 1Password's windows no longer count.
+    // 1Password and Google Chrome, when the proprietary applications are
+    // installed. While the guide stands aside for one of them, its window
+    // tells the guide when the person is done: closing it brings the guide
+    // back, and coming back by Resume (or by opening the guide again) closes
+    // it, so it does not cover the sign-in that follows. Once the guide is
+    // back, or stands aside for a sign-in, their windows no longer count.
     readonly property var passwordEntry: DesktopEntries.applications.values.find(entry => Helpers.isPassword(entry.id)) ?? null
     readonly property bool passwordAvailable: passwordEntry !== null
     property bool passwordOpened: false
-    property string passwordWindow: ""
-    readonly property bool passwordAside: aside && connectAside === "password"
+    // The first window of the app the guide stands aside for.
+    property string appWindow: ""
+    readonly property bool appAside: aside && (connectAside === "password" || connectAside === "google")
     // How many accounts 1Password has: counted read-only in its own database,
     // never read (scripts/onepassword-accounts.py). -1 while unknown.
     property int passwordAccounts: -1
     readonly property bool passwordSignedIn: passwordAccounts > 0
+    // Chrome, for the Google account: it opens on its own sign-in settings in
+    // a window of its own. The tick comes from the profile Chrome reports
+    // signed in, in its Local State file.
+    readonly property var googleEntry: DesktopEntries.applications.values.find(entry => Helpers.isChrome(entry.id)) ?? null
+    readonly property bool googleAvailable: googleEntry !== null
+    readonly property string googleSignInPage: "chrome://settings/people"
+    readonly property string chromeStatePath: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config")
+        + "/google-chrome/Local State"
+    property bool googleOpened: false
+    // The signed-in Google account, {account}, or null while none is.
+    property var googleAccount: null
+    readonly property bool googleSignedIn: googleAccount !== null
     // A sign-in started here: the guide comes back once the agent is ready.
     property bool signInPending: false
-    // What the guide stands aside for, "password" or "sign-in", and the
-    // windows that opened for it (WelcomeHelpers.connectWindow). Leaving for
-    // the desktop closes them, so the person does not find them there.
+    // What the guide stands aside for, "password", "google" or "sign-in",
+    // and the windows that opened for it (WelcomeHelpers.connectWindow).
+    // Leaving for the desktop closes them, so the person does not find them there.
     property string connectAside: ""
     property var connectWindows: []
-    readonly property bool connectAvailable: passwordAvailable || Assistant.available
+    readonly property bool connectAvailable: passwordAvailable || googleAvailable || Assistant.available
     readonly property var steps: Helpers.steps(connectAvailable)
     // The wallpaper on the desktop, named as the guide names it.
     readonly property string wallpaperName: Settings.wall === "" ? I18n.tr("No wallpaper selected")
@@ -106,7 +119,7 @@ Singleton {
     onAsideChanged: {
         if (aside) return;
         connectAside = "";
-        passwordWindow = "";
+        appWindow = "";
     }
 
     function changed(value) {
@@ -128,9 +141,10 @@ Singleton {
         // Ready reports what the check found; it runs while the person goes through the guide.
         Doctor.refreshIfStale();
         refreshPassword();
+        refreshGoogle();
         const wasOpen = open;
         if (!wasOpen || !aside) screenName = Screens.focused ? Screens.focused.name : "";
-        if (passwordAside) closePasswordWindows();
+        if (appAside) closeAppWindows();
         changed(next);
         aside = false;
         open = true;
@@ -167,10 +181,11 @@ Singleton {
     }
     function resume() {
         if (!open || !aside) return;
-        if (passwordAside) closePasswordWindows();
+        if (appAside) closeAppWindows();
         aside = false;
         asideTransient = false;
         refreshPassword();
+        refreshGoogle();
         present();
     }
     function openSheet(id) {
@@ -191,8 +206,23 @@ Singleton {
         stepAside(false);
         if (aside) connectAside = "password";
         passwordOpened = true;
-        passwordWindow = "";
+        appWindow = "";
         Pointer.launch(passwordEntry);
+    }
+    function refreshGoogle() {
+        if (googleAvailable) chromeState.reload();
+    }
+    // Chrome's sign-in settings rather than a Google web page: signing in to
+    // Chrome itself is what turns on sync, and the page offers it whatever
+    // state the profile is in. A new window, so there is one to come back
+    // from even when Chrome is already running.
+    function openGoogle() {
+        if (!googleEntry) return;
+        stepAside(false);
+        if (aside) connectAside = "google";
+        googleOpened = true;
+        appWindow = "";
+        Pointer.launch(googleEntry, ["--new-window", googleSignInPage]);
     }
     // The sign-in opens a terminal and a browser, so the guide steps aside.
     function signIn(agentId) {
@@ -202,11 +232,16 @@ Singleton {
         if (aside) connectAside = "sign-in";
     }
     // The Connect step's actions as its buttons run them, for the IPC call
-    // qualification uses: "password", or an agent id to sign in to.
+    // qualification uses: "password", "google", or an agent id to sign in to.
     function connect(item) {
         if (item === "password") {
             if (!passwordAvailable) return "unavailable";
             openPassword();
+            return "ok";
+        }
+        if (item === "google") {
+            if (!googleAvailable) return "unavailable";
+            openGoogle();
             return "ok";
         }
         if (item !== "claude" && item !== "codex") return "unknown";
@@ -219,12 +254,12 @@ Singleton {
         const owned = Helpers.connectWindow(data, aside ? connectAside : "");
         if (owned) connectWindows = connectWindows.concat([owned]);
         const window = Helpers.openedWindow(data);
-        if (passwordAside && window && Helpers.isPassword(window.windowClass) && passwordWindow === "")
-            passwordWindow = window.address;
+        if (appAside && window && Helpers.appWindow(connectAside, window.windowClass) && appWindow === "")
+            appWindow = window.address;
     }
     function windowClosed(address) {
         connectWindows = connectWindows.filter(window => window.address !== address);
-        if (passwordAside && address === passwordWindow) resume();
+        if (appAside && address === appWindow) resume();
     }
     // As their close buttons would; a sign-in still waiting keeps its windows.
     // Closing the guide from its pill keeps them all: the person is using them.
@@ -233,9 +268,9 @@ Singleton {
         connectWindows = [];
         if (addresses.length > 0) closeWindows(addresses);
     }
-    function closePasswordWindows() {
-        const addresses = Helpers.passwordWindows(connectWindows);
-        connectWindows = connectWindows.filter(window => window.signIn);
+    function closeAppWindows() {
+        const addresses = Helpers.appWindows(connectWindows);
+        connectWindows = connectWindows.filter(window => window.action === "sign-in");
         if (addresses.length > 0) closeWindows(addresses);
     }
     function dismiss() {
@@ -268,6 +303,7 @@ Singleton {
             coversAssistant: coversAssistant, handOff: handOff,
             steps: steps, checklist: checklist, connectWindows: connectWindows.map(window => window.address), connect: {
                 password: !passwordAvailable ? "unavailable" : passwordSignedIn ? "ready" : passwordOpened ? "opened" : "available",
+                google: !googleAvailable ? "unavailable" : googleSignedIn ? "ready" : googleOpened ? "opened" : "available",
                 assistant: !Assistant.available ? "unavailable" : Assistant.agentReady ? "ready"
                     : Assistant.signingIn !== "" ? "signing-in" : "required"},
             doctor: Doctor.status()});
@@ -391,6 +427,14 @@ Singleton {
         onCompleted: (code, body, detail) => {
             root.passwordAccounts = code === 0 && /^\d+\s*$/.test(body) ? parseInt(body, 10) : -1;
         }
+    }
+    // Chrome replaces Local State whole, so it is read again rather than watched.
+    FileView {
+        id: chromeState
+        path: root.googleAvailable ? root.chromeStatePath : ""
+        printErrors: false
+        onLoaded: root.googleAccount = Helpers.chromeAccount(text())
+        onLoadFailed: code => root.googleAccount = null
     }
     FileView { id: releaseVersion; path: "/etc/cybexos/release.json"; printErrors: false; blockLoading: true }
     FileView { id: sourceVersion; path: Quickshell.shellDir + "/../../VERSION"; printErrors: false; blockLoading: true }

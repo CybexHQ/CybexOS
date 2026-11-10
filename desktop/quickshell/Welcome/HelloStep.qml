@@ -112,8 +112,14 @@ Item {
         }
         Item { width: 1; height: Kiosk.px(24) }
         Repeater {
-            model: (Welcome.connectAvailable ? [[I18n.tr("Connect"), Welcome.passwordAvailable && Assistant.available
-                    ? I18n.tr("1Password and your AI assistant") : Assistant.available ? I18n.tr("your AI assistant")
+            model: (Welcome.connectAvailable ? [[I18n.tr("Connect"),
+                    Welcome.passwordAvailable && Welcome.googleAvailable && Assistant.available
+                        ? I18n.tr("1Password, Google and your AI assistant")
+                    : Welcome.passwordAvailable && Assistant.available ? I18n.tr("1Password and your AI assistant")
+                    : Welcome.passwordAvailable && Welcome.googleAvailable ? I18n.tr("1Password and Google")
+                    : Welcome.googleAvailable && Assistant.available ? I18n.tr("Google and your AI assistant")
+                    : Assistant.available ? I18n.tr("your AI assistant")
+                    : Welcome.googleAvailable ? I18n.tr("your Google account")
                     : I18n.tr("1Password, if you use it")]] : [])
                 .concat([[I18n.tr("Wallpaper"), I18n.tr("from Wallhaven or your pictures")],
                 [I18n.tr("Style"), I18n.tr("light or dark, colours and text size")],
