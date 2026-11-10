@@ -205,31 +205,46 @@ def show(run, derivations):
     return graph
 
 
-def compiles(run, derivations, *, root=None, expected=(), vendor=(), kernel_only=False):
+def family(path, info):
+    """A package's family: `discord` for discord-unwrapped, spotify-wayland."""
+    pname = attributes(info).get('pname')
+    if not isinstance(pname, str) or not pname:
+        pname = re.sub(r'-[0-9].*$', '', name(path))
+    return pname.split('-', 1)[0].lower()
+
+
+def compiles(run, derivations, *, root=None, expected=(), vendor=(), declared=(), kernel_only=False):
     """Names of real builds that are not expected local builds.
 
-    Starting from `root` (when given), descend through trivial and
-    configuration derivations only: anything needed solely to build an
-    expected derivation (Cybex OS's own packages, kernel modules) or a
-    compiled one is covered by it. Without a root every unexpected compile
-    counts.
+    Every package the plan would compile must be an expected local build
+    itself: Cybex OS's own packages and the parts they declare
+    (`passthru.cybexosLocalBuilds`), unfree vendor downloads, kernel modules
+    and `cybexos.updates.expectedBuilds`. Starting from `root`, the walk
+    checks the inputs of expected builds like everything else, so an uncached
+    Nixpkgs package can't hide below one. Before 1.0.32 Cybex OS's own
+    packages and kernel modules covered their inputs, and before 1.0.31 vendor
+    downloads did too: ChatGPT's codex and tectonic, which NixOS had failed
+    to build, came through as part of it (2026-11-10).
 
-    `vendor` names the expected builds that are unfree vendor downloads. They
-    build here because NixOS never caches them, but their inputs are ordinary
-    Nixpkgs packages that NixOS does build, so the walk continues into them.
-    A vendor wrapper without a source of its own (a Wayland launcher, Steam's
-    FHS environment) carries its vendor download: the first packages compiled
-    below it are that download, and their inputs are checked in turn.
+    Two exceptions, both narrow:
+    - `declared`: the builds `cybexos.updates.expectedBuilds` names (other than
+      vendor downloads) are built here deliberately, with whatever they need
+      that NixOS doesn't prebuild (NVIDIA's 32-bit EGL libraries).
+    - `vendor` downloads among the expected builds: a launcher or FHS
+      environment without a source of its own (a Wayland wrapper, Steam,
+      Zoom) carries the download it wraps, the first package of its own
+      family compiled below it. Other packages below it are still checked.
 
-    `kernel_only` retains personal package build choices on local previews,
-    while still refusing a kernel compile before any build starts.
+    Without a root every unexpected compile counts. `kernel_only` retains
+    personal package build choices on local previews, while still refusing
+    a kernel compile before any build starts.
     """
     pending = set(derivations)
     graph = show(run, sorted(pending))
     if root is not None:
         # A Software queue shares one plan across several package roots.
-        # Retain all reachable inputs, even below expected or compiled nodes,
-        # so kernel builds cannot hide there or be blamed on unrelated apps.
+        # Retain all reachable inputs, so kernel builds cannot hide below
+        # declared builds or be blamed on unrelated apps.
         reachable, frontier = set(), [root]
         while frontier:
             current = frontier.pop()
@@ -238,39 +253,63 @@ def compiles(run, derivations, *, root=None, expected=(), vendor=(), kernel_only
             reachable.add(current)
             frontier.extend(graph[current]['inputDrvs'])
         graph = {path: graph[path] for path in reachable}
-    expected = set(expected)
-    # Inspect the relevant pending plan before pruning expected ancestors. A
-    # kernel needed by e.g. an expected external module still must be cached.
+    # A kernel is never an expected build, even when something names it.
     kernels = {d for d, info in graph.items() if kernel_build(info)}
-    expected -= kernels
     found = [name(d) for d in kernels]
     if kernel_only:
         return sorted(set(found))
+    expected = set(expected) - kernels
     if root is None:
         return sorted(set(found) | {name(d) for d, info in graph.items() if d not in expected and kind(info) == 'compile'})
-    vendor = set(vendor) & expected
-    # (derivation, below a vendor wrapper): a package reached both ways is
-    # checked both ways.
-    seen, frontier = set(), [(root, False)]
+    vendor, declared = set(vendor) & expected, (set(declared) & expected) - set(vendor)
+    # (derivation, the family of the vendor wrapper above it): a package
+    # reached both ways is checked both ways.
+    seen, frontier = set(), [(root, None)]
     while frontier:
-        current, wrapped = frontier.pop()
-        if (current, wrapped) in seen or current not in graph:
+        current, carried = frontier.pop()
+        if (current, carried) in seen or current not in graph:
             continue
-        seen.add((current, wrapped))
-        sort = kind(graph[current])
-        if current in vendor:
-            wrapped = sort in ('trivial', 'configuration')
-        elif current in expected:
+        seen.add((current, carried))
+        info = graph[current]
+        sort = kind(info)
+        if current in declared:
             continue
-        elif sort == 'compile' and wrapped:
-            wrapped = False
+        if current in expected:
+            carried = family(current, info) if current in vendor and sort in ('trivial', 'configuration') else None
+        elif sort == 'compile' and carried and family(current, info) == carried:
+            carried = None
         elif sort == 'compile':
             found.append(name(current))
             continue
         elif sort not in ('trivial', 'configuration'):
             continue
-        for child in graph[current].get('inputDrvs') or {}:
+        for child in info.get('inputDrvs') or {}:
             child = child if child.startswith('/nix/store/') else '/nix/store/' + child
             if child in pending:
-                frontier.append((child, wrapped))
+                frontier.append((child, carried))
     return sorted(set(found))
+
+
+# What Nix reports for a derivation whose own builder failed, rather than one
+# of its dependencies: Nix 2.26-2.35 and the newer wording machines print.
+FAILED = (re.compile(r"builder for '(/nix/store/[a-z0-9]{32}-[^'\s]+\.drv)' failed"),
+          re.compile(r"Cannot build '(/nix/store/[a-z0-9]{32}-[^'\s]+\.drv)'\.\s+Reason: builder failed"),
+          re.compile(r"hash mismatch in fixed-output derivation '(/nix/store/[a-z0-9]{32}-[^'\s]+\.drv)'"))
+ANSI = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+
+
+def failed_builds(output):
+    """The derivations whose builds failed, from Nix's (internal-json) output."""
+    text = []
+    for line in (output or '').splitlines():
+        if line.startswith('@nix '):
+            try:
+                event = json.loads(line[5:])
+            except ValueError:
+                continue
+            if isinstance(event, dict) and isinstance(event.get('msg'), str):
+                text.append(event['msg'])
+        else:
+            text.append(line)
+    plain = ANSI.sub('', '\n'.join(text))
+    return sorted({match for pattern in FAILED for match in pattern.findall(plain)})

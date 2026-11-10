@@ -137,6 +137,10 @@ in stdenv.mkDerivation {
     env -i HOME="$TMPDIR" $out/libexec/cybexos-desktop-runtime-check
     runHook postInstallCheck
   '';
-  passthru = { inherit images omasnap python runtimeTools; };
+  passthru = {
+    inherit images omasnap python runtimeTools;
+    # Built separately; an expected local build like this package (nix/modules/prebuilt.nix).
+    cybexosLocalBuilds = [ images ];
+  };
   meta.license = lib.licenses.mit;
 }

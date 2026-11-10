@@ -421,7 +421,7 @@ class FakeRunner:
         # The prebuilt check: a candidate whose plan holds nothing to build.
         if args[:3]==('nix','eval','--raw') and any(a.endswith('.toplevel.drvPath') for a in args):
             return '/nix/store/'+'a'*32+'-nixos-system-cybexos.drv'
-        if args[:3]==('nix','eval','--json') and any('cybexosVendorBuilds' in a for a in args):return json.dumps({'expected':[],'vendor':[]})
+        if args[:3]==('nix','eval','--json') and any('cybexosDeclaredBuilds' in a for a in args):return json.dumps({'expected':[],'vendor':[],'declared':[]})
         if args[:2]==('nix','build') and '--dry-run' in args:return ''
         if args[:2]==('nix','build'):return json.dumps([{'outputs':{'out':NEW_SYSTEM}}])
         if args[:3]==('nix','store','diff-closures'):return 'hello: 1 → 2\n'

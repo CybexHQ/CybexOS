@@ -13,6 +13,8 @@ let
     passthru = (package.passthru or {}) // {
       # NixOS's 1Password module supplies its polkit owners through override.
       override = args: wrap { package = package.override args; inherit executable; };
+      # The download it wraps builds here too (nix/modules/prebuilt.nix).
+      cybexosLocalBuilds = [ package ];
     };
   };
 in wrap

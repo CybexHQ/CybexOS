@@ -12,9 +12,9 @@ from unittest.mock import patch
 
 import test_lifecycle as lifecycle
 from cybexos import prebuilt
-from cybexos.common import atomic, read
+from cybexos.common import CommandFailure, atomic, read
 from cybexos.common import Failure
-from cybexos.engine import NotPrebuilt
+from cybexos.engine import NotBuilt, NotPrebuilt
 
 
 def store(letter, name):
@@ -32,6 +32,7 @@ IMAGE = store('i', 'linux-image-7.3.drv')
 WRAPPER = store('l', 'chatgpt-wayland-26.1.drv')
 APP = store('a', 'chatgpt-26.1.drv')
 CODEX = store('q', 'codex-0.167.0.drv')
+VOXTYPE = store('b', 'voxtype-1.1.1.drv')
 
 
 def node(*inputs, **env):
@@ -154,7 +155,7 @@ class Classification(unittest.TestCase):
             graph[Path(path).name] = value
         def run(*args, **kwargs):
             return json.dumps({'version': 4, 'derivations': graph})
-        self.assertEqual(prebuilt.compiles(run, list(source), root=ROOT, expected=[VENDOR]), ['hello-2.12', 'opencode-2.2.5'])
+        self.assertEqual(prebuilt.compiles(run, list(source), root=ROOT, expected=[VENDOR, TOOL]), ['hello-2.12', 'opencode-2.2.5'])
         self.assertEqual(prebuilt.show(run, [ROOT])[ROOT]['outputs']['out']['path'], store('o', 'out'))
 
     def test_missing_or_malformed_metadata_never_passes_as_prebuilt(self):
@@ -163,53 +164,113 @@ class Classification(unittest.TestCase):
             with self.subTest(data=data), self.assertRaises(Failure):
                 prebuilt.compiles(lambda *args, **kwargs: json.dumps(data), [ROOT], root=ROOT)
 
-    def test_compiles_below_configuration_but_not_below_expected_builds(self):
-        found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR])
-        self.assertEqual(found, ['hello-2.12'])
+    def test_compiles_below_configuration_and_below_expected_builds(self):
+        # An expected build is allowed itself; what it needs is checked like
+        # everything else. TOOL is needed only by the vendor package.
+        self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR]),
+                         ['hello-2.12', 'patchelf-wrapper'])
+        self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR, TOOL, HELLO]), [])
 
-    def test_vendor_downloads_still_need_their_nixpkgs_inputs_prebuilt(self):
-        # NixOS never caches the unfree download, but it does build what the
-        # download needs; on 2026-11-10 ChatGPT needed a codex NixOS had failed to build.
-        found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR], vendor=[VENDOR])
-        self.assertEqual(found, ['hello-2.12', 'patchelf-wrapper'])
+    def test_only_a_declared_build_covers_what_it_needs(self):
+        # cybexos.updates.expectedBuilds: built here with what it needs.
+        self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR],
+                                           declared=[VENDOR]), ['hello-2.12'])
+        # An unfree download listed there is still a vendor download.
+        self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, expected=[VENDOR],
+                                           vendor=[VENDOR], declared=[VENDOR]), ['hello-2.12', 'patchelf-wrapper'])
+        # Declaring a package doesn't make it expected.
+        self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT, declared=[VENDOR]),
+                         ['hello-2.12', 'spotify-1.2'])
 
-    def test_a_vendor_wrapper_carries_its_download_but_not_the_downloads_inputs(self):
+    def test_no_expected_build_covers_an_uncached_package_below_it(self):
+        # 2026-11-10: the channel's ChatGPT needed a codex and a tectonic
+        # NixOS had failed to build. Its launcher and the download are
+        # expected; codex is a Nixpkgs package and must come prebuilt.
+        mesa = store('m', 'mesa-26.0.drv')
         graph = {
             ROOT: node(CONFIG, WRAPPER, preferLocalBuild='1'),
             CONFIG: node(),
-            WRAPPER: node(APP),                                  # a launcher: no source of its own
+            WRAPPER: node(APP, mesa),                            # a launcher: no source of its own
             APP: node(SOURCE, CODEX, src=store('y', 'chatgpt.deb')),
             SOURCE: GRAPH[SOURCE],
             CODEX: node(src=store('x', 'codex.tar.gz')),
+            mesa: node(src=store('x', 'mesa.tar.xz')),
         }
-        for expected in ([WRAPPER], [WRAPPER, APP]):
+        for expected in ([WRAPPER, APP], [WRAPPER]):
             with self.subTest(expected=expected):
+                # The launcher carries its own download; another package it
+                # needs, and what the download needs, must be prebuilt.
                 self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=expected,
-                                                   vendor=expected), ['codex-0.167.0'])
-        # A release without a vendor list: the wrapper covers everything below it.
-        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER]), [])
-        # Cybex OS's own packages and kernel modules still cover what only they need.
-        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER, APP],
-                                           vendor=[WRAPPER]), [])
-
-    def test_a_download_outside_its_wrapper_is_still_reported(self):
-        graph = {ROOT: node(CONFIG, WRAPPER, preferLocalBuild='1'), CONFIG: node(APP), WRAPPER: node(APP),
-                 APP: node(src=store('y', 'chatgpt.deb'))}
+                                                   vendor=expected), ['codex-0.167.0', 'mesa-26.0'])
+        # Only a vendor wrapper carries a download; Cybex OS's own don't.
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER]),
+                         ['chatgpt-26.1', 'mesa-26.0'])
+        # A download reached outside its launcher is still a compile.
+        graph[CONFIG] = node(APP)
         self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[WRAPPER],
-                                           vendor=[WRAPPER]), ['chatgpt-26.1'])
+                                           vendor=[WRAPPER]), ['chatgpt-26.1', 'codex-0.167.0', 'mesa-26.0'])
+
+    def test_family_of_a_package(self):
+        self.assertEqual(prebuilt.family(store('a', 'discord-unwrapped-1.0.166.drv'), node()), 'discord')
+        self.assertEqual(prebuilt.family(store('a', 'x.drv'), node(pname='spotify-wayland')), 'spotify')
+        self.assertEqual(prebuilt.family(store('a', '1password-8.12.42.drv'), node()), '1password')
+        self.assertEqual(prebuilt.family(store('a', 'zoom-7.2.1.5760.drv'), dict(node(), structuredAttrs={'pname': 'zoom'})), 'zoom')
 
     def test_unexpected_vendor_package_is_reported_once_without_its_inputs(self):
         found = prebuilt.compiles(shown(GRAPH), list(GRAPH), root=ROOT)
         self.assertEqual(found, ['hello-2.12', 'spotify-1.2'])
 
+    def test_only_what_the_root_needs_counts(self):
+        graph = dict(GRAPH, **{CODEX: node(src=store('x', 'codex.tar.gz'))})
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[VENDOR, TOOL]), ['hello-2.12'])
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=VENDOR, expected=[VENDOR]), ['patchelf-wrapper'])
+
+    def test_a_kernel_never_hides_below_a_declared_build(self):
+        graph = {ROOT: node(VENDOR), VENDOR: node(KERNEL, src='module'), KERNEL: node(pname='linux')}
+        self.assertEqual(prebuilt.compiles(shown(graph), list(graph), root=ROOT, expected=[VENDOR],
+                                           declared=[VENDOR]), ['linux-7.3'])
+
     def test_without_a_root_every_unexpected_compile_counts(self):
         self.assertEqual(prebuilt.compiles(shown(GRAPH), list(GRAPH), expected=[VENDOR]), ['hello-2.12', 'patchelf-wrapper'])
+
+
+class FailedBuilds(unittest.TestCase):
+    # Captured from Nix 2.26 and 2.35 (--log-format internal-json) and from
+    # the Nix on a Cybex OS laptop on 2026-11-10.
+    INTERNAL = (
+        '@nix {"action":"msg","level":3,"msg":"these 2 derivations will be built:"}\n'
+        '@nix {"action":"msg","level":0,"msg":"\\u001b[31;1merror:\\u001b[0m builder for \'\\u001b[35;1m'
+        '/nix/store/lm5wny2kdj7xyw881vbki56nr9wjnq4l-tectonic-0.17.0.drv\\u001b[0m\' failed with exit code 101;'
+        '\\n       last 1 log lines:\\n       > compiling"}\n'
+        '@nix {"action":"msg","column":null,"file":null,"level":0,"line":null,"msg":"\\u001b[31;1merror:\\u001b[0m '
+        '\\u001b[0m\\u001b[35;1m1\\u001b[0m dependencies of derivation \'\\u001b[35;1m'
+        '/nix/store/zkjj2h0f2cn8insm6mkzhvwijbfwg0g4-chatgpt-26.1.drv\\u001b[0m\' failed to build"}\n')
+    PLAIN = ("error: Cannot build '/nix/store/i887anlwq50nc3r7si2cbf9nvdvd8n0d-tectonic-0.17.0.drv'.\n"
+             "       Reason: builder failed with exit code 101.\n"
+             "       Output paths:\n         /nix/store/asnf7y5jmfj9k5kqfl4vhv0l98ilmgli-tectonic-0.17.0\n"
+             "error: Cannot build '/nix/store/lxlnk83jcw4bavhmm8mhf1wlk09wfxiv-chatgpt-26.1029.61003.drv'.\n"
+             "       Reason: 1 dependency failed.\n")
+
+    def test_only_derivations_whose_own_builder_failed(self):
+        self.assertEqual(prebuilt.failed_builds(self.INTERNAL),
+                         ['/nix/store/lm5wny2kdj7xyw881vbki56nr9wjnq4l-tectonic-0.17.0.drv'])
+        self.assertEqual(prebuilt.failed_builds(self.PLAIN),
+                         ['/nix/store/i887anlwq50nc3r7si2cbf9nvdvd8n0d-tectonic-0.17.0.drv'])
+        mismatch = ("error: hash mismatch in fixed-output derivation "
+                    "'/nix/store/" + 'f' * 32 + "-source.drv':\n  specified: sha256-A\n     got: sha256-B")
+        self.assertEqual(prebuilt.failed_builds(mismatch), ['/nix/store/' + 'f' * 32 + '-source.drv'])
+
+    def test_no_build_failure_in_other_errors(self):
+        for output in ('', None, "error: attribute 'brave' missing", '@nix {not json',
+                       "error: 1 dependencies of derivation '/nix/store/" + 'a' * 32 + "-x.drv' failed to build"):
+            with self.subTest(output=output):
+                self.assertEqual(prebuilt.failed_builds(output), [])
 
 
 class EngineGuard(unittest.TestCase):
     setUp = lifecycle.EngineTests.setUp
 
-    def plan(self, expected, vendor=(), graph=None):
+    def plan(self, expected, graph=None, vendor=None, declared=None):
         graph = graph or {ROOT: node(HELLO, preferLocalBuild='1'), HELLO: GRAPH[HELLO]}
         original = self.engine.run
         def run(*args, **kwargs):
@@ -223,8 +284,11 @@ class EngineGuard(unittest.TestCase):
             if args[:3] == ('nix', 'eval', '--json') and '--apply' in args:
                 apply = args.index('--apply')
                 self.assertTrue(args[apply - 1].endswith('#nixosConfigurations.cybexos.config.system.build'))
-                self.assertIn('build.cybexosVendorBuilds or [ ]', args[apply + 1], 'an older release has no vendor list')
-                return json.dumps({'expected': expected, 'vendor': vendor})
+                # An older release has neither list.
+                self.assertIn('build.cybexosVendorBuilds or [ ]', args[apply + 1])
+                self.assertIn('build.cybexosDeclaredBuilds or [ ]', args[apply + 1])
+                return json.dumps({'expected': expected, 'vendor': [] if vendor is None else vendor,
+                                   'declared': [] if declared is None else declared})
             if args[:3] == ('nix', 'derivation', 'show'):
                 return shown(graph)(*args)
             return original(*args, **kwargs)
@@ -255,17 +319,87 @@ class EngineGuard(unittest.TestCase):
         self.assertTrue(record['reviewToken'])
 
     def test_vendor_download_waits_for_the_nixpkgs_packages_it_needs(self):
-        self.plan([VENDOR], [VENDOR], {ROOT: node(VENDOR, preferLocalBuild='1'), VENDOR: GRAPH[VENDOR], TOOL: GRAPH[TOOL]})
+        self.plan([VENDOR], {ROOT: node(VENDOR, preferLocalBuild='1'), VENDOR: GRAPH[VENDOR], TOOL: GRAPH[TOOL]}, vendor=[VENDOR])
         with self.assertRaises(NotPrebuilt) as raised:
             self.engine.stage('upstream')
         self.assertEqual(raised.exception.names, ['patchelf-wrapper'])
         builds = [c for c in self.runner.calls if c[:2] == ('nix', 'build') and '--dry-run' not in c]
         self.assertEqual(builds, [], 'the full build never starts')
 
-    def test_malformed_vendor_list_is_no_build_plan(self):
-        self.plan([VENDOR], {VENDOR: True})
-        with self.assertRaisesRegex(Failure, 'no valid build plan'):
+    def test_malformed_build_lists_are_no_build_plan(self):
+        for expected, vendor, declared in (({VENDOR: True}, [], []), ([VENDOR, 1], [], []), (None, [], []),
+                                           ([VENDOR], {VENDOR: True}, []), ([VENDOR], [], 'all')):
+            with self.subTest(expected=expected, vendor=vendor, declared=declared):
+                self.plan(expected, vendor=vendor, declared=declared)
+                with self.assertRaisesRegex(Failure, 'no valid build plan'):
+                    self.engine.stage('upstream')
+
+    def failing(self, output, graph):
+        """The guard passes; the system build then fails with Nix's own output."""
+        self.plan([VOXTYPE], graph)
+        checked = self.engine.run
+        def run(*args, **kwargs):
+            if args[:2] == ('nix', 'build') and '--dry-run' not in args:
+                self.builds += 1
+                raise CommandFailure('nix', 1, output)
+            return checked(*args, **kwargs)
+        run.observer = None
+        run.log = None
+        self.builds = 0
+        self.engine.run = run
+
+    def test_a_new_nixpkgs_that_fails_to_build_waits_and_is_not_built_again(self):
+        # Cybex OS's own Voxtype didn't build against the channel's new Rust
+        # hook (2026-11-10). It is an expected build, so no cache check sees it.
+        graph = {ROOT: node(VOXTYPE, preferLocalBuild='1'), VOXTYPE: node(src=store('x', 'voxtype.tar.gz'))}
+        self.failing(f"error: Cannot build '{VOXTYPE}'.\n       Reason: builder failed with exit code 101.\n", graph)
+        with self.assertRaises(NotBuilt) as raised:
             self.engine.stage('upstream')
+        self.assertEqual(raised.exception.names, ['voxtype-1.1.1'])
+        status = read(self.engine.status_path)
+        self.assertEqual((status['state'], status['notPrebuilt'], status['phase']),
+                         ('failed', ['voxtype-1.1.1'], 'Waiting for a fix to the new NixOS packages'))
+        self.assertIn('failed to build with the new NixOS packages (voxtype-1.1.1)', status['error'])
+        self.assertEqual(prebuilt.waiting_packages(status), ['voxtype-1.1.1'])
+        self.assertEqual(list(read(self.engine.state / 'failed-builds.json')), [VOXTYPE])
+        self.assertEqual(lifecycle.config_digest(self.config), self.sentinel)
+        # Checked again (daily, or for newer packages): it waits without
+        # compiling the same failure again.
+        with self.assertRaises(NotBuilt):
+            self.engine.stage('upstream')
+        self.assertEqual(self.builds, 1)
+        # A week later it is built again.
+        atomic(self.engine.state / 'failed-builds.json', {VOXTYPE: 1})
+        with self.assertRaises(NotBuilt):
+            self.engine.stage('upstream')
+        self.assertEqual(self.builds, 2)
+
+    def test_a_failed_download_is_not_remembered(self):
+        fetch = store('f', 'voxtype-source.drv')
+        graph = {ROOT: node(VOXTYPE, preferLocalBuild='1'), VOXTYPE: node(fetch, src=store('x', 'voxtype.tar.gz')),
+                 fetch: {'outputs': {'out': {'path': store('z', 'source'), 'hash': 'abc'}}, 'env': {}, 'inputDrvs': {}}}
+        self.failing(f"error: hash mismatch in fixed-output derivation '{fetch}':\n", graph)
+        with self.assertRaises(NotBuilt):
+            self.engine.stage('upstream')
+        self.assertFalse((self.engine.state / 'failed-builds.json').exists())
+
+    def test_a_build_failure_without_new_nixpkgs_is_an_ordinary_failure(self):
+        graph = {ROOT: node(VOXTYPE, preferLocalBuild='1'), VOXTYPE: node(src=store('x', 'voxtype.tar.gz'))}
+        self.failing(f"error: Cannot build '{VOXTYPE}'.\n       Reason: builder failed with exit code 101.\n", graph)
+        for scope in ('cybexos', 'local'):
+            with self.subTest(scope=scope):
+                with self.assertRaises(CommandFailure):
+                    self.engine.stage(scope)
+                status = read(self.engine.status_path)
+                self.assertEqual((status['state'], status['notPrebuilt']), ('failed', None))
+        self.assertFalse((self.engine.state / 'failed-builds.json').exists())
+
+    def test_other_build_errors_stay_failures(self):
+        graph = {ROOT: node(VOXTYPE, preferLocalBuild='1'), VOXTYPE: node(src=store('x', 'voxtype.tar.gz'))}
+        self.failing('error: writing to file: No space left on device\n', graph)
+        with self.assertRaises(CommandFailure):
+            self.engine.stage('upstream')
+        self.assertEqual(read(self.engine.status_path)['notPrebuilt'], None)
 
     def kernel_plan(self, pname='linux'):
         self.plan([HELLO])

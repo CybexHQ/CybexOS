@@ -20,6 +20,10 @@ from .progress import NixProgress
 
 SCOPES = ('upstream', 'cybexos', 'both', 'local', 'firmware')
 BUSY = ('discovering', 'building', 'validating', 'activating', 'recovering', 'firmware')
+# A derivation that failed to build here doesn't build again for this long
+# unless Nixpkgs or Cybex OS changes it (a new derivation path): a held
+# update is checked again daily without compiling the same failure each time.
+FAILED_BUILDS = 7 * 24 * 3600
 UPSTREAM_METADATA = ('nix', 'flake', 'metadata', '--refresh', '--json',
                      'github:NixOS/nixpkgs/nixos-unstable')
 UPSTREAM_LOOKUP_FAILED = 'Nix metadata lookup failed. Check network access and Nix configuration.'
@@ -42,6 +46,23 @@ class NotPrebuilt(Failure):
                          f"package{'s' if len(self.names) != 1 else ''} in this change yet ({shown}). "
                          'Nothing was changed. Cybex OS installs prebuilt packages only; '
                          'try again after NixOS has built them.')
+
+
+class NotBuilt(NotPrebuilt):
+    """Packages of a new Nixpkgs that failed to build on this computer.
+
+    The prebuilt check can't foresee every failure: Cybex OS's own packages
+    build here and may not build against a new Nixpkgs yet (Voxtype on
+    2026-11-10), and configuration builds are never cached. The update waits
+    as a prebuilt hold does, and the same derivations don't build again
+    (FAILED_BUILDS) until Nixpkgs or Cybex OS changes them.
+    """
+    def __init__(self, names):
+        self.names, self.kernel = list(names), False
+        shown = ', '.join(self.names[:5]) + (f' and {len(self.names) - 5} more' if len(self.names) > 5 else '')
+        Failure.__init__(self, f"{len(self.names)} package{'s' if len(self.names) != 1 else ''} "
+                         f"failed to build with the new NixOS packages ({shown}). Nothing was changed. "
+                         'Cybex OS tries again when NixOS or Cybex OS publishes a fix.')
 
 
 class IncompatibleNixpkgs(Failure):
@@ -513,8 +534,18 @@ class Engine:
                 if region is not None:
                     from .configuration import verify_region
                     verify_region(config, region, self.run)
-                out = parse(self.nix('build', '--no-link', '--json', '--no-update-lock-file',
-                                     f'path:{config}#nixosConfigurations.cybexos.config.system.build.toplevel'))
+                try:
+                    out = parse(self.nix('build', '--no-link', '--json', '--no-update-lock-file',
+                                         f'path:{config}#nixosConfigurations.cybexos.config.system.build.toplevel'))
+                except CommandFailure as error:
+                    # A new Nixpkgs that doesn't build here waits like one
+                    # NixOS hasn't built yet; anything else is a failure.
+                    if (kind == 'update' and scope in ('upstream', 'both')
+                            and inputs.identity(old, 'nixpkgs') != inputs.identity(new, 'nixpkgs')):
+                        failed = self.failed(error)
+                        if failed:
+                            raise failed from error
+                    raise
                 system = out[0]['outputs']['out']
                 if not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+', system):
                     raise Failure('Invalid system build output')
@@ -582,7 +613,8 @@ class Engine:
                     self.keep_prepared(previous, scope, request_id, candidate, error, error.names)
                     raise
                 self.status(state='failed', error=str(error), notPrebuilt=error.names,
-                            phase='Waiting for NixOS to finish building this change' if kind == 'update'
+                            phase=('Waiting for a fix to the new NixOS packages' if isinstance(error, NotBuilt)
+                                   else 'Waiting for NixOS to finish building this change') if kind == 'update'
                                 else 'Staging failed; working system retained',
                             retry='Prepare again after NixOS has built these packages.' if kind == 'update'
                                 else 'Correct the failure and prepare this change again.')
@@ -659,27 +691,62 @@ class Engine:
         is built. Configuration, fixed-output downloads and the system's
         expected local builds (Cybex OS's own packages, unfree vendor
         downloads, kernel modules, `cybexos.updates.expectedBuilds`) are fine;
-        the Nixpkgs packages a vendor download needs must come prebuilt.
-        Personal previews allow other package builds, but never a kernel build.
+        every other package must come prebuilt, including the inputs of those
+        expected builds (prebuilt.compiles). A derivation that failed to build
+        here before waits too (FAILED_BUILDS). Personal previews allow other package builds,
+        but never a kernel build.
         """
         build = f'path:{config}#nixosConfigurations.cybexos.config.system.build'
-        root, expected, vendor = None, [], []
+        root, lists = None, {'expected': [], 'vendor': [], 'declared': []}
         if not kernel_only:
             root = self.nix('eval', '--raw', '--no-update-lock-file', build + '.toplevel.drvPath').strip()
-            # Older releases have no vendor list; their vendor downloads keep
-            # covering their inputs.
-            builds = parse(self.nix('eval', '--json', '--no-update-lock-file', build, '--apply',
-                                    'build: { expected = build.cybexosExpectedBuilds; vendor = build.cybexosVendorBuilds or [ ]; }'))
-            expected, vendor = (builds.get('expected'), builds.get('vendor')) if isinstance(builds, dict) else (None, None)
-            if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root)
-                    or any(not isinstance(items, list) or any(not isinstance(item, str) for item in items)
-                           for items in (expected, vendor))):
+            # Releases before 1.0.32 declare no covering builds: nothing covers.
+            lists = parse(self.nix('eval', '--json', '--no-update-lock-file', build, '--apply',
+                                   'build: { expected = build.cybexosExpectedBuilds; vendor = build.cybexosVendorBuilds or [ ];'
+                                   ' declared = build.cybexosDeclaredBuilds or [ ]; }'))
+            if (not re.fullmatch(r'/nix/store/[a-z0-9]{32}-[^/]+\.drv', root) or not isinstance(lists, dict)
+                    or any(not isinstance(lists.get(key), list) or any(not isinstance(item, str) for item in lists[key])
+                           for key in ('expected', 'vendor', 'declared'))):
                 raise Failure('The candidate system has no valid build plan.')
         plan = prebuilt.dry_run(self.run, build + '.toplevel', options=('--no-update-lock-file',))
-        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=expected, vendor=vendor,
-                                 kernel_only=kernel_only) if plan['build'] else []
+        if not kernel_only:
+            known = self.failed_before()
+            again = sorted(prebuilt.name(path) for path in plan['build'] if path in known)
+            if again:
+                raise NotBuilt(again)
+        found = prebuilt.compiles(self.run, plan['build'], root=root, expected=lists['expected'], vendor=lists['vendor'],
+                                 declared=lists['declared'], kernel_only=kernel_only) if plan['build'] else []
         if found:
             raise NotPrebuilt(found, kernel=kernel_only)
+
+    def failed_before(self):
+        """Derivations that failed to build here recently (FAILED_BUILDS)."""
+        try:
+            known = read(self.state / 'failed-builds.json', {}) or {}
+        except Failure:
+            return {}
+        now = time.time()
+        return {path: when for path, when in known.items() if isinstance(when, (int, float))
+                and now - when < FAILED_BUILDS} if isinstance(known, dict) else {}
+
+    def failed(self, error):
+        """A NotBuilt for the builds that failed in `error`, or None.
+
+        Remembers them, except downloads: a fixed-output derivation fails
+        when the network does, and is tried again.
+        """
+        paths = prebuilt.failed_builds(getattr(error, 'output', ''))
+        if not paths:
+            return None
+        try:
+            graph = prebuilt.show(self.run, paths)
+        except Failure:
+            graph = {}
+        remembered = [path for path in paths if path in graph and prebuilt.kind(graph[path]) != 'fetch']
+        if remembered:
+            now = time.time()
+            atomic(self.state / 'failed-builds.json', self.failed_before() | {path: now for path in remembered})
+        return NotBuilt([prebuilt.name(path) for path in paths])
 
     def git_metadata_record(self, root):
         key = hashlib.sha256(str(Path(root).resolve()).encode()).hexdigest()
