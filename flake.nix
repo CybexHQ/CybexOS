@@ -48,6 +48,7 @@
         # Built by the vendor-updates workflow before it releases a Brave update.
         brave-origin = pkgs.callPackage ./nix/packages/brave {};
         titlebars = pkgs.callPackage ./nix/packages/titlebars.nix {};
+        omasnap = pkgs.callPackage ./nix/packages/omasnap.nix {};
         iso = self.nixosConfigurations.installer.config.system.build.isoImage;
         default = desktop;
       });
@@ -148,6 +149,8 @@
         boot = import ./nix/tests/boot.nix { inherit pkgs module; };
         firmware = import ./nix/tests/firmware.nix { inherit pkgs module; };
         hyprland-pointer = import ./nix/tests/hyprland-pointer.nix { inherit pkgs module; };
+        # Omasnap's own headless suite, which machines skip when they build it.
+        omasnap = (pkgs.callPackage ./nix/packages/omasnap.nix {}).tests.smoke;
         # Installing apps leaves the shell and the assistant running; their own changes still reach them.
         session-restarts = import ./nix/tests/session-restarts.nix { inherit pkgs module; };
         # Settings -> Security -> Sudo without password: Polkit, the helper and real sudo.
