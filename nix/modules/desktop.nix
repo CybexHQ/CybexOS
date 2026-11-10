@@ -85,8 +85,12 @@ in {
     # Cybex OS's own builds (nix/modules/prebuilt.nix), including Voxtype's
     # product-owned dictation patch. Its Nixpkgs metadata still names the
     # upstream recipe, so it must be declared explicitly rather than mistaken
-    # for a Nixpkgs package awaiting its binary cache.
-    cybexos.updates.expectedBuilds = [ titlebars cfg.dictationPackage ] ++ lib.optional cfg.features.connectedWidgets hermesBridge;
+    # for a Nixpkgs package awaiting its binary cache. The encryption check is
+    # reached only through the autologin PAM rule, never a package list, so it
+    # is declared here too: otherwise any Nixpkgs update that rebuilds it waits
+    # for NixOS to build a package NixOS never builds.
+    cybexos.updates.expectedBuilds = [ titlebars cfg.dictationPackage encryptionCheck ]
+      ++ lib.optional cfg.features.connectedWidgets hermesBridge;
     environment.etc."cybexos/fingerprint-enabled" = lib.mkIf cfg.authentication.fingerprint { text = "enabled\n"; };
     environment.etc."cybexos/proprietary-enabled" = lib.mkIf cfg.features.proprietary { text = "enabled\n"; };
     environment.etc."cybexos/developer-enabled" = lib.mkIf cfg.features.developer { text = "enabled\n"; };

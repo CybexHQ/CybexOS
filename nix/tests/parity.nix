@@ -379,6 +379,10 @@ assert !encrypted.services.displayManager.sddm.autoLogin.relogin;
 assert encrypted.security.pam.services.sddm-autologin.rules.auth.cybexos-encryption.control == "requisite";
 assert builtins.any (lib.hasSuffix "-cybexos-encryption-check-1/bin/cybexos-verify-encryption")
   encrypted.security.pam.services.sddm-autologin.rules.auth.cybexos-encryption.args;
+# Only PAM reaches the check, so the updater learns it is a local build from
+# the expected list alone; without it a Nixpkgs update waits for NixOS forever.
+assert builtins.any (lib.hasSuffix "-cybexos-encryption-check-1.drv")
+  encrypted.system.build.cybexosExpectedBuilds;
 # A release that changes the desktop and the updater, but not the boot splash,
 # the encryption check or the session script, starts and logs in exactly as
 # before, so the updater installs it without a test boot.
