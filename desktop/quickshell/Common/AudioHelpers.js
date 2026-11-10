@@ -225,11 +225,14 @@ function friendlyStreamLabel(label) {
     label = text(label).trim();
     if (!label)
         return "";
+    // Display names, and the desktop entry ids a player may give instead.
     var known = {
         "spotify": "Spotify",
         "chromium": "Chromium",
         "google chrome": "Google Chrome",
+        "google-chrome": "Google Chrome",
         "brave": "Brave",
+        "brave-browser": "Brave",
         "firefox": "Firefox"
     };
     return known[label.toLowerCase()] || label;

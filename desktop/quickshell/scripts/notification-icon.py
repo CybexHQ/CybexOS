@@ -43,10 +43,13 @@ def config_roots() -> list[Path]:
     if override is not None:
         return [Path(value) for value in override.split(os.pathsep) if value]
 
+    # Google Chrome, the default browser, first; Brave Origin keeps a profile
+    # of its own beside Brave's.
     config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     return [
-        config / "BraveSoftware" / "Brave-Browser",
         config / "google-chrome",
+        config / "BraveSoftware" / "Brave-Origin",
+        config / "BraveSoftware" / "Brave-Browser",
         config / "chromium",
         config / "vivaldi",
         config / "microsoft-edge",

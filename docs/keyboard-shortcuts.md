@@ -137,8 +137,9 @@ main shortcuts with **Edit**, with its own Apply bar, and links here.
 The Web apps group opens the web apps Cybex OS installs for every account:
 `Super+M` Slack, `Super+W` WhatsApp, `Super+Y` YouTube, `Super+Shift+P` Google
 Photos and `Super+Shift+X` X. Each binding runs `cybexos-webapp launch ID`,
-which opens the site in Brave Origin's app mode when Brave Origin is installed
-and in Firefox otherwise. Remove one with **Remove web app…** in the launcher
+which opens the site in your browser: in a window of its own in Google Chrome,
+the default with proprietary applications, or another Chromium-family browser
+you chose, such as Brave Origin, and as an ordinary page in Firefox. Remove one with **Remove web app…** in the launcher
 or `cybexos-webapp remove ID`; it is not added back by later updates, and its
 shortcut then shows how to reinstall it. Add other sites with **Install web
 app…** in the launcher or `cybexos-webapp install --url ADDRESS`. Installed web

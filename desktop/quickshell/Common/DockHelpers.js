@@ -27,7 +27,8 @@ function showOnWorkspace(always, live, saved) {
         && saved.layout === "floating");
 }
 
-// Chromium's URL-app desktop id is <browser>-<host>_<path>-<profile>.
+// Chromium's URL-app desktop id is <browser>-<host>_<path>-<profile>: chrome-
+// for Google Chrome, brave- for Brave.
 // Its filename replaces slash and other illegal path characters with '_';
 // scheme, port, query and fragment do not participate. Match the whole app
 // name, so two apps on the same host but different paths stay separate.

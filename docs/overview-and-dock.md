@@ -52,12 +52,13 @@ the focused app has a wider accent mark.
   **Close window**. Close asks each window to close, as its title bar does, so
   applications still ask about unsaved work.
 
-Until you pin or unpin something, the dock suggests your default browser,
-file manager and terminal. Pins are desktop entry ids stored in `dockPinned` in
+Until you pin or unpin something, the dock suggests your default browser
+(Google Chrome with proprietary applications, Firefox without), file manager
+and terminal. Pins are desktop entry ids stored in `dockPinned` in
 `~/.config/cybexos/shell.json`. A pinned app that is not installed is not
 shown, but it stays pinned.
 
-Browser web-app windows, including Brave's URL-based app windows, match their
+Browser web-app windows, including Chrome's and Brave's URL-based app windows, match their
 installed web-app launcher so the dock uses the app's name and saved icon and
 can pin or relaunch it. Different app paths on the same host stay separate;
 ambiguous matches keep the normal window fallback.

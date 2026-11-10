@@ -19,12 +19,21 @@ function chromeNotification(overrides = {}) {
 
 test("browser detection accepts browser names and desktop entries only", () => {
     assert.equal(H.isBrowser("Google Chrome", ""), true);
+    assert.equal(H.isBrowser("Google Chrome", "google-chrome"), true);
     assert.equal(H.isBrowser("Web app", "chromium-browser"), true);
     assert.equal(H.isBrowser("Brave", "brave-browser"), true);
     assert.equal(H.isBrowser("Signal", "signal-desktop"), false);
 });
 
-test("Brave app windows resolve known product identities by safe domain suffix", () => {
+test("Chrome and Brave app windows resolve known product identities by safe domain suffix", () => {
+    const chromeSlack = H.derivePresentation(chromeNotification({
+        appName: "Google Chrome",
+        desktopEntry: "google-chrome",
+        hints: { "x-kde-origin-name": "digitalhermes.slack.com" },
+    }));
+    assert.equal(chromeSlack.displayAppName, "Slack");
+    assert.equal(chromeSlack.brandIcon, "slack");
+
     const slack = H.derivePresentation(chromeNotification({
         appName: "Brave",
         desktopEntry: "brave-browser",
