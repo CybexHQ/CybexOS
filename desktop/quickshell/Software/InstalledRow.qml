@@ -72,6 +72,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         app: root.app || root.row.catalogue || null
         icon: root.row.icon || ""
+        name: root.row.name || ""
         size: Theme.scaled(36)
     }
     Column {
@@ -97,7 +98,9 @@ Rectangle {
                 if (root.flatpak)
                     return [root.flatpak.installation === "user" ? I18n.tr("Flathub · for you") : I18n.tr("Flathub · for everyone"),
                         root.row.version || ""].filter(part => part !== "").join(" · ");
-                const how = root.app ? (root.app.free === false ? I18n.tr("Vendor download") : I18n.tr("Prebuilt by NixOS"))
+                // A catalogue app says where it came from only when that is
+                // its maker; a package without one shows its description.
+                const how = root.app ? (root.app.free === false ? I18n.tr("From the maker") : "")
                     : (root.row.description || "");
                 const where = root.app ? Software.label(Software.subcategoryName(root.app) || (Software.category(root.app) || {}).name || "") : "";
                 return [how, where, root.row.version || ""].filter(part => part !== "").join(" · ");

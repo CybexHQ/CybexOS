@@ -252,6 +252,28 @@ function keptRelease(deployment) {
         components: summary(value).components, transaction: value.transaction || "" };
 }
 
+// What "Keep this version" and "Go back" decide between, while a restarted
+// update waits for its confirmation: the version running now and the one
+// before it, for the most recognisable component the update changed:
+// Cybex OS's release, else NixOS (its build date tells two 26.05 builds
+// apart), else the Linux kernel. null when the record names none.
+var IDENTITY_ORDER = ["cybexos", "nixos", "kernel"];
+
+function trialVersions(deployment) {
+    const value = deployment || {};
+    const text = item => typeof item === "string" ? item.trim() : "";
+    const installed = text(value.installedVersion), available = text(value.availableVersion);
+    if (["cybexos", "both"].includes(value.scope) && installed !== "" && available !== "" && installed !== available)
+        return { id: "cybexos", now: available, before: installed };
+    const components = summary(value).components;
+    for (const id of IDENTITY_ORDER) {
+        const row = components.find(item => item && item.id === id);
+        if (row && text(row.before) !== "" && text(row.after) !== "" && text(row.before) !== text(row.after))
+            return { id: id, now: text(row.after), before: text(row.before) };
+    }
+    return null;
+}
+
 // A semantic release version as comparable parts (a beta before an rc before
 // the release itself), or null.
 function releaseOrder(value) {
@@ -467,7 +489,7 @@ function clockFormat(clock24) {
 if (typeof module !== "undefined") module.exports = {
     active, pending, statusPollInterval, validSources, validDeployment, channel, scope, scopeLabel, capabilities, firmwareRestart,
     overviewVisible, indicator, waitingPackages, incompatible, held, holdTarget, COMPONENTS, component, page, confirmFailed, problem, statusPose, keptRelease,
-    announce, releaseNotes, versionParts, releaseOrder, newerRelease,
+    announce, releaseNotes, versionParts, releaseOrder, newerRelease, IDENTITY_ORDER, trialVersions,
     summary, noteItems, sizeChange, targetKey, autoPrepare, preparedUpdate, replacement, replacementRequest, PREPARATION_LABELS, preparation, elapsed, downloadSize,
     clockFormat
 };

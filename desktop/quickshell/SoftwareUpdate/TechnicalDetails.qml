@@ -141,28 +141,28 @@ Rectangle {
                 objectName: "updatePrepareSources"
                 visible: root.sourcesChanged
                 primary: true
-                text: I18n.tr("Prepare Again With These Sources")
+                text: I18n.tr("Prepare again with these sources")
                 enabled: !root.service.runActive
                 onTriggered: root.service.restage()
             }
             UpdateButton {
                 objectName: "updateFullList"
-                text: root.fullList ? I18n.tr("Hide Full Change List") : I18n.tr("Full Change List")
+                text: root.fullList ? I18n.tr("Hide full change list") : I18n.tr("Full change list")
                 onTriggered: root.fullList = !root.fullList
             }
             UpdateButton {
                 visible: !!root.service.deployment.transaction
-                text: I18n.tr("Build Log")
+                text: I18n.tr("Build log")
                 onTriggered: root.service.openLog()
             }
             UpdateButton {
-                text: I18n.tr("Update History")
+                text: I18n.tr("Update history")
                 onTriggered: root.service.openRecoveryPoints()
             }
             UpdateButton {
                 objectName: "updateDiscard"
                 visible: root.service.actions.discard
-                text: I18n.tr("Discard Prepared Update")
+                text: I18n.tr("Discard prepared update")
                 onTriggered: root.service.discard()
             }
         }

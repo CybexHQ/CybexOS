@@ -219,6 +219,8 @@ IPC = '''
                 close: !!shell.updateItem("updateClose"),
                 failureText: failure ? failure.text : null,
                 newer: (shell.updateItem("updateNewerReleaseDetail") || {text: null}).text,
+                trial: shell.updateItem("updateTrialNow") ? [shell.updateItem("updateTrialNow").text,
+                    shell.updateItem("updateTrialBefore").text] : null,
                 activity: activity ? activity.text : null, elapsed: elapsed ? elapsed.text : null,
                 progress: progress ? progress.Accessible.description : null,
                 buildLog: !!shell.updateItem("updateBuildLog"),
@@ -365,7 +367,7 @@ def main():
             mouse.button(True); mouse.button(False)
             session.wait(lambda:session.state().get('window') and session.state().get('page')=='available'
                 and session.state().get('primary'),'Software Update from the menubar')
-            assert session.state()['primary']['label']=='Prepare Update', session.state()
+            assert session.state()['primary']['label']=='Prepare update', session.state()
             assert not session.state()['popout'], 'the indicator opens a window, not a panel'
             assert not session.calls() and not session.units(), (session.calls(), session.units())
             assert session.state()['error'] == '', session.state()
@@ -451,7 +453,7 @@ def main():
             state = session.state()
             assert not state['indicator'] and not state['failureText'], state
             assert 'opencode-2.2.5' in state['body'] and 'automatically' in state['body'], state
-            assert state['primary']['label']=='Check Again' and state['primary']['enabled'], state
+            assert state['primary']['label']=='Check again' and state['primary']['enabled'], state
             assert session.pose()==('needs-input',False), state
             shot('software-update-waiting.png')
             session.start_shell('qs-waiting-reloaded.log')
@@ -509,7 +511,7 @@ def main():
             assert state['newer'] == ('It could not be prepared: Release endpoint unreachable. '
                                       'You can install the update below now.'), state
             assert state['failure'] == '' and 'Release endpoint' not in state['error'], state
-            assert state['primary'] == {'label':'Install Update','enabled':True,'amber':False}, state
+            assert state['primary'] == {'label':'Install update','enabled':True,'amber':False}, state
             shot('software-update-kept-prepared.png')
             session.fixture(sources=sources)
             session.status(state='idle')
@@ -520,7 +522,7 @@ def main():
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('page')=='ready' and session.state().get('components')==3,'readable review')
             state = session.state()
-            assert state['apps'] == 1 and state['primary']['label']=='Install Update', state
+            assert state['apps'] == 1 and state['primary']['label']=='Install update', state
             assert state['title']['text'] == 'An update is ready to install', state
             assert session.calls()[-1]==['stage','upstream'], session.calls()
             assert not state['details'], 'technical details start collapsed'
@@ -531,7 +533,7 @@ def main():
             session.wait(lambda:session.state().get('page')=='restart','reviewed installation')
             assert sum(call[0]=='apply' for call in session.calls())==1, session.calls()
             assert session.calls()[-1]==['apply','a'*32,'b'*64], session.calls()
-            assert session.state()['primary']['label']=='Restart Now', session.state()
+            assert session.state()['primary']['label']=='Restart now', session.state()
             assert not session.state()['indicator']
             assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
             # Activation restarts the shell with its changed user unit. The app
@@ -545,7 +547,7 @@ def main():
                 'app reopened during activation')
             session.status(state='awaiting-boot',transaction='a'*32)
             session.wait(lambda:session.state().get('page')=='restart','result after the shell restart')
-            assert session.state()['primary']=={'label':'Restart Now','enabled':True,'amber':True}, session.state()
+            assert session.state()['primary']=={'label':'Restart now','enabled':True,'amber':True}, session.state()
             shot('software-update-restart.png')
             session.trigger('updatePrimary')
             session.wait(lambda:session.records('session.jsonl')==[['reboot']],'restart requested through the session action')
@@ -582,16 +584,19 @@ def main():
             failed = {'id':'d'*32,'action':'confirm','state':'failed','error':'Hyprland health failed'}
             session.status(state='awaiting-login',transaction='a'*32,request=failed)
             session.wait(lambda:session.state().get('page')=='confirm','failed confirmation asks')
-            assert session.state()['primary']['label']=='Keep This Version', session.state()
+            assert session.state()['primary']['label']=='Keep this version', session.state()
             assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()
             shot('software-update-confirm.png')
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('state')=='done','manual confirmation')
             assert session.calls()[-1]==['confirm'], session.calls()
             assert session.units().count(['--no-ask-password','start','--no-block','cybexos-update-confirm.service'])==1
-            session.status(state='awaiting-login',transaction='a'*32,automatic={'prepare':False,'confirm':False})
+            session.status(state='awaiting-login', automatic={'prepare':False,'confirm':False},
+                **release('1.0.0-beta.20', '1.0.0-beta.21', 'a'*32))
             session.wait(lambda:session.state().get('page')=='confirm','manual confirmation policy')
             assert session.pose()==('listening',False) and not session.state()['primary']['amber'], session.state()
+            # The decision names both versions, as its buttons do.
+            assert session.state()['trial']==['Cybex OS 1.0.0-beta.21','Cybex OS 1.0.0-beta.20'], session.state()
             shot('software-update-confirm-ask.png')
             # A kept change without a new Cybex OS version reports itself with
             # the plain completion toast.
@@ -611,7 +616,7 @@ def main():
             session.wait(lambda:session.state().get('page')=='current'
                 and (session.state().get('title') or {}).get('text')=="You're on Cybex OS 1.0.0-beta.21", 'kept release')
             state = session.state()
-            assert state['primary']=={'label':"What's New",'enabled':True,'amber':False}, state
+            assert state['primary']=={'label':"What's new",'enabled':True,'amber':False}, state
             assert state['stance']=='finished', state
             session.wait(lambda:session.state().get('celebrated')=='kept 1.0.0-beta.21','Wiz celebrates the kept release')
             session.wait(lambda:session.pose()==('happy',False),'Wiz settles into happy')
@@ -634,7 +639,7 @@ def main():
             session.trigger('updateBack')
             session.wait(lambda:not session.state().get('whatsNew') and session.state().get('page')=='current',
                 "back from What's New")
-            assert session.state()['primary']['label']=="What's New", session.state()
+            assert session.state()['primary']['label']=="What's new", session.state()
 
             # Kept while the app is closed: one plain toast, whose action opens
             # What's New. The release is never announced again.
@@ -715,7 +720,7 @@ def main():
             assert session.pose()==('sorry',False), session.state()
             session.status(state='recovery-failed',transaction='a'*32,error='Recovery interrupted')
             session.wait(lambda:session.state().get('state')=='recovery-failed','recovery action')
-            assert session.state()['primary']['label']=='Try Restoring Again', session.state()
+            assert session.state()['primary']['label']=='Try restoring again', session.state()
             assert session.pose()==('sorry',False) and session.state()['primary']['amber'], session.state()
             session.status(state='rolled-back',transaction='a'*32,error='Trial boot failed system health')
             session.wait(lambda:session.state().get('state')=='rolled-back','rolled back')
@@ -749,7 +754,7 @@ def main():
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('page')=='ready' and session.state().get('firmwareDevices')==1,
                 'firmware in the regular review')
-            assert session.state()['primary']['label']=='Install Update', session.state()
+            assert session.state()['primary']['label']=='Install update', session.state()
             assert session.calls()[-1]==['stage','firmware'], session.calls()
             session.trigger('updatePrimary')
             session.wait(lambda:session.state().get('page')=='restart','firmware uses ordinary install')
@@ -762,7 +767,7 @@ def main():
             session.wait(lambda:session.state().get('window') and session.state().get('firmwareRequests')==1,
                 'firmware instructions survive shell restart')
             session.status(state='done',firmware={**firmware,'state':'done','needsReboot':True, 'needsShutdown':True})
-            session.wait(lambda:session.state().get('page')=='restart' and session.state().get('primary',{}).get('label')=='Shut Down Now',
+            session.wait(lambda:session.state().get('page')=='restart' and session.state().get('primary',{}).get('label')=='Shut down now',
                 'firmware full shutdown requirement')
             assert not session.state()['indicator'], session.state()
             assert session.pose()==('needs-input',False) and session.state()['primary']['amber'], session.state()

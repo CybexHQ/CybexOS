@@ -187,7 +187,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     primary: true
                     glyph: "download"
-                    text: I18n.tr("Prepare Again")
+                    text: I18n.tr("Prepare again")
                     enabled: !root.service.runActive && !root.service.requestPending
                     onTriggered: root.service.prepareAgain()
                 }
@@ -509,7 +509,7 @@ Item {
                 glyph: "lock"
                 enabled: root.service.actions.apply && !root.service.requestPending
                 text: root.service.requestPending ? I18n.tr("Waiting for authorization…")
-                    : root.update ? I18n.tr("Install Update") : I18n.tr("Apply Change")
+                    : root.update ? I18n.tr("Install update") : I18n.tr("Apply change")
                 onTriggered: root.service.apply()
             }
         }

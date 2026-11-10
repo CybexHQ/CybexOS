@@ -34,7 +34,7 @@ AssistantSurface {
     Item {
         id: header
         width: parent.width
-        height: Theme.scaled(24)
+        height: Theme.scaled(28)
 
         BrandIcon {
             id: agentMark
@@ -59,7 +59,7 @@ AssistantSurface {
             elide: Text.ElideRight
             color: Theme.textLow
             font.family: Theme.fontMenu
-            font.pixelSize: Theme.typography.metadata
+            font.pixelSize: Theme.typography.secondary
         }
 
         Text {
@@ -71,7 +71,7 @@ AssistantSurface {
             text: root.turn ? AssistantHelpers.elapsedLabel(root.turn.finishedAt - root.turn.startedAt) : ""
             color: Theme.textFaint
             font.family: Theme.fontNumeric
-            font.pixelSize: Theme.typography.metadata
+            font.pixelSize: Theme.typography.secondary
             font.features: Theme.tabularNumberFeatures
         }
 
@@ -83,7 +83,7 @@ AssistantSurface {
             glyph: Settings.assistantExpanded ? "close_fullscreen" : "open_in_full"
             label: !Settings.assistantExpanded && root.overflowing ? I18n.tr("Expand") : ""
             accessibleName: Settings.assistantExpanded ? I18n.tr("Back to the small box") : I18n.tr("Expand")
-            controlHeight: Theme.scaled(24)
+            controlHeight: Theme.scaled(28)
             color: !Settings.assistantExpanded && root.overflowing ? Theme.chip : "transparent"
             onTriggered: Assistant.toggleExpanded()
         }
@@ -94,7 +94,7 @@ AssistantSurface {
             anchors.verticalCenter: parent.verticalCenter
             glyph: "close"
             accessibleName: I18n.tr("Close the reply")
-            controlHeight: Theme.scaled(24)
+            controlHeight: Theme.scaled(28)
             color: "transparent"
             onTriggered: Assistant.closeReply()
         }
@@ -397,16 +397,22 @@ AssistantSurface {
         }
 
         AssistantButton {
+            objectName: "assistantCopyReply"
             visible: !root.failed && root.turn !== null && (root.turn.text || "") !== ""
             glyph: "content_copy"
+            label: I18n.tr("Copy")
             accessibleName: I18n.tr("Copy the reply")
+            tip: I18n.tr("Copy the reply")
             onTriggered: Assistant.copyReply()
         }
 
         AssistantButton {
+            objectName: "assistantHandoff"
             visible: root.turn !== null && root.turn.resumable === true
             glyph: "terminal"
+            label: I18n.tr("Terminal")
             accessibleName: I18n.tr("Continue in a terminal")
+            tip: I18n.tr("Continue in a terminal")
             onTriggered: Assistant.handoff()
         }
     }

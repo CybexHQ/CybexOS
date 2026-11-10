@@ -6,7 +6,7 @@ import "../Popovers" as Popovers
 
 // The Software Update app's content: the prepared-update review, one
 // centred status with the next step, or what's new in a kept release.
-// Technical wording stays behind "Show Details"; the updater's own messages
+// Technical wording stays behind "Show details"; the updater's own messages
 // are never the headline.
 Item {
     id: root
@@ -30,6 +30,9 @@ Item {
     // Up to date on a release the person kept, with its What's New.
     readonly property var kept: page === "current" ? service.kept : null
     readonly property bool whatsNew: service.whatsNew !== null
+    // While a restarted update waits to be kept: the version running now and
+    // the one "Go back" returns to (UpdatesHelpers.trialVersions).
+    readonly property var trial: page === "confirm" ? Helpers.trialVersions(deployment) : null
 
     onPageChanged: problemDetails = false
 
@@ -65,6 +68,17 @@ Item {
         id: settle
         interval: 1800
         onTriggered: root.celebrating = false
+    }
+
+    // "Cybex OS 1.0.26", "NixOS 26.05 · 27 Oct 2026", "Linux kernel 6.12.58".
+    function identity(id, value) {
+        const parts = Helpers.versionParts(id, value);
+        let date = "";
+        if (parts.date !== "") {
+            const [year, month, day] = parts.date.split("-").map(Number);
+            date = new Date(year, month - 1, day).toLocaleDateString(Qt.locale(), "d MMM yyyy");
+        }
+        return I18n.tr(Helpers.component(id).label) + " " + [parts.text, date].filter(part => part !== "").join(" · ");
     }
 
     function checked() {
@@ -125,7 +139,7 @@ Item {
                         : I18n.tr("Check again later. You don't need to restart or change your update sources.")) };
         case "preparing":
             return { tone: "accent", busy: true, title: I18n.tr("Getting the update ready"),
-                body: I18n.tr("Downloading packages, building components when needed, and checking compatibility. Nothing changes until you choose Install.") };
+                body: I18n.tr("Downloading packages, building components when needed, and checking compatibility. Nothing changes until you choose to install it.") };
         case "installing":
             return { tone: "accent", busy: true, title: I18n.tr("Installing the update"),
                 body: deployment.state === "firmware"
@@ -145,7 +159,7 @@ Item {
                 ? { tone: "warn", busy: false, title: I18n.tr("The restart couldn't be confirmed"),
                     body: I18n.tr("Cybex OS couldn't confirm that everything works after the restart. Keep this version if it works for you, or go back to the previous one.") }
                 : { tone: "accent", busy: false, title: I18n.tr("Does everything work?"),
-                    body: I18n.tr("Keep this version if everything works. If you restart without keeping it, your computer returns to the previous version.") };
+                    body: I18n.tr("Try what you use every day, such as Wi-Fi, sound and your apps. Keep this version if everything works. If you restart without keeping it, your computer returns to the previous version.") };
         case "recovering":
             return { tone: "warn", busy: true, title: I18n.tr("Restoring the previous version"),
                 body: I18n.tr("Please wait. Your files and settings are kept.") };
@@ -533,6 +547,69 @@ Item {
             }
         }
 
+        // The two versions the confirmation decides between, named as the
+        // buttons below name them.
+        Rectangle {
+            objectName: "updateTrialVersions"
+            visible: root.trial !== null
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width, Theme.scaled(440))
+            height: trialColumn.implicitHeight + Theme.scaled(20)
+            radius: Theme.chipRadius + 3
+            color: Theme.cardFill
+            border.width: 1
+            border.color: Theme.hairlineSoft
+            Accessible.role: Accessible.Grouping
+            Accessible.name: I18n.tr("Versions")
+            Column {
+                id: trialColumn
+                x: Theme.scaled(14)
+                y: Theme.scaled(10)
+                width: parent.width - Theme.scaled(28)
+                spacing: Theme.scaled(6)
+                Repeater {
+                    model: root.trial === null ? [] : [
+                        { label: I18n.tr("This version"), value: root.identity(root.trial.id, root.trial.now), current: true },
+                        { label: I18n.tr("Previous version"), value: root.identity(root.trial.id, root.trial.before), current: false }
+                    ]
+                    delegate: Item {
+                        id: version
+                        required property var modelData
+                        width: trialColumn.width
+                        height: Math.max(versionLabel.implicitHeight, versionValue.implicitHeight)
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: modelData.label + ": " + modelData.value
+                        Text {
+                            id: versionLabel
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: version.modelData.label
+                            color: Theme.textDim
+                            font.family: Theme.fontMenu
+                            font.pixelSize: Theme.typography.secondary
+                            textFormat: Text.PlainText
+                        }
+                        Text {
+                            id: versionValue
+                            objectName: version.modelData.current ? "updateTrialNow" : "updateTrialBefore"
+                            anchors.left: versionLabel.right
+                            anchors.leftMargin: Theme.scaled(12)
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text: version.modelData.value
+                            color: version.modelData.current ? Theme.textHi : Theme.textMid
+                            font.family: Theme.fontNumeric
+                            font.pixelSize: Theme.typography.secondary
+                            font.weight: version.modelData.current ? Theme.weightSemibold : Theme.weightMedium
+                            elide: Text.ElideMiddle
+                            textFormat: Text.PlainText
+                        }
+                    }
+                }
+            }
+        }
+
         Row {
             id: actions
             anchors.horizontalCenter: parent.horizontalCenter
@@ -540,12 +617,12 @@ Item {
 
             UpdateButton {
                 visible: root.page === "available" && root.bothAvailable
-                text: root.chooseSources ? I18n.tr("Hide Sources") : I18n.tr("Choose Sources")
+                text: root.chooseSources ? I18n.tr("Hide sources") : I18n.tr("Choose sources")
                 onTriggered: root.chooseSources = !root.chooseSources
             }
             UpdateButton {
                 visible: ["problem", "waiting"].includes(root.page) || (root.page === "confirm" && root.service.error !== "")
-                text: root.problemDetails ? I18n.tr("Hide Details") : I18n.tr("Show Details")
+                text: root.problemDetails ? I18n.tr("Hide details") : I18n.tr("Show details")
                 onTriggered: root.problemDetails = !root.problemDetails
             }
             UpdateButton {
@@ -557,7 +634,7 @@ Item {
             UpdateButton {
                 objectName: "updateBuildLog"
                 visible: root.page === "preparing" && !!root.deployment.transaction
-                text: I18n.tr("Build Log")
+                text: I18n.tr("Build log")
                 onTriggered: root.service.openLog()
             }
             UpdateButton {
@@ -567,7 +644,7 @@ Item {
             }
             UpdateButton {
                 visible: root.page === "confirm"
-                text: I18n.tr("Go Back to Previous Version")
+                text: I18n.tr("Go back to the previous version")
                 enabled: root.service.actions.rollback && !root.service.requestPending
                 onTriggered: root.service.rollback()
             }
@@ -576,7 +653,7 @@ Item {
                 visible: root.page === "current" || (root.page === "problem" && root.problem === "check")
                 primary: root.page === "problem"
                 tone: root.current.tone
-                text: root.page === "current" ? I18n.tr("Check now") : I18n.tr("Try Again")
+                text: root.page === "current" ? I18n.tr("Check now") : I18n.tr("Try again")
                 enabled: !root.service.busy
                 onTriggered: { root.service.refreshStatus(); root.service.check(true); }
             }
@@ -594,14 +671,14 @@ Item {
                     : root.problem === "status" ? true
                     : root.service.actions.prepare)
                 text: root.service.requestPending && !root.service.runActive ? I18n.tr("Waiting for authorization…")
-                    : root.page === "available" ? I18n.tr("Prepare Update")
-                    : root.page === "waiting" ? I18n.tr("Check Again")
-                    : root.page === "restart" ? (root.firmware.needsShutdown ? I18n.tr("Shut Down Now") : I18n.tr("Restart Now"))
-                    : root.page === "confirm" ? I18n.tr("Keep This Version")
+                    : root.page === "available" ? I18n.tr("Prepare update")
+                    : root.page === "waiting" ? I18n.tr("Check again")
+                    : root.page === "restart" ? (root.firmware.needsShutdown ? I18n.tr("Shut down now") : I18n.tr("Restart now"))
+                    : root.page === "confirm" ? I18n.tr("Keep this version")
                     : root.problem === "rolled-back" ? I18n.tr("OK")
-                    : root.problem === "recovery-failed" ? I18n.tr("Try Restoring Again")
-                    : root.problem === "stale" ? I18n.tr("Prepare Again")
-                    : I18n.tr("Try Again")
+                    : root.problem === "recovery-failed" ? I18n.tr("Try restoring again")
+                    : root.problem === "stale" ? I18n.tr("Prepare again")
+                    : I18n.tr("Try again")
                 onTriggered: {
                     if (root.page === "restart") {
                         if (root.firmware.needsShutdown) Session.shutdown();
@@ -631,7 +708,7 @@ Item {
                 visible: root.kept !== null
                 primary: true
                 glyph: "sparkles"
-                text: I18n.tr("What's New")
+                text: I18n.tr("What's new")
                 onTriggered: root.service.showWhatsNew()
             }
         }
@@ -698,11 +775,11 @@ Item {
                     spacing: Theme.scaled(8)
                     UpdateButton {
                         visible: !!root.deployment.transaction
-                        text: I18n.tr("Build Log")
+                        text: I18n.tr("Build log")
                         onTriggered: root.service.openLog()
                     }
                     UpdateButton {
-                        text: I18n.tr("Update History")
+                        text: I18n.tr("Update history")
                         onTriggered: root.service.openRecoveryPoints()
                     }
                 }

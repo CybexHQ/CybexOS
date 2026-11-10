@@ -34,7 +34,7 @@ PageScroll {
             : root.restart ? I18n.tr("Restart to finish the system update.")
             : root.preparing ? I18n.tr("A system update is being prepared.")
             : I18n.tr("System updates are available.")
-        text: root.prepared ? I18n.tr("Apps update together with the system, all prebuilt, so nothing compiles.")
+        text: root.prepared ? I18n.tr("Your apps update together with the system, ready to use.")
             : root.restart ? I18n.tr("The update is installed. Restart when convenient to finish it.")
             : root.preparing ? I18n.tr("Software Update shows its progress. Your apps keep working meanwhile.")
             : I18n.tr("Prepare them in Software Update to see which of your apps change.")
@@ -67,6 +67,7 @@ PageScroll {
                 anchors.verticalCenter: parent.verticalCenter
                 app: change.app
                 icon: change.modelData.icon || ""
+                name: change.app ? change.app.name || "" : change.modelData.title || ""
                 size: Theme.scaled(36)
             }
             Column {
@@ -168,7 +169,7 @@ PageScroll {
         }
         Text {
             width: parent.width
-            text: I18n.tr("Apps update together with the system in Software Update, all prebuilt, so nothing compiles.")
+            text: I18n.tr("Your apps update together with the system in Software Update.")
             color: Theme.textDim
             font.family: Theme.fontMenu
             font.pixelSize: Theme.typography.secondary
@@ -301,6 +302,7 @@ PageScroll {
                 x: Theme.scaled(12)
                 anchors.verticalCenter: parent.verticalCenter
                 icon: flathubChange.modelData.icon || ""
+                name: flathubChange.modelData.name || flathubChange.modelData.id || ""
                 size: Theme.scaled(36)
             }
             Text {

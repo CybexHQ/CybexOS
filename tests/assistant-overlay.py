@@ -109,7 +109,7 @@ while True:
             data = json.loads(target.read_text())
             data["glassEnabled"] = True
             target.write_text(json.dumps(data, indent=2) + "\n")
-        reply("The menubar is transparent now.")
+        reply("Glass effect is on now, so the menubar and panels are see-through.")
     elif "clean" in text:
         answer = ask("r1", "Bash", {"command": "rm -rf ~/Downloads/old-isos"})
         time.sleep(0.2)
@@ -525,6 +525,8 @@ def main():
             # checks them, and the assistant's own settings are refused.
             set_clock = json.loads(session.ipc('tool', 'settings_set', json.dumps({'key': 'clock24', 'value': False})))
             assert set_clock['ok'] and set_clock['result']['after'] is False, set_clock
+            # Settings' own name and place, for the answer to use.
+            assert (set_clock['result']['label'], set_clock['result']['page']) == ('Clock', 'Region & language'), set_clock
             session.wait(lambda: json.loads(session.preferences.read_text()).get('clock24') is False,
                          'the preference written')
             refused = json.loads(session.ipc('tool', 'settings_set', json.dumps(
@@ -547,7 +549,8 @@ def main():
             # A preference edit is allowed without a card and comes back with Undo.
             session.ipc("ask", "Make the menubar transparent")
             turn = session.finished("Make the menubar transparent")
-            assert turn["status"] == "completed" and turn["text"].startswith("The menubar"), turn
+            # The answer names the setting as the change row does.
+            assert turn["status"] == "completed" and turn["text"].startswith("Glass effect"), turn
             assert turn["undo"] == ["~/.config/cybexos/shell.json"], turn
             [change] = turn["changes"]
             assert (change["kind"], change["key"], change["hadBefore"], change["after"], change["undoable"]) == \

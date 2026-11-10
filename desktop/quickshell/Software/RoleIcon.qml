@@ -28,6 +28,7 @@ Item {
         visible: !root.glyph
         app: root.option && root.option.icon ? { id: root.option.id } : null
         icon: root.entry ? root.entry.icon : ""
+        name: root.option && root.option.name ? root.option.name : ""
         size: root.size
     }
     Rectangle {

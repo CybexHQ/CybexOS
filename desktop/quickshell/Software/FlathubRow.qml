@@ -44,6 +44,7 @@ Item {
         x: Theme.scaled(10)
         anchors.verticalCenter: parent.verticalCenter
         url: root.entry.icon || ""
+        name: root.entry.name || ""
         size: Theme.scaled(44)
     }
     Column {

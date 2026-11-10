@@ -16,7 +16,7 @@ Column {
 
     Item {
         width: root.width
-        height: Theme.scaled(22)
+        height: Theme.scaled(28)
 
         Row {
             anchors.verticalCenter: parent.verticalCenter
@@ -35,12 +35,15 @@ Column {
                     : I18n.format("What Wiz did · %1 steps", [root.steps.length])
                 color: Theme.textMid
                 font.family: Theme.fontMenu
-                font.pixelSize: Theme.typography.metadata
+                font.pixelSize: Theme.typography.secondary
             }
         }
 
+        // A 32 px target around the 28 px line.
         MouseArea {
             anchors.fill: parent
+            anchors.topMargin: -Theme.scaled(2)
+            anchors.bottomMargin: -Theme.scaled(2)
             cursorShape: Qt.PointingHandCursor
             onClicked: root.folded = !root.folded
         }

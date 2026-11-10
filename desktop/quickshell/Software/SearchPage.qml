@@ -25,6 +25,17 @@ PageScroll {
         text: I18n.tr("Apps")
         detail: Software.appResults.length === 1 ? I18n.tr("1 app") : I18n.format("%1 apps", [Software.appResults.length])
     }
+    // The queue rule in one line, beside Flathub's "installed right away".
+    Text {
+        visible: Software.appResults.length > 0
+        width: parent.width
+        text: I18n.tr("Add apps to the queue, then install them together as one system change. Your current system stays as a fallback.")
+        color: Theme.textDim
+        font.family: Theme.fontMenu
+        font.pixelSize: Theme.typography.secondary
+        wrapMode: Text.Wrap
+        textFormat: Text.PlainText
+    }
     Grid {
         id: grid
         width: parent.width
@@ -140,7 +151,7 @@ PageScroll {
     }
     Text {
         width: parent.width
-        text: I18n.tr("Everything else in NixOS: command-line tools, libraries and other apps. Each is checked before you can install it, so nothing compiles.")
+        text: I18n.tr("Everything else in NixOS: command-line tools, libraries and other apps. Each is checked before you can add it to the queue, so it arrives ready to use.")
         color: Theme.textDim
         font.family: Theme.fontMenu
         font.pixelSize: Theme.typography.secondary

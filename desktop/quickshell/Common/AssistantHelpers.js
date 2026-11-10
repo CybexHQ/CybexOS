@@ -374,27 +374,47 @@ function formatValue(value, present) {
 
 // The label of a settings key from the search index's rows, else humanized.
 function settingLabel(key, rows) {
+    var found = settingRow(key, rows);
+    return found ? found.label : humanizeKey(key);
+}
+
+function settingRow(key, rows) {
     for (var i = 0; i < (rows || []).length; i++) {
         if (rows[i].key === key)
-            return rows[i].label;
+            return rows[i];
     }
-    return humanizeKey(key);
+    return null;
+}
+
+// A setting's value where the file had none: the default it stood at, when
+// `defaults` (Settings.defaults) knows the key, so a row reads "Off → On"
+// rather than "default → On".
+function settingValue(key, value, present, defaults) {
+    if (present === false && defaults && Object.prototype.hasOwnProperty.call(defaults, key))
+        return formatValue(defaults[key], true);
+    return formatValue(value, present);
 }
 
 // One change from the service's log as a row reads: what, old → new, and
-// whether Undo is offered (docs/assistant.md).
-function changeRow(change, rows) {
+// whether Undo is offered (docs/assistant.md). A setting is named as
+// Settings names it, with where it lives ("Appearance · Theme") in `place`;
+// `defaults` resolves a value the file did not hold yet.
+function changeRow(change, rows, defaults) {
     var c = change || {};
     var row = { id: c.id, kind: c.kind, status: c.status, undoable: !!c.undoable, at: c.at || 0,
         question: c.question || "", conversation: c.conversation || "", label: "", before: "", after: "",
-        detail: "", glyph: "edit", action: "undo" };
+        detail: "", place: "", glyph: "edit", action: "undo" };
     switch (c.kind) {
-    case "setting":
-        row.label = settingLabel(c.key, rows);
-        row.before = formatValue(c.before, c.hadBefore);
-        row.after = formatValue(c.after, c.hasAfter);
+    case "setting": {
+        var found = settingRow(c.key, rows);
+        row.label = found ? found.label : humanizeKey(c.key);
+        row.place = found ? [found.pageLabel || "", found.group || ""].filter(function(part) { return part !== ""; })
+            .join(" · ") : "";
+        row.before = settingValue(c.key, c.before, c.hadBefore, defaults);
+        row.after = settingValue(c.key, c.after, c.hasAfter, defaults);
         row.glyph = /^(wall|palette|theme|accent|font|bar|glass)/i.test(c.key || "") ? "palette" : "tune";
         break;
+    }
     case "file":
         row.label = c.path || "";
         row.detail = (c.files && c.files[0] && c.files[0].op) || c.op || "modified";
@@ -670,6 +690,8 @@ var exported = {
     humanizeKey: humanizeKey,
     formatValue: formatValue,
     settingLabel: settingLabel,
+    settingRow: settingRow,
+    settingValue: settingValue,
     changeRow: changeRow,
     groupChanges: groupChanges,
     SITUATION_MS: SITUATION_MS,

@@ -45,7 +45,7 @@ Rectangle {
             }
         }
         if (pending && pending.attribute && Software.queued(pending.attribute) === "install")
-            return I18n.tr("On your install list");
+            return I18n.tr("In the install queue");
         return I18n.tr("Waiting to install");
     }
 

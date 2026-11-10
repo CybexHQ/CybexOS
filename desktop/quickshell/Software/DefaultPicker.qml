@@ -60,8 +60,8 @@ Rectangle {
         case "nixos": {
             const size = Helpers.size(chosenRow.option.downloadBytes);
             return joined([size !== ""
-                ? I18n.format("Installs %1 (≈ %2, prebuilt by NixOS), then switches to it. You confirm with your password; no restart.", [chosenName, size])
-                : I18n.format("Installs %1, prebuilt by NixOS, then switches to it. You confirm with your password; no restart.", [chosenName]), keep]);
+                ? I18n.format("Installs %1 (≈ %2, open source, ready to use), then switches to it. You confirm with your password; no restart.", [chosenName, size])
+                : I18n.format("Installs %1 (open source, ready to use), then switches to it. You confirm with your password; no restart.", [chosenName]), keep]);
         }
         case "vendor":
             return joined([I18n.format("Downloads %1 from its maker, then switches to it. You confirm with your password; no restart.", [chosenName]), keep]);

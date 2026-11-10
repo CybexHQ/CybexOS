@@ -162,12 +162,16 @@ FocusScope {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: Theme.scaled(34)
                 spacing: Theme.scaled(8)
+                // The slide's main action is solid in its ink, so it stands
+                // out on any brand colour (an accent fill can be blue on blue).
                 AppAction {
+                    id: heroAction
                     objectName: slide.active ? "softwareHeroInstall" : ""
                     app: slide.modelData
                     big: true
-                    prominent: true
                     foreground: slide.ink
+                    solidFill: heroAction.mode === "install" || heroAction.mode === "open" ? slide.ink : "transparent"
+                    solidInk: slide.darkText ? "#f7f5f0" : "#1d1b26"
                 }
                 SoftwareButton {
                     objectName: slide.active ? "softwareHeroDetails" : ""

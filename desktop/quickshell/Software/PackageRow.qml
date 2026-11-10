@@ -2,9 +2,9 @@ import QtQuick
 import "../Common"
 import "../Common/SoftwareHelpers.js" as Helpers
 
-// A package from the full Nixpkgs search. It is checked before Install is
-// offered: only a prebuilt package (or an unfree vendor download) can join
-// the install list.
+// A package from the full Nixpkgs search. It is checked before "Add to
+// queue" is offered: only a package that arrives ready to use (prebuilt, or
+// an unfree download from its maker) can join the install queue.
 Rectangle {
     id: root
 
@@ -18,6 +18,8 @@ Rectangle {
         : queuedAction === "install" ? "added"
         : !verdict ? "unchecked"
         : verdict.state
+    // Checked and ready: pressing the action adds it to the install queue.
+    readonly property bool addable: phase === "prebuilt"
 
     implicitHeight: Math.max(Theme.scaled(58), copy.implicitHeight + Theme.scaled(18))
     radius: Theme.chipRadius + 3
@@ -73,10 +75,10 @@ Rectangle {
                 : verdictState === "unavailable" ? (root.verdict.reason === "unfree"
                     ? I18n.tr("Proprietary apps are turned off on this computer.")
                     : I18n.tr("NixOS marks this package as unavailable for this computer."))
-                : verdictState === "error" ? I18n.tr("Couldn't check NixOS's cache. Try again.")
-                : verdictState === "prebuilt" && !root.installed ? (root.verdict.vendor ? I18n.tr("Vendor download · nothing to compile")
-                    : root.verdict.downloadBytes > 0 ? I18n.format("Prebuilt · %1 to download", [Helpers.size(root.verdict.downloadBytes)])
-                    : I18n.tr("Prebuilt · already downloaded"))
+                : verdictState === "error" ? I18n.tr("Couldn't check this package. Try again.")
+                : verdictState === "prebuilt" && !root.installed ? (root.verdict.vendor ? I18n.tr("Downloads from its maker, ready to use")
+                    : root.verdict.downloadBytes > 0 ? I18n.format("Ready to use · %1 to download", [Helpers.size(root.verdict.downloadBytes)])
+                    : I18n.tr("Ready to use · already downloaded"))
                 : root.attribute
             color: verdictState === "compiles" ? Theme.amber : verdictState === "prebuilt" && !root.installed ? Theme.ok : Theme.textFaint
             font.family: text === root.attribute ? Theme.fontMono : Theme.fontMenu
@@ -99,18 +101,18 @@ Rectangle {
             visible: root.phase !== "installed"
             busy: root.phase === "checking"
             queued: root.phase === "added"
-            glyph: queued ? "check" : ""
+            glyph: queued ? "check" : root.addable ? "plus" : ""
             enabled: ["unchecked", "error", "prebuilt", "added"].includes(root.phase)
             primary: root.phase === "prebuilt"
-            text: root.phase === "added" ? I18n.tr("Added")
-                : root.phase === "prebuilt" ? I18n.tr("Install")
+            text: root.phase === "added" ? I18n.tr("In queue")
+                : root.phase === "prebuilt" ? I18n.tr("Add to queue")
                 : root.phase === "checking" ? I18n.tr("Checking…")
                 : root.phase === "compiles" ? I18n.tr("Not ready yet")
                 : root.phase === "unavailable" ? I18n.tr("Unavailable")
                 : I18n.tr("Check")
-            accessibleName: root.phase === "prebuilt" ? I18n.format("Install %1", [root.result.name || root.attribute])
-                : root.phase === "added" ? I18n.format("Take %1 off the install list", [root.result.name || root.attribute])
-                : I18n.format("Check whether %1 is prebuilt", [root.result.name || root.attribute])
+            accessibleName: root.phase === "prebuilt" ? I18n.format("Add %1 to the install queue", [root.result.name || root.attribute])
+                : root.phase === "added" ? I18n.format("Take %1 out of the install queue", [root.result.name || root.attribute])
+                : I18n.format("Check whether %1 can be installed", [root.result.name || root.attribute])
             onTriggered: {
                 if (root.phase === "prebuilt" || root.phase === "added")
                     Software.toggleInstall(root.attribute);

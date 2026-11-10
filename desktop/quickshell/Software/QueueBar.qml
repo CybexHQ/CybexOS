@@ -3,9 +3,11 @@ import QtQuick
 import "../Common"
 import "../Common/SoftwareHelpers.js" as Helpers
 
-// The install list, then the one system change it becomes: checked (nothing
+// The install queue, then the one system change it becomes: checked (nothing
 // compiles), prepared by the supervised worker, installed after
 // authorization with the current system kept as a fallback, then opened.
+// Its primary button is the only "Install" for NixOS apps: adding an app
+// only queues it (AppAction).
 Rectangle {
     id: root
 
@@ -37,7 +39,7 @@ Rectangle {
     function lead() {
         switch (phase) {
         case "checking":
-            return I18n.tr("Checking that nothing needs compiling…");
+            return I18n.tr("Checking that everything is ready to install…");
         case "blocked":
             return I18n.tr("Some apps can't be installed yet");
         case "authorizing":
@@ -81,8 +83,8 @@ Rectangle {
             return I18n.tr("Preparing a system change asks for your password.");
         case "preparing":
             return progress.fraction >= 0
-                ? I18n.format("Downloading prebuilt packages · %1 of %2", [Helpers.size(progress.done) || "0 kB", Helpers.size(progress.expected)])
-                : I18n.tr("Downloading prebuilt packages and checking the change. You can keep browsing.");
+                ? I18n.format("Downloading · %1 of %2", [Helpers.size(progress.done) || "0 kB", Helpers.size(progress.expected)])
+                : I18n.tr("Downloading and checking the change. You can keep browsing.");
         case "ready":
             return Updates.requestFailure || I18n.tr("Checked and ready. Your current system stays as a fallback.");
         case "installing":
@@ -111,13 +113,13 @@ Rectangle {
         const size = Helpers.size(queueState.downloadBytes);
         const vendor = queueState.vendor > 0;
         if (queueState.state === "checking")
-            return size !== "" ? I18n.format("≈ %1 download · checking that everything is prebuilt…", [size])
-                : I18n.tr("Checking that everything is prebuilt…");
+            return size !== "" ? I18n.format("≈ %1 download · checking that everything is ready…", [size])
+                : I18n.tr("Checking that everything is ready…");
         if (vendor)
-            return size !== "" ? I18n.format("≈ %1 download plus vendor downloads · nothing to compile · you can keep browsing", [size])
-                : I18n.tr("Vendor downloads · nothing to compile · you can keep browsing");
-        return size !== "" ? I18n.format("≈ %1 download · all prebuilt, nothing to compile · you can keep browsing", [size])
-            : I18n.tr("Nothing to download · all prebuilt · you can keep browsing");
+            return size !== "" ? I18n.format("≈ %1 download, plus downloads from their makers · you can keep browsing", [size])
+                : I18n.tr("Downloads from their makers · you can keep browsing");
+        return size !== "" ? I18n.format("≈ %1 download · ready to use · you can keep browsing", [size])
+            : I18n.tr("Nothing to download · you can keep browsing");
     }
 
     readonly property bool problem: phase === "failed" || (phase === "idle" && (Software.flowError !== "" || blocked !== ""))
@@ -156,6 +158,7 @@ Rectangle {
                 AppIcon {
                     anchors.centerIn: parent
                     app: Software.appsByAttribute[chip.modelData.attribute] || null
+                    name: chip.modelData.name || ""
                     size: Theme.scaled(30)
                 }
                 Rectangle {

@@ -100,7 +100,7 @@ publishes this grouping as `highlights` in `cybex update status`, and the
 review token covers it with the package changes and closure diff. Nixpkgs does
 not label security fixes, so the app does not claim them.
 
-**Install Update** asks for authorization and is offered only after the
+**Install update** asks for authorization and is offered only after the
 candidate passes its checks. A new personal configuration edit invalidates the
 preview and requires preparation again. Finished failures (failed, interrupted
 or rolled back) can be dismissed; dismissal, like discarding a preview,
@@ -112,7 +112,7 @@ dismissed.
 When a confirmed update, kept by the person or by automatic confirmation,
 moved Cybex OS to a new version, the up-to-date page reads **You're on Cybex OS
 VERSION**. Wiz nods and sparkles once as the page comes into view and settles
-into happy, and **What's New** opens a page in the same window with that
+into happy, and **What's new** opens a page in the same window with that
 release's notes and its important changes (component versions, old to new).
 **Back** or Escape returns. Notes render as Markdown without images or raw
 HTML, so the page fetches nothing; only web links open, in the browser.
@@ -250,7 +250,7 @@ authentication token.
 
 Device firmware is included in the regular **Software Update** flow. Checks
 refresh fwupd's signed metadata; a firmware-only update uses the same
-**Prepare Update → Install Update** actions when the OS sources are current.
+**Prepare update → Install update** actions when the OS sources are current.
 The ready page lists each device and its old/new firmware versions. Preparation
 never flashes hardware. The reviewed device releases are bound to the review
 token, and installation rejects changed versions instead of silently adding
@@ -299,8 +299,12 @@ authenticated desktop login, `cybex update confirm` validates system services,
 Hyprland, exactly one managed Quickshell and its current journal.
 The app distinguishes **Restart to finish** (before the trial boot) from
 finishing after signing in. It never requests a second restart for
-confirmation. **Go Back to Previous Version** and **Try Restoring Again**
-remain explicit when confirmation fails or recovery needs attention.
+confirmation. **Go back to the previous version** and **Try restoring
+again** remain explicit when confirmation fails or recovery needs attention.
+The question after the restart names both versions beside its buttons (**This
+version** and **Previous version**: the Cybex OS release, else the NixOS build,
+else the kernel, from `UpdatesHelpers.trialVersions`) and asks you to try what
+you use every day before keeping it. Buttons and labels are in sentence case.
 
 A failed deployment is quarantined by complete system identity. Inspect the
 cause before using `cybex update retry-failed ID` to explicitly allow another

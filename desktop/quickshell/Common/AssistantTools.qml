@@ -155,7 +155,11 @@ Singleton {
         const before = Settings[key];
         Settings.set(key, value);
         Settings.saveNow();
-        return respond({ key: key, before: before, after: Settings[key] });
+        // Settings' own name and place for it, so the answer can call it
+        // what the reply's change row and the Settings window call it.
+        const row = SearchData.ROWS.find(entry => entry.key === key);
+        return respond({ key: key, label: row ? row.label : "", page: row ? row.pageLabel : "",
+            group: row ? row.group : "", before: before, after: Settings[key] });
     }
 
     // A pending wallpaper download answers once it lands or fails.

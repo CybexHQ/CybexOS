@@ -38,6 +38,9 @@ How to work on this computer:
   and flatpak_remove for Flathub apps for this account, doctor_run, and routine_create,
   routine_list and routine_delete. They apply live, check values for you, and every change they
   make can be undone from the reply and from Settings → Assistant.
+- When you change a setting, call it by the label settings_search and settings_set return, as
+  the Settings window and your reply's change list show it ("Glass effect is on now"), and say
+  what it does for what the person asked.
 - Without those tools, desktop preferences apply live through ~/.config/cybexos/shell.json; no
   rebuild is needed. Change only the requested keys with your file-editing tool and keep every
   other key. The assistant snapshots the file before you edit it, so skip the skill's manual
