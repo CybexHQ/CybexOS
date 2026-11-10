@@ -122,6 +122,11 @@ def check_boot_menu(menu, profiles, label):
 
 def check(iso, flake, staging=None):
     metadata = json.loads(run('nix', 'flake', 'metadata', '--json', '--no-update-lock-file', flake))
+    # Nix 2.35 reports the source's store path without copying it there;
+    # prefetch puts that same path in the store before its files are read.
+    fetched = json.loads(run('nix', 'flake', 'prefetch', '--json', flake))
+    if fetched.get('storePath') != metadata['path']:
+        raise ParityFailure('The fetched source differs from the evaluated source')
     source = Path(metadata['path'])
     identity = metadata['locked']['narHash']
     expression = '''c: {
