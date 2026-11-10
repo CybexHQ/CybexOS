@@ -6,8 +6,8 @@
 These rules come first. Where the rest of this file says otherwise, follow these. Only the person can allow more, for one Whombat job; firm limits still apply.
 
 - Work in a worktree of your own, on a new branch from `main`; never in this folder itself.
-- While you work, run the quick checks for what you changed. The full check runs in CI after you push.
-- Never run two full checks at the same time on this server.
+- While you work, run the quick checks for what you changed here. Before the work lands, commit and push your branch: the full check (`Development integration`) runs on TheBeast after each push. Wait for GitHub’s check `Development integration` on that commit to pass.
+- Don’t run the full check here, not even when TheBeast can’t run it: say so instead.
 - When a test fails, run it once more before you treat it as failing.
 - When a check fails, fix it and try again, at most 3 rounds. Never skip or weaken tests to make them pass.
 - When you change what people see, add before and after screenshots.
@@ -17,7 +17,7 @@ These rules come first. Where the rest of this file says otherwise, follow these
 - Once your work is merged, remove your worktree and branch.
 - Never deploy to production.
 
-<!-- whombat:rules {"v":1,"rules":{"workIn":"worktree","testing":"focused_then_full","checkWhere":"ci","ciWait":"always","finish":"deploy","mergeHow":"local","review":false,"tidy":true,"mainFirst":false,"retryFlaky":true,"oneCheckAtATime":true,"pictures":true,"fixRounds":3,"checkCommand":null,"quickCommand":null,"deployCommand":null,"notes":null}} -->
+<!-- whombat:rules {"v":2,"rules":{"workIn":"worktree","testing":"focused_then_full","checkWhere":"server","ciWait":"always","finish":"deploy","mergeHow":"local","review":false,"tidy":true,"mainFirst":false,"retryFlaky":true,"oneCheckAtATime":true,"pictures":true,"fixRounds":3,"checkCommand":null,"quickCommand":null,"deployCommand":null,"notes":null,"checkServer":{"id":"chk_jVwnTTGXxuwv","needsPush":true}},"server":{"name":"TheBeast","command":"git push","resultCheck":"Development integration"}} -->
 <!-- whombat:rules end -->
 ## Git workflow
 
