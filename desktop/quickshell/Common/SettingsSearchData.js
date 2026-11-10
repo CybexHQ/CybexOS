@@ -60,7 +60,7 @@ var ROWS = [
     { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Add shortcut", key: "", anchor: "shortcuts-add", terms: "custom new launch app website url web app command run keybinding" },
     { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Keyboard map", key: "", anchor: "shortcuts-map", terms: "free keys super letters digits layout overview" },
     { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Reset all shortcuts", key: "", anchor: "shortcuts-reset", terms: "defaults restore keybindings" },
-    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "From user.lua", label: "From user.lua", key: "", terms: "personal lua config bindings hypr user" },
+    { page: "keyboard", tab: "shortcuts", pageLabel: "Keyboard", group: "Keyboard shortcuts", label: "Hand-written shortcuts", key: "", terms: "from user.lua personal lua config bindings hypr user hand written own file" },
     { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Tap to click", key: "", terms: "touchpad tapping click input" },
     { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Natural scrolling", key: "", terms: "touchpad reverse scroll direction" },
     { page: "touchpad", pageLabel: "Touchpad", group: "Touchpad", label: "Swipe between workspaces", key: "", terms: "touchpad gesture three fingers swipe workspace overview" },

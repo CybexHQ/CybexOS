@@ -13,7 +13,14 @@ GridView {
     signal selected(var item)
     readonly property int columnCount: width >= 300 ? 3 : width >= 190 ? 2 : 1
     cellWidth: Math.floor(width / columnCount)
-    cellHeight: Math.floor((cellWidth - 8) * 10 / 16) + 8
+    // Rows share the viewport out whole: the 16:10 height a cell would like,
+    // stretched or squeezed (the thumbnails crop to fit) so the rows at rest
+    // end on the view's edge. A third row cut through its middle read as a
+    // broken layout (2026-11 council review); the "Show more" or page edge
+    // below already says there is more.
+    readonly property int naturalCellHeight: Math.floor((cellWidth - 8) * 10 / 16) + 8
+    readonly property int wholeRows: Math.max(1, Math.round(height / Math.max(1, naturalCellHeight)))
+    cellHeight: height >= naturalCellHeight ? Math.floor(height / wholeRows) : naturalCellHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     model: ScriptModel { values: root.items }

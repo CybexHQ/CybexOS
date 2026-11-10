@@ -3,11 +3,16 @@ import QtQuick
 import "../Common"
 
 // Review changes (2026-10 redesign): every draft waiting for Apply, from
-// every page, in one sheet over the window. "Applies now" settles session
-// drafts at once; "System change" prepares a deployment you review in
-// Software Update and use after a restart. Each row can be dropped on its
-// own; Discard all and Apply settle the rest. The sheet closes by itself
-// once nothing is left to review.
+// every page, in one sheet over the window. Nothing in it has happened yet,
+// so its groups say what Apply will do (2026-11 council review: "Applies
+// now" read as if a waiting change were already in effect): "Takes effect
+// when you apply" settles session drafts at once; "Takes effect after a
+// restart" prepares a deployment you review in Software Update and use
+// after a restart. Each row can be dropped on its own; Discard all and
+// Apply settle the rest. The sheet's footer holds the one Apply: while it
+// is open the page's own Apply bar steps back (SettingsChanges.reviewOpen).
+// The scrim covers the whole window, rail included. The sheet closes by
+// itself once nothing is left to review.
 Item {
     id: root
 
@@ -18,6 +23,8 @@ Item {
     readonly property var systemItems: items.filter(item => item.system)
 
     visible: open
+    onOpenChanged: SettingsChanges.reviewOpen = open
+    Component.onDestruction: SettingsChanges.reviewOpen = false
     Accessible.role: Accessible.Dialog
     Accessible.name: I18n.tr("Review changes")
 
@@ -105,7 +112,7 @@ Item {
                 SettingsGroup {
                     width: parent.width
                     visible: root.liveItems.length > 0
-                    title: I18n.tr("Applies now")
+                    title: I18n.tr("Takes effect when you apply")
                     Repeater {
                         model: root.liveItems
                         delegate: ChangeRow {}
@@ -115,8 +122,9 @@ Item {
                 SettingsGroup {
                     width: parent.width
                     visible: root.systemItems.length > 0
-                    title: I18n.tr("System change")
-                    changeTag: "restart"
+                    title: I18n.tr("Takes effect after a restart")
+                    // The heading already says restart; the tag adds who asks.
+                    changeTag: "admin"
                     Repeater {
                         model: root.systemItems
                         delegate: ChangeRow {}

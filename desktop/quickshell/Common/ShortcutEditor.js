@@ -413,6 +413,17 @@ function workspaceNumber(label) {
     return match ? Number(match[1]) : 0;
 }
 
+// The icon a keyboard-map key shows in place of an action name that does
+// not fit on it whole (two lines at word boundaries): its group's, as the
+// Settings rail draws that subject. The full name stays in the key's tip,
+// its accessible name and the detail under the map.
+var GROUP_GLYPHS = { "Shell": "tune", "Apps": "apps", "Web apps": "web", "Web": "language",
+    "Development": "code", "Windows": "window", "Workspaces": "view_quilt", "Clipboard": "content_paste",
+    "Capture": "photo_camera", "Dictation": "mic" };
+function groupGlyph(group) {
+    return GROUP_GLYPHS[group] || "keyboard";
+}
+
 // Super+K sheet markers: "Group: Label" → "changed" or "user", for rows the
 // sheet can name exactly. Collapsed numbered rows stay unmarked.
 function sheetMarks(actions, userBinds) {
@@ -434,6 +445,6 @@ var exported = { FILTERS: FILTERS, WEBAPPS: WEBAPPS, RUN_TYPES: RUN_TYPES, DEFAU
     recorderCommand: recorderCommand, keyboardMap: keyboardMap, mapMove: mapMove, runTarget: runTarget,
     runValue: runValue, labelError: labelError, appChoices: appChoices, webappChoices: webappChoices,
     sheetMarks: sheetMarks, liveCaps: liveCaps, releaseCombo: releaseCombo,
-    workspaceNumber: workspaceNumber };
+    workspaceNumber: workspaceNumber, GROUP_GLYPHS: GROUP_GLYPHS, groupGlyph: groupGlyph };
 if (typeof module !== "undefined" && module.exports)
     module.exports = exported;

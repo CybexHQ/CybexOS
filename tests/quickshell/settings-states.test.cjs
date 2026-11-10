@@ -14,15 +14,18 @@ function read(relative) {
 
 test("the shared switch draws off, on, focus and disabled apart", () => {
     const toggle = read("Common/Toggle.qml");
-    assert.match(toggle, /color: root\.checked \? Theme\.accent : Theme\.switchOffTrack/);
-    assert.match(toggle, /border\.width: root\.checked \? 0 : 1\s+border\.color: Theme\.switchOffBorder/,
+    assert.match(toggle, /color: root\.checked \? \(root\.enabled \? Theme\.accent : Theme\.textDisabled\)\s+: Theme\.switchOffTrack/);
+    assert.match(toggle, /border\.width: root\.checked \? 0 : 1\s+border\.color: root\.enabled \? Theme\.switchOffBorder : Theme\.textDisabled/,
         "an off track carries its own 1 px boundary");
-    assert.match(toggle, /color: root\.checked \? Theme\.accentFg : Theme\.switchOffKnob/);
+    assert.match(toggle, /color: root\.checked \? \(root\.enabled \? Theme\.accentFg : Theme\.background\)\s+: root\.enabled \? Theme\.switchOffKnob : Theme\.textDisabled/);
     assert.doesNotMatch(toggle, /Qt\.rgba\(1, 1, 1, 0\.12\)/, "the off track comes from the pack's tokens");
     // Focus is a ring of its own, never the track's border or a tint on it.
     assert.match(toggle, /border\.width: Theme\.focusWidth\(root\.activeFocus\)\s+border\.color: Theme\.focusRing/);
     assert.doesNotMatch(toggle, /focused: root\.activeFocus/);
-    assert.match(toggle, /opacity: enabled \? 1 : 0\.45/, "a disabled switch fades itself");
+    // A disabled switch is dimmed in the readable disabled ink (about 3:1,
+    // state-tokens.test.cjs), not faded: a 45 % fade took its boundary below
+    // 2:1 (2026-11 review).
+    assert.doesNotMatch(toggle, /opacity:/);
     // Its rows no longer fade it a second time.
     assert.doesNotMatch(read("Settings/SwitchRow.qml"), /opacity:/);
     assert.doesNotMatch(read("Settings/PluginRow.qml"), /opacity: enabled \? 1 : 0\.45/);
@@ -30,12 +33,44 @@ test("the shared switch draws off, on, focus and disabled apart", () => {
     assert.match(read("Settings/SettingsRow.qml"), /controlOpacity: enabled \? 1 : 0\.45/);
 });
 
+test("every shared switch is at least 24 px tall with a 32 px target", () => {
+    // Claude Fable, 2026-11 review: "switches are about 32×18".
+    const theme = read("Common/Theme.qml");
+    const metrics = {};
+    for (const name of ["switchPopover", "switchRow", "switchCompact"]) {
+        const block = theme.match(new RegExp(`readonly property var ${name}: \\(\\{([\\s\\S]*?)\\}\\)`))[1];
+        const track = block.match(/track: Qt\.size\((\d+), (\d+)\)/);
+        metrics[name] = { width: Number(track[1]), height: Number(track[2]) };
+        const box = block.match(/box: Qt\.size\((\d+),/);
+        assert.ok(Number(box[1]) >= metrics[name].width + 6, `${name}: the box holds the track and its ring`);
+    }
+    for (const [name, track] of Object.entries(metrics)) {
+        assert.ok(track.height >= 24, `${name} track is ${track.height} px tall`);
+        const ratio = track.width / track.height;
+        assert.ok(ratio >= 1.6 && ratio <= 1.8, `${name} keeps the switch proportions (${ratio.toFixed(2)})`);
+    }
+    assert.match(theme, /readonly property int switchHitMin: 32/);
+    const toggle = read("Common/Toggle.qml");
+    assert.match(toggle, /width: Math\.max\(root\.width, root\.ringWidth, Theme\.switchHitMin\)/);
+    assert.match(toggle, /height: Math\.max\(root\.height, root\.ringHeight, Theme\.switchHitMin\)/);
+    // The plugin kit's switch follows the same floor.
+    const kit = read("Ui/ToggleSwitch.qml");
+    assert.match(kit, /property int trackHeight: Math\.max\(24,/);
+    assert.match(kit, /width: Math\.max\(parent\.width, 32\)\s+height: Math\.max\(parent\.height, 32\)/);
+});
+
 test("settings actions come in three tiers with a 32 px target", () => {
     const action = read("Settings/SettingsAction.qml");
     assert.match(action, /property bool secondary: false/);
-    assert.match(action, /color: primary \? Theme\.accent : secondary \? Theme\.chip : "transparent"/);
-    assert.match(action, /border\.width: ringShown \? Theme\.focusRingWidth : secondary \? 1 : 0/);
-    assert.match(action, /border\.color: ringShown \? \(primary \? Theme\.textHi : Theme\.focusRing\) : Theme\.hairline/);
+    assert.match(action, /readonly property bool accentFill: primary && enabled/);
+    assert.match(action, /readonly property bool chipFill: secondary \|\| \(primary && !enabled\)/);
+    assert.match(action, /color: accentFill \? Theme\.accent : chipFill \? Theme\.chip : "transparent"/);
+    assert.match(action, /border\.width: ringShown \? Theme\.focusRingWidth : chipFill \? 1 : 0/);
+    assert.match(action, /border\.color: ringShown \? \(accentFill \? Theme\.textHi : Theme\.focusRing\) : Theme\.hairline/);
+    // Disabled reads as unavailable but stays readable: the textDisabled
+    // token (about 3:1), never a fade of the accent fill.
+    assert.match(action, /readonly property color ink: !enabled \? Theme\.textDisabled/);
+    assert.doesNotMatch(action, /opacity: enabled \? 1 : 0\.4/);
     assert.match(action, /hitInsetY: Math\.min\(0, \(height - Theme\.inlineActionHeight\) \/ 2\)/);
     assert.match(action, /anchors\.topMargin: root\.hitInsetY/);
 });
@@ -90,6 +125,36 @@ test("Home reflows and keeps its formats, tiers and static memory", () => {
     for (const status of ["Restart needed", "Ready", "In progress", "Not applied", "Not set up"])
         assert.ok(home.includes(`status: "${status}"`), status);
     assert.equal((home.match(/primary: true/g) || []).length, 0);
+});
+
+test("waiting changes have one status, one Apply and headings that say what Apply does", () => {
+    const view = read("Settings/SettingsView.qml");
+    // No unqualified "Saved" beside "1 change waiting".
+    assert.match(view, /\|\| \(\(Settings\.savePending \|\| justSaved\) && !changesChip\.shown\)/);
+    assert.match(view, /ChangesChip \{\s+id: changesChip/);
+    const sheet = read("Settings/ChangesSheet.qml");
+    assert.doesNotMatch(sheet, /title: "Applies now"/);
+    assert.match(sheet, /title: "Takes effect when you apply"/);
+    assert.match(sheet, /title: "Takes effect after a restart"\s+\/\/[^\n]*\n\s+changeTag: "admin"/);
+    // The scrim spans the whole window, rail included.
+    assert.match(view, /ChangesSheet \{\s+id: changesSheet\s+objectName: "changesSheet"\s+anchors\.fill: parent/);
+    assert.match(sheet, /Rectangle \{\s+anchors\.fill: parent\s+color: Theme\.scrim/);
+    // The page's Apply bar steps back under the sheet; a trial stays.
+    assert.match(sheet, /onOpenChanged: SettingsChanges\.reviewOpen = open/);
+    assert.match(read("Settings/SettingsChanges.qml"), /property bool reviewOpen: false/);
+    assert.match(read("Settings/ApplyBar.qml"), /visible: shown && \(trial \|\| !SettingsChanges\.reviewOpen\)/);
+    // The rail's tip and name say what its dot means, in the chip's words.
+    assert.match(view, /I18n\.format\("%1: changes waiting", \[navItem\.modelData\.label\]\)|"%1: changes waiting"/);
+    assert.match(view, /Accessible\.name: navItem\.spokenName[\s\S]{0,800}?text: navItem\.spokenName/);
+});
+
+test("Home offers one way into Software Update at a time", () => {
+    const home = read("Settings/HomePage.qml");
+    assert.match(home, /attentionOpensUpdates: attention\.some\(item =>\s+item\.id === "restart" \|\| item\.id === "review" \|\| item\.id === "check:firmware-updates"\)/);
+    assert.match(home, /readonly property bool actionShown: !page\.attentionOpensUpdates/);
+    assert.match(home, /id: updateAction\s+visible: heroSide\.actionShown/);
+    // A hidden action takes no room in the hero.
+    assert.match(home, /rowWidth: updatePill\.width\s+\+ \(actionShown \? gap \+ updateAction\.width : 0\)/);
 });
 
 test("an attention item stacks its pill and action rather than eliding its title", () => {

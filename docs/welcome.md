@@ -64,8 +64,13 @@ wallpaper, a Cybex OS theme or one colour of your own), the text size and
 glass. A preview beside the choices is drawn with your real settings. The
 guide itself keeps the installer's colours.
 
-**Shortcuts** shows the Super keys as a keyboard. Lit keys do something;
-choose one to see what, and **Change key** to record another. The essentials
+**Shortcuts** shows the Super keys as a keyboard. Lit keys do something
+and name it; free keys are plain, with a dashed outline. A lock marks a
+protected key and an amber edge with a warning mark a key used twice. The
+legend under the map uses the same words as Settings' map (**In use**,
+**Free**, **Protected**, **Used more than once**, **Italic: hand-written**),
+and a name too long for its key shows its group's icon instead of a cut-off
+word. Choose a key to see what it does, and **Change key** to record another. The essentials
 are listed beside it. A change takes effect only once you apply it: when
 you leave the step with **Continue**, **Back** or Close, the guide lists what
 would change and asks you to **Apply** or **Discard** it first. Enter

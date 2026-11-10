@@ -27,13 +27,18 @@ how it is organised since the October 2026 redesign; the code is
   keyboard is in use. When a page changes from elsewhere (Back, a Home
   reading, a search), focus moves with the selection, so the ring is never on
   one page while another is selected. In the icon rail every page and the
-  search glyph name themselves in a tip on hover and on keyboard focus. The
-  icon rail also shows "Press / to search pages" once above the page.
-  Dismissing it, opening the palette or closing the window retires it. The
-  window keeps no state on disk, so this lasts for the session.
+  search glyph name themselves in a tip on hover and on keyboard focus, and
+  as their accessible name; a page with changes waiting adds that to both
+  ("Touchpad: changes waiting"). The icon rail also shows "Press / to search
+  pages" once above the page, as a plain tip with an info mark rather than a
+  filled box, so it is never taken for a second search field. Dismissing it,
+  opening the palette or closing the window retires it. The window keeps no
+  state on disk, so this lasts for the session.
 - **Header.** It holds Back (also Alt+Left), then the page and what it is
   about, the save state ("Saving… / Saved", with Undo after a reset), the
-  **Changes** chip and Close. Back walks the pages visited since the window
+  **Changes** chip and Close. While the chip shows, it is the only status:
+  "Saved" beside "1 change waiting" read as if the waiting change were saved,
+  so the brief saving note steps back. Errors and Undo still show. Back walks the pages visited since the window
   opened. Closing the window forgets that trail.
 - **Tabs.** A page that holds more than one view shows underlined tabs above its
   content:
@@ -48,7 +53,10 @@ how it is organised since the October 2026 redesign; the code is
 Home replaces About. From top to bottom it shows:
 
 1. The computer's name, release and hardware, and the update state as a
-   status pill over a secondary **Software Update…** action.
+   status pill over a secondary **Software Update…** action. While an item
+   under Needs attention already opens Software Update (a restart, a ready
+   change, firmware updates), the hero keeps only its pill, so the page has
+   one way into Software Update at a time.
 2. One strip with storage, battery (memory on a desktop), backups and network.
    Storage and backups open Backup & storage, network opens Network and
    battery opens Power. Memory has no page, so it is plain text, not a button.
@@ -70,7 +78,10 @@ Home replaces About. From top to bottom it shows:
 6. **Reset all**, in a group of its own.
 
 Actions follow the three tiers in [shell states](shell-states.md): primary,
-secondary and tertiary. Every tier has at least a 32 px target. Below about
+secondary and tertiary. Every tier has at least a 32 px target. A disabled
+action keeps its shape but not its call to action: a primary trades the
+accent for the chip and hairline, and every tier's copy and icon take
+`Theme.textDisabled`, dimmed but still about 3:1, rather than a fade. Below about
 560 px of content column (`SettingsPage.compact`), Home reflows instead of
 eliding. The update state moves under the identity, the four readings go two
 by two and wrap, and an attention item puts its pill and action on a line
@@ -110,7 +121,13 @@ Most settings apply as they change. These drafts wait for Apply instead:
 They are kept for the session in `InputDrafts`, `Keybindings`, `RegionDrafts`
 and `RetentionDraft`, so leaving a page keeps them. The rail marks each page
 that has a draft. The header's chip counts the drafts, and **Review changes**
-lists every one with its old value.
+lists every one with its old value. Nothing in the sheet has happened yet, so
+it groups the drafts by what Apply will do: **Takes effect when you apply**
+(session drafts) and **Takes effect after a restart** (a system change, with
+the **Administrator** tag). Its scrim covers the whole window, rail included,
+and its footer holds the one Apply: a page's own Apply bar steps back while
+the sheet is open (`SettingsChanges.reviewOpen`), and a keep-or-revert trial
+keeps its countdown in view.
 
 Apply settles each session draft one at a time. It then prepares at most one
 system change, because the updater keeps one deployment at a time. A

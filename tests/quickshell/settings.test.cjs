@@ -801,7 +801,10 @@ test("wallpaper and module layouts switch before content can collide", () => {
     const grid = read("Settings/WallpaperGrid.qml");
     assert.match(grid, /columnCount: width >= 300 \? 3 : width >= 190 \? 2 : 1/);
     assert.match(grid, /cellWidth: Math.floor\(width \/ columnCount\)/);
-    assert.match(grid, /cellHeight: Math.floor\(\(cellWidth - 8\) \* 10 \/ 16\) \+ 8/);
+    assert.match(grid, /naturalCellHeight: Math.floor\(\(cellWidth - 8\) \* 10 \/ 16\) \+ 8/);
+    // Rows at rest end on the view's edge: no row is cut through its middle.
+    assert.match(grid, /wholeRows: Math\.max\(1, Math\.round\(height \/ Math\.max\(1, naturalCellHeight\)\)\)/);
+    assert.match(grid, /cellHeight: height >= naturalCellHeight \? Math\.floor\(height \/ wholeRows\) : naturalCellHeight/);
     assert.match(wallpaper, /WallpaperPicker \{/);
     assert.match(wallpaper, /label: "Current"[\s\S]*?text: "Shuffle now"[\s\S]{0,200}?onTriggered: Wallpaper.shuffle\(\)/);
     assert.match(modules, /columns: Math.max\(1, Math.min\(3/);

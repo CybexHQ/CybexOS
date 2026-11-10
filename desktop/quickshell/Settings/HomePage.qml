@@ -103,6 +103,12 @@ SettingsPage {
     }
     // The group's one primary: the most urgent item that has an action.
     readonly property int leadAttention: attention.findIndex(item => item.action !== "")
+    // One way into Software Update at a time: while an attention item's
+    // action already opens it (a restart, a ready change, firmware), the
+    // hero keeps only its status pill (2026-11 council review: two
+    // "Software Update…" buttons on one page).
+    readonly property bool attentionOpensUpdates: attention.some(item =>
+        item.id === "restart" || item.id === "review" || item.id === "check:firmware-updates")
 
     function checkAction(id) {
         switch (id) {
@@ -416,10 +422,13 @@ SettingsPage {
                 Item {
                     id: heroSide
                     readonly property real gap: Theme.scaled(8)
-                    readonly property real rowWidth: updatePill.width + gap + updateAction.width
-                    width: page.compact ? rowWidth : Math.max(updatePill.width, updateAction.width)
-                    height: page.compact ? Math.max(updatePill.height, updateAction.height)
-                        : updatePill.height + gap + updateAction.height
+                    readonly property bool actionShown: !page.attentionOpensUpdates
+                    readonly property real rowWidth: updatePill.width
+                        + (actionShown ? gap + updateAction.width : 0)
+                    width: page.compact ? rowWidth
+                        : Math.max(updatePill.width, actionShown ? updateAction.width : 0)
+                    height: page.compact ? Math.max(updatePill.height, actionShown ? updateAction.height : 0)
+                        : updatePill.height + (actionShown ? gap + updateAction.height : 0)
                     // Under the copy when the row fits there, else under the mark.
                     x: !page.compact ? hero.rightEdge - width
                         : heroText.x + rowWidth <= hero.rightEdge ? heroText.x : logo.x
@@ -434,6 +443,7 @@ SettingsPage {
                     }
                     SettingsAction {
                         id: updateAction
+                        visible: heroSide.actionShown
                         x: page.compact ? updatePill.width + heroSide.gap : parent.width - width
                         y: page.compact ? (parent.height - height) / 2 : updatePill.height + heroSide.gap
                         secondary: true

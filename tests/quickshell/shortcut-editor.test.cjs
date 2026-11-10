@@ -337,6 +337,66 @@ test('map labels shorten workspace switches only', () => {
     assert.equal(S.workspaceNumber(undefined), 0);
 });
 
+test('a key name that does not fit shows its group icon, and every group has one that resolves', () => {
+    const Tabler = load('TablerGlyphs.js');
+    const KeybindHelpers = load('KeybindHelpers.js');
+    for (const group of KeybindHelpers.GROUP_ORDER.concat(['Web']))
+        assert.ok(S.GROUP_GLYPHS[group], group);
+    for (const glyph of Object.values(S.GROUP_GLYPHS).concat([S.groupGlyph('Mine')]))
+        assert.ok(Tabler.has(glyph), glyph);
+    assert.equal(S.groupGlyph('Mine'), 'keyboard', 'a group of your own falls back to the keyboard');
+    assert.equal(S.groupGlyph(undefined), 'keyboard');
+});
+
+test('both keyboard maps light the keys in use, outline the free ones and share one legend', () => {
+    const shell = path.join(root, 'desktop/quickshell');
+    const read = name => fs.readFileSync(path.join(shell, name), 'utf8');
+    for (const name of ['Settings/ShortcutKeyboardMap.qml', 'Welcome/KioskKeyMap.qml']) {
+        const map = read(name);
+        // Lit means in use, in both maps (2026-11: Settings lit its free keys).
+        assert.match(map, /readonly property bool lit: !modelData\.free/, name);
+        assert.match(map, /strokeStyle: ShapePath\.DashLine/, `${name}: a free key has a dashed outline`);
+        assert.match(map, /name: [\w.]*modelData\.protected \? "lock" : "warning"/, `${name}: lock and warning marks`);
+        // Never an elided "Worksp…": the group icon takes the name's place.
+        assert.match(map, /opacity: truncated \? 0 : 1/, name);
+        assert.match(map, /visible: \w+\.lit && keyLabel\.truncated[\s\S]{0,200}?name: Helpers\.groupGlyph\(/, name);
+        const legend = [...map.matchAll(/Legend \{\s*kind: "(\w+)"[^}]*?text: I18n\.tr\("([^"]+)"\)/g)]
+            .map(match => match[1] + ': ' + match[2]);
+        assert.deepEqual(legend, ['used: In use', 'free: Free', 'protected: Protected', 'shared: Used more than once',
+            'user: Italic: hand-written'], name);
+    }
+    const page = read('Settings/ShortcutsPage.qml');
+    assert.doesNotMatch(page, /Lit keys are free/);
+    assert.match(page, /Lit keys are in use\./);
+    assert.match(read('Welcome/ShortcutsStep.qml'), /Lit keys do something/);
+    // The detail under the Settings map is always there and follows the keyboard.
+    const settingsMap = read('Settings/ShortcutKeyboardMap.qml');
+    assert.match(settingsMap, /id: detail\s+objectName: "shortcutMapDetail"\s+width: parent\.width\s+height: Math\.max\(/);
+    assert.doesNotMatch(settingsMap, /id: detail\s+visible:/);
+    assert.match(settingsMap, /function focusKey[\s\S]*?selected = key\.combo;/);
+    assert.match(settingsMap, /active: keyMouse\.containsMouse\s+sourceComponent: SettingsTooltip/, 'a hovered key names itself in full');
+});
+
+test('the Shortcuts page keeps one search field and a compact toolbar above the list', () => {
+    const shell = path.join(root, 'desktop/quickshell');
+    const page = fs.readFileSync(path.join(shell, 'Settings/ShortcutsPage.qml'), 'utf8');
+    assert.equal((page.match(/SettingsField \{/g) || []).length, 1, 'one search field');
+    assert.doesNotMatch(page, /DraftFieldRow|PickerRow \{/, 'no label-and-control rows above the list');
+    assert.match(page, /\{ value: "user", label: I18n\.tr\("Hand-written"\) \}/);
+    assert.doesNotMatch(page, /"From user\.lua"/);
+    // The search jump anchors stay on the controls that replaced the rows.
+    for (const anchor of ['shortcuts-map', 'shortcuts-add', 'shortcuts-reset'])
+        assert.ok(page.includes(`"${anchor}"`), anchor);
+    // Reset all: under the read-only banner, else at the foot.
+    assert.match(page, /ResetRows \{\s+width: parent\.width\s+visible: page\.readOnly\s+\}[\s\S]*id: toolbar/);
+    assert.match(page, /ResetRows \{\s+width: parent\.width\s+visible: !page\.readOnly\s+\}\s+SettingsHint \{[\s\S]{0,120}keybindings\.json/);
+    // The narrow window's search tip is a tip, not a second field.
+    const view = fs.readFileSync(path.join(shell, 'Settings/SettingsView.qml'), 'utf8');
+    const tip = view.slice(view.indexOf('id: searchHint'), view.indexOf('id: hintCopy'));
+    assert.match(tip, /color: "transparent"/);
+    assert.doesNotMatch(tip, /name: "search"/);
+});
+
 test('keyboard map focus moves clamp to the staggered rows', () => {
     const map = S.keyboardMap([], []);
     assert.deepEqual(plain(S.mapMove(map, 0, 9, 'down')), {row: 1, column: 9});

@@ -43,11 +43,14 @@ PopoutPanel {
 
     // The save state speaks only when there is something to say: while a
     // change saves and briefly after, after a reset (with Undo), and on an
-    // error. A standing "saved" line told nobody anything.
+    // error. A standing "saved" line told nobody anything. While the Changes
+    // chip shows, it is the one status: an unqualified "Saved" beside
+    // "1 change waiting" read as if the waiting change were saved too
+    // (2026-11 council review). Errors and Undo still speak.
     property bool justSaved: false
     readonly property bool statusShown: Settings.undoAvailable
         || Settings.persistenceError || Settings.newerSchema
-        || Settings.savePending || justSaved
+        || ((Settings.savePending || justSaved) && !changesChip.shown)
     Connections {
         target: Settings
         function onSavePendingChanged() {
@@ -269,18 +272,21 @@ PopoutPanel {
         border.color: Theme.focusRing
         activeFocusOnTab: navItem.current
         Accessible.role: Accessible.PageTab
-        Accessible.name: navItem.modelData.label + (navItem.pending ? ", " + I18n.tr("changes not applied yet") : "")
+        // The name, and the dot's meaning in the status line's words.
+        readonly property string spokenName: navItem.pending
+            ? I18n.format("%1: changes waiting", [navItem.modelData.label]) : navItem.modelData.label
+        Accessible.name: navItem.spokenName
         Accessible.selected: navItem.current
         Accessible.onPressAction: {
             navState.pulseCenter();
             Settings.page = navItem.modelData.id;
         }
         // The icon rail names each page beside it, for the pointer and for
-        // the keyboard alike.
+        // the keyboard alike, and says what its dot means.
         SettingsTooltip {
             visible: root.compactNav && (navMouse.containsMouse
                 || Theme.focusWidth(navItem.activeFocus) > 0)
-            text: navItem.modelData.label
+            text: navItem.spokenName
             x: parent.width + Theme.scaled(6)
             y: (parent.height - height) / 2
         }
@@ -597,7 +603,10 @@ PopoutPanel {
         // The icon rail hides the search field's "/" key cap, so the
         // narrow window says it once, above the page, on the content
         // column's edges. Dismissing it, opening the palette or closing the
-        // window retires it for the session (searchHintSeen).
+        // window retires it for the session (searchHintSeen). It reads as a
+        // tip, not a field: a filled box with a magnifier and grey copy was
+        // taken for a second search field above a page's own (2026-11
+        // council review), so it has no fill and an info mark.
         Rectangle {
             id: searchHint
             objectName: "settingsSearchHint"
@@ -610,15 +619,14 @@ PopoutPanel {
             height: visible ? Math.max(Theme.inlineActionHeight + Theme.scaled(4),
                 hintCopy.implicitHeight + Theme.scaled(12)) : 0
             radius: Theme.chipRadius
-            color: Theme.chip
-            border.width: 1
-            border.color: Theme.hairlineSoft
+            color: "transparent"
+            border.width: 0
 
             Sym {
                 id: hintGlyph
-                x: Theme.scaled(10)
+                x: Theme.scaled(4)
                 anchors.verticalCenter: parent.verticalCenter
-                name: "search"
+                name: "info-circle"
                 size: Theme.iconSmall
                 color: Theme.accentText
             }
@@ -633,7 +641,7 @@ PopoutPanel {
                 wrapMode: Text.Wrap
                 font.family: Theme.fontMenu
                 font.pixelSize: Theme.typography.secondary
-                color: Theme.textHi
+                color: Theme.textMid
             }
             SettingsAction {
                 id: hintClose
@@ -902,6 +910,7 @@ PopoutPanel {
             }
 
             ChangesChip {
+                id: changesChip
                 anchors.verticalCenter: parent.verticalCenter
                 compact: root.compactNav
                 onReviewRequested: root.openChanges()
