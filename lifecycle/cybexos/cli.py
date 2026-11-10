@@ -11,7 +11,7 @@ import uuid
 from . import automatic
 from . import channel as channels
 from .common import Failure, atomic, digest, locked, read
-from .engine import Engine, IncompatibleNixpkgs, NotPrebuilt, config_digest
+from .engine import Engine, config_digest
 from .trust import version
 
 LIVE_MARKER = Path('/etc/cybexos/installer')
@@ -156,26 +156,27 @@ def update_status(state=Path('/var/lib/cybexos'), working=Path('/etc/nixos'), po
 
 
 def stage_update(engine, scope, identifier):
-    """Stage `scope`; a combined update NixOS holds back brings its release alone.
+    """Stage `scope`; a combined update that fails brings its release alone.
 
-    New NixOS packages that NixOS has not built yet, or that need a newer
-    Cybex OS, must not keep a published Cybex OS release from this computer.
-    The release is prepared on the packages it runs now instead, and the
-    newer packages follow once NixOS has them (automatic.prepare).
+    A published Cybex OS release must never wait for new NixOS packages: not
+    for ones NixOS hasn't built, a Nixpkgs that needs a newer Cybex OS, a
+    package that fails to build, or a fault in the updater's own checks.
+    Whatever stopped the combined update, the release is prepared on the
+    packages this computer runs now, so its updater's fixes always arrive;
+    the newer packages follow on their own (automatic.prepare).
     """
     try:
         engine.stage(scope, request_id=identifier)
         return
-    except (NotPrebuilt, IncompatibleNixpkgs) as error:
-        if not release_alone(engine, scope, error):
+    except Failure:
+        if not release_alone(engine, scope):
             raise
     engine.stage('cybexos', request_id=identifier)
 
 
-def release_alone(engine, scope, error):
-    """Whether a held combined update leaves a newer release to prepare alone."""
-    held = not error.kernel if isinstance(error, NotPrebuilt) else error.held
-    if scope != 'both' or not held:
+def release_alone(engine, scope):
+    """Whether a failed combined update leaves a newer release to prepare alone."""
+    if scope != 'both':
         return False
     try:
         candidate = engine.channel()

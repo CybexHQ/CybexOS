@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import test_lifecycle as lifecycle
 from cybexos import cli, review
-from cybexos.common import Failure, atomic, read
+from cybexos.common import CommandFailure, Failure, atomic, read
 from cybexos.engine import IncompatibleNixpkgs, NotPrebuilt
 
 
@@ -84,25 +84,55 @@ class UpdateRequests(unittest.TestCase):
         result, guard = self.run_stage('both', [held, None])
         self.assertEqual((guard.call_count, result['state'], result['scope']), (2, 'ready', 'cybexos'))
 
-    def test_only_a_held_combined_update_with_a_newer_release_is_prepared_alone(self):
+    def test_a_release_is_not_held_back_by_any_failure_of_the_combined_update(self):
+        # A kernel NixOS hasn't built, a personal module the new Nixpkgs
+        # breaks, or a fault in the check itself: the release is prepared on
+        # the packages this computer runs now, which it has already built.
+        personal = IncompatibleNixpkgs({'origin': 'personal', 'file': 'local/personal.nix', 'message': 'gone'}, '1.1.0')
+        for failure in (NotPrebuilt(['linux-7.3']), personal, Failure('Nix omitted requested derivation metadata.')):
+            with self.subTest(failure=failure):
+                result, guard = self.run_stage('both', [failure, None])
+                self.assertEqual((guard.call_count, result['state'], result['scope']), (2, 'ready', 'cybexos'))
+                self.assertEqual(result['inputs']['nixpkgs'], lifecycle.inputs.identity(lifecycle.lock(), 'nixpkgs'))
+                self.assertEqual(result['request']['state'], 'done')
+                self.enqueue_discard(result['transaction'])
+
+    def test_a_release_is_not_held_back_by_a_package_that_fails_to_build(self):
+        # 2026-11-10: the channel's ChatGPT needed a tectonic that doesn't
+        # build. Nix fails the system build; the release comes alone.
+        builds = []
+        def fail(args):
+            if args[:2] == ('nix', 'build') and '--dry-run' not in args:
+                builds.append(args)
+                if len(builds) == 1:
+                    raise CommandFailure('nix', 1, "error: Cannot build '/nix/store/" + 'i' * 32
+                                         + "-tectonic-0.17.0.drv'.\n       Reason: builder failed with exit code 101.\n")
+            return False
+        self.runner.fail = fail
+        result, guard = self.run_stage('both', [None, None])
+        self.assertEqual((len(builds), result['state'], result['scope'], result['availableVersion']),
+                         (2, 'ready', 'cybexos', '1.1.0'))
+        self.assertEqual(result['inputs']['nixpkgs'], lifecycle.inputs.identity(lifecycle.lock(), 'nixpkgs'))
+
+    def test_only_a_combined_update_with_a_newer_release_is_prepared_alone(self):
         waiting = lambda: NotPrebuilt(['codex-0.167.0'])
         # NixOS packages alone have no release to fall back to.
         result, guard = self.run_stage('upstream', [waiting()])
         self.assertEqual((guard.call_count, result['state'], result['notPrebuilt']), (1, 'failed', ['codex-0.167.0']))
         self.assertEqual(result['request']['state'], 'failed')
-        # A kernel build is refused, never worked around.
-        result, guard = self.run_stage('both', [NotPrebuilt(['linux-6.18'], kernel=True)])
-        self.assertEqual((guard.call_count, result['state']), (1, 'failed'))
-        # A personal module that needs changing is the person's to fix.
-        personal = IncompatibleNixpkgs({'origin': 'personal', 'file': 'local/personal.nix', 'message': 'gone'}, '1.1.0')
-        result, guard = self.run_stage('both', [personal])
-        self.assertEqual((guard.call_count, result['state']), (1, 'failed'))
         # A newer release is required: none, or an unreadable listing, is no reason.
-        self.assertTrue(cli.release_alone(self.engine, 'both', waiting()))
+        self.assertTrue(cli.release_alone(self.engine, 'both'))
+        self.assertFalse(cli.release_alone(self.engine, 'upstream'))
         self.engine.channel = lambda: lifecycle.release() | {'version': '1.0.0'}
-        self.assertFalse(cli.release_alone(self.engine, 'both', waiting()))
+        self.assertFalse(cli.release_alone(self.engine, 'both'))
+        result, guard = self.run_stage('both', [waiting()])
+        self.assertEqual((result['state'], result['request']['state']), ('failed', 'failed'))
         self.engine.channel = lambda: (_ for _ in ()).throw(Failure('Release listing unavailable'))
-        self.assertFalse(cli.release_alone(self.engine, 'both', waiting()))
+        self.assertFalse(cli.release_alone(self.engine, 'both'))
+
+    def enqueue_discard(self, transaction):
+        identifier = self.enqueue('discard', [transaction])['requestId']
+        cli.run_update(self.engine, identifier)
 
     def test_a_prepared_release_is_not_prepared_again_for_held_packages(self):
         result, _ = self.run_stage('cybexos', [None])

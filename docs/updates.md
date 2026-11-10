@@ -329,12 +329,28 @@ would compile, it stops before building: the status is `failed`, its phase
 "Waiting for NixOS to finish building this change", `notPrebuilt` names the
 packages, and nothing changes.
 
-A hold never keeps a published Cybex OS release back. When a combined update
-(`both`) is held for packages NixOS hasn't built, or for packages that need a
-newer Cybex OS, the same request prepares the newer release alone on this
-computer's current packages (`stage_update` in `lifecycle/cybexos/cli.py`).
-A kernel build or a personal module that needs changing is never worked
-around this way, and a prepared update that already holds the release is kept.
+The check can't foresee every failure: Cybex OS's own packages build here and
+may not build against a new Nixpkgs yet (Voxtype on 2026-11-10), and
+configuration is never cached. When the system build itself fails in an
+update that moves Nixpkgs, the update waits the same way: phase "Waiting for a
+fix to the new NixOS packages", `notPrebuilt` names the packages whose own
+builds failed, and nothing changes. The derivations that failed are kept in
+`/var/lib/cybexos/failed-builds.json`, so checking the same candidate again
+doesn't compile the same failure again; a week later, or once Nixpkgs or
+Cybex OS changes them, they are built again. A download that fails (a
+fixed-output derivation) is not kept: the network may be the cause.
+
+Nothing that goes wrong with new NixOS packages keeps a published Cybex OS
+release back. When a combined update (`both`) fails for any reason, whether
+packages NixOS hasn't built, a Nixpkgs that needs a newer Cybex OS, a package
+that fails to build, a personal module the new Nixpkgs breaks or a fault in
+the check itself, the same request prepares the newer release alone on the
+packages this computer already runs (`stage_update` in
+`lifecycle/cybexos/cli.py`). The release's own updater then judges the next
+NixOS package update, so a fix to the updater always arrives. Only when the
+release alone fails too does the request fail. A prepared update that already
+holds the release is kept. Updaters before 1.0.32 fall back only for a hold:
+on one of those, `cybex update stage cybexos` prepares the release alone.
 
 When only newer NixOS packages are held, there is nothing for the person to
 do. Software Update, Settings and the Control Center read as up to date, with
@@ -437,27 +453,40 @@ use NixOS's cached default builds: Hyprland and its portal as Nixpkgs builds
 them, Xwayland without a font path, and every glibc locale. What builds on the
 computer by design:
 
-- Cybex OS's own packages and hardware stacks, and its NetworkManager
-  Libreswan path fix. These include Codex and Claude Code, the agent CLIs
+- Cybex OS's own packages and hardware stacks, including the ones no
+  package list reaches (Voxtype with its dictation patch, the automatic-login
+  encryption check: the internal `cybexos.updates.ownBuilds`). These include
+  Codex and Claude Code, the agent CLIs
   Wiz drives: Cybex OS packages the vendors' own release builds and keeps
   them current itself ([vendor updates](releasing.md#automatic-vendor-updates)),
   so they do not wait for NixOS's build farm and do not update themselves;
 - unfree vendor downloads, which NixOS never caches: Google Chrome,
   1Password, Spotify, ChatGPT, Steam, Brave Origin from Software and NVIDIA's
-  userspace, with NVIDIA's 32-bit EGL platform libraries for Steam. The
-  Nixpkgs packages a download needs are ordinary NixOS builds and must come
-  prebuilt (`system.build.cybexosVendorBuilds`): on 2026-11-10 the channel's
-  ChatGPT needed a codex and a tectonic that NixOS had failed to build, so
-  the update waits for them instead of compiling them. A wrapper without a
-  source of its own (a Wayland launcher, Steam's environment) carries its
-  download, whose inputs are checked the same way;
+  userspace. A wrapper without a source of its own (a Wayland launcher,
+  Steam's or Zoom's environment) carries its download: the first package of
+  its own family below it (`prebuilt.family`). Cybex OS's own wrappers name
+  it exactly (`passthru.cybexosLocalBuilds`);
 - out-of-tree kernel modules (NVIDIA, the XPS camera, the medium's ZFS);
+- what `cybexos.updates.expectedBuilds` declares: the Libreswan path fix,
+  Steam's runtime, the XPS camera's GStreamer source and NVIDIA's 32-bit EGL
+  platform libraries for Steam, with the 32-bit build tools those need
+  (`system.build.cybexosDeclaredBuilds`);
 - the machine's own configuration: initrd, PAM, setuid wrappers, dconf.
 
+Everything else must come prebuilt, including what these builds need: an
+expected build never covers an uncached Nixpkgs package below it. On
+2026-11-10 the channel's ChatGPT needed a codex and a tectonic NixOS had
+failed to build; updaters before 1.0.31 let the download cover them and
+compiled them until they failed, and before 1.0.32 Cybex OS's own packages
+and kernel modules still covered theirs. Only a declared build covers its
+inputs, and an unfree download listed there doesn't.
+
 A package you deliberately build from source goes in
-`cybexos.updates.expectedBuilds` in your personal configuration. Releases run
-`scripts/check-prebuilt`, `--nvidia` and `--catalogue` (every Software profile
-app); each lists any other build and exits 1.
+`cybexos.updates.expectedBuilds` in your personal configuration; what it needs
+that NixOS doesn't prebuild is built too. Releases run `scripts/check-prebuilt`,
+`--nvidia` and `--catalogue` (every Software profile app), and so does the full
+check's product job; each lists any other build and exits 1. A part a Cybex OS
+package builds separately goes in its `passthru.cybexosLocalBuilds`.
 
 ## Release delivery
 
