@@ -16,13 +16,21 @@ scripts/check-prebuilt names the packages its machines' updater holds back
 until NixOS builds them: a build that fails there means machines wait, and
 any other failure is one they would hit.
 
-  scripts/nixpkgs-canary [--sources main,beta,stable,TAG...] [--build] [--report DIR]
+With --verified FILE (and --build) it also records the channel revision as
+verified for each published release that passes completely: every target
+evaluates, the release's check-prebuilt holds nothing (with and without
+NVIDIA) and every expected local build builds. Machines move their Nixpkgs
+only to a revision verified for the release they run (lifecycle/cybexos/
+verified.py); the workflow publishes FILE on the nixpkgs-verified branch.
+
+  scripts/nixpkgs-canary [--sources main,beta,stable,TAG...] [--build] [--verified FILE] [--report DIR]
 
 Exit status 1 means an evaluation or a build failed. The nixpkgs-canary
 workflow runs it daily with --build and keeps a GitHub issue open while it
 fails. Locally it needs git, gh (for the release tags) and Nix.
 """
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -97,7 +105,7 @@ def nixpkgs(ref):
     if meta.returncode:
         return None
     locked = json.loads(meta.stdout)['locked']
-    return {'ref': ref, 'rev': locked['rev'], 'date': locked.get('lastModified')}
+    return {'ref': ref, 'rev': locked['rev'], 'date': locked.get('lastModified'), 'narHash': locked.get('narHash')}
 
 
 def located(trace, source):
@@ -167,18 +175,22 @@ def build(name, revision, branch, workspace):
     source = Path(workspace) / (name + '-build')
     subprocess.run(['git', 'worktree', 'add', '--quiet', '--detach', str(source), revision], cwd=ROOT, check=True)
     result = {'source': name, 'revision': revision, 'nixpkgs': branch, 'ok': False,
-              'expected': 0, 'built': 0, 'held': [], 'failed': []}
+              'expected': 0, 'built': 0, 'held': [], 'heldNvidia': [], 'failed': []}
     try:
         # Machines resolve Cybex OS against their own Nixpkgs the same way.
         step = run(*NIX, 'flake', 'lock', '--override-input', 'nixpkgs', f"github:NixOS/nixpkgs/{branch['rev']}",
                    cwd=source)
         if step.returncode:
             return result | {'error': tail(step.stderr)}
-        step = run(sys.executable, '-I', '-B', str(source / 'scripts/check-prebuilt'), cwd=source)
-        held = [line.strip() for line in step.stdout.splitlines()
-                if line.strip() and not line.startswith('pointer theme: ')]
-        if step.returncode not in (0, 1) or (step.returncode and not step.stdout.strip()):
-            return result | {'error': tail(step.stderr)}
+        holds = {}
+        for key, flags in (('held', []), ('heldNvidia', ['--nvidia'])):
+            step = run(sys.executable, '-I', '-B', str(source / 'scripts/check-prebuilt'), *flags, cwd=source)
+            holds[key] = [line.strip() for line in step.stdout.splitlines()
+                          if line.strip() and not line.startswith('pointer theme: ')]
+            if step.returncode not in (0, 1) or (step.returncode and not step.stdout.strip()):
+                return result | {'error': tail(step.stderr)}
+        held = holds['held']
+        result['heldNvidia'] = holds['heldNvidia']
         step = run(*NIX, 'eval', '--impure', '--json', '--expr', EXPECTED % {'root': json.dumps(str(source))}, cwd=source)
         if step.returncode:
             return result | {'error': tail(step.stderr)}
@@ -202,6 +214,47 @@ def build(name, revision, branch, workspace):
         subprocess.run(['git', 'worktree', 'remove', '--force', str(source)], cwd=ROOT)
 
 
+def release(revision):
+    """`v1.0.32` -> `1.0.32`; None for a branch or commit."""
+    match = re.fullmatch(r'v(\d+\.\d+\.\d+(?:-(?:beta|rc)\.\d+)?)', revision)
+    return match[1] if match else None
+
+
+def verifications(results, builds, channel, aliases):
+    """Release versions that pass completely against the channel revision.
+
+    `aliases` maps a source name to the other sources at its commit (the
+    newest beta is often the newest stable release too).
+    """
+    versions = set()
+    for b in builds:
+        evaluated = [r for r in results if r['source'] == b['source'] and r['nixpkgs']['ref'] == channel['ref']]
+        if (b['nixpkgs']['rev'] != channel['rev'] or b.get('skipped') or b.get('error') or b['failed']
+                or b['held'] or b.get('heldNvidia') or b['built'] != b['expected'] or not b['expected']
+                or not evaluated or not all(r['ok'] for r in evaluated)):
+            continue
+        versions |= {release(revision) for revision in [b['revision'], *aliases.get(b['source'], [])]} - {None}
+    return sorted(versions)
+
+
+def verify(record, channel, versions, now, keep=60):
+    """`record` with the channel revision verified for `versions` (lifecycle/cybexos/verified.py)."""
+    record = record if isinstance(record, dict) and record.get('schema') == 1 else {'schema': 1, 'branches': {}}
+    entries = [dict(item) for item in record.get('branches', {}).get(channel['ref'], [])]
+    if not versions or not channel.get('narHash') or not isinstance(channel.get('date'), int):
+        return record
+    for item in entries:
+        if item['rev'] == channel['rev']:
+            item['releases'] = sorted(set(item['releases']) | set(versions))
+            item['verifiedAt'] = now
+            break
+    else:
+        entries.append({'rev': channel['rev'], 'narHash': channel['narHash'], 'lastModified': channel['date'],
+                        'releases': list(versions), 'verifiedAt': now})
+    entries.sort(key=lambda item: item['lastModified'], reverse=True)
+    return {'schema': 1, 'branches': dict(record.get('branches', {}), **{channel['ref']: entries[:keep]})}
+
+
 def markdown_builds(builds):
     if not builds:
         return []
@@ -217,7 +270,8 @@ def markdown_builds(builds):
                       '  ```']
             continue
         lines.append(head + f"{b['built']} of {b['expected']} built.")
-        waiting = sorted({item['name'] for item in b['failed'] if item['held']})
+        waiting = sorted({item['name'] for item in b['failed'] if item['held']} | set(b['held'])
+                         | set(b.get('heldNvidia', [])))
         if waiting:
             lines.append(f"  NixOS hasn't built {', '.join(f'`{n}`' for n in waiting)}; machines on this release hold "
                          'the NixOS update back until it has.')
@@ -258,17 +312,20 @@ def main(argv):
     parser.add_argument('--build', action='store_true',
                         help="also build each source's expected local builds against the channel head")
     parser.add_argument('--report', type=Path, help='write report.json and report.md here')
+    parser.add_argument('--verified', type=Path,
+                        help='update this verified Nixpkgs record (with --build) for the releases that pass')
     options = parser.parse_args(argv)
     branches = [b for b in (nixpkgs(ref) for ref in ('nixos-unstable', 'master', NEXT_STABLE)) if b]
     if len(branches) < 2:
         raise SystemExit('nixpkgs-canary: cannot resolve the Nixpkgs channel and master')
-    seen, results, builds = set(), [], []
+    seen, results, builds, aliases = {}, [], [], {}
     with tempfile.TemporaryDirectory(prefix='nixpkgs-canary.') as workspace:
         for name, revision in sources(options.sources.split(',')).items():
             commit = run('git', 'rev-parse', revision + '^{commit}', cwd=ROOT).stdout.strip()
             if commit in seen:
+                aliases.setdefault(seen[commit], []).append(revision)
                 continue
-            seen.add(commit)
+            seen[commit] = name
             evaluated = check(name, revision, branches, workspace)
             results += evaluated
             # Only the channel is in NixOS's cache; master would compile everything.
@@ -280,6 +337,24 @@ def main(argv):
                 else:
                     builds.append(build(name, revision, channel, workspace))
     report = markdown(results, branches, builds)
+    channel = next((b for b in branches if b['ref'] == 'nixos-unstable'), None)
+    versions = verifications(results, builds, channel, aliases) if options.build and channel else []
+    if options.verified:
+        try:
+            record = json.loads(options.verified.read_text())
+        except (OSError, ValueError):
+            record = None
+        updated = verify(record, channel, versions, datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+        changed = updated != record
+        if changed:
+            options.verified.write_text(json.dumps(updated, indent=2, sort_keys=True) + '\n')
+        report += (f"\nVerified `{channel['ref']}` {channel['rev'][:12]} for Cybex OS {', '.join(versions)}: "
+                   'machines on these releases take it with their next update.\n' if versions else
+                   f"\nNo release was verified with `{channel['ref']}` {channel['rev'][:12]}: machines keep the "
+                   'NixOS packages they have.\n')
+        if options.report:
+            options.report.mkdir(parents=True, exist_ok=True)
+            (options.report / 'verified').write_text(' '.join(versions) + '\n' if changed and versions else '\n')
     print(report)
     if options.report:
         options.report.mkdir(parents=True, exist_ok=True)

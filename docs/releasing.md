@@ -172,11 +172,13 @@ with the current pins without publishing.
 
 ### Nixpkgs canary
 
-Machines follow `nixos-unstable` themselves, so a Nixpkgs change that breaks
-Cybex OS reaches them without a Cybex OS release. The **nixpkgs-canary**
-workflow (`scripts/nixpkgs-canary --build`) evaluates `main` and the newest
-beta and stable releases daily against the channel head, Nixpkgs master
-(which leads the channel by days) and the next stable branch once it exists.
+Machines take `nixos-unstable` revisions without a Cybex OS release, but only
+revisions the canary has verified for their release
+([updates](updates.md#verified-nixpkgs)). The **nixpkgs-canary** workflow
+(`scripts/nixpkgs-canary --build --verified`) evaluates `main` and the newest
+beta and stable releases twice a day, and when a release is published,
+against the channel head, Nixpkgs master (which leads the channel by days)
+and the next stable branch once it exists.
 It evaluates the `product`, `system`, `xps-system` and `nvidia-evaluation`
 checks.
 
@@ -191,13 +193,19 @@ reported as a wait; any other failure is one machines on that release would
 hit, such as the codex ChatGPT needed that day, which updaters then still
 let through.
 
+A release that passes completely (every check evaluates, its
+`scripts/check-prebuilt` holds nothing with or without NVIDIA, and every
+expected local build builds) gets the channel revision recorded as verified
+for it: the workflow commits `nixpkgs/verified.json` to the
+`nixpkgs-verified` branch as github-actions[bot]. It never changes `main`.
+Machines on that release take the revision with their next update.
+
 An evaluation failure, a build failure machines would hit, or a new evaluation
 warning (usually the notice before a removal) keeps a `nixpkgs-canary` issue
 open with the error, the module that caused it or the failing build's log;
 the issue closes once every source evaluates and builds again. Fix it on
-`main` and release before the channel moves on. Machines that receive the
-change first wait for that release
-([updates](updates.md#when-nixpkgs-drops-something-cybex-os-uses)).
+`main` and release: until then that release's machines keep the Nixpkgs they
+have ([updates](updates.md#when-nixpkgs-drops-something-cybex-os-uses)).
 
 Fix forward on `main`: there are no maintenance branches. When stable needs a
 fix while beta carries changes that are not ready, revert those on `main` or

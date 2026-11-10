@@ -7,19 +7,25 @@ name: Nixpkgs canary
 # builds (Cybex OS's own packages, unfree vendor downloads) against the
 # channel head (scripts/nixpkgs-canary --build). A failure that machines would
 # hit, or a new evaluation warning, keeps a "nixpkgs-canary" issue open.
-# Nothing is released or changed.
+# A published release that passes completely gets the channel revision
+# verified on the nixpkgs-verified branch: machines on that release move their
+# Nixpkgs only to verified revisions (lifecycle/cybexos/verified.py). Nothing
+# is released, and main is never changed.
 on:
   schedule:
-    - cron: "17 4 * * *"
+    - cron: "17 4,16 * * *"
+  # A new release has no verified Nixpkgs until the canary checks it.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
   group: nixpkgs-canary
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   canary:
@@ -41,15 +47,45 @@ jobs:
       # cachix/install-nix-action, as in the repository's other workflows.
       - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
 
+      - name: Fetch the verified Nixpkgs record
+        run: |
+          if git fetch --quiet origin nixpkgs-verified; then
+            git show FETCH_HEAD:nixpkgs/verified.json > "$RUNNER_TEMP/verified.json"
+          else
+            echo '{"schema": 1, "branches": {}}' > "$RUNNER_TEMP/verified.json"
+          fi
+
       - name: Evaluate and build against upcoming Nixpkgs
         id: canary
         run: |
           set +e
-          python3 -I -B scripts/nixpkgs-canary --build --report "$RUNNER_TEMP/canary"
+          python3 -I -B scripts/nixpkgs-canary --build --verified "$RUNNER_TEMP/verified.json" --report "$RUNNER_TEMP/canary"
           status=$?
           cat "$RUNNER_TEMP/canary/report.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null
           echo "result=$(cat "$RUNNER_TEMP/canary/status" 2>/dev/null || echo failed)" >> "$GITHUB_OUTPUT"
           exit $status
+
+      # The record machines read, on its own branch (never main).
+      - name: Publish verified Nixpkgs revisions
+        if: always()
+        run: |
+          # Nothing to publish when nothing new verified or the canary stopped early.
+          versions="$(cat "$RUNNER_TEMP/canary/verified" 2>/dev/null || true)"
+          versions="${versions//$'\n'/}"
+          [ -n "$versions" ] || exit 0
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          dir="$RUNNER_TEMP/nixpkgs-verified"
+          if git fetch --quiet origin nixpkgs-verified; then
+            git worktree add --quiet -B nixpkgs-verified "$dir" FETCH_HEAD
+          else
+            git worktree add --quiet --orphan -b nixpkgs-verified "$dir"
+          fi
+          mkdir -p "$dir/nixpkgs"
+          cp "$RUNNER_TEMP/verified.json" "$dir/nixpkgs/verified.json"
+          git -C "$dir" add nixpkgs/verified.json
+          git -C "$dir" commit --quiet -m "Verify Nixpkgs for Cybex OS $versions"
+          git -C "$dir" push --quiet origin nixpkgs-verified
 
       - name: Report the result
         if: always()
