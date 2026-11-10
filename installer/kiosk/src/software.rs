@@ -5,8 +5,10 @@
 use crate::protocol::{Draft, Profile, Software, SoftwareSummary};
 
 /// Software that is always installed. Proprietary ones need that switch.
+/// Google Chrome is the default browser with them, Firefox without; the strip
+/// has room for "Chrome" only.
 const ALWAYS: [(&str, bool); 14] = [
-    ("Brave", true),
+    ("Chrome", true),
     ("Firefox", false),
     ("Files", false),
     ("Text Editor", false),
@@ -259,10 +261,12 @@ mod tests {
 
     #[test]
     fn proprietary_applications_decide_what_is_always_included() {
-        assert!(always_included(true).starts_with("Brave · Firefox"));
+        assert!(always_included(true).starts_with("Chrome · Firefox"));
         assert!(always_included(true).contains("Claude Code · Codex"));
         let free = always_included(false);
-        assert!(!free.contains("Brave") && !free.contains("1Password") && !free.contains("Claude Code"));
+        assert!(free.starts_with("Firefox"));
+        assert!(!free.contains("Chrome") && !free.contains("1Password") && !free.contains("Claude Code"));
+        assert!(!always_included(true).contains("Brave"), "Brave is an option in Software, not included");
         assert!(free.contains("Codex · Wiz assistant"));
     }
 }

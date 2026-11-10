@@ -215,8 +215,11 @@ Tailscale, local network discovery, connected desktop widgets and proprietary
 applications. Docker and Podman follow Development in and out; a switch flipped
 afterwards is kept. The assistant is always included. Its `software.packages`
 are the chosen profiles' app attributes, minus the apps turned off and, without
-proprietary applications, minus the unfree apps and Steam. Claude Code, Brave
-and 1Password are then not installed either; Codex still is. The worker
+proprietary applications, minus the unfree apps and Steam. Claude Code, Google
+Chrome and 1Password are then not installed either; Codex still is, and Firefox
+is the default browser instead of Chrome. The strip under the cards lists what
+every installation gets, Chrome first with proprietary applications. Brave
+Origin is an option in Software's browser picker. The worker
 validates the packages like Software does (Nixpkgs attribute paths, at most 512,
 distinct) and writes them to the machine's `local/software.json`. Software lists
 them as added by you, and they can be removed there.

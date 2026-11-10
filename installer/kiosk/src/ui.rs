@@ -663,7 +663,7 @@ impl App {
                 ..row(2, key, name.clone(), detail.clone())
             });
             if key == "proprietary" && !proprietary {
-                let mut note = row(3, "", "Off: unfree apps and Steam are left out, and Claude Code, Brave and 1Password aren't installed. Codex still is.".into(), String::new());
+                let mut note = row(3, "", "Off: unfree apps and Steam are left out, and Claude Code, Chrome and 1Password aren't installed. Codex still is.".into(), String::new());
                 note.warn = true;
                 rows.push(note);
             }
