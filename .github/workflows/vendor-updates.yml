@@ -1,11 +1,13 @@
 name: Vendor updates
 
 # Keeps the vendor downloads Cybex OS pins itself current (scripts/vendor-pins).
-# Daily: when Brave Origin has a newer stable release, update the pin, build
-# it, run the source tests and its 1Password browser check, then release it to
-# the beta channel (release/automatic). Promotion to stable stays a person's
-# decision. Pins that need review are listed in a "vendor-pins-behind" issue;
-# a failed run opens a "vendor-updates" issue.
+# Daily: when Brave Origin, Codex or Claude Code has a newer release, update
+# every such pin, build them, run the source tests and each pin's own checks
+# (Brave's 1Password browser check, the agent CLIs' check), then release them
+# together to the beta channel (release/automatic). Promotion to stable stays
+# a person's decision. A failed check releases none of them. Pins that need
+# review are listed in a "vendor-pins-behind" issue; a failed run opens a
+# "vendor-updates" issue.
 on:
   schedule:
     - cron: "41 5 * * *"
@@ -19,6 +21,10 @@ on:
         description: Run every check with the current pins even when nothing is behind (never publishes)
         type: boolean
         default: false
+      pins:
+        description: Only these automatic pins (space-separated names; empty for all)
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -48,28 +54,36 @@ jobs:
           python3 -I -B scripts/vendor-pins status --json > "$RUNNER_TEMP/status.json"
           python3 -I -B scripts/vendor-pins status --markdown > "$RUNNER_TEMP/report.md"
           cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
-          python3 -I - "$RUNNER_TEMP/status.json" >> "$GITHUB_OUTPUT" <<'EOF'
+          python3 -I - "$RUNNER_TEMP/status.json" "$PINS" >> "$GITHUB_OUTPUT" <<'EOF'
           import json, sys
           rows = json.load(open(sys.argv[1]))
           auto = [row for row in rows if row['mode'] == 'auto']
-          behind = [row for row in auto if row['behind']]
-          print('name=' + (behind[0]['name'] if behind else ''))
-          print('rehearsal=' + (auto[0]['name'] if auto else ''))
+          wanted = sys.argv[2].split()
+          unknown = sorted(set(wanted) - {row['name'] for row in auto})
+          if unknown:
+              sys.exit('not automatic pins: ' + ' '.join(unknown))
+          auto = [row for row in auto if not wanted or row['name'] in wanted]
+          print('names=' + ' '.join(row['name'] for row in auto if row['behind']))
+          print('rehearsal=' + ' '.join(row['name'] for row in auto))
           print('review=' + ('yes' if any(row['behind'] for row in rows if row['mode'] == 'report') else ''))
           EOF
+        env:
+          PINS: ${{ inputs.pins }}
 
-      - name: Update the pin
-        if: steps.pins.outputs.name != ''
-        run: python3 -I -B scripts/vendor-pins update "${{ steps.pins.outputs.name }}" | tee "$RUNNER_TEMP/change.json"
+      - name: Update the pins
+        if: steps.pins.outputs.names != ''
+        run: python3 -I -B scripts/vendor-pins update ${{ steps.pins.outputs.names }} | tee "$RUNNER_TEMP/changes.json"
 
       - name: Select the checks
         id: plan
-        if: steps.pins.outputs.name != '' || inputs.rehearse
+        if: steps.pins.outputs.names != '' || inputs.rehearse
         run: |
-          python3 -I - "$RUNNER_TEMP/status.json" "${{ steps.pins.outputs.name || steps.pins.outputs.rehearsal }}" >> "$GITHUB_OUTPUT" <<'EOF'
+          python3 -I - "$RUNNER_TEMP/status.json" "${{ steps.pins.outputs.names || steps.pins.outputs.rehearsal }}" >> "$GITHUB_OUTPUT" <<'EOF'
           import json, sys
-          row = next(row for row in json.load(open(sys.argv[1])) if row['name'] == sys.argv[2])
-          print('checks=' + ' '.join('.#' + check for check in row['checks']))
+          names = sys.argv[2].split()
+          rows = [row for row in json.load(open(sys.argv[1])) if row['name'] in names]
+          checks = dict.fromkeys(check for row in rows for check in row['checks'])
+          print('checks=' + ' '.join('.#' + check for check in checks))
           EOF
 
       - name: Free disk space for the VM check
@@ -106,13 +120,13 @@ jobs:
         run: nix build --no-link -L ${{ steps.plan.outputs.checks }}
 
       - name: Release to beta
-        if: steps.pins.outputs.name != '' && (github.event_name == 'schedule' || inputs.publish)
+        if: steps.pins.outputs.names != '' && (github.event_name == 'schedule' || inputs.publish)
         run: |
           # The checks may leave untracked files; this checkout is disposable.
           git clean -ffdxq
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          release/automatic "$RUNNER_TEMP/change.json"
+          release/automatic "$RUNNER_TEMP/changes.json"
 
       - name: Report pins that need review
         if: always() && steps.pins.outcome == 'success'
@@ -141,8 +155,8 @@ jobs:
           {
             echo "The vendor-updates workflow failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo
-            if [ -f "$RUNNER_TEMP/change.json" ]; then
-              echo "Attempted update:"; echo; echo '```json'; cat "$RUNNER_TEMP/change.json"; echo '```'; echo
+            if [ -f "$RUNNER_TEMP/changes.json" ]; then
+              echo "Attempted updates:"; echo; echo '```json'; cat "$RUNNER_TEMP/changes.json"; echo '```'; echo
             fi
             echo "Nothing was released. Beta and stable machines keep the current pins."
           } > "$RUNNER_TEMP/failure.md"

@@ -25,7 +25,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
 # Machine configurations a release ships: the default VM/installation set,
-# the full default application selection (with Brave Origin, ChatGPT, Steam),
+# the full default application selection (with Google Chrome, ChatGPT, Steam),
 # the XPS stack and the NVIDIA driver.
 TARGETS = ['product', 'system', 'xps-system', 'nvidia-evaluation']
 # The stable branch that follows the current one. NixOS 26.11 is planned for

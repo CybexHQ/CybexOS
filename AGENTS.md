@@ -81,8 +81,9 @@ for it. An ISO follows the ISO rules below.
   Publishing with `--stable` and promoting each need the owner's explicit
   decision.
 - Never fix stable from a maintenance branch: fix forward on `main`.
-- The vendor-updates workflow publishes to beta on its own: a verified Brave
-  Origin update (owner's decision, 2026-11-07; see
+- The vendor-updates workflow publishes to beta on its own: verified Brave
+  Origin, Codex and Claude Code updates, one release per run (owner's
+  decisions, 2026-11-07 for Brave Origin and 2026-11-10 for the agent CLIs; see
   [docs/releasing.md](docs/releasing.md#automatic-vendor-updates)). It pushes
   `Update … to …` and `Prepare Cybex OS X.Y.Z release` commits to `main` as
   github-actions[bot], so fetch before branching and before choosing a version.
