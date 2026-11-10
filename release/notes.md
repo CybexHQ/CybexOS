@@ -1,9 +1,11 @@
-# Cybex OS 1.0.27
+# Cybex OS 1.0.28
 
-A new Cybex OS release no longer waits for NixOS packages. When NixOS hasn't finished building some of its newer packages yet, Software Update now prepares the Cybex OS release on its own, on the packages your computer runs now. The newer NixOS packages follow once NixOS has built them.
+Screenshots now use Omasnap, the screenshot tool Omarchy uses. Press Print or Super+` and drag out an area, click a window, or click outside every window for the whole screen. The screen holds still while you choose, the size shows beside the pointer, and Tab, R and Ctrl+A give you fixed shapes, your last area and the whole screen. Press the shortcut again to close it.
 
-While newer NixOS packages are only waiting for NixOS, Software Update, Settings and the Control Center now say your system is up to date, with one short line that the packages follow once they are built. There is no warning, update badge or list of package names, because there is nothing for you to do.
+Every screenshot is still saved in ~/Pictures/Screenshots and copied to the clipboard. A preview now stays in the corner for a few seconds: drag it into an app to attach it, or hover it to copy it again, pin it on top of your windows or edit it. Shift+Print still saves the whole screen at once, with a notification you can click to edit it.
 
-On computers that log in automatically after unlocking the disk, a NixOS package update no longer waits forever for the Cybex OS encryption check. That check is part of Cybex OS and is now built on your computer like Cybex OS's other parts.
+The new editor replaces Satty. Arrows, shapes, text and highlights stay movable after you draw them, and it can redact, crop, cut out a band, read text and add a background. Its buttons and outlines follow your desktop's colours. To edit an image you already have, run `omasnap FILE`.
+
+Scrolling screenshots (Alt+Print) can now scroll the page for you, and you finish them with Done or Enter. The red menubar indicator no longer appears for them.
 
 This is a source update with no new ISO. Installation, boot, physical hardware and staged-updater qualification are separate from source tests and package builds.
