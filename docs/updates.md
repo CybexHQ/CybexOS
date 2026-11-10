@@ -438,9 +438,12 @@ them, Xwayland without a font path, and every glibc locale. What builds on the
 computer by design:
 
 - Cybex OS's own packages and hardware stacks, and its NetworkManager
-  Libreswan path fix;
+  Libreswan path fix. These include Codex and Claude Code, the agent CLIs
+  Wiz drives: Cybex OS packages the vendors' own release builds and keeps
+  them current itself ([vendor updates](releasing.md#automatic-vendor-updates)),
+  so they do not wait for NixOS's build farm and do not update themselves;
 - unfree vendor downloads, which NixOS never caches: Brave Origin,
-  1Password, Spotify, ChatGPT, Claude Code, Steam and NVIDIA's userspace,
+  1Password, Spotify, ChatGPT, Steam and NVIDIA's userspace,
   with NVIDIA's 32-bit EGL platform libraries for Steam;
 - out-of-tree kernel modules (NVIDIA, the XPS camera, the medium's ZFS);
 - the machine's own configuration: initrd, PAM, setuid wrappers, dconf.
