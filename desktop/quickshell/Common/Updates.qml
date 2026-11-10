@@ -64,12 +64,17 @@ Singleton {
     readonly property bool runActive: Helpers.active(deployment.state) || requestPending
     readonly property string runState: runActive ? "running" : deployment.state === "done" ? "done"
         : ["failed", "interrupted", "rolled-back", "recovery-failed"].includes(deployment.state) ? "failed" : "idle"
-    readonly property bool hasUpdates: sourcesLoaded && [sources.upstream, sources.cybexos, sources.firmware || {}].some(source => source.state === "available")
+    // Packages NixOS hasn't built yet are no update to offer (nixosPending).
+    readonly property bool hasUpdates: sourcesLoaded && !nixosPending
+        && [sources.upstream, sources.cybexos, sources.firmware || {}].some(source => source.state === "available")
     readonly property var waitingPackages: Helpers.waitingPackages(deployment)
     // Waiting for a Cybex OS release that supports the new Nixpkgs, or null.
     readonly property var incompatible: Helpers.incompatible(deployment)
     readonly property bool held: Helpers.held(deployment)
     readonly property string holdTarget: Helpers.holdTarget(deployment, sourcesLoaded ? sources : null)
+    // Only newer NixOS packages, and NixOS hasn't built them all yet: up to
+    // date until it has. Software Update says so in one quiet line.
+    readonly property bool nixosPending: Helpers.quietHold(deployment, sourcesLoaded ? sources : null, holdTarget)
     readonly property bool showIndicator: !Helpers.firmwareRestart(deployment) && Helpers.indicator(hasUpdates, deployment.state, holdTarget)
     readonly property string selectedScope: sourcesLoaded ? Helpers.scope(sources, selectedSources) : ""
     readonly property var actions: Helpers.capabilities(deployment, runActive || !statusLoaded || statusError !== "", available, selectedScope)
@@ -99,14 +104,15 @@ Singleton {
     readonly property string page: Helpers.page({statusLoaded: statusLoaded, statusError: statusError,
         sourcesLoaded: sourcesLoaded, hasUpdates: hasUpdates, error: error, state: deployment.state,
         request: deployment.request, requestAction: requestAction, automatic: automatic,
-        waitingForPackages: held, holdTarget: holdTarget,
+        waitingForPackages: held, quietHold: nixosPending, holdTarget: holdTarget,
         firmwareRestart: Helpers.firmwareRestart(deployment)})
     readonly property string problem: Helpers.problem({statusLoaded: statusLoaded, state: deployment.state})
     readonly property var review: Helpers.summary(deployment)
     readonly property bool upstreamOnlyAvailable: deployment.state === "failed" && deployment.scope === "both"
         && sourcesLoaded && sources.upstream.state === "available"
     readonly property string error: [...new Set([requestError, statusError, checkError,
-        Helpers.replacementRequest(deployment) ? "" : (deployment.request || {}).error || "", deployment.error || "",
+        Helpers.replacementRequest(deployment) || nixosPending ? "" : (deployment.request || {}).error || "",
+        nixosPending ? "" : deployment.error || "",
         sources.error || "", sources.upstream.error || "", sources.cybexos.error || "",
         (sources.firmware || {}).error || "", (deployment.firmware || {}).error || ""].filter(value => value))].join("\n\n")
     readonly property string projectNotes: ready || rebootRecommended ? deployment.notes || "" : sources.cybexos.notes || ""
@@ -116,7 +122,8 @@ Singleton {
         : sources.cybexos.state !== "ahead" ? sources.cybexos.available || "" : ""
     readonly property string checkedLabel: checkedAt ? "Checked " + Qt.formatTime(checkedAt, "HH:mm") : "Not checked"
     readonly property string scopeLabel: Helpers.scopeLabel(ready || runActive || rebootRecommended ? deployment.scope : selectedScope)
-    readonly property bool overviewVisible: Helpers.overviewVisible(hasUpdates, deployment, error)
+    readonly property bool overviewVisible: Helpers.overviewVisible(hasUpdates,
+        nixosPending ? { request: deployment.request } : deployment, error)
     readonly property string summary: deployment.available === false ? deployment.phase || "System updates are available after installation."
         : requester.busy ? "Waiting for authorization…"
         : Helpers.active(deployment.state) ? runPhaseLabel
@@ -126,6 +133,7 @@ Singleton {
         : deployment.state === "recovery-failed" ? "Recovery needs attention"
         : deployment.state === "stale" ? "The configuration changed. Prepare again."
         : page === "waiting" ? (incompatible ? "Waiting for a Cybex OS update" : "Waiting for NixOS packages")
+        : nixosPending ? "Your system is up to date"
         : ["failed", "interrupted"].includes(deployment.state) ? "The update did not finish"
         : hasUpdates ? "System updates available"
         : busy ? "Checking for system updates…"

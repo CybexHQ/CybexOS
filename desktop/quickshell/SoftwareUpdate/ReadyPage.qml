@@ -135,7 +135,10 @@ Item {
             // and an attempt that did not finish says why here.
             Rectangle {
                 objectName: "updateNewerRelease"
-                visible: root.service.newerRelease !== "" || root.service.replacement !== null
+                // Newer packages NixOS hasn't built yet need nothing from
+                // the person: preparing again would only wait again.
+                visible: root.service.newerRelease !== ""
+                    || (root.service.replacement !== null && root.service.replacement.state !== "waiting")
                 width: parent.width
                 height: Math.max(newer.implicitHeight, prepareAgain.height) + Theme.scaled(24)
                 radius: Theme.chipRadius + 3

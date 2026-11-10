@@ -252,6 +252,28 @@ test("queued requests show their action before the worker reports a phase", () =
     assert.equal(page({ state: "ready", request: { state: "failed", action: "apply" } }), "ready");
 });
 
+test("NixOS packages NixOS hasn't built yet read as up to date until something is installable", () => {
+    const held = {state: "failed", changeKind: "update", notPrebuilt: ["codex-0.167.0"], inputs: {
+        nixpkgs: {rev: "nixpkgs-revision"}, cybexos: {rev: "cybexos-revision"}}};
+    const sources = {upstream: {state: "available", available: "nixpkgs-revision"}, cybexos: {state: "current"}};
+    assert.equal(H.quietHold(held, sources, H.holdTarget(held, sources)), true);
+    assert.equal(H.quietHold(held, null, H.holdTarget(held, null)), true, "before the first check");
+    // A release, firmware or newer packages are still updates to offer.
+    for (const changed of [{...sources, cybexos: {state: "available", revision: "cybexos-revision"}},
+        {...sources, upstream: {state: "available", available: "newer-nixpkgs"}},
+        {...sources, firmware: {state: "available"}}])
+        assert.equal(H.quietHold(held, changed, H.holdTarget(held, changed)), false);
+    // Waiting for a Cybex OS release that supports the packages is explained.
+    const incompatible = {...held, notPrebuilt: null, incompatible: {origin: "cybexos", message: "gone"}};
+    assert.equal(H.quietHold(incompatible, sources, H.holdTarget(incompatible, sources)), false);
+    assert.equal(H.quietHold({...held, state: "ready"}, sources, "same"), false);
+    const quiet = {state: "failed", waitingForPackages: true, quietHold: true, holdTarget: "same", hasUpdates: false};
+    assert.equal(page({...quiet, sourcesLoaded: true}), "current");
+    assert.equal(page({...quiet, sourcesLoaded: false}), "checking");
+    assert.equal(page({...quiet, sourcesLoaded: true, request: {state: "queued", action: "stage"}}), "preparing");
+    assert.equal(H.overviewVisible(false, {request: null}, ""), false);
+});
+
 test("prebuilt refusals wait without masking an active worker or a changed candidate", () => {
     const held = {state: "failed", waitingForPackages: true, holdTarget: "same", hasUpdates: true};
     assert.equal(page(held), "waiting");

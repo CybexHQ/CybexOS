@@ -1497,6 +1497,8 @@ var MESSAGES = {
     "New version": "Nieuwe versie",
     "New workspace": "Nieuw werkblad",
     "Newer NixOS packages are available": "Nieuwere NixOS-pakketten zijn beschikbaar",
+    "Newer NixOS packages are prepared for you once NixOS has finished building them.": "Nieuwere NixOS-pakketten worden voor je voorbereid zodra NixOS ze heeft gebouwd.",
+    "Newer NixOS packages can be prepared once NixOS has finished building them.": "Nieuwere NixOS-pakketten kunnen worden voorbereid zodra NixOS ze heeft gebouwd.",
     "Next": "Volgende",
     "Next layout": "Volgende indeling",
     "Next month": "Volgende maand",

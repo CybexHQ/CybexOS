@@ -11,7 +11,8 @@ import uuid
 from . import automatic
 from . import channel as channels
 from .common import Failure, atomic, digest, locked, read
-from .engine import Engine, config_digest
+from .engine import Engine, IncompatibleNixpkgs, NotPrebuilt, config_digest
+from .trust import version
 
 LIVE_MARKER = Path('/etc/cybexos/installer')
 PKEXEC = '/run/wrappers/bin/pkexec'
@@ -154,6 +155,40 @@ def update_status(state=Path('/var/lib/cybexos'), working=Path('/etc/nixos'), po
     return status
 
 
+def stage_update(engine, scope, identifier):
+    """Stage `scope`; a combined update NixOS holds back brings its release alone.
+
+    New NixOS packages that NixOS has not built yet, or that need a newer
+    Cybex OS, must not keep a published Cybex OS release from this computer.
+    The release is prepared on the packages it runs now instead, and the
+    newer packages follow once NixOS has them (automatic.prepare).
+    """
+    try:
+        engine.stage(scope, request_id=identifier)
+        return
+    except (NotPrebuilt, IncompatibleNixpkgs) as error:
+        if not release_alone(engine, scope, error):
+            raise
+    engine.stage('cybexos', request_id=identifier)
+
+
+def release_alone(engine, scope, error):
+    """Whether a held combined update leaves a newer release to prepare alone."""
+    held = not error.kernel if isinstance(error, NotPrebuilt) else error.held
+    if scope != 'both' or not held:
+        return False
+    try:
+        candidate = engine.channel()
+        if version(candidate['version']) <= version(read(engine.release)['version']):
+            return False
+    except (Failure, KeyError, TypeError):
+        return False
+    # Preparing again kept the prepared update, which may hold this release.
+    current = read(engine.status_path, {}) or {}
+    return not (current.get('state') == 'ready' and current.get('scope') in ('cybexos', 'both')
+                and current.get('availableVersion') == candidate['version'])
+
+
 def run_update(engine, identifier):
     if not re.fullmatch('[0-9a-f]{32}', identifier):
         raise Failure('Invalid request identifier')
@@ -170,7 +205,7 @@ def run_update(engine, identifier):
             raise Failure('Invalid supervised update payload')
         action, values = payload['action'], payload['arguments']
         update_arguments(action, values)
-        if action == 'stage': engine.stage(values[0], request_id=identifier)
+        if action == 'stage': stage_update(engine, values[0], identifier)
         elif action == 'apply': engine.apply(*values)
         elif action == 'rollback': engine.rollback(values[0] if values else None)
         elif action == 'confirm': engine.confirm()
