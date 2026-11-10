@@ -164,6 +164,8 @@ fn scenarios() -> Vec<(&'static str, Value, Setup)> {
             "message": "Building and downloading packages"}), none),
         ("13-done", json!({"phase": "complete", "stage": 6, "diskTouched": true,
             "result": {"username": "ada", "hostname": "ada-cybexos", "encrypted": true}}), none),
+        ("13a-done-unencrypted", json!({"phase": "complete", "stage": 6, "diskTouched": true,
+            "result": {"username": "ada", "hostname": "ada-cybexos", "encrypted": false}}), none),
         ("14-stopped-secure-boot", json!({"phase": "error", "firmware": {"uefi": true, "secureBoot": true},
             "error": "Secure Boot is enabled. A signed installer and locally enrolled signing keys are required; it will not be disabled."}), none),
         ("15-failed", json!({"phase": "error", "diskTouched": true,
