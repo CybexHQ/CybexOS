@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-Press `Super+K`, or use **Keyboard shortcuts** in the Control Panel, to open
+Press `Super+K`, or use **Keyboard shortcuts** in the Control Center, to open
 the shortcut sheet. It lists the keybindings Hyprland actually has, read with
 `hyprctl binds -j` each time the sheet opens. There is no separate list to
 fall out of date, and a failed read is shown as an error.

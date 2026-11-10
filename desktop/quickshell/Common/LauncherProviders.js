@@ -301,7 +301,7 @@ var BUILTIN_ACTIONS = [
     {
         id: "power",
         verb: "system",
-        name: "Open Control Panel",
+        name: "Open Control Center",
         subtitle: "Lock, suspend, log out, restart or shut down",
         keywords: ["session", "shutdown", "restart", "suspend"],
         glyph: "power_settings_new"

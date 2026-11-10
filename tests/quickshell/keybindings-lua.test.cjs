@@ -33,8 +33,11 @@ test('defaults preserve the baseline with the reviewed dictation changes, includ
         // Keep the historical fixture intact. Dictation now delegates language
         // selection to Settings and routes all three keys through Quickshell,
         // with no binding allowed on the lock screen (8f3239cd), and
-        // Super+Ctrl+Shift+X opens its history beside Super+Ctrl+X.
+        // Super+Ctrl+Shift+X opens its history beside Super+Ctrl+X. The
+        // Control Panel took the shell's one name, Control Center (2026-11-10).
         const expected = old.flatMap(row => {
+            if (row.options.description === 'Shell: Control Panel')
+                return [{...row, options: {...row.options, description: 'Shell: Control Center'}}];
             if (row.options.description === 'Dictation: Dictate in Dutch') return [];
             if (row.options.description === 'Dictation: Dictate in English') {
                 const toggle = {
