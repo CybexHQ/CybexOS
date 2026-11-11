@@ -7,6 +7,7 @@ tests/model-usage. The settings check holds Common/SettingsHelpers.js to the
 vendored manifest: the same keys and defaults, and every declared bound and
 option accepted as is.
 """
+import contextlib
 import os
 import json
 from pathlib import Path
@@ -82,7 +83,7 @@ def quickshell(path: Path, seconds: int, env: dict) -> tuple[int, str]:
 def main() -> None:
     subprocess.run(["node", "-e", SETTINGS_CHECK, str(HELPERS), str(TESTS / "manifest.json")],
                    check=True)
-    with tempfile.TemporaryDirectory(prefix="cybex-model-usage-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="cybex-model-usage-") as temporary, contextlib.ExitStack() as cleanup:
         package = Path(temporary) / "model-usage"
         shutil.copytree(RUNTIME, package)
         integration = ROOT / 'scripts/model-usage/integration.patch'
@@ -109,12 +110,18 @@ def main() -> None:
         # an explicitly stopped service) also exercises the real QML lifetime.
         if shutil.which("qs") and subprocess.run(["pgrep", "-x", "qs"],
                 stdout=subprocess.DEVNULL).returncode != 0:
+            # Quickshell crashes without a runtime directory it can write,
+            # and the CI runner's /run/user/<uid> doesn't exist. Its own one
+            # stays short enough for Quickshell's Unix IPC socket.
+            runtime = tempfile.mkdtemp(prefix="cxu-", dir="/tmp")
+            cleanup.callback(shutil.rmtree, runtime, ignore_errors=True)
             harness = Path(temporary) / "live"
             harness.mkdir()
             shutil.copyfile(package / "tests/qml/live-shell.qml", harness / "shell.qml")
             marker = harness / "events.jsonl"
             code, output = quickshell(harness, 10, {
-                **env, "QT_QPA_PLATFORM": "offscreen", "QT_LOGGING_RULES": "qml.debug=true",
+                **env, "XDG_RUNTIME_DIR": runtime, "QT_QPA_PLATFORM": "offscreen",
+                "QT_LOGGING_RULES": "qml.debug=true",
                 "MODEL_USAGE_REPO_URL": package.as_uri(),
                 "MODEL_USAGE_FAKE_LIVE": str(package / "tests/fake_live.py"),
                 "MODEL_USAGE_LIVE_MARKER": str(marker)})
@@ -131,7 +138,8 @@ def main() -> None:
             shutil.copytree(ROOT / 'tests/fixtures/model-usage-shared', shared)
             requests = shared / 'requests.jsonl'
             code, output = quickshell(shared, 12, {
-                **env, "QT_QPA_PLATFORM": "offscreen", "MODEL_USAGE_REPO_URL": package.as_uri(),
+                **env, "XDG_RUNTIME_DIR": runtime, "QT_QPA_PLATFORM": "offscreen",
+                "MODEL_USAGE_REPO_URL": package.as_uri(),
                 "MODEL_USAGE_FAKE_REQUEST": str(shared / 'request.py'),
                 "MODEL_USAGE_REQUEST_MARKER": str(requests)})
             if code or any(error in output for error in
