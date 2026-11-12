@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Fetch the vendor downloads a CI build needs before building, robustly.
+
+Unfree vendor downloads (the Spotify snap, Chrome's package, ...) are not on
+cache.nixos.org, so every CI run downloads them from the vendor. A vendor host
+that GitHub's runners cannot reach for a while (api.snapcraft.io from
+2026-11-11) would fail the whole run. This fetches those downloads first:
+from the workflow's cache when it holds them, else from the vendor with a few
+spaced attempts, and keeps what it fetched for the next run.
+
+  scripts/vendor-downloads plan --out FILE INSTALLABLE...
+      the fixed-output derivations the installables would build (downloads
+      nothing can substitute); prints `key=vendor-downloads-<hash>` for
+      $GITHUB_OUTPUT, the cache key of exactly that set
+  scripts/vendor-downloads fetch --plan FILE --cache DIR
+      make each planned download valid in the Nix store: from DIR, else from
+      the vendor (three attempts, minutes apart); then leave exactly the
+      planned downloads in DIR
+
+The cache never vouches for content: a cached file enters the store with
+`nix-store --add-fixed`, whose store path follows from the file's own hash,
+so a file that does not match the derivation's pinned hash is not used.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+NIX = ['nix', '--extra-experimental-features', 'nix-command flakes']
+# Derive([("out","/nix/store/…-name","sha512","<hex>")],…: a fixed output.
+FIXED = re.compile(r'^Derive\(\[\("out","(/nix/store/[^"]+)","(r:)?(\w+)","([0-9a-f]+)"\)\]')
+# Waits before the second and third attempt: an unreachable vendor host has
+# come back within minutes on another day, never within curl's own retries.
+WAITS = [int(s) for s in os.environ.get('VENDOR_DOWNLOAD_WAITS', '120 300').split()]
+
+
+def will_build(installables):
+    """Derivations `nix build` would build for INSTALLABLES (not substitutable)."""
+    step = subprocess.run([*NIX, 'build', '--dry-run', '--no-link', *installables],
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if step.returncode:
+        sys.stderr.write(step.stderr)
+        sys.exit(step.returncode)
+    drvs, section = [], None
+    for line in step.stderr.splitlines():
+        if not line.startswith(' '):
+            section = 'build' if 'will be built' in line else 'other'
+        elif section == 'build' and line.strip().endswith('.drv'):
+            drvs.append(line.strip())
+    return drvs
+
+
+def fixed_output(drv):
+    """{drv, path, name, algo, recursive} for a fixed-output derivation, else None."""
+    match = FIXED.match(Path(drv).read_text(errors='replace'))
+    if not match:
+        return None
+    path, recursive, algo, _ = match.groups()
+    return {'drv': drv, 'path': path, 'name': path.rsplit('/', 1)[1].split('-', 1)[1],
+            'algo': algo, 'recursive': bool(recursive)}
+
+
+def plan(args):
+    downloads = sorted(filter(None, map(fixed_output, will_build(args.installables))), key=lambda d: d['path'])
+    Path(args.out).write_text(json.dumps(downloads, indent=1) + '\n')
+    for d in downloads:
+        print(f"will download {d['name']}", file=sys.stderr)
+    digest = hashlib.sha256('\n'.join(d['path'] for d in downloads).encode()).hexdigest()[:20]
+    print(f'key=vendor-downloads-{digest}')
+
+
+def valid(path):
+    return subprocess.run(['nix-store', '--check-validity', path], stderr=subprocess.DEVNULL).returncode == 0
+
+
+def from_cache(d, cache):
+    """Add DIR's copy of D to the store; True when it lands on D's own path."""
+    copy = cache / Path(d['path']).name / d['name']
+    if not copy.exists():
+        return False
+    flags = ['--recursive'] if d['recursive'] else []
+    step = subprocess.run(['nix-store', '--add-fixed', *flags, d['algo'], str(copy)],
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if step.stdout.strip() != d['path']:
+        print(f"cached {d['name']} does not match its pinned hash; downloading it", file=sys.stderr)
+        shutil.rmtree(copy.parent)
+        return False
+    print(f"{d['name']}: from the cache", file=sys.stderr)
+    return True
+
+
+def download(missing):
+    """Build the missing downloads, retrying when a vendor host could not be reached."""
+    for attempt, wait in enumerate([0, *WAITS], start=1):
+        if wait:
+            print(f'waiting {wait} s before attempt {attempt}', file=sys.stderr, flush=True)
+            time.sleep(wait)
+        step = subprocess.run([*NIX, 'build', '--no-link', '--keep-going', '-L',
+                               *(d['drv'] + '^out' for d in missing)], text=True, stderr=subprocess.PIPE)
+        sys.stderr.write(step.stderr)
+        missing = [d for d in missing if not valid(d['path'])]
+        if not missing:
+            return []
+        # Only an unreachable host is worth waiting for; a hash mismatch is not.
+        if 'from any mirror' not in step.stderr:
+            break
+    return missing
+
+
+def fetch(args):
+    downloads = json.loads(Path(args.plan).read_text())
+    cache = Path(args.cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    missing = [d for d in downloads if not valid(d['path']) and not from_cache(d, cache)]
+    failed = download(missing) if missing else []
+    # Keep exactly this plan's downloads, so the cache does not grow.
+    keep = {Path(d['path']).name for d in downloads}
+    for entry in cache.iterdir():
+        if entry.name not in keep:
+            shutil.rmtree(entry)
+    for d in downloads:
+        target = cache / Path(d['path']).name
+        if valid(d['path']) and not target.exists():
+            target.mkdir()
+            subprocess.run(['cp', '-a', '--no-preserve=ownership', d['path'], str(target / d['name'])], check=True)
+            # Store copies are read-only; the next run must be able to prune them.
+            subprocess.run(['chmod', '-R', 'u+w', str(target)], check=True)
+    for d in failed:
+        print(f"::error::{d['name']} could not be downloaded from its vendor after {1 + len(WAITS)} attempts",
+              file=sys.stderr)
+    return 1 if failed else 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='command', required=True)
+    p = sub.add_parser('plan')
+    p.add_argument('--out', required=True)
+    p.add_argument('installables', nargs='+')
+    f = sub.add_parser('fetch')
+    f.add_argument('--plan', required=True)
+    f.add_argument('--cache', required=True)
+    args = parser.parse_args()
+    if args.command == 'plan':
+        plan(args)
+        return 0
+    return fetch(args)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

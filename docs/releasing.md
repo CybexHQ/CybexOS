@@ -159,6 +159,14 @@ daily on a GitHub-hosted runner:
   release reaches beta only; promoting it stays a person's decision. A failed
   run releases none of them and keeps a `vendor-updates` issue open with the
   attempted updates.
+
+  Before the package checks, `scripts/vendor-downloads` fetches the downloads
+  nothing can substitute (unfree vendor files such as the Spotify snap in the
+  1Password check's system): from the workflow's Actions cache when it holds
+  them, else from the vendor, three times a few minutes apart when its host
+  can't be reached (GitHub's runners lost api.snapcraft.io for days from
+  2026-11-11). A cached file enters the Nix store only through its pinned
+  hash. The cache keeps one set, the newest.
 - **T3 Code, Intel LPMd and Omawrite** are reported, not updated: each needs a
   review beyond its checksum (T3 Code's connected-widget bar API, for
   example). While one is behind upstream, a `vendor-pins-behind` issue lists it.
