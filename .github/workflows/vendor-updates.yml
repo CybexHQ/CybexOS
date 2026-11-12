@@ -149,13 +149,7 @@ jobs:
       # One set of vendor downloads is a few gigabytes: keep only the newest.
       - name: Drop superseded vendor-download caches
         if: steps.plan.outputs.checks != '' && steps.downloads-cache.outputs.cache-hit != 'true'
-        env:
-          KEY: ${{ steps.downloads.outputs.key }}
-        run: |
-          old=$(gh cache list --key vendor-downloads- --limit 100 --json key --jq '.[].key' | grep -vxF "$KEY" || true)
-          for key in $old; do
-            gh cache delete "$key" || echo "::warning::The superseded cache $key was not removed."
-          done
+        run: python3 -I -B scripts/vendor-downloads prune --keep "${{ steps.downloads.outputs.key }}"
 
       - name: Package checks
         if: steps.plan.outputs.checks != ''
