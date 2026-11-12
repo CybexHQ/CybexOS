@@ -165,8 +165,10 @@ daily on a GitHub-hosted runner:
   1Password check's system): from the workflow's Actions cache when it holds
   them, else from the vendor, three times a few minutes apart when its host
   can't be reached (GitHub's runners lost api.snapcraft.io for days from
-  2026-11-11). A cached file enters the Nix store only through its pinned
-  hash. The cache keeps one set, the newest.
+  2026-11-11). The daily Nixpkgs canary fetches the same set for the current
+  pins, so whichever runner reaches a vendor host first fills the cache. A
+  cached file enters the Nix store only through its pinned hash. The cache
+  keeps one set, the newest.
 - **T3 Code, Intel LPMd and Omawrite** are reported, not updated: each needs a
   review beyond its checksum (T3 Code's connected-widget bar API, for
   example). While one is behind upstream, a `vendor-pins-behind` issue lists it.

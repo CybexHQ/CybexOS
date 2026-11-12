@@ -141,5 +141,19 @@ class Fetch(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in self.cache.iterdir()), [Path(SNAP).name])
 
 
+class Prune(unittest.TestCase):
+    def test_every_other_vendor_downloads_cache_is_deleted(self):
+        calls = []
+
+        def gh(cmd, **kw):
+            calls.append(cmd)
+            return done(stdout='vendor-downloads-new\nvendor-downloads-old\nvendor-downloads-older\n')
+
+        with mock.patch.object(vd.subprocess, 'run', side_effect=gh):
+            self.assertEqual(vd.prune(types.SimpleNamespace(keep='vendor-downloads-new')), 0)
+        self.assertEqual([c[3] for c in calls if c[:3] == ['gh', 'cache', 'delete']],
+                         ['vendor-downloads-old', 'vendor-downloads-older'])
+
+
 if __name__ == '__main__':
     unittest.main()

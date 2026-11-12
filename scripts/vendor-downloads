@@ -16,6 +16,13 @@ spaced attempts, and keeps what it fetched for the next run.
       make each planned download valid in the Nix store: from DIR, else from
       the vendor (three attempts, minutes apart); then leave exactly the
       planned downloads in DIR
+  scripts/vendor-downloads prune --keep KEY
+      delete the workflows' other vendor-downloads caches (gh), so the
+      repository keeps one set of a few gigabytes
+
+The vendor-updates workflow uses it before its package checks; the daily
+Nixpkgs canary fetches the same set for the current pins, so whichever
+runner reaches a vendor host first fills the cache for both.
 
 The cache never vouches for content: a cached file enters the store with
 `nix-store --add-fixed`, whose store path follows from the file's own hash,
@@ -137,6 +144,18 @@ def fetch(args):
     return 1 if failed else 0
 
 
+def prune(args):
+    listing = subprocess.run(['gh', 'cache', 'list', '--key', 'vendor-downloads-', '--limit', '100',
+                              '--json', 'key', '--jq', '.[].key'], text=True, stdout=subprocess.PIPE)
+    if listing.returncode:
+        print('::warning::The vendor-downloads caches could not be listed.', file=sys.stderr)
+        return 0
+    for key in sorted(set(listing.stdout.split()) - {args.keep}):
+        if subprocess.run(['gh', 'cache', 'delete', key]).returncode:
+            print(f'::warning::The superseded cache {key} was not removed.', file=sys.stderr)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -146,11 +165,13 @@ def main():
     f = sub.add_parser('fetch')
     f.add_argument('--plan', required=True)
     f.add_argument('--cache', required=True)
+    r = sub.add_parser('prune')
+    r.add_argument('--keep', required=True)
     args = parser.parse_args()
     if args.command == 'plan':
         plan(args)
         return 0
-    return fetch(args)
+    return fetch(args) if args.command == 'fetch' else prune(args)
 
 
 if __name__ == '__main__':
