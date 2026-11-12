@@ -27,6 +27,8 @@ on:
         default: ""
 
 permissions:
+  # actions: the vendor-downloads cache drops the entries it replaces.
+  actions: write
   contents: write
   issues: write
 
@@ -114,6 +116,46 @@ jobs:
           nix eval --raw .#packages.x86_64-linux.installer-ui.drvPath > /dev/null
           nix flake check --no-build
           nix develop -c tests/run
+
+      # Unfree vendor downloads (the Spotify snap in the 1Password check's
+      # system) come from the vendors, whose hosts GitHub's runners cannot
+      # always reach: fetch them first, from this workflow's cache when it
+      # has them, else with spaced attempts (scripts/vendor-downloads).
+      - name: Plan the vendor downloads
+        id: downloads
+        if: steps.plan.outputs.checks != ''
+        run: python3 -I -B scripts/vendor-downloads plan --out "$RUNNER_TEMP/downloads.json" ${{ steps.plan.outputs.checks }} >> "$GITHUB_OUTPUT"
+
+      # actions/cache/restore v5.1.0.
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
+        id: downloads-cache
+        if: steps.plan.outputs.checks != ''
+        with:
+          path: ${{ runner.temp }}/vendor-downloads
+          key: ${{ steps.downloads.outputs.key }}
+          restore-keys: vendor-downloads-
+
+      - name: Fetch the vendor downloads
+        if: steps.plan.outputs.checks != ''
+        run: python3 -I -B scripts/vendor-downloads fetch --plan "$RUNNER_TEMP/downloads.json" --cache "$RUNNER_TEMP/vendor-downloads"
+
+      # actions/cache/save v5.1.0.
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25
+        if: steps.plan.outputs.checks != '' && steps.downloads-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/vendor-downloads
+          key: ${{ steps.downloads.outputs.key }}
+
+      # One set of vendor downloads is a few gigabytes: keep only the newest.
+      - name: Drop superseded vendor-download caches
+        if: steps.plan.outputs.checks != '' && steps.downloads-cache.outputs.cache-hit != 'true'
+        env:
+          KEY: ${{ steps.downloads.outputs.key }}
+        run: |
+          old=$(gh cache list --key vendor-downloads- --limit 100 --json key --jq '.[].key' | grep -vxF "$KEY" || true)
+          for key in $old; do
+            gh cache delete "$key" || echo "::warning::The superseded cache $key was not removed."
+          done
 
       - name: Package checks
         if: steps.plan.outputs.checks != ''
