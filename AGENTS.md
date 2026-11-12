@@ -1,24 +1,30 @@
 # Repository agent instructions
 
-<!-- whombat:rules start · written by Whombat: change these rules in Whombat’s Repositories, not here -->
 ## How agents work here
 
-These rules come first. Where the rest of this file says otherwise, follow these. Only the person can allow more, for one Whombat job; firm limits still apply.
-
 - Work in a worktree of your own, on a new branch from `main`; never in this folder itself.
-- While you work, run the quick checks for what you changed here. Before the work lands, commit and push your branch, then start the full check on TheBeast: `gh workflow run nixos.yml --ref <your branch>`. Wait for that run to pass: `gh run list --workflow nixos.yml --branch <your branch> --limit 1` gives its id, and `gh run watch <id> --exit-status` ends with exit code 0 only when it passed.
-- Don’t run the full check here, not even when TheBeast can’t run it: say so instead.
-- When a test fails, run it once more before you treat it as failing.
-- When a check fails, fix it and try again, at most 3 rounds. Never skip or weaken tests to make them pass.
+- When a check fails, fix it and try again, at most 3 rounds.
 - When you change what people see, add before and after screenshots.
-- Wait for every CI check to finish and pass before you finish or deploy.
 - Commit in small commits, merge your branch into `main` here (`git merge --no-ff`) and push `main`.
 - Then deploy it to the development environment.
 - Once your work is merged, remove your worktree and branch.
 - Never deploy to production.
 
-<!-- whombat:rules {"v":2,"rules":{"workIn":"worktree","testing":"focused_then_full","checkWhere":"server","ciWait":"always","finish":"deploy","mergeHow":"local","review":false,"tidy":true,"mainFirst":false,"retryFlaky":true,"oneCheckAtATime":true,"pictures":true,"fixRounds":3,"checkCommand":null,"quickCommand":null,"deployCommand":null,"notes":null,"checkServer":{"id":"chk_6suCHSSC-cHI","needsPush":true}},"server":{"name":"TheBeast","command":"gh workflow run nixos.yml","resultCheck":"image"}} -->
-<!-- whombat:rules end -->
+## Testing (fast testing)
+- After a change, run `fast-test` in the repository folder. It tests only what changed since `main` (commits,
+  staged and unstaged edits, new files): quick tests here on The Dragon, heavy ones (VMs, Nix, databases, wide
+  changes) on The Beast by itself. `fast-test --dry-run` shows what it would run and why.
+- Exit 0 passed, 1 failed, 2 couldn't run (say so; don't run the full suite here instead). When it fails, its output
+  ends with the failing step's last lines; the whole log is in `.git/fast-test/`.
+- Don't run the full test suite and don't wait for GitHub CI. `fast-test --full` runs everything on The Beast, only
+  when someone asks for it.
+- A failing test runs once more before it counts as failing (fast-test does this itself). Never skip or weaken a test
+  to make it pass.
+- Every night The Beast runs the full suite of `main`; failures are reported in the morning.
+- Here every step runs on The Dragon in the dev shell, and there is no `--full` or nightly run yet. The NixOS
+  checks (product, VM, boot, firmware, ISO) run in the manual `nixos.yml` workflow on The Beast's runner, only
+  when someone asks for them.
+
 ## Git workflow
 
 - Direct commits and pushes to `main` are supported. Do not require a pull
@@ -45,9 +51,10 @@ can try it right away:
 1. Implement on a short-lived branch, or in a worktree for larger work. Other
    sessions use this checkout too, and their worktrees are in
    `~/.t3/worktrees/CybexOS`. Commit as above.
-2. Verify quickly with `tests/run` and `nix flake check --no-build`, plus a Nix
-   build of what changed when one exists. Don't run NixOS qualification,
-   installation VMs or an ISO build for this.
+2. Verify with `fast-test` (it runs `tests/run`, the shell's checks and
+   `nix flake check --no-build` as the change needs), plus a Nix build of what
+   changed when one exists. Don't run NixOS qualification, installation VMs or
+   an ISO build for this.
 3. Merge into `main` (`git merge --no-ff <branch>`), check that `HEAD`
    actually moved, delete the branch, and `git push origin main`.
 4. Publish it to beta:

@@ -1,0 +1,38 @@
+{
+  "about": "What `fast-test` runs for a change (see ~/Code/fast-test). Everything here runs on The Dragon in the dev shell. The NixOS checks (product, VM, boot, ISO) stay on the manual nixos.yml workflow on The Beast's runner: run it by hand when someone asks.",
+  "steps": [
+    {
+      "name": "regression",
+      "about": "The source and fixture regression suite.",
+      "unless": ["docs/**", "*.md", "web/**", "release/notes.md", "assets/**", ".github/**"],
+      "run": "nix --extra-experimental-features 'nix-command flakes' develop --command tests/run",
+      "timeout": 20
+    },
+    {
+      "name": "shell",
+      "about": "QML lint and the shell's runtime tests, when the Quickshell config changed.",
+      "when": ["desktop/quickshell/**", "tests/qml-lint", "tests/user-plugins.py", "tests/media-player.py"],
+      "run": "nix --extra-experimental-features 'nix-command flakes' develop --command sh -c 'tests/qml-lint && python3 -B tests/user-plugins.py && python3 -B tests/media-player.py'",
+      "timeout": 20
+    },
+    {
+      "name": "single-tests",
+      "about": "A changed standalone test script.",
+      "when": ["tests/*.py", "tests/nixos-native"],
+      "unless": ["tests/user-plugins.py", "tests/media-player.py"],
+      "run": "nix --extra-experimental-features 'nix-command flakes' develop --command sh -c 'for f in \"$@\"; do python3 -B \"$f\" || exit 1; done' sh {files}"
+    },
+    {
+      "name": "flake-check",
+      "about": "The flake evaluates.",
+      "when": ["*.nix", "flake.lock"],
+      "run": "nix --extra-experimental-features 'nix-command flakes' flake check --no-build"
+    },
+    {
+      "name": "web",
+      "about": "The website: lint, types and tests.",
+      "when": ["web/**"],
+      "run": "cd web && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run lint && npm run typecheck && npm test"
+    }
+  ]
+}
