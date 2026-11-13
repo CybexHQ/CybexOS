@@ -39,25 +39,45 @@ def process_guard(owned_runtime=None):
     for name in ('qs', '.quickshell-wra'):
         result = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name], capture_output=True, text=True)
         pids.update(result.stdout.split())
+    environments = {}
     for pid in sorted(pids):
         proc = Path('/proc') / pid
-        if proc.exists():
+        try:
             print(f'qs PID {pid}, MainPID={main or "absent"}: '
                   + (proc / 'cmdline').read_bytes().replace(b'\0', b' ').decode(errors='replace')
                   + '\n' + (proc / 'cgroup').read_text())
+            environments[pid] = (proc / 'environ').read_bytes().split(b'\0')
+        except OSError:
+            pass  # another test's shell that exited meanwhile
     if owned_runtime:
-        for pid in pids:
-            environment = Path('/proc') / pid / 'environ'
-            if environment.exists():
-                assert ('XDG_RUNTIME_DIR=' + str(owned_runtime)).encode() not in environment.read_bytes().split(b'\0'), pid
+        for pid, environment in environments.items():
+            assert ('XDG_RUNTIME_DIR=' + str(owned_runtime)).encode() not in environment, pid
         print('process guard: no task-owned Quickshell processes remain')
     else:
         assert main in ('', '0'), 'A managed desktop shell is active'
-        for pid in pids:
-            environment = dict(part.split(b'=', 1) for part in (Path('/proc') / pid / 'environ').read_bytes().split(b'\0') if b'=' in part)
+        for environment in environments.values():
+            environment = dict(part.split(b'=', 1) for part in environment if b'=' in part)
             other_runtime = environment.get(b'XDG_RUNTIME_DIR', b'').decode()
-            assert other_runtime.startswith(('/tmp/', '/data/tmp/')), 'An unrelated real desktop session is active'
+            # A desktop's shell has the login session's runtime directory. Any
+            # other one a test made for itself, wherever TMPDIR points
+            # (another run's, say), and its shell can't see this test's.
+            assert other_runtime.rstrip('/') not in ('', f'/run/user/{os.getuid()}'), \
+                'An unrelated real desktop session is active'
         print('process guard: no managed desktop; unrelated private tests are preserved')
+
+
+def owned_shells(runtime):
+    """Whether a Quickshell of this test's own session is still alive."""
+    own = ('XDG_RUNTIME_DIR=' + str(runtime)).encode()
+    for name in ('qs', '.quickshell-wra'):
+        result = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name], capture_output=True, text=True)
+        for pid in result.stdout.split():
+            try:
+                if own in (Path('/proc') / pid / 'environ').read_bytes().split(b'\0'):
+                    return True
+            except OSError:
+                pass  # exited meanwhile
+    return False
 
 
 def main():
@@ -299,9 +319,9 @@ def main():
                     proc.wait()
             # dbus-run-session owns qs; allow its just-exited descendant to
             # be reaped before the final comparison, with no blanket signals.
+            # Only this test's own: another test's shell may stay alive.
             for _ in range(50):
-                if all(subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name],
-                       stdout=subprocess.DEVNULL).returncode != 0 for name in ('qs', '.quickshell-wra')):
+                if not owned_shells(runtime):
                     break
                 time.sleep(0.1)
             process_guard(runtime)

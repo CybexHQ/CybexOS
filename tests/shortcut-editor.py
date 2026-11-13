@@ -195,7 +195,11 @@ def process_guard(owned_runtime=None):
                 continue  # exited meanwhile
             environment = dict(part.split(b'=', 1) for part in raw.split(b'\0') if b'=' in part)
             other_runtime = environment.get(b'XDG_RUNTIME_DIR', b'').decode()
-            assert other_runtime.startswith(('/tmp/', '/data/tmp/')), 'An unrelated real desktop session is active'
+            # A desktop's shell has the login session's runtime directory. Any
+            # other one a test made for itself, wherever TMPDIR points
+            # (another run's, say), and its shell can't see this test's.
+            assert other_runtime.rstrip('/') not in ('', f'/run/user/{os.getuid()}'), \
+                'An unrelated real desktop session is active'
         print('process guard: no managed desktop; unrelated private tests are preserved')
 
 

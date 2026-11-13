@@ -74,7 +74,14 @@ else:
 '''
 
 
-def shell_pids():
+def shell_pids(owned_runtime=None):
+    """The managed shell's PID (0: none) and the Quickshell PIDs that count.
+
+    Before the test, a desktop's: in the login session's runtime directory, or
+    in none. After it, the test's own: in `owned_runtime`. Another test's
+    shell (a second run's, say) has a runtime directory of its own and can't
+    see this one, so it is left alone and not counted.
+    """
     result = set()
     for name in ('qs', '.quickshell-wra'):
         value = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name], capture_output=True, text=True)
@@ -82,12 +89,25 @@ def shell_pids():
     managed = subprocess.run(['systemctl', '--user', 'show', 'quickshell.service', '-p', 'MainPID', '--value'],
                              capture_output=True, text=True)
     main_pid = int(managed.stdout.strip() or '0') if managed.stdout.strip().isdigit() else 0
+    counted = set()
     for pid in result - {main_pid}:
         # Inspect without changing anyone else's process. This test refuses an
         # existing desktop rather than enrolling it in its own cleanup.
-        print(f'existing qs PID {pid}: {(Path("/proc") / str(pid) / "cmdline").read_bytes()!r}')
-        print((Path('/proc') / str(pid) / 'cgroup').read_text())
-    return main_pid, result
+        proc = Path('/proc') / str(pid)
+        try:
+            print(f'existing qs PID {pid}: {(proc / "cmdline").read_bytes()!r}')
+            print((proc / 'cgroup').read_text())
+            environment = (proc / 'environ').read_bytes().split(b'\0')
+        except OSError:
+            continue  # another test's shell that exited meanwhile
+        runtime = next((part[16:].decode() for part in environment if part.startswith(b'XDG_RUNTIME_DIR=')), '')
+        if owned_runtime:
+            counts = runtime == str(owned_runtime)
+        else:
+            counts = runtime.rstrip('/') in ('', f'/run/user/{os.getuid()}')
+        if counts:
+            counted.add(pid)
+    return main_pid, counted
 
 
 def main():
@@ -193,7 +213,7 @@ def main():
                     process.wait()
             for log in logs:
                 log.close()
-    assert shell_pids() == (0, set()), 'the test left a shell process behind'
+    assert shell_pids(runtime) == (0, set()), 'the test left a shell process behind'
 
 
 if __name__ == '__main__':
