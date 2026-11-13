@@ -1,5 +1,10 @@
 # Repository agent instructions
 
+## How to answer
+
+- Always answer concisely and in plain English: short sentences, everyday words, the answer first. Leave out filler,
+  jargon and long lists unless someone asks for more detail.
+
 ## How agents work here
 
 - Work in a worktree of your own, on a new branch from `main`; never in this folder itself.
