@@ -79,10 +79,22 @@ def main() -> None:
             raise SystemExit(result.stdout + result.stderr)
         subprocess.run(["node", str(package / "tests/test_usage_logic.js")], check=True,
                        stdout=subprocess.DEVNULL)
-        # Never create a developer shell beside the managed desktop. CI (or
-        # an explicitly stopped service) also exercises the real QML lifetime.
-        if shutil.which("qs") and subprocess.run(["pgrep", "-x", "qs"],
-                stdout=subprocess.DEVNULL).returncode != 0:
+        # The real QML lifetime always runs, also while another Quickshell is
+        # alive (a desktop's, or another test's): this windowless one has a
+        # home and runtime directory of its own and no session bus, so the two
+        # can't see each other. A short path: Quickshell's IPC socket lives
+        # below XDG_RUNTIME_DIR and must fit Linux's 108-byte sockaddr_un path.
+        if not shutil.which("qs"):
+            raise SystemExit("qs is required; use nix develop")
+        with tempfile.TemporaryDirectory(prefix="cxl-", dir="/tmp") as private:
+            session = Path(private)
+            (session / "run").mkdir(mode=0o700)
+            (session / "home").mkdir()
+            env = {**env, "HOME": str(session / "home"), "XDG_RUNTIME_DIR": str(session / "run"),
+                   "XDG_CONFIG_HOME": str(session / "config"), "XDG_DATA_HOME": str(session / "data"),
+                   "XDG_STATE_HOME": str(session / "state")}
+            for name in ("DISPLAY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS"):
+                env.pop(name, None)
             harness = Path(temporary) / "live"
             harness.mkdir()
             shutil.copyfile(package / "tests/qml/live-shell.qml", harness / "shell.qml")

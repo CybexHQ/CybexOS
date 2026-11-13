@@ -386,14 +386,16 @@ def main():
     parser.add_argument("--screenshots", type=Path,
                         help="save the Ask Wiz row and the empty notification centre here")
     options = parser.parse_args()
-    if not shutil.which("qs") or any(subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', name],
-            stdout=subprocess.DEVNULL).returncode == 0 for name in ('qs', '.quickshell-wra')):
-        print("Assistant overlay test deferred to isolated CI")
-        return
-    for executable in ("wtype", *(("grim",) if options.screenshots else ())):
+    # Always runs, also while another Quickshell is alive (a desktop's, or
+    # another test's): this one has a home, runtime directory, session bus and
+    # compositor of its own, so the two can't see each other.
+    for executable in ("qs", "wtype", *(("grim",) if options.screenshots else ())):
         if not shutil.which(executable):
             raise SystemExit(f"{executable} is required; use nix develop")
-    with tempfile.TemporaryDirectory(prefix="cybexos-assistant-overlay-") as temporary:
+    # A short path: Quickshell's IPC socket lives below XDG_RUNTIME_DIR and
+    # must fit Linux's 108-byte sockaddr_un path, which a long TMPDIR (a Nix
+    # shell's, a builder's) does not leave room for.
+    with tempfile.TemporaryDirectory(prefix="cxa-", dir="/tmp") as temporary:
         session = Session(Path(temporary))
         try:
             if options.screenshots:

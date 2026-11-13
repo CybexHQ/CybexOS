@@ -13,9 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    if not shutil.which('qs') or subprocess.run(['pgrep', '-x', 'qs'], stdout=subprocess.DEVNULL).returncode == 0:
-        print('Model Usage popup test deferred to isolated CI')
-        return
+    # Always runs, also while another Quickshell is alive: this one has a home,
+    # runtime directory, session bus and compositor of its own.
+    if not shutil.which('qs'):
+        raise SystemExit('qs is required; use nix develop')
     with tempfile.TemporaryDirectory(prefix='cxm-', dir='/tmp') as temporary:
         base = Path(temporary)
         runtime = base / 'run'
