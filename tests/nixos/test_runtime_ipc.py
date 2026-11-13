@@ -2,6 +2,7 @@
 
 No live menubar or user service is started, stopped or replaced.
 """
+import concurrent.futures
 import os
 from pathlib import Path
 import shlex
@@ -63,13 +64,13 @@ ShellRoot {
         return subprocess.run(list(map(str, arguments)), env=self.environment | (environment or {}),
                               capture_output=True, text=True, timeout=timeout)
 
-    def start_fixture(self, log):
+    def start_fixture(self, log, environment=None):
         process = subprocess.Popen([str(self.command), 'exec', 'quickshell'],
-                                   env=self.environment, stdout=log, stderr=subprocess.STDOUT)
+                                   env=self.environment | (environment or {}), stdout=log, stderr=subprocess.STDOUT)
         self.addCleanup(self.stop_fixture, process)
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
-            result = self.run_command(self.command, 'ipc', 'shell', 'ping')
+            result = self.run_command(self.command, 'ipc', 'shell', 'ping', environment=environment)
             if result.returncode == 0 and result.stdout.strip() == 'pong':
                 return process
             if process.poll() is not None:
@@ -134,6 +135,17 @@ ShellRoot {
 
     @unittest.skipUnless(QS, 'Quickshell required for the real headless IPC regression')
     def test_ipc_limit_is_two_seconds_unless_a_check_lengthens_it(self):
+        def refused(value):
+            # A call keeps its shell busy for 3 s, so each value asks a shell
+            # of its own (its own runtime directory) and they run side by side.
+            runtime = Path(self.temporary.name) / ('xdg-' + str(values.index(value)))
+            runtime.mkdir(mode=0o700)
+            environment = {'XDG_RUNTIME_DIR': str(runtime)}
+            with tempfile.TemporaryFile(mode='w+') as log:
+                self.start_fixture(log, environment)
+                return self.run_command(self.command, 'ipc', 'shell', 'slow', timeout=10,
+                                        environment=environment | {'CYBEXOS_IPC_TIMEOUT': value})
+
         with tempfile.TemporaryFile(mode='w+') as log:
             self.start_fixture(log)
             # The default stops a call to a busy shell after 2 s.
@@ -142,16 +154,15 @@ ShellRoot {
             self.assertEqual(result.returncode, 124, result)
             self.assertLess(time.monotonic() - started, 4)
             # Values outside 1-120 whole seconds keep the default.
-            for value in ('0', '121', '5s', '05', '-3', ''):
+            values = ('0', '121', '5s', '05', '-3', '')
+            with concurrent.futures.ThreadPoolExecutor(len(values)) as pool:
+                results = pool.map(refused, values)
                 time.sleep(3)  # let the shell finish the previous call
                 result = self.run_command(self.command, 'ipc', 'shell', 'slow',
-                                          environment={'CYBEXOS_IPC_TIMEOUT': value}, timeout=10)
-                self.assertEqual(result.returncode, 124, (value, result))
-            time.sleep(3)
-            result = self.run_command(self.command, 'ipc', 'shell', 'slow',
-                                      environment={'CYBEXOS_IPC_TIMEOUT': '10'}, timeout=15)
-            self.assertEqual((result.returncode, result.stdout.strip()), (0, 'slow'), result)
-
+                                          environment={'CYBEXOS_IPC_TIMEOUT': '10'}, timeout=15)
+                self.assertEqual((result.returncode, result.stdout.strip()), (0, 'slow'), result)
+                for value, result in zip(values, results):
+                    self.assertEqual(result.returncode, 124, (value, result))
 
 if __name__ == '__main__':
     unittest.main()

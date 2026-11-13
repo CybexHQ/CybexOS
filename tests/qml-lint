@@ -113,7 +113,7 @@ if ((${#files[@]} == 0)); then
   exit 1
 fi
 
-# tests/run passes its own --jobs; standalone, up to eight slices.
+# CYBEXOS_TESTS_RUN_JOBS sets the number of slices; otherwise up to eight.
 shards=${CYBEXOS_TESTS_RUN_JOBS:-}
 if [[ ! $shards =~ ^[1-9][0-9]*$ ]]; then
   shards=$(nproc 2>/dev/null) || shards=4

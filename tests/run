@@ -1,18 +1,44 @@
 #!/usr/bin/env bash
 # Source/fixture regression checks. Real installation qualification is separate.
-set -euo pipefail
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+#
+# The checks don't depend on each other, so they run side by side
+# (tests/checks.bash): every tests/nixos module in a process of its own,
+# each standalone script, and the Quickshell suite.
+#
+#   CYBEXOS_TESTS_RUN_JOBS=N   checks at a time (default: the CPU count)
+set -uo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." || exit 2
 export PYTHONDONTWRITEBYTECODE=1
-python3 -B -m unittest discover -s tests/nixos -v
-python3 -B tests/nixos/hermes-bridge.py
-python3 -B tests/nixos/hermes-remote-runtime.py
-python3 -B tests/nixos/hermes-webui-auth.py
-python3 -B tests/nixos/default-agent.py
-python3 -B tests/nixos/camera-frame.py
-python3 -B tests/system-settings.py
-python3 -B tests/settings-ownership.py
-# Native subprocess timeout checks need a bounded workload, including on CI.
-node --test --test-concurrency=1 tests/quickshell/*.test.cjs
-python3 -B tests/plugin-packages.py
-python3 -B tests/theme-packs.py
-python3 -B tests/model-usage.py
+
+source tests/checks.bash
+
+# Checks that wait on real clocks (timeouts, a busy shell, restic) come first,
+# so they are already under way when only a few checks fit at a time.
+long=(test_runtime_ipc.py test_fusebox.py test_backup.py)
+for module in "${long[@]}"; do
+  [[ -f tests/nixos/$module ]] || { echo "tests/run: tests/nixos/$module is gone, update the list" >&2; exit 2; }
+  check "tests/nixos/$module" python3 -B -m unittest discover -s tests/nixos -p "$module" -v
+done
+
+# Native subprocess timeout checks need a bounded workload, including on CI:
+# a quarter of the slots, eight files at most, and one after the other on a
+# small machine.
+node_jobs=$((jobs / 4))
+((node_jobs < 1)) && node_jobs=1
+((node_jobs > 8)) && node_jobs=8
+check tests/quickshell node --test "--test-concurrency=$node_jobs" tests/quickshell/*.test.cjs
+
+for script in model-usage.py plugin-packages.py theme-packs.py system-settings.py settings-ownership.py \
+    nixos/hermes-bridge.py nixos/hermes-remote-runtime.py nixos/hermes-webui-auth.py \
+    nixos/default-agent.py nixos/camera-frame.py; do
+  check "tests/$script" python3 -B "tests/$script"
+done
+
+# What `unittest discover -s tests/nixos` finds: every test*.py there.
+for path in tests/nixos/test*.py; do
+  module=${path##*/}
+  [[ " ${long[*]} " == *" $module "* ]] && continue
+  check "$path" python3 -B -m unittest discover -s tests/nixos -p "$module" -v
+done
+
+run_checks tests/run
