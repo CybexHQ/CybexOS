@@ -10,19 +10,17 @@
     },
     {
       "name": "shell",
-      "about": "QML lint and the shell's runtime tests, when the Quickshell config changed. Alone: its real-engine checks are left out while another test's Quickshell is alive, and the regression step starts some.",
+      "about": "QML lint and the shell's runtime tests, when the Quickshell config changed. Each test's Quickshell has a home, runtime directory, session bus and compositor of its own, so the step runs beside the others and beside another run.",
       "when": ["desktop/quickshell/**", "tests/qml-lint", "tests/user-plugins.py", "tests/media-player.py", "tests/shell-checks", "tests/checks.bash"],
       "run": "nix --extra-experimental-features 'nix-command flakes' develop --command tests/shell-checks",
-      "timeout": 20,
-      "alone": true
+      "timeout": 20
     },
     {
       "name": "single-tests",
-      "about": "A changed standalone test script. Alone and one after the other: several of them wait, or leave their real-engine checks out, while another test's Quickshell is alive.",
+      "about": "A changed standalone test script, one after the other. Each one's Quickshell has a home, runtime directory, session bus and compositor of its own, so the step runs beside the others and beside another run.",
       "when": ["tests/*.py", "tests/nixos-native"],
       "unless": ["tests/user-plugins.py", "tests/media-player.py"],
-      "run": "nix --extra-experimental-features 'nix-command flakes' develop --command sh -c 'for f in \"$@\"; do python3 -B \"$f\" || exit 1; done' sh {files}",
-      "alone": true
+      "run": "nix --extra-experimental-features 'nix-command flakes' develop --command sh -c 'for f in \"$@\"; do python3 -B \"$f\" || exit 1; done' sh {files}"
     },
     {
       "name": "flake-check",

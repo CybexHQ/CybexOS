@@ -162,7 +162,9 @@ compatibility fixture; it does not claim to exercise two published releases
 or the complete package updater. Existing ownership/convergence gates check
 the deployment boundary separately.
 
-The real-engine test runs in isolated CI, never alongside a live `qs` process.
+The real-engine test always runs, also while another Quickshell is alive: its
+shell has a home, runtime directory, session bus and headless compositor of its
+own, so it never meets a desktop's shell or another test's.
 On an installed desktop, follow `tests/lib/quickshell-live` for service/PID
 reconciliation and current-invocation journal checks.
 

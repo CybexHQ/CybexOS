@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 # QML lint and the shell's runtime tests, for a change to the Quickshell config.
 #
-# The lint runs beside the runtime tests (tests/checks.bash). The two
-# runtime tests stay one after the other: user-plugins.py leaves its
-# real-engine checks out while any Quickshell is alive, and media-player.py
-# starts one. For the same reason, run this while no other test starts a
-# Quickshell (the fast-test step runs alone).
+# The lint and the two runtime tests run side by side (tests/checks.bash).
+# Each runtime test starts its Quickshell with a home, runtime directory,
+# session bus and compositor of its own, so neither waits for the other, nor
+# for another test's shell (the regression step's, a second run's).
 set -uo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." || exit 2
 
 source tests/checks.bash
 
 check tests/qml-lint tests/qml-lint
-check 'tests/user-plugins.py, then tests/media-player.py' sh -c '
-  python3 -B tests/user-plugins.py; plugins=$?
-  python3 -B tests/media-player.py; player=$?
-  exit $((plugins | player))'
+check tests/user-plugins.py python3 -B tests/user-plugins.py
+check tests/media-player.py python3 -B tests/media-player.py
 run_checks tests/shell-checks
