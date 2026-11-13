@@ -1,18 +1,136 @@
 #!/usr/bin/env bash
 # Source/fixture regression checks. Real installation qualification is separate.
-set -euo pipefail
+#
+# The checks don't depend on each other, so they run side by side: every
+# tests/nixos module in a process of its own, each standalone script, and the
+# Quickshell suite. Each check keeps its output to itself and prints it whole
+# when it ends. A failing check's output is held back and printed last, above
+# the summary. Every check runs to the end, also after another one failed.
+#
+#   CYBEXOS_TESTS_RUN_JOBS=N   checks at a time (default: the CPU count)
+set -uo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 export PYTHONDONTWRITEBYTECODE=1
-python3 -B -m unittest discover -s tests/nixos -v
-python3 -B tests/nixos/hermes-bridge.py
-python3 -B tests/nixos/hermes-remote-runtime.py
-python3 -B tests/nixos/hermes-webui-auth.py
-python3 -B tests/nixos/default-agent.py
-python3 -B tests/nixos/camera-frame.py
-python3 -B tests/system-settings.py
-python3 -B tests/settings-ownership.py
-# Native subprocess timeout checks need a bounded workload, including on CI.
-node --test --test-concurrency=1 tests/quickshell/*.test.cjs
-python3 -B tests/plugin-packages.py
-python3 -B tests/theme-packs.py
-python3 -B tests/model-usage.py
+
+if ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 501)); then
+  echo "tests/run needs bash 5.1 or newer (the dev shell has it: nix develop -c tests/run)" >&2
+  exit 2
+fi
+
+jobs=${CYBEXOS_TESTS_RUN_JOBS:-}
+if [[ ! $jobs =~ ^[1-9][0-9]*$ ]]; then
+  jobs=$(nproc 2>/dev/null) || jobs=4
+fi
+
+names=() commands=()
+check() {
+  names+=("$1")
+  shift
+  commands+=("$(printf '%q ' "$@")")
+}
+
+# Checks that wait on real clocks (timeouts, a busy shell, restic) come first,
+# so they are already under way when only a few checks fit at a time.
+long=(test_runtime_ipc.py test_fusebox.py test_backup.py)
+for module in "${long[@]}"; do
+  [[ -f tests/nixos/$module ]] || { echo "tests/run: tests/nixos/$module is gone, update the list" >&2; exit 2; }
+  check "tests/nixos/$module" python3 -B -m unittest discover -s tests/nixos -p "$module" -v
+done
+
+# Native subprocess timeout checks need a bounded workload, including on CI:
+# a quarter of the slots, eight files at most, and one after the other on a
+# small machine.
+node_jobs=$((jobs / 4))
+((node_jobs < 1)) && node_jobs=1
+((node_jobs > 8)) && node_jobs=8
+check tests/quickshell node --test "--test-concurrency=$node_jobs" tests/quickshell/*.test.cjs
+
+for script in model-usage.py plugin-packages.py theme-packs.py system-settings.py settings-ownership.py \
+    nixos/hermes-bridge.py nixos/hermes-remote-runtime.py nixos/hermes-webui-auth.py \
+    nixos/default-agent.py nixos/camera-frame.py; do
+  check "tests/$script" python3 -B "tests/$script"
+done
+
+# What `unittest discover -s tests/nixos` finds: every test*.py there.
+for path in tests/nixos/test*.py; do
+  module=${path##*/}
+  [[ " ${long[*]} " == *" $module "* ]] && continue
+  check "$path" python3 -B -m unittest discover -s tests/nixos -p "$module" -v
+done
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/cybexos-tests-run.XXXXXX") || exit 2
+stop() {
+  trap - INT TERM
+  local pids
+  pids=$(jobs -p)
+  [[ -n $pids ]] && kill $pids 2>/dev/null
+  wait
+  rm -rf -- "$work"
+  exit 130
+}
+trap 'rm -rf -- "$work"' EXIT
+trap stop INT TERM
+
+now() { local time=${EPOCHREALTIME/[.,]/}; printf '%s' "$((time / 1000))"; }
+seconds() { printf '%d.%d' "$(($1 / 1000))" "$(($1 % 1000 / 100))"; }
+rule() { printf '\n==== %s ====\n' "$1"; }
+
+declare -A index_of
+statuses=() started=() took=() failed=()
+running=0
+begun=$(now)
+
+launch() {
+  local index=$1
+  started[index]=$(now)
+  (eval "${commands[index]}") >"$work/$index.out" 2>&1 </dev/null &
+  index_of[$!]=$index
+  running=$((running + 1))
+}
+
+# Waits for one check to end and reports it.
+collect() {
+  local pid status index
+  wait -n -p pid
+  status=$?
+  [[ -n ${pid:-} ]] || return
+  index=${index_of[$pid]}
+  running=$((running - 1))
+  statuses[index]=$status
+  took[index]=$(($(now) - started[index]))
+  if ((status == 0)); then
+    rule "passed: ${names[index]} ($(seconds "${took[index]}")s)"
+    cat -- "$work/$index.out"
+  else
+    failed+=("$index")
+    rule "FAILED: ${names[index]} (exit $status, $(seconds "${took[index]}")s); its output follows at the end"
+  fi
+}
+
+for index in "${!names[@]}"; do
+  while ((running >= jobs)); do collect; done
+  launch "$index"
+done
+while ((running > 0)); do collect; done
+
+for index in "${failed[@]}"; do
+  rule "FAILED: ${names[index]} (exit ${statuses[index]}, $(seconds "${took[index]}")s)"
+  printf '$ %s\n' "${commands[index]}"
+  cat -- "$work/$index.out"
+done
+
+rule "tests/run: ${#names[@]} checks, $jobs at a time, $(seconds $(($(now) - begun)))s"
+echo "slowest:"
+for index in "${!names[@]}"; do
+  printf '%s %s\n' "${took[index]}" "${names[index]}"
+done | sort -rn | head -n 5 | while read -r time name; do
+  printf '  %6ss  %s\n' "$(seconds "$time")" "$name"
+done
+if ((${#failed[@]})); then
+  echo "FAILED, ${#failed[@]} of ${#names[@]} checks:"
+  for index in "${failed[@]}"; do
+    printf '  %s (exit %s)\n' "${names[index]}" "${statuses[index]}"
+  done
+  exit 1
+fi
+echo "all ${#names[@]} checks passed"
