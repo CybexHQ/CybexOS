@@ -278,13 +278,11 @@ Label {
 
         if not shutil.which("qs"):
             raise RuntimeError("qs is required for user widget runtime tests")
-        if any(path.read_text().strip() in ("qs", "quickshell", ".quickshell-wra")
-               and path.with_name('stat').read_text().rsplit(')', 1)[1].split()[0] != 'Z'
-               for path in Path("/proc").glob("[0-9]*/comm")
-               if path.exists()):
-            print("User plugin storage tests passed; real-engine checks deferred to isolated CI (qs active)")
-            return
-
+        # The real-engine checks always run, also while another Quickshell is
+        # alive (a desktop's, or another test's): theirs has a home, runtime
+        # directory, session bus and compositor of its own, so the two can't
+        # see each other.
+        #
         # PopupWindow/PanelWindow need a real backend. Never attach these tests
         # to the user's compositor: own a headless Wayland session and stop it
         # before TemporaryDirectory removes its socket and runtime files.

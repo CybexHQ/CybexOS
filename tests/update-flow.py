@@ -312,12 +312,18 @@ def process_guard(runtime=None):
         try:
             print('Quickshell', pid, 'MainPID', main, (path/'cmdline').read_bytes(), (path/'cgroup').read_text())
             env = (path/'environ').read_bytes().split(b'\0')
-            assert runtime is None or ('XDG_RUNTIME_DIR='+str(runtime)).encode() not in env
-        except FileNotFoundError:
-            pass
+        except OSError:
+            continue  # another test's shell that exited meanwhile
+        if runtime is None:
+            # A desktop's shell has the login session's runtime directory. Any
+            # other one a test made for itself (another run's, say), and its
+            # shell can't see this test's: it stays, and this test runs.
+            other = next((part[16:].decode() for part in env if part.startswith(b'XDG_RUNTIME_DIR=')), '')
+            assert other.rstrip('/') not in ('', f'/run/user/{os.getuid()}'), \
+                'A desktop Quickshell is active; preserve it and run this test on a host without one'
+        else:
+            assert ('XDG_RUNTIME_DIR='+str(runtime)).encode() not in env
     assert main in ('', '0'), 'Run private shell tests on a host without an active managed desktop'
-    if runtime is None:
-        assert not pids, 'Another Quickshell is active; preserve it and run this test separately'
 
 
 def main():
