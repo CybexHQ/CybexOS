@@ -84,10 +84,12 @@ def main():
     process_guard()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     processes = []
-    with tempfile.TemporaryDirectory(prefix='private-', dir=OUTPUT) as temporary:
+    with tempfile.TemporaryDirectory(prefix='private-', dir=OUTPUT) as temporary, \
+            tempfile.TemporaryDirectory(prefix='cxp-', dir='/tmp') as runtime_directory:
         base = Path(temporary)
-        runtime, home = base / 'run', base / 'home'
-        runtime.mkdir(mode=0o700)
+        # Sway and Quickshell put their sockets below this path. Nix's TMPDIR
+        # plus the screenshot directory can exceed AF_UNIX's limit.
+        runtime, home = Path(runtime_directory), base / 'home'
         (home / '.config/cybexos').mkdir(parents=True)
         (home / '.config/cybexos/shell.json').write_text(json.dumps({'v': 30, 'wall': ''}))
         shell = base / 'runtime/quickshell'

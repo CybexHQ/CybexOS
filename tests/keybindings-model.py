@@ -113,7 +113,10 @@ def shell_pids(owned_runtime=None):
 def main():
     assert shell_pids() == (0, set()), 'run only with no existing desktop shell'
     processes = []
-    with tempfile.TemporaryDirectory(prefix='cybexos-keybindings-engine-') as temporary:
+    # A short path: Quickshell's IPC socket lives below XDG_RUNTIME_DIR and
+    # must fit Linux's 108-byte sockaddr_un path, which a long TMPDIR (a Nix
+    # shell's, a builder's) does not leave room for.
+    with tempfile.TemporaryDirectory(prefix='cxb-', dir='/tmp') as temporary:
         base = Path(temporary)
         runtime, home, shell = base / 'runtime', base / 'home', base / 'shell'
         runtime.mkdir(mode=0o700)
